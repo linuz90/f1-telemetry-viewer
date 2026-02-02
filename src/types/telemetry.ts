@@ -140,6 +140,13 @@ export interface CarStatus {
   "fuel-in-tank": number;
   "fuel-remaining-laps": number;
   "engine-power-ice": number;
+  "engine-power-mguk"?: number;
+  "ers-store-energy"?: number;
+  "ers-deploy-mode"?: string;
+  "ers-harvested-this-lap-mguk"?: number;
+  "ers-harvested-this-lap-mguh"?: number;
+  "ers-deployed-this-lap"?: number;
+  "ers-max-capacity"?: number;
 }
 
 export interface LapDataCurrent {
@@ -233,6 +240,9 @@ export interface DebugInfo {
 
 export interface PerLapInfo {
   "lap-number": number;
-  "car-damage": CarDamage;
-  "car-status": CarStatus;
+  "car-damage-data": CarDamage;
+  "car-status-data": CarStatus;
+  "max-safety-car-status": string;
+  "track-position"?: number;
+  "top-speed-kmph"?: number;
 }
