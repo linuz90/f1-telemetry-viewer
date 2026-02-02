@@ -6,6 +6,7 @@ import {
   Github,
   Grid3x3,
   Layers,
+  ShieldCheck,
   Timer,
   TrendingUp,
   Upload,
@@ -188,6 +189,10 @@ export function ZipUploadScreen({
         {/* Info footer */}
         <div className="w-full px-10 pt-6 pb-8 text-center space-y-4">
           <div className="h-px bg-zinc-900" />
+          <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-500">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+            100% client-side — your telemetry never leaves your browser
+          </p>
           <div className="flex items-center justify-center gap-2 text-xs text-zinc-500">
             <span>Vibecoded by</span>
             <a

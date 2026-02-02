@@ -70,8 +70,10 @@ export function RaceResultsTable({ session }: RaceResultsTableProps) {
                   (d) => d["is-player"] && d["driver-name"] === entry.name,
                 );
                 const gap = entry["delta-to-leader"];
-                const gapStr =
-                  gap == null || gap === 0 || gap === ""
+                const status = entry["result-status"];
+                const gapStr = status && status !== "FINISHED"
+                  ? status
+                  : gap == null || gap === 0 || gap === ""
                     ? "Leader"
                     : typeof gap === "number"
                       ? `+${(gap / 1000).toFixed(3)}s`
@@ -101,7 +103,7 @@ export function RaceResultsTable({ session }: RaceResultsTableProps) {
                       {entry.name}
                     </td>
                     <td className="py-1.5 px-2 text-zinc-400">{entry.team}</td>
-                    <td className="py-1.5 px-2 text-right font-mono">
+                    <td className={`py-1.5 px-2 text-right font-mono ${status === "DNF" || status === "DSQ" ? "text-red-400" : ""}`}>
                       {gapStr}
                     </td>
                     <td className="py-1.5 px-2 text-right text-zinc-400">
