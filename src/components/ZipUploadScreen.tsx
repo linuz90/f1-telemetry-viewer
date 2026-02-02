@@ -1,9 +1,23 @@
 import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Upload, X } from "lucide-react";
+import {
+  ChartLine,
+  Flag,
+  Github,
+  Grid3x3,
+  Layers,
+  Timer,
+  TrendingUp,
+  Upload,
+  X,
+} from "lucide-react";
 import { useTelemetry } from "../context/TelemetryContext";
 
-export function ZipUploadScreen({ dismissable = false }: { dismissable?: boolean }) {
+export function ZipUploadScreen({
+  dismissable = false,
+}: {
+  dismissable?: boolean;
+}) {
   const { loadZip, zipLoading, setShowUploadModal } = useTelemetry();
   const navigate = useNavigate();
   const [dragOver, setDragOver] = useState(false);
@@ -69,7 +83,7 @@ export function ZipUploadScreen({ dismissable = false }: { dismissable?: boolean
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex w-full max-w-lg flex-col items-center rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden"
+        className="relative flex w-full max-w-xl flex-col items-center rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden"
       >
         {dismissable && (
           <button
@@ -85,9 +99,44 @@ export function ZipUploadScreen({ dismissable = false }: { dismissable?: boolean
           <h2 className="text-2xl font-bold tracking-tight">
             <span className="text-red-500">F1</span> Telemetry Viewer
           </h2>
-          <p className="mt-2 text-sm text-zinc-400">
-            Visualize your lap times, compare rivals, and track your progress across sessions.
+          <p className="mt-4 text-base text-zinc-300">
+            Dive into your{" "}
+            <a
+              href="https://www.pitsngiggles.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-red-400 hover:text-red-300 underline underline-offset-2"
+            >
+              Pits n' Giggles
+            </a>{" "}
+            telemetry.
           </p>
+          <div className="mx-auto mt-5 mb-2 grid grid-cols-2 gap-x-8 gap-y-3 text-left text-sm">
+            <div className="flex items-center gap-2 text-zinc-400">
+              <Grid3x3 className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              Sector-by-sector breakdown
+            </div>
+            <div className="flex items-center gap-2 text-zinc-400">
+              <ChartLine className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              Driver-vs-driver comparison
+            </div>
+            <div className="flex items-center gap-2 text-zinc-400">
+              <Layers className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              Stint strategy &amp; tyre wear
+            </div>
+            <div className="flex items-center gap-2 text-zinc-400">
+              <TrendingUp className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              Progress tracking over time
+            </div>
+            <div className="flex items-center gap-2 text-zinc-400">
+              <Timer className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              Pace &amp; consistency metrics
+            </div>
+            <div className="flex items-center gap-2 text-zinc-400">
+              <Flag className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              Race &amp; qualifying analysis
+            </div>
+          </div>
         </div>
 
         {/* Upload zone */}
@@ -104,8 +153,12 @@ export function ZipUploadScreen({ dismissable = false }: { dismissable?: boolean
               <>
                 <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-zinc-600 border-t-red-500" />
                 <div>
-                  <p className="text-sm font-medium text-zinc-200">Loading telemetry data...</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">Extracting and parsing session files</p>
+                  <p className="text-sm font-medium text-zinc-200">
+                    Loading telemetry data...
+                  </p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    Extracting and parsing session files
+                  </p>
                 </div>
               </>
             ) : (
@@ -115,7 +168,8 @@ export function ZipUploadScreen({ dismissable = false }: { dismissable?: boolean
                 </div>
                 <div>
                   <p className="text-sm font-medium text-zinc-200">
-                    Drop a <span className="text-zinc-100">.zip</span> here or click to browse
+                    Drop or select a <span className="text-zinc-100">.zip</span>{" "}
+                    with Pits n' Giggles telemetry
                   </p>
                 </div>
                 {error && <p className="text-xs text-red-400">{error}</p>}
@@ -133,19 +187,6 @@ export function ZipUploadScreen({ dismissable = false }: { dismissable?: boolean
 
         {/* Info footer */}
         <div className="w-full px-10 pt-6 pb-8 text-center space-y-4">
-          <p className="text-xs leading-relaxed text-zinc-500">
-            Works with JSON telemetry files from{" "}
-            <a
-              href="https://www.pitsngiggles.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-red-400 hover:text-red-300 underline underline-offset-2"
-            >
-              Pits n' Giggles
-            </a>
-            {" "}— a self-engineering tool for F1 23, F1 24, and F1 25.
-            Just zip your telemetry data folder and drop it above.
-          </p>
           <div className="h-px bg-zinc-900" />
           <div className="flex items-center justify-center gap-2 text-xs text-zinc-500">
             <span>Vibecoded by</span>
@@ -161,6 +202,16 @@ export function ZipUploadScreen({ dismissable = false }: { dismissable?: boolean
                 className="h-3.5 w-3.5 rounded-full"
               />
               <span>Fabrizio Rinaldi</span>
+            </a>
+            <span>·</span>
+            <a
+              href="https://github.com/linuz90/f1-telemetry-viewer"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              <Github className="h-3 w-3" />
+              <span>View source on GitHub</span>
             </a>
           </div>
         </div>

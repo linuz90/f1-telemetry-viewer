@@ -34,6 +34,12 @@ export function formatTime(dateStr: string): string {
   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Format a date as short month + day (e.g. "Jan 30") */
+export function formatShortDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+}
+
 /** Check if a lap is valid based on bit flags (15 = all 4 sectors valid) */
 export function isLapValid(flags: number): boolean {
   return flags === 15;

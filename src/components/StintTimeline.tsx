@@ -15,16 +15,21 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
     return <p className="text-sm text-zinc-500">No stint data available.</p>;
   }
 
-  const effectiveTotal = totalLaps || stints.reduce((s, t) => s + t["stint-length"], 0);
+  const effectiveTotal =
+    totalLaps || stints.reduce((s, t) => s + t["stint-length"], 0);
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-2">Stint Strategy</h3>
+      <h3 className="text-sm font-semibold text-zinc-300 mb-2">
+        Stint Strategy
+      </h3>
       <div className="flex h-10 rounded-lg overflow-hidden gap-0.5">
         {stints.map((stint, i) => {
           const compound = stint["tyre-set-data"]["visual-tyre-compound"];
           const color = getCompoundColor(compound);
           const widthPct = (stint["stint-length"] / effectiveTotal) * 100;
+          const isLastUnfinished =
+            i === stints.length - 1 && stint["end-lap"] < totalLaps;
 
           return (
             <div
@@ -35,6 +40,10 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
                 backgroundColor: color,
                 color: compound === "Hard" ? "#18181b" : "#fff",
                 minWidth: "40px",
+                ...(isLastUnfinished && {
+                  maskImage:
+                    "linear-gradient(to right, black 90%, transparent)",
+                }),
               }}
               title={`${compound}: Laps ${stint["start-lap"]}–${stint["end-lap"]} (${stint["stint-length"]} laps)`}
             >
@@ -51,9 +60,14 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
           <span key={i} className="flex items-center gap-1">
             <span
               className="inline-block w-2.5 h-2.5 rounded-sm"
-              style={{ backgroundColor: getCompoundColor(stint["tyre-set-data"]["visual-tyre-compound"]) }}
+              style={{
+                backgroundColor: getCompoundColor(
+                  stint["tyre-set-data"]["visual-tyre-compound"],
+                ),
+              }}
             />
-            {stint["tyre-set-data"]["visual-tyre-compound"]} ({stint["stint-length"]} laps)
+            {stint["tyre-set-data"]["visual-tyre-compound"]} (
+            {stint["stint-length"]} laps)
           </span>
         ))}
       </div>
