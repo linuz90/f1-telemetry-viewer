@@ -4,6 +4,8 @@ A web app for visualizing telemetry data exported by [Pits n' Giggles](https://g
 
 Works with telemetry from **F1 23**, **F1 24**, and **F1 25**.
 
+![F1 Telemetry Viewer](assets/preview.png)
+
 Vibe-coded with AI by [Fabrizio Rinaldi](https://fabrizio.so), so expect some small bugs and issues.
 
 > [!NOTE]
