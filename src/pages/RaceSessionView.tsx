@@ -40,6 +40,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   const stints = player?.["tyre-set-history"] ?? [];
   const laps = player?.["session-history"]["lap-history-data"] ?? [];
   const pitLaps = stints.slice(1).map((s) => s["start-lap"]);
+  const perLapInfo = player?.["per-lap-info"] ?? [];
 
   // Derive rival data
   const rival = useMemo(
@@ -108,6 +109,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
           pitLaps={pitLaps}
           rivalLaps={rival ? rivalLaps : undefined}
           rivalName={rival?.["driver-name"]}
+          perLapInfo={perLapInfo}
         />
       </Card>
 
@@ -127,6 +129,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
           <PositionChart
             positionHistory={session["position-history"]}
             playerName={player?.["driver-name"] ?? ""}
+            rivalName={rival?.["driver-name"]}
           />
         </Card>
       )}

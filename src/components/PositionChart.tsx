@@ -13,13 +13,14 @@ import { getTeamColor, CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 interface PositionChartProps {
   positionHistory: PositionHistoryEntry[];
   playerName: string;
+  rivalName?: string;
 }
 
 /**
  * Position chart for races. Player line is thick, nearby competitors thin.
  * Y-axis inverted (P1 at top).
  */
-export function PositionChart({ positionHistory, playerName }: PositionChartProps) {
+export function PositionChart({ positionHistory, playerName, rivalName }: PositionChartProps) {
   if (!positionHistory.length) {
     return <p className="text-sm text-zinc-500">No position data.</p>;
   }
@@ -43,24 +44,43 @@ export function PositionChart({ positionHistory, playerName }: PositionChartProp
     data.push(entry);
   }
 
-  // Find driver names near the player's positions for reduced clutter
-  const playerData = positionHistory.find((d) => d.name === playerName);
-  const playerPositions = playerData?.["driver-position-history"].map((p) => p.position) ?? [];
-  const playerRange = [
-    Math.min(...playerPositions) - 3,
-    Math.max(...playerPositions) + 3,
-  ];
+  // Find the race winner (P1 on last lap)
+  const lastLapData = data[data.length - 1];
+  const winnerName = lastLapData
+    ? Object.entries(lastLapData)
+        .filter(([k]) => k !== "lap")
+        .sort((a, b) => (a[1] as number) - (b[1] as number))[0]?.[0]
+    : undefined;
 
-  // Show player + drivers who were within 3 positions
-  const nearbyDrivers = positionHistory.filter((d) => {
-    if (d.name === playerName) return true;
-    return d["driver-position-history"].some(
-      (p) => p.position >= playerRange[0] && p.position <= playerRange[1],
+  let visibleDrivers: PositionHistoryEntry[];
+
+  if (rivalName) {
+    // Rival selected: show player, rival, and race winner
+    visibleDrivers = positionHistory.filter(
+      (d) => d.name === playerName || d.name === rivalName || d.name === winnerName,
     );
-  });
+  } else {
+    // No rival: show player, race winner, and drivers ±1 position at race start/end
+    const firstLapData = data[0];
+    const neighborNames = new Set<string>();
 
-  // Dynamic Y domain based on actual grid size
-  const allPositions = positionHistory.flatMap((d) =>
+    for (const lapData of [firstLapData, lastLapData]) {
+      if (!lapData) continue;
+      const playerPos = lapData[playerName] as number | undefined;
+      if (playerPos == null) continue;
+      for (const [name, pos] of Object.entries(lapData)) {
+        if (name === "lap") continue;
+        if (Math.abs((pos as number) - playerPos) === 1) neighborNames.add(name);
+      }
+    }
+
+    visibleDrivers = positionHistory.filter(
+      (d) => d.name === playerName || d.name === winnerName || neighborNames.has(d.name),
+    );
+  }
+
+  // Dynamic Y domain based on visible drivers
+  const allPositions = visibleDrivers.flatMap((d) =>
     d["driver-position-history"].map((p) => p.position),
   );
   const maxPosition = Math.max(...allPositions);
@@ -90,7 +110,7 @@ export function PositionChart({ positionHistory, playerName }: PositionChartProp
             formatter={(value: number | undefined, name: string | undefined) => [`P${value ?? "–"}`, name ?? ""]}
           />
 
-          {nearbyDrivers.map((driver) => {
+          {visibleDrivers.map((driver) => {
             const isPlayer = driver.name === playerName;
             return (
               <Line
