@@ -110,6 +110,8 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         for (const [slug, data] of result.sessionData) {
           sessionStore.set(slug, data);
         }
+        setMode("upload");
+        setSessionsError(null);
         setSessions(result.sessions);
       } finally {
         setZipLoading(false);
