@@ -7,6 +7,7 @@ import { SessionHeader } from "../components/SessionHeader";
 import { StrategyInsightsCard } from "../components/StrategyInsightsCard";
 import { QualifyingTable } from "../components/QualifyingTable";
 import { SectorComparison } from "../components/SectorComparison";
+import { SectorVsBest } from "../components/SectorVsBest";
 import { Card } from "../components/Card";
 
 export function QualifyingSessionView({
@@ -47,6 +48,11 @@ export function QualifyingSessionView({
       {/* Results table */}
       <Card as="section">
         <QualifyingTable session={session} />
+      </Card>
+
+      {/* Sector comparison vs session best */}
+      <Card as="section">
+        <SectorVsBest session={session} />
       </Card>
 
       {/* Player lap breakdown */}
