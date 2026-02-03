@@ -28,6 +28,7 @@ interface LapTimeChartProps {
 
 const SC_COLORS: Record<string, string> = {
   SAFETY_CAR: "#f59e0b",       // amber for SC
+  FULL_SAFETY_CAR: "#f59e0b",  // amber for SC (alternate key)
   VIRTUAL_SAFETY_CAR: "#eab308", // yellow for VSC
 };
 
@@ -91,7 +92,7 @@ export function LapTimeChart({
         s3: l["sector-3-time-in-ms"] / 1000,
         rivalTimeSec: rivalMap.get(lapNum) ?? undefined,
         scStatus,
-        isSC: scStatus === "SAFETY_CAR",
+        isSC: scStatus === "SAFETY_CAR" || scStatus === "FULL_SAFETY_CAR",
         isVSC: scStatus === "VIRTUAL_SAFETY_CAR",
         ersPct,
       };
@@ -124,7 +125,7 @@ export function LapTimeChart({
   // Collect SC/VSC ranges for reference areas
   const scRanges: { x1: number; x2: number; status: string }[] = [];
   for (const d of data) {
-    if (d.scStatus !== "NO_SAFETY_CAR") {
+    if (d.isSC || d.isVSC) {
       const prev = scRanges[scRanges.length - 1];
       if (prev && prev.status === d.scStatus && prev.x2 === d.lap - 1) {
         prev.x2 = d.lap;
@@ -140,7 +141,7 @@ export function LapTimeChart({
         <h3 className="text-sm font-semibold text-zinc-300">Lap Times</h3>
         {scRanges.length > 0 && (
           <div className="flex items-center gap-3 text-[10px] text-zinc-400">
-            {scRanges.some((r) => r.status === "SAFETY_CAR") && (
+            {scRanges.some((r) => r.status === "SAFETY_CAR" || r.status === "FULL_SAFETY_CAR") && (
               <span className="flex items-center gap-1">
                 <span className="inline-block w-3 h-2.5 rounded-sm bg-amber-500/25 border border-amber-500/40" />
                 SC
@@ -211,7 +212,7 @@ export function LapTimeChart({
               stroke={SC_COLORS[range.status] ?? "#f59e0b"}
               strokeOpacity={0.3}
               label={{
-                value: range.status === "SAFETY_CAR" ? "SC" : "VSC",
+                value: range.status === "SAFETY_CAR" || range.status === "FULL_SAFETY_CAR" ? "SC" : "VSC",
                 fill: SC_COLORS[range.status] ?? "#f59e0b",
                 fontSize: 10,
                 position: "insideTopLeft",

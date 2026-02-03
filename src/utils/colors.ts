@@ -4,7 +4,9 @@ export const COMPOUND_COLORS: Record<string, string> = {
   Medium: "#eab308",
   Hard: "#e5e7eb",
   Intermediate: "#22c55e",
+  Inters: "#22c55e",
   Wet: "#3b82f6",
+  Wets: "#3b82f6",
   // Fallback for actual compound names
   C1: "#e5e7eb",
   C2: "#e5e7eb",
