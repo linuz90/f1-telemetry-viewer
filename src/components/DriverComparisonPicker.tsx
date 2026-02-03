@@ -53,9 +53,13 @@ export function DriverComparisonPicker({
 
   // Other drivers (non-player, not already a preset)
   const presetIndices = new Set(validPresets.map((p) => p.driver!.index));
-  const otherDrivers = drivers.filter(
-    (d) => !d["is-player"] && !presetIndices.has(d.index),
-  );
+  const otherDrivers = drivers
+    .filter((d) => !d["is-player"] && !presetIndices.has(d.index))
+    .sort(
+      (a, b) =>
+        (a["final-classification"]?.position ?? 999) -
+        (b["final-classification"]?.position ?? 999),
+    );
 
   // All non-player drivers
   const allRivals = drivers.filter((d) => !d["is-player"]);
