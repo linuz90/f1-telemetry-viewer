@@ -19,6 +19,7 @@ export function QualifyingSessionView({
 }) {
   const player = findPlayer(session);
   const laps = player?.["session-history"]["lap-history-data"] ?? [];
+  const stints = player?.["session-history"]["tyre-stints-history-data"] ?? [];
   const records = session.records?.fastest;
 
   // Find track name from session list to match history
@@ -58,7 +59,7 @@ export function QualifyingSessionView({
       {/* Player lap breakdown */}
       {laps.length > 0 && (
         <Card as="section">
-          <SectorComparison laps={laps} />
+          <SectorComparison laps={laps} stints={stints} />
         </Card>
       )}
 
