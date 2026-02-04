@@ -15,6 +15,7 @@ import { StintTimeline } from "../components/StintTimeline";
 import { TyreWearChart } from "../components/TyreWearChart";
 import { StintComparisonTable } from "../components/StintComparisonTable";
 import { LapTimeChart } from "../components/LapTimeChart";
+import { CompoundLapComparison } from "../components/CompoundLapComparison";
 import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
 import { PositionChart } from "../components/PositionChart";
 import { RaceResultsTable } from "../components/RaceResultsTable";
@@ -112,6 +113,19 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
           perLapInfo={perLapInfo}
         />
       </Card>
+
+      {/* Compound comparison (only when rival selected) */}
+      {rival && (
+        <Card as="section">
+          <CompoundLapComparison
+            playerStints={stints}
+            playerLaps={laps}
+            rivalStints={rivalStints}
+            rivalLaps={rivalLaps}
+            rivalName={rival["driver-name"]}
+          />
+        </Card>
+      )}
 
       {/* Performance delta (only when rival selected) */}
       {rival && deltas.length > 0 && (

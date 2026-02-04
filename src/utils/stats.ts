@@ -286,141 +286,225 @@ export function generateInsights(
   const allDrivers = session["classification-data"] ?? [];
   const playerLaps = player["session-history"]["lap-history-data"];
 
-  // 1. Pace ranking
-  const paceRanking: { driver: DriverData; avgPace: number }[] = [];
-  for (const d of allDrivers) {
-    const valid = getValidLaps(d["session-history"]["lap-history-data"]);
-    if (valid.length === 0) continue;
-    const avg =
-      valid.reduce((s, l) => s + l["lap-time-in-ms"], 0) / valid.length;
-    paceRanking.push({ driver: d, avgPace: avg });
-  }
-  paceRanking.sort((a, b) => a.avgPace - b.avgPace);
-  const pacePos = paceRanking.findIndex((r) => r.driver.index === player.index);
-  if (pacePos >= 0 && paceRanking.length > 1) {
-    const delta = paceRanking[pacePos].avgPace - paceRanking[0].avgPace;
-    insights.push({
-      type: "pace",
-      label: "Race Pace",
-      value: ordinal(pacePos + 1),
-      detail:
-        delta < 10
-          ? `of ${paceRanking.length}`
-          : `of ${paceRanking.length} — +${(delta / 1000).toFixed(3)}s vs P1`,
-      rank: pacePos,
-      rankTotal: paceRanking.length,
-    });
-  }
+  if (rival) {
+    // --- Head-to-head mode ---
+    const rivalLaps = rival["session-history"]["lap-history-data"];
+    const rivalName = rival["driver-name"];
 
-  // 2. Tyre wear ranking
-  const wearRanking: { driver: DriverData; avgRate: number }[] = [];
-  for (const d of allDrivers) {
-    const stints = d["tyre-set-history"];
-    if (!stints?.length) continue;
-    const rates = stints.map((s) => stintWearRate(s)).filter((r) => r > 0);
-    if (rates.length === 0) continue;
-    const avg = rates.reduce((a, b) => a + b, 0) / rates.length;
-    wearRanking.push({ driver: d, avgRate: avg });
-  }
-  wearRanking.sort((a, b) => a.avgRate - b.avgRate);
-  const wearPos = wearRanking.findIndex(
-    (r) => r.driver.index === player.index,
-  );
-  if (wearPos >= 0 && wearRanking.length > 1) {
-    const playerRate = wearRanking[wearPos].avgRate;
-    const bestRate = wearRanking[0].avgRate;
-    const diff = playerRate - bestRate;
-    insights.push({
-      type: "tyre",
-      label: "Tyre Management",
-      value: ordinal(wearPos + 1),
-      detail:
-        diff < 0.05
-          ? `of ${wearRanking.length}`
-          : `of ${wearRanking.length} — +${diff.toFixed(1)}%/lap vs best`,
-      rank: wearPos,
-      rankTotal: wearRanking.length,
-    });
-  }
-
-  // 3. Weakest & strongest sector (avg vs avg across all drivers)
-  const playerValidLaps = getValidLaps(playerLaps);
-  if (playerValidLaps.length > 0) {
-    const sectorKeys = [
-      { key: "sector-1-time-in-ms" as const, label: "S1" },
-      { key: "sector-2-time-in-ms" as const, label: "S2" },
-      { key: "sector-3-time-in-ms" as const, label: "S3" },
-    ];
-
-    const sectorRankings: {
-      label: string;
-      pos: number;
-      total: number;
-      delta: number;
-      bestDriver: string;
-      deltaToP2: number;
-      p2Driver: string;
-    }[] = [];
-
-    for (const { key, label } of sectorKeys) {
-      const ranking: { driver: DriverData; avg: number }[] = [];
-      for (const d of allDrivers) {
-        const valid = getValidLaps(d["session-history"]["lap-history-data"]);
-        if (!valid.length) continue;
-        const avg =
-          valid.reduce((s, l) => s + l[key], 0) / valid.length;
-        if (avg > 0) ranking.push({ driver: d, avg });
-      }
-      ranking.sort((a, b) => a.avg - b.avg);
-
-      const pos = ranking.findIndex((r) => r.driver.index === player.index);
-      if (pos >= 0 && ranking.length > 1) {
-        sectorRankings.push({
-          label,
-          pos,
-          total: ranking.length,
-          delta: ranking[pos].avg - ranking[0].avg,
-          bestDriver: ranking[0].driver["driver-name"],
-          deltaToP2: ranking.length > 1 ? ranking[1].avg - ranking[0].avg : 0,
-          p2Driver: ranking.length > 1 ? ranking[1].driver["driver-name"] : "",
-        });
-      }
+    // 1. Pace delta vs rival
+    const playerValid = getValidLaps(playerLaps);
+    const rivalValid = getValidLaps(rivalLaps);
+    if (playerValid.length > 0 && rivalValid.length > 0) {
+      const playerAvg =
+        playerValid.reduce((s, l) => s + l["lap-time-in-ms"], 0) / playerValid.length;
+      const rivalAvg =
+        rivalValid.reduce((s, l) => s + l["lap-time-in-ms"], 0) / rivalValid.length;
+      const delta = (playerAvg - rivalAvg) / 1000;
+      insights.push({
+        type: "pace",
+        label: "Race Pace",
+        value: `${delta <= 0 ? "" : "+"}${delta.toFixed(3)}s`,
+        detail: delta <= 0
+          ? `faster per lap on average vs ${rivalName}`
+          : `slower per lap on average vs ${rivalName}`,
+      });
     }
 
-    if (sectorRankings.length > 0) {
-      const worst = [...sectorRankings].sort((a, b) => b.pos - a.pos)[0];
-      const best = [...sectorRankings].sort((a, b) => a.pos - b.pos)[0];
+    // 2. Tyre wear delta vs rival
+    const playerRates = player["tyre-set-history"]
+      .map((s) => stintWearRate(s))
+      .filter((r) => r > 0);
+    const rivalRates = rival["tyre-set-history"]
+      .map((s) => stintWearRate(s))
+      .filter((r) => r > 0);
+    if (playerRates.length > 0 && rivalRates.length > 0) {
+      const playerAvgRate = playerRates.reduce((a, b) => a + b, 0) / playerRates.length;
+      const rivalAvgRate = rivalRates.reduce((a, b) => a + b, 0) / rivalRates.length;
+      const diff = playerAvgRate - rivalAvgRate;
+      insights.push({
+        type: "tyre",
+        label: "Tyre Management",
+        value: `${diff <= 0 ? "" : "+"}${diff.toFixed(1)}%/lap`,
+        detail: diff <= 0
+          ? `less wear per lap vs ${rivalName}`
+          : `more wear per lap vs ${rivalName}`,
+      });
+    }
 
-      if (worst.pos > 0) {
-        insights.push({
-          type: "sector",
-          label: `Weakest — ${worst.label}`,
-          value: ordinal(worst.pos + 1),
-          detail:
-            worst.delta < 1
-              ? `of ${worst.total}`
-              : `of ${worst.total} — +${(worst.delta / 1000).toFixed(3)}s vs ${worst.bestDriver}`,
-          rank: worst.pos,
-          rankTotal: worst.total,
-        });
+    // 3. Sector deltas vs rival (all 3 sectors)
+    const playerValidLaps = getValidLaps(playerLaps);
+    const rivalValidLaps = getValidLaps(rivalLaps);
+    if (playerValidLaps.length > 0 && rivalValidLaps.length > 0) {
+      const sectorKeys = [
+        { key: "sector-1-time-in-ms" as const, label: "S1" },
+        { key: "sector-2-time-in-ms" as const, label: "S2" },
+        { key: "sector-3-time-in-ms" as const, label: "S3" },
+      ];
+
+      const parts: string[] = [];
+      let gains = 0;
+      let losses = 0;
+      for (const { key, label } of sectorKeys) {
+        const pAvg = playerValidLaps.reduce((s, l) => s + l[key], 0) / playerValidLaps.length;
+        const rAvg = rivalValidLaps.reduce((s, l) => s + l[key], 0) / rivalValidLaps.length;
+        const d = (pAvg - rAvg) / 1000;
+        parts.push(`${label}: ${d <= 0 ? "" : "+"}${d.toFixed(3)}s`);
+        if (d < -0.001) gains++;
+        if (d > 0.001) losses++;
       }
 
-      if (best.pos < worst.pos) {
-        const isP1 = best.pos === 0;
-        insights.push({
-          type: "sector",
-          label: `Strongest — ${best.label}`,
-          value: ordinal(best.pos + 1),
-          detail: isP1
-            ? best.deltaToP2 < 1
-              ? `of ${best.total}`
-              : `of ${best.total} — ${(best.deltaToP2 / 1000).toFixed(3)}s ahead of ${best.p2Driver}`
-            : best.delta < 1
-              ? `of ${best.total}`
-              : `of ${best.total} — +${(best.delta / 1000).toFixed(3)}s vs ${best.bestDriver}`,
-          rank: best.pos,
-          rankTotal: best.total,
-        });
+      insights.push({
+        type: "sector",
+        label: "Sector Analysis",
+        value: parts.join("  "),
+        detail: gains > 0 && losses > 0
+          ? `gaining in ${gains}, losing in ${losses} vs ${rivalName}`
+          : gains === 3
+            ? `faster in all sectors vs ${rivalName}`
+            : losses === 3
+              ? `slower in all sectors vs ${rivalName}`
+              : `vs ${rivalName}`,
+      });
+    }
+  } else {
+    // --- Field ranking mode (original behavior) ---
+
+    // 1. Pace ranking
+    const paceRanking: { driver: DriverData; avgPace: number }[] = [];
+    for (const d of allDrivers) {
+      const valid = getValidLaps(d["session-history"]["lap-history-data"]);
+      if (valid.length === 0) continue;
+      const avg =
+        valid.reduce((s, l) => s + l["lap-time-in-ms"], 0) / valid.length;
+      paceRanking.push({ driver: d, avgPace: avg });
+    }
+    paceRanking.sort((a, b) => a.avgPace - b.avgPace);
+    const pacePos = paceRanking.findIndex((r) => r.driver.index === player.index);
+    if (pacePos >= 0 && paceRanking.length > 1) {
+      const delta = paceRanking[pacePos].avgPace - paceRanking[0].avgPace;
+      insights.push({
+        type: "pace",
+        label: "Race Pace",
+        value: ordinal(pacePos + 1),
+        detail:
+          delta < 10
+            ? `of ${paceRanking.length}`
+            : `of ${paceRanking.length} — +${(delta / 1000).toFixed(3)}s vs P1`,
+        rank: pacePos,
+        rankTotal: paceRanking.length,
+      });
+    }
+
+    // 2. Tyre wear ranking
+    const wearRanking: { driver: DriverData; avgRate: number }[] = [];
+    for (const d of allDrivers) {
+      const stints = d["tyre-set-history"];
+      if (!stints?.length) continue;
+      const rates = stints.map((s) => stintWearRate(s)).filter((r) => r > 0);
+      if (rates.length === 0) continue;
+      const avg = rates.reduce((a, b) => a + b, 0) / rates.length;
+      wearRanking.push({ driver: d, avgRate: avg });
+    }
+    wearRanking.sort((a, b) => a.avgRate - b.avgRate);
+    const wearPos = wearRanking.findIndex(
+      (r) => r.driver.index === player.index,
+    );
+    if (wearPos >= 0 && wearRanking.length > 1) {
+      const playerRate = wearRanking[wearPos].avgRate;
+      const bestRate = wearRanking[0].avgRate;
+      const diff = playerRate - bestRate;
+      insights.push({
+        type: "tyre",
+        label: "Tyre Management",
+        value: ordinal(wearPos + 1),
+        detail:
+          diff < 0.05
+            ? `of ${wearRanking.length}`
+            : `of ${wearRanking.length} — +${diff.toFixed(1)}%/lap vs best`,
+        rank: wearPos,
+        rankTotal: wearRanking.length,
+      });
+    }
+
+    // 3. Weakest & strongest sector (avg vs avg across all drivers)
+    const playerValidLaps = getValidLaps(playerLaps);
+    if (playerValidLaps.length > 0) {
+      const sectorKeys = [
+        { key: "sector-1-time-in-ms" as const, label: "S1" },
+        { key: "sector-2-time-in-ms" as const, label: "S2" },
+        { key: "sector-3-time-in-ms" as const, label: "S3" },
+      ];
+
+      const sectorRankings: {
+        label: string;
+        pos: number;
+        total: number;
+        delta: number;
+        bestDriver: string;
+        deltaToP2: number;
+        p2Driver: string;
+      }[] = [];
+
+      for (const { key, label } of sectorKeys) {
+        const ranking: { driver: DriverData; avg: number }[] = [];
+        for (const d of allDrivers) {
+          const valid = getValidLaps(d["session-history"]["lap-history-data"]);
+          if (!valid.length) continue;
+          const avg =
+            valid.reduce((s, l) => s + l[key], 0) / valid.length;
+          if (avg > 0) ranking.push({ driver: d, avg });
+        }
+        ranking.sort((a, b) => a.avg - b.avg);
+
+        const pos = ranking.findIndex((r) => r.driver.index === player.index);
+        if (pos >= 0 && ranking.length > 1) {
+          sectorRankings.push({
+            label,
+            pos,
+            total: ranking.length,
+            delta: ranking[pos].avg - ranking[0].avg,
+            bestDriver: ranking[0].driver["driver-name"],
+            deltaToP2: ranking.length > 1 ? ranking[1].avg - ranking[0].avg : 0,
+            p2Driver: ranking.length > 1 ? ranking[1].driver["driver-name"] : "",
+          });
+        }
+      }
+
+      if (sectorRankings.length > 0) {
+        const worst = [...sectorRankings].sort((a, b) => b.pos - a.pos)[0];
+        const best = [...sectorRankings].sort((a, b) => a.pos - b.pos)[0];
+
+        if (worst.pos > 0) {
+          insights.push({
+            type: "sector",
+            label: `Weakest — ${worst.label}`,
+            value: ordinal(worst.pos + 1),
+            detail:
+              worst.delta < 1
+                ? `of ${worst.total}`
+                : `of ${worst.total} — +${(worst.delta / 1000).toFixed(3)}s vs ${worst.bestDriver}`,
+            rank: worst.pos,
+            rankTotal: worst.total,
+          });
+        }
+
+        if (best.pos < worst.pos) {
+          const isP1 = best.pos === 0;
+          insights.push({
+            type: "sector",
+            label: `Strongest — ${best.label}`,
+            value: ordinal(best.pos + 1),
+            detail: isP1
+              ? best.deltaToP2 < 1
+                ? `of ${best.total}`
+                : `of ${best.total} — ${(best.deltaToP2 / 1000).toFixed(3)}s ahead of ${best.p2Driver}`
+              : best.delta < 1
+                ? `of ${best.total}`
+                : `of ${best.total} — +${(best.delta / 1000).toFixed(3)}s vs ${best.bestDriver}`,
+            rank: best.pos,
+            rankTotal: best.total,
+          });
+        }
       }
     }
   }
