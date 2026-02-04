@@ -1,8 +1,10 @@
-import type { LapHistoryEntry } from "../types/telemetry";
+import type { LapHistoryEntry, TyreStintBasic } from "../types/telemetry";
 import { isLapValid, msToLapTime } from "../utils/format";
+import { getCompoundColor } from "../utils/colors";
 
 interface SectorComparisonProps {
   laps: LapHistoryEntry[];
+  stints?: TyreStintBasic[];
 }
 
 const SECTOR_COLORS = {
@@ -15,7 +17,20 @@ const SECTOR_COLORS = {
  * Horizontal segment layout showing each qualifying lap with proportional
  * sector bars, times, and deltas. Replaces the stacked BarChart.
  */
-export function SectorComparison({ laps }: SectorComparisonProps) {
+export function SectorComparison({ laps, stints }: SectorComparisonProps) {
+  // Build a lap→compound lookup from stint data
+  const lapCompound = new Map<number, string>();
+  if (stints?.length) {
+    let startLap = 1;
+    for (const stint of stints) {
+      const compound = stint["tyre-visual-compound"];
+      for (let lap = startLap; lap <= stint["end-lap"]; lap++) {
+        lapCompound.set(lap, compound);
+      }
+      startLap = stint["end-lap"] + 1;
+    }
+  }
+
   const data = laps
     .filter((l) => l["lap-time-in-ms"] > 0)
     .map((l, i) => ({
@@ -26,6 +41,7 @@ export function SectorComparison({ laps }: SectorComparisonProps) {
       total: l["lap-time-in-ms"] / 1000,
       totalStr: l["lap-time-str"],
       valid: isLapValid(l["lap-valid-bit-flags"]),
+      compound: lapCompound.get(i + 1),
     }));
 
   if (!data.length) {
@@ -85,6 +101,16 @@ export function SectorComparison({ laps }: SectorComparisonProps) {
                 <span className="text-sm font-semibold text-zinc-400 w-10 shrink-0">
                   Lap {d.lap}
                 </span>
+
+                {d.compound && (
+                  <span className="flex items-center gap-1">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: getCompoundColor(d.compound) }}
+                    />
+                    <span className="text-xs text-zinc-500">{d.compound}</span>
+                  </span>
+                )}
 
                 {!d.valid && (
                   <span className="text-red-400 text-sm font-bold flex items-center gap-0.5">
