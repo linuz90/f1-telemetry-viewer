@@ -1,8 +1,9 @@
 import dayjs from "dayjs";
 import { Calendar, Cloud, Cpu, Flag, Gauge, Globe, Target, Timer, Trophy, User } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { TelemetrySession } from "../types/telemetry";
 import { findPlayer, getBestLapTime, isRaceSession } from "../utils/stats";
-import { formatSessionType, msToLapTime, getTrackFlag } from "../utils/format";
+import { formatSessionType, msToLapTime, getTrackFlag, toTrackSlug } from "../utils/format";
 
 const SESSION_ICONS: Record<string, typeof Flag> = {
   Race: Flag,
@@ -39,7 +40,11 @@ export function SessionHeader({ session }: { session: TelemetrySession }) {
     <div className="mb-6">
       {/* Title row */}
       <div className="flex items-center gap-3 mb-3">
-        <h2 className="text-2xl font-bold">{getTrackFlag(info["track-id"])} {info["track-id"]}</h2>
+        <h2 className="text-2xl font-bold">
+          <Link to={`/track/${toTrackSlug(info["track-id"])}`} className="hover:text-purple-400 transition-colors">
+            {getTrackFlag(info["track-id"])} {info["track-id"]}
+          </Link>
+        </h2>
         <span className="flex items-center gap-1 text-sm text-zinc-400">
           <TypeIcon className="size-3.5" />
           {sessionType}
