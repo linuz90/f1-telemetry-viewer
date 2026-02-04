@@ -20,6 +20,7 @@ import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, i
 import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getTrackFlag, getSessionIcon } from "../utils/format";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 import { cardClass, cardClassCompact } from "../components/Card";
+import { Upload, ArrowLeft } from "lucide-react";
 
 interface LapPoint {
   timeSec: number;
@@ -108,7 +109,7 @@ function deduplicateRuns(sessions: TrackSessionData[]): TrackSessionData[] {
 export function TrackProgressPage() {
   const { trackId } = useParams<{ trackId: string }>();
   const { sessions } = useSessionList();
-  const { getSession } = useTelemetry();
+  const { getSession, mode, setShowUploadModal } = useTelemetry();
   const [data, setData] = useState<TrackSessionData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -200,10 +201,46 @@ export function TrackProgressPage() {
   }
 
   if (!data.length) {
+    const isUploadWithNoData = mode === "upload" && sessions.length === 0;
+
     return (
-      <div className="p-6">
-        <h2 className="text-2xl font-bold mb-2">{displayTrackName}</h2>
-        <p className="text-zinc-500">No sessions found for this track.</p>
+      <div className="flex items-center justify-center h-full">
+        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900">
+            {isUploadWithNoData ? (
+              <Upload className="h-5 w-5 text-zinc-500" />
+            ) : (
+              <ArrowLeft className="h-5 w-5 text-zinc-500" />
+            )}
+          </div>
+          <div>
+            <h3 className="text-base font-medium text-zinc-200">
+              {isUploadWithNoData
+                ? "Track data not available"
+                : "No sessions found"}
+            </h3>
+            <p className="mt-1 text-sm text-zinc-500">
+              {isUploadWithNoData
+                ? "Uploaded telemetry is stored in memory and lost when the browser is closed. Re-upload your .zip to continue."
+                : `No sessions found for ${displayTrackName}.`}
+            </p>
+          </div>
+          {isUploadWithNoData ? (
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"
+            >
+              Upload telemetry
+            </button>
+          ) : (
+            <Link
+              to="/"
+              className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
+            >
+              Back to dashboard
+            </Link>
+          )}
+        </div>
       </div>
     );
   }
