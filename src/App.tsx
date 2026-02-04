@@ -1,4 +1,5 @@
 import { Routes, Route } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { Layout } from "./components/Layout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { SessionPage } from "./pages/SessionPage";
@@ -39,6 +40,7 @@ export function App() {
   return (
     <TelemetryProvider>
       <AppRoutes />
+      <Analytics />
     </TelemetryProvider>
   );
 }
