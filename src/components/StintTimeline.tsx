@@ -1,6 +1,7 @@
 import type { TyreStint } from "../types/telemetry";
 import { getCompoundColor } from "../utils/colors";
-import { stintWearRate, getWorstWheelWear } from "../utils/stats";
+import { stintWearRate, getWorstWheelWear, estimateMaxLife, PUNCTURE_THRESHOLD } from "../utils/stats";
+import { CompoundStatCard } from "./CompoundStatCard";
 
 interface StintTimelineProps {
   stints: TyreStint[];
@@ -76,8 +77,6 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
   );
 }
 
-const PUNCTURE_THRESHOLD = 75; // % wear where puncture risk starts
-
 /**
  * Stint detail cards showing wear-based estimated max life.
  * Placed below the tyre wear chart for context.
@@ -102,58 +101,37 @@ export function StintDetailCards({ stints }: { stints: TyreStint[] }) {
           const wearHistory = stint["tyre-wear-history"];
           const peakWear = wearHistory.length > 0 ? getWorstWheelWear(wearHistory[wearHistory.length - 1]) : 0;
           const wearRate = stintWearRate(stint);
-          const estMaxLife = wearRate > 0 ? Math.round(PUNCTURE_THRESHOLD / wearRate) : 0;
+          const estLife = estimateMaxLife(wearRate);
+
+          const rows = [
+            { label: "Stint", value: `${stint["stint-length"]} laps` },
+            ...(peakWear > 0 ? [{
+              label: "Peak wear",
+              value: `${peakWear.toFixed(1)}%`,
+              className: `font-mono ${peakWear > 60 ? "text-red-400" : peakWear > 40 ? "text-amber-400" : "text-zinc-300"}`,
+            }] : []),
+            { label: "Wear rate", value: `${wearRate.toFixed(1)}%/lap` },
+            ...(estLife > 0 ? [{ label: "Est. max life", value: `~${estLife} laps` }] : []),
+          ];
 
           return (
-            <div key={i} className="rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-3">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <span
-                  className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                  style={{ backgroundColor: color }}
+            <CompoundStatCard key={i} compound={compound} rows={rows}>
+              {/* Wear bar: 0–100% scale with puncture threshold marker */}
+              <div className="relative h-2 rounded-full bg-zinc-800 mt-1.5">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  style={{
+                    width: `${Math.min(peakWear, 100)}%`,
+                    backgroundColor: color,
+                  }}
                 />
-                <span className="text-xs font-medium text-zinc-300 truncate">
-                  {compound}
-                </span>
+                <div
+                  className="absolute inset-y-0 w-0.5 bg-red-500/80"
+                  style={{ left: `${PUNCTURE_THRESHOLD}%` }}
+                  title={`${PUNCTURE_THRESHOLD}% puncture risk`}
+                />
               </div>
-              <div className="text-xs text-zinc-400 space-y-1">
-                <div className="flex justify-between">
-                  <span>Stint</span>
-                  <span className="text-zinc-300 font-mono">{stint["stint-length"]} laps</span>
-                </div>
-                {peakWear > 0 && (
-                  <div className="flex justify-between">
-                    <span>Peak wear</span>
-                    <span className={`font-mono ${peakWear > 60 ? "text-red-400" : peakWear > 40 ? "text-amber-400" : "text-zinc-300"}`}>{peakWear.toFixed(1)}%</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span>Wear rate</span>
-                  <span className="text-zinc-300 font-mono">{wearRate.toFixed(1)}%/lap</span>
-                </div>
-                {estMaxLife > 0 && (
-                  <div className="flex justify-between">
-                    <span>Est. max life</span>
-                    <span className="text-zinc-300 font-mono">~{estMaxLife} laps</span>
-                  </div>
-                )}
-                {/* Wear bar: 0–100% scale with 75% puncture threshold marker */}
-                <div className="relative h-2 rounded-full bg-zinc-800 mt-2.5">
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full"
-                    style={{
-                      width: `${Math.min(peakWear, 100)}%`,
-                      backgroundColor: color,
-                    }}
-                  />
-                  {/* Puncture threshold marker at 75% */}
-                  <div
-                    className="absolute inset-y-0 w-0.5 bg-red-500/80"
-                    style={{ left: `${PUNCTURE_THRESHOLD}%` }}
-                    title={`${PUNCTURE_THRESHOLD}% puncture risk`}
-                  />
-                </div>
-              </div>
-            </div>
+            </CompoundStatCard>
           );
         })}
       </div>

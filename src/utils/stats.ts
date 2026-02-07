@@ -561,37 +561,96 @@ export function generateInsights(
   return insights;
 }
 
-/** Generate fuel insights for race sessions */
-export function generateFuelInsights(player: DriverData): StrategyInsight[] {
-  const insights: StrategyInsight[] = [];
+/** Worst-wheel wear % at which puncture risk starts */
+export const PUNCTURE_THRESHOLD = 75;
+
+/** Estimate max tyre life (laps) before hitting puncture threshold */
+export function estimateMaxLife(wearRatePerLap: number): number {
+  return wearRatePerLap > 0 ? Math.round(PUNCTURE_THRESHOLD / wearRatePerLap) : 0;
+}
+
+/** Result of a fuel burn-rate calculation for a single race session */
+export interface FuelCalcResult {
+  burnRateKg: number;
+  startFuelKg: number;
+  startFuelLaps: number;
+  fuelRemainingLaps: number;
+  suggestedKg: number;
+  suggestedLaps: number;
+}
+
+/** Calculate fuel burn rate and related metrics for a player in a race */
+export function calculateBurnRate(
+  player: DriverData,
+): FuelCalcResult | null {
   const perLap = player["per-lap-info"];
-  if (!perLap?.length) return insights;
+  if (!perLap?.length) return null;
 
   const lapsWithFuel = perLap.filter(
     (l) => l["car-status-data"]?.["fuel-in-tank"] > 0,
   );
-  if (lapsWithFuel.length < 6) return insights;
+  if (lapsWithFuel.length < 6) return null;
 
+  const firstLap = lapsWithFuel[0];
   const lastLap = lapsWithFuel[lapsWithFuel.length - 1];
-  const fuelRemaining = lastLap["car-status-data"]["fuel-remaining-laps"];
+
+  const fuelFirst = firstLap["car-status-data"]["fuel-in-tank"];
+  const fuelLast = lastLap["car-status-data"]["fuel-in-tank"];
+  const lapSpan = lastLap["lap-number"] - firstLap["lap-number"];
+
+  if (lapSpan <= 0) return null;
+
+  const burnRateKg = (fuelFirst - fuelLast) / lapSpan;
+  if (burnRateKg <= 0) return null;
+
+  const startFuelKg = fuelFirst;
+  const startFuelLaps = startFuelKg / burnRateKg;
+  const fuelRemainingLaps = lastLap["car-status-data"]["fuel-remaining-laps"];
+  const suggestedLaps = startFuelLaps - fuelRemainingLaps;
+  const suggestedKg = suggestedLaps * burnRateKg;
+
+  return {
+    burnRateKg,
+    startFuelKg,
+    startFuelLaps,
+    fuelRemainingLaps,
+    suggestedKg,
+    suggestedLaps,
+  };
+}
+
+/** Format a lap delta as "+X.X" or "-X.X" */
+function formatLapDelta(delta: number): string {
+  return delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
+}
+
+/** Generate fuel insights for race sessions */
+export function generateFuelInsights(
+  player: DriverData,
+  totalRaceLaps: number,
+): StrategyInsight[] {
+  const result = calculateBurnRate(player);
+  if (!result) return [];
+
+  const { startFuelKg, startFuelLaps, fuelRemainingLaps, suggestedKg, suggestedLaps } = result;
+  const startDelta = startFuelLaps - totalRaceLaps;
+  const suggestedDelta = suggestedLaps - totalRaceLaps;
 
   let detail: string;
-  if (fuelRemaining > 0.5) {
-    detail = `remaining — try -${fuelRemaining.toFixed(1)} laps next race`;
-  } else if (fuelRemaining < -0.1) {
-    detail = `remaining — try +${Math.abs(fuelRemaining).toFixed(1)} laps next race`;
+  if (Math.abs(fuelRemainingLaps) < 0.3) {
+    detail = "remaining — perfect fuel load";
   } else {
-    detail = `remaining — perfect fuel load`;
+    detail =
+      `started ${formatLapDelta(startDelta)} laps (${Math.round(startFuelKg)}kg), ` +
+      `suggested ${formatLapDelta(suggestedDelta)} laps (${Math.round(suggestedKg)}kg)`;
   }
 
-  insights.push({
+  return [{
     type: "fuel",
     label: "Fuel at Finish",
-    value: `${fuelRemaining.toFixed(1)} laps`,
+    value: `${fuelRemainingLaps.toFixed(1)} laps`,
     detail,
-  });
-
-  return insights;
+  }];
 }
 
 /** Generate qualifying-specific insights for the player */
@@ -909,4 +968,90 @@ export function generateRaceHistoryInsights(
   }
 
   return insights;
+}
+
+// --- Track-level aggregation ---
+
+/** Per-compound tyre life stats aggregated across sessions */
+export interface CompoundLifeStats {
+  compound: string;
+  avgWearRatePerLap: number;
+  estMaxLife: number;
+  avgStintLength: number;
+  longestStint: number;
+  stintCount: number;
+}
+
+/** Aggregate compound tyre life across all race sessions at a track */
+export function aggregateCompoundLife(
+  sessions: TelemetrySession[],
+): CompoundLifeStats[] {
+  const byCompound: Record<string, { rates: number[]; lengths: number[] }> = {};
+
+  for (const session of sessions) {
+    if (!isRaceSession(session)) continue;
+    const player = findPlayer(session);
+    if (!player) continue;
+
+    for (const stint of player["tyre-set-history"]) {
+      const compound = stint["tyre-set-data"]["visual-tyre-compound"];
+      const rate = stintWearRate(stint);
+      if (rate <= 0) continue;
+
+      if (!byCompound[compound]) byCompound[compound] = { rates: [], lengths: [] };
+      byCompound[compound].rates.push(rate);
+      byCompound[compound].lengths.push(stint["stint-length"]);
+    }
+  }
+
+  return Object.entries(byCompound).map(([compound, { rates, lengths }]) => {
+    const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+    const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+    return {
+      compound,
+      avgWearRatePerLap: avgRate,
+      estMaxLife: estimateMaxLife(avgRate),
+      avgStintLength: Math.round(avgLength),
+      longestStint: Math.max(...lengths),
+      stintCount: rates.length,
+    };
+  });
+}
+
+/** Fuel stats aggregated across race sessions at a track */
+export interface TrackFuelStats {
+  avgBurnRateKgPerLap: number;
+  avgStartingFuelKg: number;
+  avgFuelRemainingLaps: number;
+  suggestedFuelKg: number;
+  suggestedFuelLaps: number;
+  raceCount: number;
+}
+
+/** Aggregate fuel data across all race sessions at a track */
+export function aggregateFuelData(
+  sessions: TelemetrySession[],
+): TrackFuelStats | null {
+  const results: FuelCalcResult[] = [];
+
+  for (const session of sessions) {
+    if (!isRaceSession(session)) continue;
+    const player = findPlayer(session);
+    if (!player) continue;
+    const result = calculateBurnRate(player);
+    if (result) results.push(result);
+  }
+
+  if (results.length === 0) return null;
+
+  const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+
+  return {
+    avgBurnRateKgPerLap: avg(results.map((r) => r.burnRateKg)),
+    avgStartingFuelKg: avg(results.map((r) => r.startFuelKg)),
+    avgFuelRemainingLaps: avg(results.map((r) => r.fuelRemainingLaps)),
+    suggestedFuelKg: avg(results.map((r) => r.suggestedKg)),
+    suggestedFuelLaps: avg(results.map((r) => r.suggestedLaps)),
+    raceCount: results.length,
+  };
 }
