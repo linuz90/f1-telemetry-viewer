@@ -90,14 +90,19 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
                           <config.icon className={`h-3 w-3 ${config.fg}`} />
                         </span>
                       )}
-                      <a
-                        href={`${REPO_URL}/commit/${entry.hash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-zinc-300 leading-snug hover:text-zinc-100 transition-colors"
-                      >
+                      <span className="text-sm text-zinc-300 leading-snug">
                         {entry.message}
-                      </a>
+                      </span>
+                      {entry.pr && (
+                        <a
+                          href={`${REPO_URL}/pull/${entry.pr}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
+                        >
+                          PR
+                        </a>
+                      )}
                     </li>
                   );
                 })}
