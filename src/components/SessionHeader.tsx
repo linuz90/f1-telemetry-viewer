@@ -3,7 +3,8 @@ import { Calendar, Cloud, Cpu, Flag, Gauge, Globe, Target, Timer, Trophy, User }
 import { Link } from "react-router-dom";
 import type { TelemetrySession } from "../types/telemetry";
 import { findPlayer, getBestLapTime, isRaceSession } from "../utils/stats";
-import { formatSessionType, msToLapTime, getTrackFlag, toTrackSlug } from "../utils/format";
+import { formatSessionType, msToLapTime, toTrackSlug } from "../utils/format";
+import { TrackFlag } from "./TrackFlag";
 
 const SESSION_ICONS: Record<string, typeof Flag> = {
   Race: Flag,
@@ -42,7 +43,7 @@ export function SessionHeader({ session }: { session: TelemetrySession }) {
       <div className="flex items-center gap-3 mb-3">
         <h2 className="text-2xl font-bold">
           <Link to={`/track/${toTrackSlug(info["track-id"])}`} className="hover:text-purple-400 transition-colors">
-            {getTrackFlag(info["track-id"])} {info["track-id"]}
+            <TrackFlag track={info["track-id"]} className="mr-1" /> {info["track-id"]}
           </Link>
         </h2>
         <span className="flex items-center gap-1 text-sm text-zinc-400">
