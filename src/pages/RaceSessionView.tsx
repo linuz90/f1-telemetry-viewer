@@ -60,6 +60,11 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   const stints = focusedDriver?.["tyre-set-history"] ?? [];
   const laps = focusedDriver?.["session-history"]["lap-history-data"] ?? [];
   const pitLaps = stints.slice(1).map((s) => s["start-lap"]);
+  // Laps affected by pit stops (end of outgoing stint + start of incoming stint)
+  const pitAffectedLaps = new Set([
+    ...stints.slice(0, -1).map((s) => s["end-lap"]),
+    ...stints.slice(1).map((s) => s["start-lap"]),
+  ]);
   const perLapInfo = focusedDriver?.["per-lap-info"] ?? [];
 
   // Derive rival data
@@ -222,7 +227,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
             positionHistory={session["position-history"]}
             playerName={focusedDriver?.["driver-name"] ?? ""}
             rivalName={rival?.["driver-name"]}
-            overtakes={session.overtakes?.records}
+            overtakes={session.overtakes?.records.filter((ot) => !pitAffectedLaps.has(ot["overtaking-driver-lap"]))}
           />
         </Card>
       )}

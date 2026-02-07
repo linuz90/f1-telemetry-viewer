@@ -270,8 +270,8 @@ export interface RecordEntry {
 
 export interface OvertakeRecord {
   "overtaking-driver-name": string;
-  "being-overtaken-driver-name": string;
-  "lap-number": number;
+  "overtaken-driver-name": string;
+  "overtaking-driver-lap": number;
 }
 
 export interface DebugInfo {

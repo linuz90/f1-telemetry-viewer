@@ -103,11 +103,9 @@ export function StintDetailCards({ stints }: { stints: TyreStint[] }) {
           const peakWear = wearHistory.length > 0 ? getWorstWheelWear(wearHistory[wearHistory.length - 1]) : 0;
           const wearRate = stintWearRate(stint);
           const estMaxLife = wearRate > 0 ? Math.round(PUNCTURE_THRESHOLD / wearRate) : 0;
-          const usageRatio = estMaxLife > 0 ? stint["stint-length"] / estMaxLife : 0;
-          const usagePct = Math.round(usageRatio * 100);
 
           return (
-            <div key={i} className="rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-2">
+            <div key={i} className="rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-3">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span
                   className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
@@ -117,7 +115,7 @@ export function StintDetailCards({ stints }: { stints: TyreStint[] }) {
                   {compound}
                 </span>
               </div>
-              <div className="text-[11px] text-zinc-400 space-y-1">
+              <div className="text-xs text-zinc-400 space-y-1">
                 <div className="flex justify-between">
                   <span>Stint</span>
                   <span className="text-zinc-300 font-mono">{stint["stint-length"]} laps</span>
@@ -133,35 +131,34 @@ export function StintDetailCards({ stints }: { stints: TyreStint[] }) {
                   <span className="text-zinc-300 font-mono">{wearRate.toFixed(1)}%/lap</span>
                 </div>
                 {estMaxLife > 0 && (
-                  <>
-                    <div className="flex justify-between">
-                      <span>Est. max life</span>
-                      <span className="text-zinc-300 font-mono">~{estMaxLife} laps</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Life used</span>
-                      <span className={`font-mono font-medium ${usageRatio > 0.8 ? "text-red-400" : usageRatio > 0.6 ? "text-amber-400" : "text-emerald-400"}`}>
-                        {usagePct}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${Math.min(usagePct, 100)}%`,
-                          backgroundColor: usageRatio > 0.8 ? "#ef4444" : usageRatio > 0.6 ? "#f59e0b" : "#22c55e",
-                        }}
-                      />
-                    </div>
-                  </>
+                  <div className="flex justify-between">
+                    <span>Est. max life</span>
+                    <span className="text-zinc-300 font-mono">~{estMaxLife} laps</span>
+                  </div>
                 )}
+                {/* Wear bar: 0–100% scale with 75% puncture threshold marker */}
+                <div className="relative h-2 rounded-full bg-zinc-800 mt-2.5">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full"
+                    style={{
+                      width: `${Math.min(peakWear, 100)}%`,
+                      backgroundColor: color,
+                    }}
+                  />
+                  {/* Puncture threshold marker at 75% */}
+                  <div
+                    className="absolute inset-y-0 w-0.5 bg-red-500/80"
+                    style={{ left: `${PUNCTURE_THRESHOLD}%` }}
+                    title={`${PUNCTURE_THRESHOLD}% puncture risk`}
+                  />
+                </div>
               </div>
             </div>
           );
         })}
       </div>
-      <p className="text-[10px] text-zinc-600 mt-1.5">
-        Max life estimated at {PUNCTURE_THRESHOLD}% worst-wheel wear (puncture risk threshold)
+      <p className="text-xs text-zinc-600 mt-1.5">
+        Bar = worst-wheel wear. <span className="text-red-500/60">Red line</span> = {PUNCTURE_THRESHOLD}% puncture risk threshold.
       </p>
     </div>
   );
