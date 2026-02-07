@@ -69,66 +69,72 @@ export function toTrackSlug(track: string): string {
   return track.toLowerCase();
 }
 
-/** Map F1 track names (from telemetry filenames) to country flag emoji */
-const TRACK_FLAGS: Record<string, string> = {
+/** Map F1 track names (from telemetry filenames) to ISO 3166-1 alpha-2 country codes */
+const TRACK_COUNTRY_CODES: Record<string, string> = {
   // Current F1 calendar
-  Bahrain: "\u{1F1E7}\u{1F1ED}",       // 🇧🇭
-  Jeddah: "\u{1F1F8}\u{1F1E6}",        // 🇸🇦
-  SaudiArabia: "\u{1F1F8}\u{1F1E6}",   // 🇸🇦
-  Australia: "\u{1F1E6}\u{1F1FA}",      // 🇦🇺
-  Melbourne: "\u{1F1E6}\u{1F1FA}",      // 🇦🇺
-  Japan: "\u{1F1EF}\u{1F1F5}",          // 🇯🇵
-  Suzuka: "\u{1F1EF}\u{1F1F5}",         // 🇯🇵
-  China: "\u{1F1E8}\u{1F1F3}",          // 🇨🇳
-  Shanghai: "\u{1F1E8}\u{1F1F3}",       // 🇨🇳
-  Miami: "\u{1F1FA}\u{1F1F8}",          // 🇺🇸
-  Imola: "\u{1F1EE}\u{1F1F9}",          // 🇮🇹
-  Monaco: "\u{1F1F2}\u{1F1E8}",         // 🇲🇨
-  Spain: "\u{1F1EA}\u{1F1F8}",          // 🇪🇸
-  Barcelona: "\u{1F1EA}\u{1F1F8}",      // 🇪🇸
-  Canada: "\u{1F1E8}\u{1F1E6}",         // 🇨🇦
-  Montreal: "\u{1F1E8}\u{1F1E6}",       // 🇨🇦
-  Austria: "\u{1F1E6}\u{1F1F9}",        // 🇦🇹
-  Spielberg: "\u{1F1E6}\u{1F1F9}",      // 🇦🇹
-  Silverstone: "\u{1F1EC}\u{1F1E7}",    // 🇬🇧
-  Hungary: "\u{1F1ED}\u{1F1FA}",        // 🇭🇺
-  Budapest: "\u{1F1ED}\u{1F1FA}",       // 🇭🇺
-  Hungaroring: "\u{1F1ED}\u{1F1FA}",    // 🇭🇺
-  Spa: "\u{1F1E7}\u{1F1EA}",            // 🇧🇪
-  Belgium: "\u{1F1E7}\u{1F1EA}",        // 🇧🇪
-  Zandvoort: "\u{1F1F3}\u{1F1F1}",      // 🇳🇱
-  Netherlands: "\u{1F1F3}\u{1F1F1}",    // 🇳🇱
-  Monza: "\u{1F1EE}\u{1F1F9}",          // 🇮🇹
-  Italy: "\u{1F1EE}\u{1F1F9}",          // 🇮🇹
-  Baku: "\u{1F1E6}\u{1F1FF}",           // 🇦🇿
-  Azerbaijan: "\u{1F1E6}\u{1F1FF}",     // 🇦🇿
-  Singapore: "\u{1F1F8}\u{1F1EC}",      // 🇸🇬
-  Marina: "\u{1F1F8}\u{1F1EC}",         // 🇸🇬
-  Austin: "\u{1F1FA}\u{1F1F8}",         // 🇺🇸
-  COTA: "\u{1F1FA}\u{1F1F8}",           // 🇺🇸
-  Texas: "\u{1F1FA}\u{1F1F8}",          // 🇺🇸
-  Mexico: "\u{1F1F2}\u{1F1FD}",         // 🇲🇽
-  Brazil: "\u{1F1E7}\u{1F1F7}",         // 🇧🇷
-  Interlagos: "\u{1F1E7}\u{1F1F7}",     // 🇧🇷
-  SaoPaulo: "\u{1F1E7}\u{1F1F7}",       // 🇧🇷
-  LasVegas: "\u{1F1FA}\u{1F1F8}",       // 🇺🇸
-  Vegas: "\u{1F1FA}\u{1F1F8}",          // 🇺🇸
-  Qatar: "\u{1F1F6}\u{1F1E6}",          // 🇶🇦
-  Lusail: "\u{1F1F6}\u{1F1E6}",         // 🇶🇦
-  Losail: "\u{1F1F6}\u{1F1E6}",         // 🇶🇦
-  AbuDhabi: "\u{1F1E6}\u{1F1EA}",       // 🇦🇪
-  YasMarina: "\u{1F1E6}\u{1F1EA}",      // 🇦🇪
+  Bahrain: "bh",
+  Sakhir: "bh",
+  Jeddah: "sa",
+  SaudiArabia: "sa",
+  Australia: "au",
+  Melbourne: "au",
+  Japan: "jp",
+  Suzuka: "jp",
+  China: "cn",
+  Shanghai: "cn",
+  Miami: "us",
+  Imola: "it",
+  Monaco: "mc",
+  Spain: "es",
+  Barcelona: "es",
+  Catalunya: "es",
+  Canada: "ca",
+  Montreal: "ca",
+  Austria: "at",
+  Spielberg: "at",
+  Silverstone: "gb",
+  Hungary: "hu",
+  Budapest: "hu",
+  Hungaroring: "hu",
+  Spa: "be",
+  Belgium: "be",
+  Zandvoort: "nl",
+  Netherlands: "nl",
+  Monza: "it",
+  Italy: "it",
+  Baku: "az",
+  Azerbaijan: "az",
+  Singapore: "sg",
+  Marina: "sg",
+  Austin: "us",
+  COTA: "us",
+  Texas: "us",
+  Mexico: "mx",
+  Brazil: "br",
+  Interlagos: "br",
+  SaoPaulo: "br",
+  "Las Vegas": "us",
+  LasVegas: "us",
+  Vegas: "us",
+  Qatar: "qa",
+  Lusail: "qa",
+  Losail: "qa",
+  "Abu Dhabi": "ae",
+  AbuDhabi: "ae",
+  YasMarina: "ae",
   // Classic / additional circuits
-  Portugal: "\u{1F1F5}\u{1F1F9}",        // 🇵🇹
-  Portimao: "\u{1F1F5}\u{1F1F9}",        // 🇵🇹
-  France: "\u{1F1EB}\u{1F1F7}",          // 🇫🇷
-  PaulRicard: "\u{1F1EB}\u{1F1F7}",      // 🇫🇷
-  Russia: "\u{1F1F7}\u{1F1FA}",          // 🇷🇺
-  Sochi: "\u{1F1F7}\u{1F1FA}",           // 🇷🇺
-  Turkey: "\u{1F1F9}\u{1F1F7}",          // 🇹🇷
-  Istanbul: "\u{1F1F9}\u{1F1F7}",        // 🇹🇷
-  Vietnam: "\u{1F1FB}\u{1F1F3}",         // 🇻🇳
-  Hanoi: "\u{1F1FB}\u{1F1F3}",           // 🇻🇳
+  Portugal: "pt",
+  Portimao: "pt",
+  France: "fr",
+  "Paul Ricard": "fr",
+  PaulRicard: "fr",
+  Russia: "ru",
+  Sochi: "ru",
+  Turkey: "tr",
+  Istanbul: "tr",
+  Vietnam: "vn",
+  Hanoi: "vn",
+  Hockenheim: "de",
 };
 
 /**
@@ -191,9 +197,9 @@ export function sortTracksByCalendar(tracks: string[]): string[] {
   });
 }
 
-/** Get country flag emoji for a track name */
-export function getTrackFlag(track: string): string {
-  return TRACK_FLAGS[track] ?? "\u{1F3CE}\u{FE0F}"; // 🏎️ fallback
+/** Get ISO country code for a track name, or null for unknown tracks */
+export function getTrackCountryCode(track: string): string | null {
+  return TRACK_COUNTRY_CODES[track] ?? null;
 }
 
 /** Get emoji icon for a session type */

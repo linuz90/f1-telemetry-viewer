@@ -16,6 +16,7 @@ import { findPlayer, getBestLapTime, isRaceSession } from "../utils/stats";
 import { msToLapTime, formatSessionType, formatDate, formatShortDate, toTrackSlug, sortTracksByCalendar } from "../utils/format";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 import { Card, cardClassCompact } from "../components/Card";
+import { TrackFlag } from "../components/TrackFlag";
 
 interface SessionStats {
   summary: SessionSummary;
@@ -199,7 +200,7 @@ export function DashboardPage() {
                 to={`/session/${s.summary.slug}`}
                 className={`${cardClassCompact} hover:bg-zinc-900/70 transition-colors`}
               >
-                <div className="text-sm font-medium">{s.summary.track}</div>
+                <div className="text-sm font-medium flex items-center gap-1.5"><TrackFlag track={s.summary.track} />{s.summary.track}</div>
                 <div className="text-xs text-zinc-500">
                   {formatSessionType(s.summary.sessionType)} ·{" "}
                   {formatDate(s.summary.date)}
@@ -233,7 +234,8 @@ export function DashboardPage() {
       {/* Per-track pace chart */}
       {mostDrivenTrack && paceChartData.length > 1 && (
         <Card as="section">
-          <h3 className="text-sm font-semibold text-zinc-300 mb-2">
+          <h3 className="text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-1.5">
+            <TrackFlag track={mostDrivenTrack} />
             Pace at {mostDrivenTrack}
             <span className="font-normal text-zinc-500 ml-2">
               {paceChartData.length} qualifying sessions
@@ -297,7 +299,7 @@ export function DashboardPage() {
                 to={`/track/${toTrackSlug(track)}`}
                 className={`${cardClassCompact} !p-4 hover:bg-zinc-900/70 transition-colors`}
               >
-                <div className="text-base font-semibold">{track}</div>
+                <div className="text-base font-semibold flex items-center gap-1.5"><TrackFlag track={track} />{track}</div>
                 <div className="flex gap-4 mt-1 text-xs text-zinc-400">
                   <span>{trackStats.length} sessions</span>
                   {bestEver > 0 && bestEver < Infinity && (

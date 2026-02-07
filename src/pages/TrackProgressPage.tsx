@@ -17,7 +17,8 @@ import { useSessionList } from "../hooks/useSessionList";
 import { useTelemetry } from "../context/TelemetryContext";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
 import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, isRaceSession } from "../utils/stats";
-import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getTrackFlag, getSessionIcon } from "../utils/format";
+import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getSessionIcon } from "../utils/format";
+import { TrackFlag } from "../components/TrackFlag";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 import { cardClass, cardClassCompact } from "../components/Card";
 import { Upload, ArrowLeft } from "lucide-react";
@@ -350,7 +351,7 @@ export function TrackProgressPage() {
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold mb-1">
-          <span className="mr-2">{getTrackFlag(displayTrackName)}</span>
+          <TrackFlag track={displayTrackName} className="mr-2" />
           {displayTrackName}
         </h2>
         <p className="text-sm text-zinc-500">

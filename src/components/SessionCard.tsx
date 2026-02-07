@@ -1,5 +1,5 @@
 import { Globe, Timer, Target, Flag } from "lucide-react";
-import { getTrackFlag } from "../utils/format";
+import { TrackFlag } from "./TrackFlag";
 
 interface SessionCardProps {
   sessionType: string;
@@ -30,7 +30,7 @@ export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTi
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-1.5">
-        <span className="text-sm font-medium truncate">{getTrackFlag(track)} {track}</span>
+        <span className="text-sm font-medium truncate flex items-center gap-1.5"><TrackFlag track={track} />{track}</span>
         <span className={`shrink-0 flex items-center gap-0.5 text-[10px] font-medium uppercase leading-none ${typeConfig.color}`}>
           <TypeIcon className="size-3" />
           {sessionType}

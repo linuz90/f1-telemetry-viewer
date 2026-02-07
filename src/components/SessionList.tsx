@@ -2,7 +2,8 @@ import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useSessionList } from "../hooks/useSessionList";
 import type { SessionSummary } from "../types/telemetry";
-import { formatDate, formatTime, formatSessionType, getTrackFlag, toTrackSlug, sortTracksByCalendar } from "../utils/format";
+import { formatDate, formatTime, formatSessionType, toTrackSlug, sortTracksByCalendar } from "../utils/format";
+import { TrackFlag } from "./TrackFlag";
 import { SessionCard } from "./SessionCard";
 
 /** Groups sessions by date for display */
@@ -175,7 +176,7 @@ export function SessionList() {
                   }`
                 }
               >
-                <span className="text-base leading-none">{getTrackFlag(track)}</span>
+                <TrackFlag track={track} />
                 <span className="flex-1 truncate font-medium">{track}</span>
                 {bestTime && (
                   <span className="text-xs font-mono text-purple-400">{bestTime}</span>
