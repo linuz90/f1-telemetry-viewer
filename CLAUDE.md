@@ -58,4 +58,6 @@ Commit messages feed a **user-facing changelog** (the "What's new" modal). A Vit
   - Bad: `feat: refactor TyreChart to use compound map lookup`
 - Only `feat`, `fix`, and `docs` commits appear in the changelog. Other types (`chore`, `refactor`, `style`, etc.) are filtered out at build time.
 - Keep subjects concise and in imperative mood (matches conventional commit convention).
-- Internal-only changes (refactors, deps, CI) should use `chore:` or `refactor:` so they stay out of the user-facing changelog.
+- Internal-only changes should use `chore:` or `refactor:` so they stay out of the user-facing changelog. This includes: dev tooling (Vite config, linter setup), dependency updates, CI/CD, refactors, build config, and anything that doesn't change what the user sees or experiences in the app.
+  - Good: `chore(dev): auto-open browser on dev server start` (dev tooling, not user-facing)
+  - Bad: `feat(dev): auto-open browser on dev server start` (this would show up in the changelog)
