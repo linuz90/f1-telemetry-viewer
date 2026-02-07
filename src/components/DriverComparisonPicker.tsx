@@ -1,6 +1,5 @@
 import type { TelemetrySession, DriverData } from "../types/telemetry";
 import {
-  findPlayer,
   findRaceWinner,
   findClosestRival,
   findFastestLapDriver,
@@ -11,6 +10,7 @@ interface DriverComparisonPickerProps {
   session: TelemetrySession;
   selectedIndex: number | null;
   onSelect: (index: number | null) => void;
+  focusedDriverIndex: number;
 }
 
 interface Preset {
@@ -23,10 +23,11 @@ export function DriverComparisonPicker({
   session,
   selectedIndex,
   onSelect,
+  focusedDriverIndex,
 }: DriverComparisonPickerProps) {
-  const player = findPlayer(session);
-  const playerPos = player?.["final-classification"]?.position ?? 0;
   const drivers = session["classification-data"] ?? [];
+  const focused = drivers.find((d) => d.index === focusedDriverIndex);
+  const focusedPos = focused?.["final-classification"]?.position ?? 0;
 
   const presets: Preset[] = [
     {
@@ -36,8 +37,8 @@ export function DriverComparisonPicker({
     },
     {
       label: "Closest Rival",
-      driver: findClosestRival(session, playerPos),
-      tag: `P${playerPos > 1 ? playerPos - 1 : playerPos + 1}`,
+      driver: findClosestRival(session, focusedPos),
+      tag: `P${focusedPos > 1 ? focusedPos - 1 : focusedPos + 1}`,
     },
     {
       label: "Fastest Lap",
@@ -46,23 +47,23 @@ export function DriverComparisonPicker({
     },
   ];
 
-  // Filter out presets that resolve to the player or are undefined
+  // Filter out presets that resolve to the focused driver or are undefined
   const validPresets = presets.filter(
-    (p) => p.driver && p.driver.index !== player?.index,
+    (p) => p.driver && p.driver.index !== focusedDriverIndex,
   );
 
-  // Other drivers (non-player, not already a preset)
+  // Other drivers (not focused, not already a preset)
   const presetIndices = new Set(validPresets.map((p) => p.driver!.index));
   const otherDrivers = drivers
-    .filter((d) => !d["is-player"] && !presetIndices.has(d.index))
+    .filter((d) => d.index !== focusedDriverIndex && !presetIndices.has(d.index))
     .sort(
       (a, b) =>
         (a["final-classification"]?.position ?? 999) -
         (b["final-classification"]?.position ?? 999),
     );
 
-  // All non-player drivers
-  const allRivals = drivers.filter((d) => !d["is-player"]);
+  // All non-focused drivers
+  const allRivals = drivers.filter((d) => d.index !== focusedDriverIndex);
   const singleRival = allRivals.length === 1 ? allRivals[0] : null;
 
   // Simplified UI when there's only one rival

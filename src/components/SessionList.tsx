@@ -153,6 +153,7 @@ export function SessionList() {
                       bestLapTime={s.bestLapTime}
                       isTrackBest={!!s.bestLapTimeMs && s.bestLapTimeMs === bestTimeByTrack[s.track]}
                       aiDifficulty={s.aiDifficulty}
+                      isSpectator={s.isSpectator}
                     />
                   </NavLink>
                 ))}

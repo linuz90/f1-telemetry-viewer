@@ -1,4 +1,4 @@
-import { Globe, Timer, Target, Flag } from "lucide-react";
+import { Eye, Globe, Timer, Target, Flag } from "lucide-react";
 import { TrackFlag } from "./TrackFlag";
 
 interface SessionCardProps {
@@ -9,6 +9,7 @@ interface SessionCardProps {
   bestLapTime?: string;
   isTrackBest?: boolean;
   aiDifficulty?: number;
+  isSpectator?: boolean;
 }
 
 const TYPE_CONFIG: Record<string, { color: string; icon: typeof Flag }> = {
@@ -23,7 +24,7 @@ const INDICATOR_COLORS = {
   best: "bg-purple-400",
 };
 
-export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTime, isTrackBest, aiDifficulty }: SessionCardProps) {
+export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTime, isTrackBest, aiDifficulty, isSpectator }: SessionCardProps) {
   const typeConfig = TYPE_CONFIG[sessionType] ?? { color: "text-zinc-500", icon: Flag };
   const TypeIcon = typeConfig.icon;
 
@@ -31,10 +32,18 @@ export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTi
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-1.5">
         <span className="text-sm font-medium truncate flex items-center gap-1.5"><TrackFlag track={track} />{track}</span>
-        <span className={`shrink-0 flex items-center gap-0.5 text-[10px] font-medium uppercase leading-none ${typeConfig.color}`}>
-          <TypeIcon className="size-3" />
-          {sessionType}
-        </span>
+        <div className="shrink-0 flex items-center gap-1.5">
+          {isSpectator && (
+            <span className="flex items-center gap-0.5 text-[10px] font-medium text-zinc-500">
+              <Eye className="size-3" />
+              Spectator
+            </span>
+          )}
+          <span className={`flex items-center gap-0.5 text-[10px] font-medium uppercase leading-none ${typeConfig.color}`}>
+            <TypeIcon className="size-3" />
+            {sessionType}
+          </span>
+        </div>
       </div>
       <div className="flex items-center justify-between gap-1 mt-0.5">
         <div className="flex items-center gap-1">

@@ -71,8 +71,8 @@ export function SessionPage() {
   }
 
   return isRaceSession(session) ? (
-    <RaceSessionView session={session} slug={slug} />
+    <RaceSessionView key={slug} session={session} slug={slug} />
   ) : (
-    <QualifyingSessionView session={session} slug={slug} />
+    <QualifyingSessionView key={slug} session={session} slug={slug} />
   );
 }

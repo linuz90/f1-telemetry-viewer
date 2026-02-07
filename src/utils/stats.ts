@@ -12,6 +12,32 @@ export function findPlayer(session: TelemetrySession): DriverData | undefined {
   return session["classification-data"]?.find((d) => d["is-player"]);
 }
 
+/** Find the default focused driver: player > P1 finisher > driver with most laps */
+export function findFocusedDriver(session: TelemetrySession): DriverData | undefined {
+  const drivers = session["classification-data"] ?? [];
+
+  // 1. Player
+  const player = drivers.find((d) => d["is-player"]);
+  if (player) return player;
+
+  // 2. P1 finisher
+  const p1 = drivers.find((d) => d["final-classification"]?.position === 1);
+  if (p1) return p1;
+
+  // 3. Driver with most valid laps
+  let best: DriverData | undefined;
+  let maxLaps = 0;
+  for (const d of drivers) {
+    const count = d["session-history"]["lap-history-data"]
+      .filter((l) => l["lap-time-in-ms"] > 0).length;
+    if (count > maxLaps) {
+      maxLaps = count;
+      best = d;
+    }
+  }
+  return best;
+}
+
 /** Get valid laps for a driver */
 export function getValidLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
   return laps.filter(

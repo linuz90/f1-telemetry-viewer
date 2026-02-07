@@ -33,16 +33,33 @@ export async function loadZipFile(file: File): Promise<ZipLoadResult> {
       let bestLapTime: string | undefined;
       let bestLapTimeMs: number | undefined;
       let aiDifficulty: number | undefined;
+      let isSpectator = false;
 
       const sessionInfo = json["session-info"];
       const isOnline = sessionInfo?.["network-game"] === 1;
       aiDifficulty = isOnline ? 0 : (sessionInfo?.["ai-difficulty"] ?? 0);
 
-      const player = json["classification-data"]?.find(
+      let focusDriver = json["classification-data"]?.find(
         (d) => d["is-player"],
       );
-      if (player) {
-        const laps = player["session-history"]?.["lap-history-data"] ?? [];
+
+      // Spectator fallback: no player → pick driver with most valid laps
+      if (!focusDriver) {
+        isSpectator = true;
+        const drivers = json["classification-data"] ?? [];
+        let maxLaps = 0;
+        for (const d of drivers) {
+          const count = (d["session-history"]?.["lap-history-data"] ?? [])
+            .filter((l) => l["lap-time-in-ms"] > 0).length;
+          if (count > maxLaps) {
+            maxLaps = count;
+            focusDriver = d;
+          }
+        }
+      }
+
+      if (focusDriver) {
+        const laps = focusDriver["session-history"]?.["lap-history-data"] ?? [];
         validLapCount = laps.filter((l) => l["lap-time-in-ms"] > 0).length;
 
         const isQuali =
@@ -50,7 +67,7 @@ export async function loadZipFile(file: File): Promise<ZipLoadResult> {
           parsed.sessionType === "One Shot Qualifying";
         if (isQuali) {
           const bestLapNum =
-            player["session-history"]?.["best-lap-time-lap-num"] ?? -1;
+            focusDriver["session-history"]?.["best-lap-time-lap-num"] ?? -1;
           lapIndicators = laps
             .filter((l) => l["lap-time-in-ms"] > 0)
             .map((l, i) => {
@@ -81,6 +98,7 @@ export async function loadZipFile(file: File): Promise<ZipLoadResult> {
           bestLapTime,
           bestLapTimeMs,
           aiDifficulty,
+          isSpectator,
         });
         sessionData.set(slug, json);
       }
