@@ -66,9 +66,8 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         setMode("api");
         setSessions(data);
       })
-      .catch((e: Error) => {
+      .catch(() => {
         setMode("upload");
-        setSessionsError(e.message);
       })
       .finally(() => setSessionsLoading(false));
   }, []);
