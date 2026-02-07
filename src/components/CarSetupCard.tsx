@@ -26,7 +26,6 @@ const RANGES: Record<string, [number, number]> = {
   "front-right-tyre-pressure": [21.0, 30.0],
   "rear-left-tyre-pressure": [19.5, 27.0],
   "rear-right-tyre-pressure": [19.5, 27.0],
-  "fuel-load": [0, 110],
 };
 
 function getRangePercent(key: string, value: number): number {
@@ -39,7 +38,6 @@ function getRangePercent(key: string, value: number): number {
 
 function formatValue(key: string, value: number): string {
   if (key.includes("tyre-pressure")) return value.toFixed(1);
-  if (key === "fuel-load") return `${value.toFixed(1)} kg`;
   if (key.includes("camber") || key.includes("toe"))
     return `${value.toFixed(1)}°`;
   if (
@@ -271,13 +269,6 @@ export function CarSetupCard({ setup }: CarSetupCardProps) {
             </div>
           </Section>
 
-          <Section title="Fuel">
-            <SetupRow
-              label="Fuel Load"
-              setupKey="fuel-load"
-              value={setup["fuel-load"]}
-            />
-          </Section>
         </div>
       </div>
     </div>

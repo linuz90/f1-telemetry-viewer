@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   LineChart,
@@ -16,9 +16,10 @@ import {
 import { useSessionList } from "../hooks/useSessionList";
 import { useTelemetry } from "../context/TelemetryContext";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
-import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, isRaceSession } from "../utils/stats";
+import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, isRaceSession, aggregateCompoundLife, aggregateFuelData } from "../utils/stats";
 import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getSessionIcon } from "../utils/format";
 import { TrackFlag } from "../components/TrackFlag";
+import { CompoundStatCard } from "../components/CompoundStatCard";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 import { cardClass, cardClassCompact } from "../components/Card";
 import { Upload, ArrowLeft } from "lucide-react";
@@ -113,6 +114,7 @@ export function TrackProgressPage() {
   const { getSession, mode, setShowUploadModal } = useTelemetry();
   const [data, setData] = useState<TrackSessionData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"qualifying" | "race">("race");
 
   // Case-insensitive match: slug is lowercase, track names from data may be capitalized
   const trackSessions = sessions.filter(
@@ -192,6 +194,20 @@ export function TrackProgressPage() {
       setLoading(false);
     });
   }, [trackSessions.length]);
+
+  // Compound life + fuel aggregations (race only) — must be before early returns
+  const raceSessions = useMemo(
+    () => data.filter((d) => d.isRace).map((d) => d.session),
+    [data],
+  );
+  const compoundLifeStats = useMemo(
+    () => aggregateCompoundLife(raceSessions),
+    [raceSessions],
+  );
+  const trackFuelStats = useMemo(
+    () => aggregateFuelData(raceSessions),
+    [raceSessions],
+  );
 
   if (loading) {
     return (
@@ -346,24 +362,47 @@ export function TrackProgressPage() {
   // Session history sorted newest first
   const sessionHistory = [...data].reverse();
 
+  const hasBoth = qualiData.length > 0 && raceData.length > 0;
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold mb-1">
-          <TrackFlag track={displayTrackName} className="mr-2" />
-          {displayTrackName}
-        </h2>
-        <p className="text-sm text-zinc-500">
-          {data.length} session{data.length !== 1 ? "s" : ""}{(() => {
-            const totalAttempts = data.reduce((sum, d) => sum + d.attemptCount, 0);
-            return totalAttempts > data.length ? ` (${totalAttempts} total attempts)` : "";
-          })()} · {dateRange}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold mb-1">
+            <TrackFlag track={displayTrackName} className="mr-2" />
+            {displayTrackName}
+          </h2>
+          <p className="text-sm text-zinc-500">
+            {data.length} session{data.length !== 1 ? "s" : ""}{(() => {
+              const totalAttempts = data.reduce((sum, d) => sum + d.attemptCount, 0);
+              return totalAttempts > data.length ? ` (${totalAttempts} total attempts)` : "";
+            })()} · {dateRange}
+          </p>
+        </div>
+
+        {/* Tab switcher — only when both qualifying and race data exist */}
+        {hasBoth && (
+          <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80 shrink-0">
+            {(["qualifying", "race"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${
+                  activeTab === tab
+                    ? "bg-zinc-800 text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Qualifying Section ── */}
-      {qualiData.length > 0 && (
+      {qualiData.length > 0 && (!hasBoth || activeTab === "qualifying") && (
         <>
           <div className="flex items-center gap-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Qualifying Progress</h3>
@@ -618,7 +657,7 @@ export function TrackProgressPage() {
       )}
 
       {/* ── Race Section ── */}
-      {raceData.length > 0 && (
+      {raceData.length > 0 && (!hasBoth || activeTab === "race") && (
         <>
           <div className="flex items-center gap-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Race Performance</h3>
@@ -640,6 +679,74 @@ export function TrackProgressPage() {
               </div>
             </div>
           </div>
+
+          {/* Compound tyre life cards */}
+          {compoundLifeStats.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-zinc-300 mb-2">Compound Tyre Life</h4>
+              <div
+                className="grid gap-2"
+                style={{ gridTemplateColumns: `repeat(${Math.min(compoundLifeStats.length, 4)}, minmax(0, 1fr))` }}
+              >
+                {compoundLifeStats.map((cs) => (
+                  <CompoundStatCard
+                    key={cs.compound}
+                    compound={cs.compound}
+                    hero={{ value: `~${cs.estMaxLife}`, label: "pit by lap" }}
+                    rows={[
+                      { label: "Avg wear", value: `${cs.avgWearRatePerLap.toFixed(1)}%/lap` },
+                      { label: "Stints", value: `${cs.avgStintLength}–${cs.longestStint} laps` },
+                    ]}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-zinc-600 mt-1.5">
+                Pit lap estimated at {75}% worst-wheel wear (puncture risk threshold), based on {compoundLifeStats.reduce((s, c) => s + c.stintCount, 0)} stints across {raceData.length} race{raceData.length !== 1 ? "s" : ""}.
+              </p>
+            </div>
+          )}
+
+          {/* Fuel summary */}
+          {trackFuelStats && (
+            <div>
+              <h4 className="text-sm font-semibold text-zinc-300 mb-2">Fuel Management</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className={cardClass}>
+                  <div className="text-xs text-zinc-500 mb-1">Avg Burn Rate</div>
+                  <div className="font-mono text-lg text-amber-400">
+                    {trackFuelStats.avgBurnRateKgPerLap.toFixed(2)} kg/lap
+                  </div>
+                </div>
+                <div className={cardClass}>
+                  <div className="text-xs text-zinc-500 mb-1">Recommended Fuel</div>
+                  <div className="font-mono text-lg text-cyan-400">
+                    {Math.round(trackFuelStats.suggestedFuelKg)} kg
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-0.5">
+                    ~{trackFuelStats.suggestedFuelLaps.toFixed(1)} laps
+                  </div>
+                </div>
+                <div className={cardClass}>
+                  <div className="text-xs text-zinc-500 mb-1">Avg Excess at Finish</div>
+                  <div className={`font-mono text-lg ${
+                    trackFuelStats.avgFuelRemainingLaps > 1
+                      ? "text-amber-400"
+                      : trackFuelStats.avgFuelRemainingLaps < 0
+                        ? "text-red-400"
+                        : "text-emerald-400"
+                  }`}>
+                    {trackFuelStats.avgFuelRemainingLaps.toFixed(1)} laps
+                  </div>
+                </div>
+                <div className={cardClass}>
+                  <div className="text-xs text-zinc-500 mb-1">Races</div>
+                  <div className="text-lg text-zinc-200">
+                    {trackFuelStats.raceCount}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Tyre management trend (race only) */}
           {raceWearTrend.length > 1 && (

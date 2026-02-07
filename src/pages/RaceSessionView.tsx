@@ -90,7 +90,9 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   const insights = useMemo(() => {
     if (!focusedDriver) return [];
     const base = generateInsights(session, focusedDriver, rival);
-    base.push(...generateFuelInsights(focusedDriver));
+    base.push(
+      ...generateFuelInsights(focusedDriver, session["session-info"]["total-laps"]),
+    );
     if (pbs) {
       base.push(...generateRaceHistoryInsights(focusedDriver, pbs));
     }
@@ -152,13 +154,6 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
       {/* Strategy insights */}
       <StrategyInsightsCard insights={insights} />
 
-      {/* Car setup */}
-      {showSetup && focusedDriver["car-setup"] && (
-        <Card as="section">
-          <CarSetupCard setup={focusedDriver["car-setup"]} />
-        </Card>
-      )}
-
       {/* Stint strategy + tyre wear */}
       <Card as="section" className="space-y-4">
         <StintTimeline stints={stints} totalLaps={info["total-laps"]} />
@@ -189,6 +184,13 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
           damageLaps={damageLaps}
         />
       </Card>
+
+      {/* Car setup */}
+      {showSetup && focusedDriver["car-setup"] && (
+        <Card as="section">
+          <CarSetupCard setup={focusedDriver["car-setup"]} />
+        </Card>
+      )}
 
       {/* Damage timeline */}
       {perLapInfo.length > 0 && (
