@@ -6,7 +6,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
   ResponsiveContainer,
 } from "recharts";
 import { useSessionList } from "../hooks/useSessionList";
@@ -14,8 +13,8 @@ import { useTelemetry } from "../context/TelemetryContext";
 import type { SessionSummary } from "../types/telemetry";
 import { findPlayer, getBestLapTime, isRaceSession } from "../utils/stats";
 import { msToLapTime, formatSessionType, formatDate, formatShortDate, toTrackSlug, sortTracksByCalendar } from "../utils/format";
-import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
-import { Card, cardClassCompact } from "../components/Card";
+import { CHART_THEME } from "../utils/colors";
+import { cardClassCompact } from "../components/Card";
 import { TrackFlag } from "../components/TrackFlag";
 
 interface SessionStats {
@@ -100,41 +99,32 @@ export function DashboardPage() {
   // --- Recent sessions (first 6, already sorted most-recent-first from API) ---
   const recentSessions = stats.slice(0, 6);
 
-  // --- Per-track pace chart: find the most-driven track (qualifying sessions only) ---
-  const trackQualiCounts: Record<string, number> = {};
-  for (const s of stats) {
-    if (!s.isRace) {
-      trackQualiCounts[s.summary.track] = (trackQualiCounts[s.summary.track] || 0) + 1;
+  // --- Per-track sparkline data: group qualifying sessions by day, best lap per day ---
+  const sparklineData: Record<string, { points: { day: string; bestLap: number }[]; pbMs: number }> = {};
+  for (const [track, trackStats] of Object.entries(trackGroups)) {
+    const qualiSessions = trackStats.filter((s) => !s.isRace && s.bestLapMs > 0);
+    const byDay: Record<string, number> = {};
+    for (const s of qualiSessions) {
+      const dayKey = s.summary.date.split("T")[0];
+      const prev = byDay[dayKey];
+      if (!prev || s.bestLapMs < prev) {
+        byDay[dayKey] = s.bestLapMs;
+      }
     }
+    const dayEntries = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
+    if (dayEntries.length < 3) continue;
+    sparklineData[track] = {
+      points: dayEntries.map(([dayKey, ms]) => ({
+        day: new Date(dayKey).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+        bestLap: ms / 1000,
+      })),
+      pbMs: Math.min(...Object.values(byDay)),
+    };
   }
-  const mostDrivenTrack = Object.entries(trackQualiCounts).sort(
-    (a, b) => b[1] - a[1],
-  )[0]?.[0];
-
-  const paceChartData = mostDrivenTrack
-    ? stats
-        .filter(
-          (s) =>
-            !s.isRace &&
-            s.summary.track === mostDrivenTrack &&
-            s.bestLapMs > 0,
-        )
-        .sort(
-          (a, b) =>
-            new Date(a.summary.date).getTime() -
-            new Date(b.summary.date).getTime(),
-        )
-        .map((s) => ({
-          date: formatShortDate(s.summary.date),
-          bestLap: s.bestLapMs / 1000,
-          bestLapMs: s.bestLapMs,
-        }))
-    : [];
+  const sparklineTracks = sortTracksByCalendar(Object.keys(sparklineData));
 
   // --- Tracks sorted by calendar order ---
   const sortedTracks = sortTracksByCalendar(Object.keys(trackGroups));
-
-  const tooltipStyle = TOOLTIP_STYLE;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -231,53 +221,61 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {/* Per-track pace chart */}
-      {mostDrivenTrack && paceChartData.length > 1 && (
-        <Card as="section">
-          <h3 className="text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-1.5">
-            <TrackFlag track={mostDrivenTrack} />
-            Pace at {mostDrivenTrack}
-            <span className="font-normal text-zinc-500 ml-2">
-              {paceChartData.length} qualifying sessions
-            </span>
+      {/* Per-track qualifying pace sparklines */}
+      {sparklineTracks.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-zinc-300 mb-1">
+            Qualifying Pace
           </h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart
-              data={paceChartData}
-              margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke={CHART_THEME.grid}
-              />
-              <XAxis
-                dataKey="date"
-                stroke={CHART_THEME.axis}
-                fontSize={11}
-              />
-              <YAxis
-                stroke={CHART_THEME.axis}
-                fontSize={11}
-                tickFormatter={(v) => msToLapTime(v * 1000)}
-                domain={["auto", "auto"]}
-              />
-              <Tooltip
-                {...tooltipStyle}
-                formatter={(value: number | undefined) => [
-                  value ? msToLapTime(value * 1000) : "–",
-                  "Best Lap",
-                ]}
-              />
-              <Line
-                type="monotone"
-                dataKey="bestLap"
-                stroke="#a855f7"
-                strokeWidth={2}
-                dot={{ fill: "#a855f7", r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </Card>
+          <p className="text-xs text-zinc-500 mb-3">Best lap per day</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {sparklineTracks.map((track) => {
+              const { points, pbMs } = sparklineData[track];
+              return (
+                <Link
+                  key={track}
+                  to={`/track/${toTrackSlug(track)}`}
+                  className={`${cardClassCompact} !p-3 hover:bg-zinc-900/70 transition-colors block`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <TrackFlag track={track} />
+                      <span className="text-sm font-medium">{track}</span>
+                      <span className="text-[11px] text-zinc-500 ml-1">{points.length} days</span>
+                    </div>
+                    <span className="text-sm font-mono text-purple-400">{msToLapTime(pbMs)}</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={120}>
+                    <LineChart data={points} margin={{ top: 5, right: 5, bottom: 0, left: -10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
+                      <XAxis dataKey="day" stroke={CHART_THEME.axis} fontSize={10} tickLine={false} />
+                      <YAxis
+                        stroke={CHART_THEME.axis}
+                        fontSize={10}
+                        tickLine={false}
+                        tickFormatter={(v: number) => {
+                          const ms = v * 1000;
+                          const minutes = Math.floor(ms / 60000);
+                          const seconds = ((ms % 60000) / 1000).toFixed(1);
+                          return minutes > 0 ? `${minutes}:${seconds.padStart(4, "0")}` : seconds;
+                        }}
+                        domain={["dataMin - 0.5", "dataMax + 0.5"]}
+                        width={50}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="bestLap"
+                        stroke="#a855f7"
+                        strokeWidth={2}
+                        dot={{ fill: "#a855f7", r: 3 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {/* Track summary cards */}
