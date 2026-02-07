@@ -1,13 +1,16 @@
 import { useCallback, useRef, useState } from "react";
 import { Outlet, Link } from "react-router-dom";
-import { FolderUp } from "lucide-react";
+import { Bell, FolderUp } from "lucide-react";
 import { SessionList } from "./SessionList";
+import { ChangelogModal } from "./ChangelogModal";
 import { useTelemetry } from "../context/TelemetryContext";
+import changelog from "virtual:changelog";
 
 const MIN_WIDTH = 250;
 const MAX_WIDTH = 480;
 const DEFAULT_WIDTH = 288; // 72 * 4 (w-72)
 const STORAGE_KEY = "sidebar-width";
+const CHANGELOG_SEEN_KEY = "changelog-last-seen";
 
 function getInitialWidth(): number {
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -21,7 +24,20 @@ function getInitialWidth(): number {
 export function Layout() {
   const { mode, setShowUploadModal } = useTelemetry();
   const [width, setWidth] = useState(getInitialWidth);
+  const [showChangelog, setShowChangelog] = useState(false);
+  const latestHash = changelog[0]?.hash ?? "";
+  const [hasUnseen, setHasUnseen] = useState(
+    () => latestHash !== "" && localStorage.getItem(CHANGELOG_SEEN_KEY) !== latestHash,
+  );
   const dragging = useRef(false);
+
+  const openChangelog = useCallback(() => {
+    setShowChangelog(true);
+    if (latestHash) {
+      localStorage.setItem(CHANGELOG_SEEN_KEY, latestHash);
+      setHasUnseen(false);
+    }
+  }, [latestHash]);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -61,15 +77,27 @@ export function Layout() {
             <Link to="/" className="text-lg font-bold tracking-tight hover:opacity-80 transition-opacity">
               <span className="text-red-500">F1</span> Telemetry Viewer
             </Link>
-            {mode === "upload" && (
+            <div className="flex items-center gap-1">
               <button
-                onClick={() => setShowUploadModal(true)}
-                title="Load different data"
-                className="rounded-lg p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+                onClick={openChangelog}
+                title="What's new"
+                className="relative rounded-lg p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
               >
-                <FolderUp className="h-4 w-4" />
+                <Bell className="h-4 w-4" />
+                {hasUnseen && (
+                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+                )}
               </button>
-            )}
+              {mode === "upload" && (
+                <button
+                  onClick={() => setShowUploadModal(true)}
+                  title="Load different data"
+                  className="rounded-lg p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+                >
+                  <FolderUp className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <SessionList />
@@ -86,6 +114,10 @@ export function Layout() {
       <main className="flex-1 overflow-y-auto bg-black">
         <Outlet />
       </main>
+
+      {showChangelog && (
+        <ChangelogModal onClose={() => setShowChangelog(false)} />
+      )}
     </div>
   );
 }

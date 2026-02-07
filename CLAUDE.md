@@ -45,3 +45,17 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 - `src/plugin/` — Vite plugin (has its own tsconfig: `tsconfig.node.json`)
 
 **Styling:** Dark theme (slate-950 background). All styling via Tailwind utility classes.
+
+## Commit Message Guidelines
+
+Commit messages feed a **user-facing changelog** (the "What's new" modal). A Vite plugin (`src/plugin/changelog.ts`) parses `git log` at build time, extracts the conventional commit type and subject, and displays them in the UI via `ChangelogModal.tsx`.
+
+**Rules:**
+
+- Use conventional commits: `feat:`, `fix:`, `docs:`, etc.
+- The subject after the prefix is shown **verbatim** to users — write it as a user-facing change description, not a developer note.
+  - Good: `feat(ui): show tyre compounds in qualifying lap breakdown`
+  - Bad: `feat: refactor TyreChart to use compound map lookup`
+- Only `feat`, `fix`, and `docs` commits appear in the changelog. Other types (`chore`, `refactor`, `style`, etc.) are filtered out at build time.
+- Keep subjects concise and in imperative mood (matches conventional commit convention).
+- Internal-only changes (refactors, deps, CI) should use `chore:` or `refactor:` so they stay out of the user-facing changelog.
