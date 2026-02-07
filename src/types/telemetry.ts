@@ -10,6 +10,7 @@ export interface SessionSummary {
   bestLapTime?: string;
   bestLapTimeMs?: number;
   aiDifficulty?: number;
+  isSpectator?: boolean;
 }
 
 // --- Full session JSON types ---
@@ -53,6 +54,33 @@ export interface WeatherForecastSample {
   "rain-percentage": number;
 }
 
+export interface CarSetup {
+  "front-wing": number;
+  "rear-wing": number;
+  "on-throttle": number;
+  "off-throttle": number;
+  "front-camber": number;
+  "rear-camber": number;
+  "front-toe": number;
+  "rear-toe": number;
+  "front-suspension": number;
+  "rear-suspension": number;
+  "front-anti-roll-bar": number;
+  "rear-anti-roll-bar": number;
+  "front-suspension-height": number;
+  "rear-suspension-height": number;
+  "brake-pressure": number;
+  "brake-bias": number;
+  "engine-braking": number;
+  "rear-left-tyre-pressure": number;
+  "rear-right-tyre-pressure": number;
+  "front-left-tyre-pressure": number;
+  "front-right-tyre-pressure": number;
+  "ballast": number;
+  "fuel-load": number;
+  "is-valid": boolean;
+}
+
 export interface DriverData {
   index: number;
   "is-player": boolean;
@@ -68,6 +96,7 @@ export interface DriverData {
   "lap-data": LapDataCurrent;
   "tyre-set-history": TyreStint[];
   "per-lap-info": PerLapInfo[];
+  "car-setup"?: CarSetup | null;
 }
 
 export interface SessionHistory {

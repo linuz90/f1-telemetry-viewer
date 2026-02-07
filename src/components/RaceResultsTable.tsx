@@ -4,13 +4,14 @@ import { usePlayerOnly } from "../hooks/usePlayerOnly";
 
 interface RaceResultsTableProps {
   session: TelemetrySession;
+  focusedDriverIndex: number;
 }
 
 /**
  * Final classification table for race sessions.
  * Uses tyre-stint-history-v2 when available, falls back to classification-data.
  */
-const PlayerOnlyToggle = ({
+const FocusDriverToggle = ({
   value,
   onChange,
 }: {
@@ -18,7 +19,7 @@ const PlayerOnlyToggle = ({
   onChange: () => void;
 }) => (
   <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer select-none">
-    Player only
+    Focus driver only
     <button
       type="button"
       role="switch"
@@ -33,25 +34,27 @@ const PlayerOnlyToggle = ({
   </label>
 );
 
-export function RaceResultsTable({ session }: RaceResultsTableProps) {
-  const [playerOnly, togglePlayerOnly] = usePlayerOnly();
+export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTableProps) {
+  const [focusedOnly, toggleFocusedOnly] = usePlayerOnly();
   const stintHistory = session["tyre-stint-history-v2"];
   const drivers = session["classification-data"];
   const speedTraps = session["speed-trap-records"];
 
+  // Find focused driver name for v2 stint matching
+  const focusedDriver = drivers.find((d) => d.index === focusedDriverIndex);
+  const focusedName = focusedDriver?.["driver-name"];
+
   // Use tyre-stint-history-v2 if available (has clean per-driver race results)
   if (stintHistory?.length) {
-    const filteredStints = playerOnly
-      ? stintHistory.filter((entry) =>
-          drivers.some((d) => d["is-player"] && d["driver-name"] === entry.name),
-        )
+    const filteredStints = focusedOnly
+      ? stintHistory.filter((entry) => entry.name === focusedName)
       : stintHistory;
 
     return (
       <div>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-zinc-300">Classification</h3>
-          <PlayerOnlyToggle value={playerOnly} onChange={togglePlayerOnly} />
+          <FocusDriverToggle value={focusedOnly} onChange={toggleFocusedOnly} />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -66,9 +69,7 @@ export function RaceResultsTable({ session }: RaceResultsTableProps) {
             </thead>
             <tbody>
               {filteredStints.map((entry, i) => {
-                const isPlayer = drivers.some(
-                  (d) => d["is-player"] && d["driver-name"] === entry.name,
-                );
+                const isFocused = entry.name === focusedName;
                 const gap = entry["delta-to-leader"];
                 const status = entry["result-status"];
                 const gapStr = status && status !== "FINISHED"
@@ -92,7 +93,7 @@ export function RaceResultsTable({ session }: RaceResultsTableProps) {
                 return (
                   <tr
                     key={i}
-                    className={`border-t border-zinc-800/50 ${isPlayer ? "bg-zinc-900/50 text-white font-medium" : ""}`}
+                    className={`border-t border-zinc-800/50 ${isFocused ? "bg-zinc-900/50 text-white font-medium" : ""}`}
                   >
                     <td className="py-1.5 px-2">{entry.position}</td>
                     <td className="py-1.5 px-2">
@@ -122,7 +123,7 @@ export function RaceResultsTable({ session }: RaceResultsTableProps) {
   // Fallback: use classification-data with final-classification
   const sorted = [...drivers]
     .filter((d) => d["final-classification"])
-    .filter((d) => !playerOnly || d["is-player"])
+    .filter((d) => !focusedOnly || d.index === focusedDriverIndex)
     .sort(
       (a, b) =>
         (a["final-classification"]?.position ?? 99) -
@@ -133,7 +134,7 @@ export function RaceResultsTable({ session }: RaceResultsTableProps) {
     <div>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-zinc-300">Classification</h3>
-        <PlayerOnlyToggle value={playerOnly} onChange={togglePlayerOnly} />
+        <FocusDriverToggle value={focusedOnly} onChange={toggleFocusedOnly} />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -153,7 +154,7 @@ export function RaceResultsTable({ session }: RaceResultsTableProps) {
               return (
                 <tr
                   key={d.index}
-                  className={`border-t border-zinc-800/50 ${d["is-player"] ? "bg-zinc-900/50 text-white font-medium" : ""}`}
+                  className={`border-t border-zinc-800/50 ${d.index === focusedDriverIndex ? "bg-zinc-900/50 text-white font-medium" : ""}`}
                 >
                   <td className="py-1.5 px-2">{fc.position}</td>
                   <td className="py-1.5 px-2">

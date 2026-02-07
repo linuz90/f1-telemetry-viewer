@@ -55,6 +55,7 @@ export function telemetryServer(telemetryDir?: string): Plugin {
               let bestLapTime: string | undefined;
               let bestLapTimeMs: number | undefined;
               let aiDifficulty: number | undefined;
+              let isSpectator = false;
               try {
                 const raw = fs.readFileSync(
                   path.join(telemetryDir, relativePath),
@@ -64,12 +65,28 @@ export function telemetryServer(telemetryDir?: string): Plugin {
                 const sessionInfo = json["session-info"];
                 const isOnline = sessionInfo?.["network-game"] === 1;
                 aiDifficulty = isOnline ? 0 : (sessionInfo?.["ai-difficulty"] ?? 0);
-                const player = json["classification-data"]?.find(
+                let focusDriver = json["classification-data"]?.find(
                   (d: { "is-player": boolean }) => d["is-player"],
                 );
-                if (player) {
+
+                // Spectator fallback: no player → pick driver with most valid laps
+                if (!focusDriver) {
+                  isSpectator = true;
+                  const drivers = json["classification-data"] ?? [];
+                  let maxLaps = 0;
+                  for (const d of drivers) {
+                    const count = (d["session-history"]?.["lap-history-data"] ?? [])
+                      .filter((l: { "lap-time-in-ms": number }) => l["lap-time-in-ms"] > 0).length;
+                    if (count > maxLaps) {
+                      maxLaps = count;
+                      focusDriver = d;
+                    }
+                  }
+                }
+
+                if (focusDriver) {
                   const laps =
-                    player["session-history"]?.["lap-history-data"] ?? [];
+                    focusDriver["session-history"]?.["lap-history-data"] ?? [];
                   validLapCount = laps.filter(
                     (l: { "lap-time-in-ms": number; "lap-valid-bit-flags": number }) =>
                       l["lap-time-in-ms"] > 0,
@@ -81,7 +98,7 @@ export function telemetryServer(telemetryDir?: string): Plugin {
                     parsed.sessionType === "One Shot Qualifying";
                   if (isQuali) {
                     const bestLapNum =
-                      player["session-history"]?.["best-lap-time-lap-num"] ?? -1;
+                      focusDriver["session-history"]?.["best-lap-time-lap-num"] ?? -1;
                     lapIndicators = laps
                       .filter(
                         (l: { "lap-time-in-ms": number }) =>
@@ -117,7 +134,7 @@ export function telemetryServer(telemetryDir?: string): Plugin {
               }
 
               slugMap.set(slug, relativePath);
-              return { relativePath, slug, ...parsed, validLapCount, lapIndicators, bestLapTime, bestLapTimeMs, aiDifficulty };
+              return { relativePath, slug, ...parsed, validLapCount, lapIndicators, bestLapTime, bestLapTimeMs, aiDifficulty, isSpectator };
             })
             .filter((s) => s.validLapCount > 0);
 

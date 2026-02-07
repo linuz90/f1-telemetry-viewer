@@ -1,10 +1,11 @@
 import type { TelemetrySession } from "../types/telemetry";
 import { msToSectorTime } from "../utils/format";
-import { getValidLaps, findPlayer } from "../utils/stats";
+import { getValidLaps } from "../utils/stats";
 import { getTeamColor } from "../utils/colors";
 
 interface SectorVsBestProps {
   session: TelemetrySession;
+  focusedDriverIndex: number;
 }
 
 const SECTOR_KEYS = [
@@ -14,23 +15,21 @@ const SECTOR_KEYS = [
 ] as const;
 
 /**
- * Compares the player's best sector times against the session-best sectors,
+ * Compares the focused driver's best sector times against the session-best sectors,
  * showing deltas and who holds the best in each sector.
  */
-export function SectorVsBest({ session }: SectorVsBestProps) {
-  const player = findPlayer(session);
-  if (!player) return null;
-
+export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps) {
   const drivers = session["classification-data"];
+  const focused = drivers.find((d) => d.index === focusedDriverIndex);
+  if (!focused) return null;
 
-  // Compute session-best and player-best for each sector
+  // Compute session-best and focused-driver-best for each sector
   const sectors = SECTOR_KEYS.map(({ key, label }) => {
-    // Player best
-    const playerValid = getValidLaps(
-      player["session-history"]["lap-history-data"],
+    const focusedValid = getValidLaps(
+      focused["session-history"]["lap-history-data"],
     );
-    const playerBest = playerValid.length
-      ? Math.min(...playerValid.map((l) => l[key]))
+    const focusedBest = focusedValid.length
+      ? Math.min(...focusedValid.map((l) => l[key]))
       : null;
 
     // Session best across all drivers
@@ -51,20 +50,20 @@ export function SectorVsBest({ session }: SectorVsBestProps) {
 
     if (sessionBest === Infinity) sessionBest = 0;
 
-    const isPlayerBest =
-      playerBest !== null &&
+    const isFocusedBest =
+      focusedBest !== null &&
       sessionBest > 0 &&
-      Math.abs(playerBest - sessionBest) < 1;
+      Math.abs(focusedBest - sessionBest) < 1;
     const deltaMs =
-      playerBest !== null && sessionBest > 0 ? playerBest - sessionBest : null;
+      focusedBest !== null && sessionBest > 0 ? focusedBest - sessionBest : null;
 
     return {
       label,
-      playerBest,
+      focusedBest,
       sessionBest,
       sessionBestDriver,
       sessionBestTeam,
-      isPlayerBest,
+      isFocusedBest,
       deltaMs,
     };
   });
@@ -72,14 +71,14 @@ export function SectorVsBest({ session }: SectorVsBestProps) {
   return (
     <div>
       <h3 className="text-base font-semibold text-zinc-300 mb-3">
-        Your Sectors vs Best
+        Sectors vs Best
       </h3>
       <div className="grid grid-cols-3 gap-3">
         {sectors.map((s) => (
           <div
             key={s.label}
             className={`rounded-lg px-3 py-3 ${
-              s.isPlayerBest
+              s.isFocusedBest
                 ? "bg-purple-500/10 border border-purple-500/30"
                 : "bg-zinc-900/50"
             }`}
@@ -88,30 +87,30 @@ export function SectorVsBest({ session }: SectorVsBestProps) {
               {s.label}
             </div>
 
-            {/* Player time */}
+            {/* Focused driver time */}
             <div className="font-mono text-lg font-semibold text-zinc-100">
-              {s.playerBest !== null ? msToSectorTime(s.playerBest) : "–"}
+              {s.focusedBest !== null ? msToSectorTime(s.focusedBest) : "–"}
             </div>
 
             {/* Delta */}
             {s.deltaMs !== null && (
               <div
                 className={`font-mono text-sm mt-0.5 ${
-                  s.isPlayerBest
+                  s.isFocusedBest
                     ? "text-purple-400"
                     : s.deltaMs < 100
                       ? "text-yellow-400"
                       : "text-red-400"
                 }`}
               >
-                {s.isPlayerBest
+                {s.isFocusedBest
                   ? "Session best"
                   : `+${(s.deltaMs / 1000).toFixed(3)}`}
               </div>
             )}
 
             {/* Session best holder */}
-            {!s.isPlayerBest && s.sessionBest > 0 && (
+            {!s.isFocusedBest && s.sessionBest > 0 && (
               <div className="flex items-center gap-1.5 mt-2 text-xs text-zinc-500">
                 <span
                   className="inline-block w-1.5 h-1.5 rounded-full"

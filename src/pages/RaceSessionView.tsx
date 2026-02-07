@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { TelemetrySession } from "../types/telemetry";
 import {
-  findPlayer,
+  findFocusedDriver,
   calculateCumulativeDeltas,
   generateInsights,
   generateFuelInsights,
@@ -22,16 +22,32 @@ import { PositionChart } from "../components/PositionChart";
 import { RaceResultsTable } from "../components/RaceResultsTable";
 import { DamageTimeline } from "../components/DamageTimeline";
 import { WeatherTimeline } from "../components/WeatherTimeline";
+import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
 
 export function RaceSessionView({ session, slug }: { session: TelemetrySession; slug: string }) {
+  const drivers = session["classification-data"] ?? [];
+  const defaultFocused = findFocusedDriver(session);
+
+  const [focusedDriverIndex, setFocusedDriverIndex] = useState<number>(
+    defaultFocused?.index ?? 0,
+  );
   const [selectedRivalIndex, setSelectedRivalIndex] = useState<number | null>(
     null,
   );
 
-  const player = findPlayer(session);
+  // Reset when session data actually changes (handles cached fast-resolve)
+  useEffect(() => {
+    setFocusedDriverIndex(findFocusedDriver(session)?.index ?? 0);
+    setSelectedRivalIndex(null);
+  }, [session]);
+
+  const focusedDriver = useMemo(
+    () => drivers.find((d) => d.index === focusedDriverIndex),
+    [drivers, focusedDriverIndex],
+  );
+
   const info = session["session-info"];
-  const drivers = session["classification-data"] ?? [];
 
   // Find track name from session list to match history
   const { sessions: allSessions } = useSessionList();
@@ -41,10 +57,10 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   );
   const { pbs } = useTrackHistory(trackName, slug);
 
-  const stints = player?.["tyre-set-history"] ?? [];
-  const laps = player?.["session-history"]["lap-history-data"] ?? [];
+  const stints = focusedDriver?.["tyre-set-history"] ?? [];
+  const laps = focusedDriver?.["session-history"]["lap-history-data"] ?? [];
   const pitLaps = stints.slice(1).map((s) => s["start-lap"]);
-  const perLapInfo = player?.["per-lap-info"] ?? [];
+  const perLapInfo = focusedDriver?.["per-lap-info"] ?? [];
 
   // Derive rival data
   const rival = useMemo(
@@ -67,14 +83,19 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
 
   // Strategy insights
   const insights = useMemo(() => {
-    if (!player) return [];
-    const base = generateInsights(session, player, rival);
-    base.push(...generateFuelInsights(player));
+    if (!focusedDriver) return [];
+    const base = generateInsights(session, focusedDriver, rival);
+    base.push(...generateFuelInsights(focusedDriver));
     if (pbs) {
-      base.push(...generateRaceHistoryInsights(player, pbs));
+      base.push(...generateRaceHistoryInsights(focusedDriver, pbs));
     }
     return base;
-  }, [session, player, rival, pbs]);
+  }, [session, focusedDriver, rival, pbs]);
+
+  // Show car setup only for the actual player with valid setup data
+  const showSetup =
+    focusedDriver?.["is-player"] &&
+    focusedDriver["car-setup"]?.["is-valid"];
 
   // Compute laps where damage increased
   const damageLaps = useMemo(() => {
@@ -104,7 +125,11 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
-      <SessionHeader session={session} />
+      <SessionHeader
+        session={session}
+        focusedDriverIndex={focusedDriverIndex}
+        onFocusedDriverChange={setFocusedDriverIndex}
+      />
 
       {/* Weather timeline */}
       {(info["weather-forecast-samples"]?.length ?? 0) > 1 && (
@@ -116,10 +141,18 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
         session={session}
         selectedIndex={selectedRivalIndex}
         onSelect={setSelectedRivalIndex}
+        focusedDriverIndex={focusedDriverIndex}
       />
 
       {/* Strategy insights */}
       <StrategyInsightsCard insights={insights} />
+
+      {/* Car setup */}
+      {showSetup && focusedDriver["car-setup"] && (
+        <Card as="section">
+          <CarSetupCard setup={focusedDriver["car-setup"]} />
+        </Card>
+      )}
 
       {/* Stint strategy + tyre wear */}
       <Card as="section" className="space-y-4">
@@ -134,9 +167,9 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
       </Card>
 
       {/* Stint comparison table */}
-      {player && (
+      {focusedDriver && (
         <Card as="section">
-          <StintComparisonTable player={player} allDrivers={drivers} />
+          <StintComparisonTable player={focusedDriver} allDrivers={drivers} />
         </Card>
       )}
 
@@ -187,7 +220,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
         <Card as="section">
           <PositionChart
             positionHistory={session["position-history"]}
-            playerName={player?.["driver-name"] ?? ""}
+            playerName={focusedDriver?.["driver-name"] ?? ""}
             rivalName={rival?.["driver-name"]}
             overtakes={session.overtakes?.records}
           />
@@ -196,7 +229,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
 
       {/* Results table */}
       <Card as="section">
-        <RaceResultsTable session={session} />
+        <RaceResultsTable session={session} focusedDriverIndex={focusedDriverIndex} />
       </Card>
     </div>
   );

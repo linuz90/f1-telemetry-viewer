@@ -6,6 +6,7 @@ import { getValidLaps } from "../utils/stats";
 
 interface QualifyingTableProps {
   session: TelemetrySession;
+  focusedDriverIndex: number;
 }
 
 /** Get the best lap entry for a driver */
@@ -29,8 +30,8 @@ function hasOnlyInvalidLaps(driver: DriverData): boolean {
 /**
  * Qualifying results table: all drivers ranked by best valid lap.
  */
-export function QualifyingTable({ session }: QualifyingTableProps) {
-  const [playerOnly, togglePlayerOnly] = usePlayerOnly();
+export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTableProps) {
+  const [focusedOnly, toggleFocusedOnly] = usePlayerOnly();
   const drivers = session["classification-data"];
 
   // Build rows with best lap data
@@ -45,7 +46,7 @@ export function QualifyingTable({ session }: QualifyingTableProps) {
       };
     })
     .filter((r) => r.bestLap || r.allInvalid)
-    .filter((r) => !playerOnly || r.driver["is-player"])
+    .filter((r) => !focusedOnly || r.driver.index === focusedDriverIndex)
     .sort((a, b) => a.bestTime - b.bestTime);
 
   const p1Time = rows[0]?.bestTime ?? 0;
@@ -72,16 +73,16 @@ export function QualifyingTable({ session }: QualifyingTableProps) {
           Qualifying Results
         </h3>
         <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer select-none">
-          Player only
+          Focus driver only
           <button
             type="button"
             role="switch"
-            aria-checked={playerOnly}
-            onClick={togglePlayerOnly}
-            className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${playerOnly ? "bg-cyan-600" : "bg-zinc-800"}`}
+            aria-checked={focusedOnly}
+            onClick={toggleFocusedOnly}
+            className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${focusedOnly ? "bg-cyan-600" : "bg-zinc-800"}`}
           >
             <span
-              className={`inline-block h-3 w-3 rounded-full bg-white transition-transform ${playerOnly ? "translate-x-3.5" : "translate-x-0.5"}`}
+              className={`inline-block h-3 w-3 rounded-full bg-white transition-transform ${focusedOnly ? "translate-x-3.5" : "translate-x-0.5"}`}
             />
           </button>
         </label>
@@ -102,7 +103,7 @@ export function QualifyingTable({ session }: QualifyingTableProps) {
           </thead>
           <tbody>
             {rows.map((row, i) => {
-              const isPlayer = row.driver["is-player"];
+              const isFocused = row.driver.index === focusedDriverIndex;
               const gap =
                 i === 0
                   ? "–"
@@ -113,7 +114,7 @@ export function QualifyingTable({ session }: QualifyingTableProps) {
               return (
                 <tr
                   key={row.driver.index}
-                  className={`border-t border-zinc-800/50 ${isPlayer ? "bg-zinc-900/50 text-white font-medium" : ""}`}
+                  className={`border-t border-zinc-800/50 ${isFocused ? "bg-zinc-900/50 text-white font-medium" : ""}`}
                 >
                   <td className="py-1.5 px-2">{i + 1}</td>
                   <td className="py-1.5 px-2">

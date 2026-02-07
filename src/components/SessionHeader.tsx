@@ -1,9 +1,11 @@
+import { useMemo } from "react";
 import dayjs from "dayjs";
-import { AlertTriangle, ArrowDown, ArrowUp, Calendar, Cloud, Cpu, Flag, Gauge, Globe, Target, Timer, Trophy, User } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Calendar, ChevronDown, Cloud, Cpu, Flag, Gauge, Globe, Target, Timer, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { TelemetrySession } from "../types/telemetry";
-import { findPlayer, getBestLapTime, isRaceSession } from "../utils/stats";
+import { getBestLapTime, isRaceSession } from "../utils/stats";
 import { formatSessionType, msToLapTime, toTrackSlug } from "../utils/format";
+import { getTeamColor } from "../utils/colors";
 import { TrackFlag } from "./TrackFlag";
 
 const SESSION_ICONS: Record<string, typeof Flag> = {
@@ -14,9 +16,16 @@ const SESSION_ICONS: Record<string, typeof Flag> = {
   "One-Shot Quali": Target,
 };
 
-export function SessionHeader({ session }: { session: TelemetrySession }) {
+interface SessionHeaderProps {
+  session: TelemetrySession;
+  focusedDriverIndex: number;
+  onFocusedDriverChange: (index: number) => void;
+}
+
+export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChange }: SessionHeaderProps) {
   const info = session["session-info"];
-  const player = findPlayer(session);
+  const drivers = session["classification-data"] ?? [];
+  const focusedDriver = drivers.find((d) => d.index === focusedDriverIndex);
   const debug = session.debug;
   const isQuali = !isRaceSession(session);
   const isOnline = info["network-game"] === 1;
@@ -25,8 +34,8 @@ export function SessionHeader({ session }: { session: TelemetrySession }) {
   const TypeIcon = SESSION_ICONS[info["session-type"]] ?? SESSION_ICONS[sessionType] ?? Flag;
 
   let bestLapTimeStr: string | undefined;
-  if (isQuali && player) {
-    const laps = player["session-history"]["lap-history-data"];
+  if (isQuali && focusedDriver) {
+    const laps = focusedDriver["session-history"]["lap-history-data"];
     const bestMs = getBestLapTime(laps);
     if (bestMs > 0) bestLapTimeStr = msToLapTime(bestMs);
   }
@@ -36,6 +45,24 @@ export function SessionHeader({ session }: { session: TelemetrySession }) {
   const date = dayjs(rawTs);
   const formattedDate = date.format("ddd, D MMM YYYY");
   const formattedTime = date.format("HH:mm");
+
+  // Drivers with laps, sorted by position
+  const selectableDrivers = useMemo(() => {
+    return drivers
+      .filter((d) => {
+        const laps = d["session-history"]["lap-history-data"];
+        return laps.some((l) => l["lap-time-in-ms"] > 0);
+      })
+      .sort((a, b) => {
+        const posA = a["final-classification"]?.position ?? 999;
+        const posB = b["final-classification"]?.position ?? 999;
+        if (posA !== posB) return posA - posB;
+        // For qualifying without final-classification, sort by best lap
+        const bestA = getBestLapTime(a["session-history"]["lap-history-data"]);
+        const bestB = getBestLapTime(b["session-history"]["lap-history-data"]);
+        return bestA - bestB;
+      });
+  }, [drivers]);
 
   return (
     <div className="mb-6">
@@ -59,19 +86,39 @@ export function SessionHeader({ session }: { session: TelemetrySession }) {
 
       {/* Meta pills */}
       <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-        {player && (
-          <Pill icon={User} accent>
-            {player["driver-name"]} — {player.team}
-          </Pill>
-        )}
-        {player?.["final-classification"] && (
+        {/* Driver selector */}
+        <span className="relative inline-flex items-center">
+          <span
+            className="inline-block w-1.5 h-1.5 rounded-full mr-1"
+            style={{ backgroundColor: focusedDriver ? getTeamColor(focusedDriver.team) : undefined }}
+          />
+          <select
+            value={focusedDriverIndex}
+            onChange={(e) => onFocusedDriverChange(Number(e.target.value))}
+            className="appearance-none bg-zinc-900 text-zinc-200 text-xs font-medium rounded-full pl-2 pr-6 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-purple-500/40 cursor-pointer"
+          >
+            {selectableDrivers.map((d) => {
+              const pos = d["final-classification"]?.position;
+              const suffix = d["is-player"] ? " (You)" : "";
+              const prefix = pos ? `P${pos} ` : "";
+              return (
+                <option key={d.index} value={d.index}>
+                  {prefix}{d["driver-name"]} — {d.team}{suffix}
+                </option>
+              );
+            })}
+          </select>
+          <ChevronDown className="absolute right-1.5 size-3 pointer-events-none text-zinc-500" />
+        </span>
+
+        {focusedDriver?.["final-classification"] && (
           <Pill icon={Trophy} accent>
-            P{player["final-classification"].position}
+            P{focusedDriver["final-classification"].position}
           </Pill>
         )}
         {(() => {
-          if (!isRaceSession(session) || !player?.["final-classification"]) return null;
-          const fc = player["final-classification"];
+          if (!isRaceSession(session) || !focusedDriver?.["final-classification"]) return null;
+          const fc = focusedDriver["final-classification"];
           const gained = fc["grid-position"] - fc.position;
           if (fc["grid-position"] <= 0 || gained === 0) return null;
           return gained > 0 ? (
@@ -85,8 +132,8 @@ export function SessionHeader({ session }: { session: TelemetrySession }) {
           );
         })()}
         {(() => {
-          if (!player?.["final-classification"]) return null;
-          const fc = player["final-classification"];
+          if (!focusedDriver?.["final-classification"]) return null;
+          const fc = focusedDriver["final-classification"];
           if (fc["num-penalties"] <= 0) return null;
           const penaltyText = fc["penalties-time"] > 0
             ? `${fc["num-penalties"]} ${fc["num-penalties"] === 1 ? "penalty" : "penalties"} (+${fc["penalties-time"]}s)`
