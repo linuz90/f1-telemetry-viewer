@@ -6,6 +6,7 @@ export interface ChangelogEntry {
   date: string;
   type: string;
   message: string;
+  pr?: number;
 }
 
 const VISIBLE_TYPES = new Set(["feat", "fix", "docs"]);
@@ -31,9 +32,14 @@ function getChangelog(): ChangelogEntry[] {
         // Parse conventional commit prefix
         const match = subject.match(/^(\w+)(?:\(.+?\))?:\s*(.+)$/);
         const type = match?.[1] ?? "other";
-        const message = match?.[2] ?? subject;
+        const rawMessage = match?.[2] ?? subject;
 
-        return { hash: hash.slice(0, 7), date, type, message };
+        // Extract PR number from GitHub merge format, e.g. "some message (#42)"
+        const prMatch = rawMessage.match(/^(.+?)\s*\(#(\d+)\)$/);
+        const message = prMatch ? prMatch[1] : rawMessage;
+        const pr = prMatch ? Number(prMatch[2]) : undefined;
+
+        return { hash: hash.slice(0, 7), date, type, message, pr };
       })
       .filter((e) => VISIBLE_TYPES.has(e.type));
   } catch {

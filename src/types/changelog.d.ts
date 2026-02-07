@@ -4,6 +4,7 @@ declare module "virtual:changelog" {
     date: string;
     type: string;
     message: string;
+    pr?: number;
   }
   const entries: ChangelogEntry[];
   export default entries;
