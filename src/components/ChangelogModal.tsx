@@ -98,7 +98,7 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
                           href={`${REPO_URL}/pull/${entry.pr}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
+                          className="shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] leading-none font-medium bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
                         >
                           #{entry.pr}
                         </a>
