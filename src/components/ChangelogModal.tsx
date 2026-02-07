@@ -82,27 +82,30 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
                 {grouped[date].map((entry) => {
                   const config = TYPE_CONFIG[entry.type];
                   return (
-                    <li key={entry.hash} className="flex items-center gap-2.5">
+                    <li key={entry.hash} className="flex items-start gap-2.5">
                       {config && (
                         <span
-                          className={`shrink-0 flex h-5 w-5 items-center justify-center rounded ${config.bg}`}
+                          className={`shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded ${config.bg}`}
                         >
                           <config.icon className={`h-3 w-3 ${config.fg}`} />
                         </span>
                       )}
                       <span className="text-sm text-zinc-300 leading-snug">
                         {entry.message}
+                        {entry.pr && (
+                          <>
+                            {" "}
+                            <a
+                              href={`${REPO_URL}/pull/${entry.pr}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] leading-none font-medium bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 transition-colors align-middle"
+                            >
+                              #{entry.pr}
+                            </a>
+                          </>
+                        )}
                       </span>
-                      {entry.pr && (
-                        <a
-                          href={`${REPO_URL}/pull/${entry.pr}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="shrink-0 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] leading-none font-medium bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 transition-colors"
-                        >
-                          #{entry.pr}
-                        </a>
-                      )}
                     </li>
                   );
                 })}
