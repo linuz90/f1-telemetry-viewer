@@ -108,8 +108,32 @@ export function PositionChart({ positionHistory, playerName, rivalName, overtake
           />
           <Tooltip
             {...TOOLTIP_STYLE}
-            labelFormatter={(lap) => `Lap ${lap}`}
-            formatter={(value: number | undefined, name: string | undefined) => [`P${value ?? "–"}`, name ?? ""]}
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const lap = label as number;
+              const lapOvertakes = overtakes?.filter((ot) => {
+                const otLap = ot["overtaking-driver-lap"];
+                return otLap === lap && (ot["overtaking-driver-name"] === playerName || ot["overtaken-driver-name"] === playerName);
+              }) ?? [];
+              return (
+                <div className="rounded-md bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs">
+                  <p className="text-zinc-400 mb-1">Lap {lap}</p>
+                  {payload.map((entry) => (
+                    <p key={entry.name} style={{ color: entry.color }} className="font-mono">
+                      {entry.name}: P{entry.value}
+                    </p>
+                  ))}
+                  {lapOvertakes.map((ot, i) => {
+                    const isPlayerOvertaking = ot["overtaking-driver-name"] === playerName;
+                    return (
+                      <p key={i} className="mt-1" style={{ color: isPlayerOvertaking ? "#22c55e" : "#ef4444" }}>
+                        {isPlayerOvertaking ? `Passed ${ot["overtaken-driver-name"]}` : `Overtaken by ${ot["overtaking-driver-name"]}`}
+                      </p>
+                    );
+                  })}
+                </div>
+              );
+            }}
           />
 
           {visibleDrivers.map((driver) => {
@@ -131,9 +155,9 @@ export function PositionChart({ positionHistory, playerName, rivalName, overtake
           {/* Overtake markers */}
           {overtakes?.map((ot, i) => {
             const isPlayerOvertaking = ot["overtaking-driver-name"] === playerName;
-            const isPlayerOvertaken = ot["being-overtaken-driver-name"] === playerName;
+            const isPlayerOvertaken = ot["overtaken-driver-name"] === playerName;
             if (!isPlayerOvertaking && !isPlayerOvertaken) return null;
-            const lap = ot["lap-number"];
+            const lap = ot["overtaking-driver-lap"];
             const position = data[lap]?.[playerName];
             if (position == null) return null;
             return (
@@ -151,7 +175,7 @@ export function PositionChart({ positionHistory, playerName, rivalName, overtake
           })}
         </LineChart>
       </ResponsiveContainer>
-      {overtakes && overtakes.some((ot) => ot["overtaking-driver-name"] === playerName || ot["being-overtaken-driver-name"] === playerName) && (
+      {overtakes && overtakes.some((ot) => ot["overtaking-driver-name"] === playerName || ot["overtaken-driver-name"] === playerName) && (
         <div className="flex items-center gap-4 mt-1.5 text-[10px] text-zinc-400">
           {overtakes.some((ot) => ot["overtaking-driver-name"] === playerName) && (
             <span className="flex items-center gap-1">
@@ -159,7 +183,7 @@ export function PositionChart({ positionHistory, playerName, rivalName, overtake
               Overtake
             </span>
           )}
-          {overtakes.some((ot) => ot["being-overtaken-driver-name"] === playerName) && (
+          {overtakes.some((ot) => ot["overtaken-driver-name"] === playerName) && (
             <span className="flex items-center gap-1">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
               Overtaken

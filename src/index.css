@@ -20,3 +20,9 @@
 ::-webkit-scrollbar-thumb:hover {
   background: theme("--color-zinc-700");
 }
+
+/* Remove focus ring on Recharts containers */
+.recharts-wrapper:focus,
+.recharts-surface:focus {
+  outline: none;
+}
