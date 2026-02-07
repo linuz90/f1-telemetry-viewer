@@ -1,5 +1,6 @@
 import type { TyreStint } from "../types/telemetry";
 import { getCompoundColor } from "../utils/colors";
+import { stintWearRate, getWorstWheelWear } from "../utils/stats";
 
 interface StintTimelineProps {
   stints: TyreStint[];
@@ -71,6 +72,97 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+const PUNCTURE_THRESHOLD = 75; // % wear where puncture risk starts
+
+/**
+ * Stint detail cards showing wear-based estimated max life.
+ * Placed below the tyre wear chart for context.
+ */
+export function StintDetailCards({ stints }: { stints: TyreStint[] }) {
+  // Only show if we have meaningful wear data
+  const stintsWithWear = stints.filter((s) => stintWearRate(s) > 0);
+  if (stintsWithWear.length === 0) return null;
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-zinc-300 mb-2">
+        Tyre Life Estimate
+      </h3>
+      <div
+        className="grid gap-2"
+        style={{ gridTemplateColumns: `repeat(${stints.length}, minmax(0, 1fr))` }}
+      >
+        {stints.map((stint, i) => {
+          const compound = stint["tyre-set-data"]["visual-tyre-compound"];
+          const color = getCompoundColor(compound);
+          const wearHistory = stint["tyre-wear-history"];
+          const peakWear = wearHistory.length > 0 ? getWorstWheelWear(wearHistory[wearHistory.length - 1]) : 0;
+          const wearRate = stintWearRate(stint);
+          const estMaxLife = wearRate > 0 ? Math.round(PUNCTURE_THRESHOLD / wearRate) : 0;
+          const usageRatio = estMaxLife > 0 ? stint["stint-length"] / estMaxLife : 0;
+          const usagePct = Math.round(usageRatio * 100);
+
+          return (
+            <div key={i} className="rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-2">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="text-xs font-medium text-zinc-300 truncate">
+                  {compound}
+                </span>
+              </div>
+              <div className="text-[11px] text-zinc-400 space-y-1">
+                <div className="flex justify-between">
+                  <span>Stint</span>
+                  <span className="text-zinc-300 font-mono">{stint["stint-length"]} laps</span>
+                </div>
+                {peakWear > 0 && (
+                  <div className="flex justify-between">
+                    <span>Peak wear</span>
+                    <span className={`font-mono ${peakWear > 60 ? "text-red-400" : peakWear > 40 ? "text-amber-400" : "text-zinc-300"}`}>{peakWear.toFixed(1)}%</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span>Wear rate</span>
+                  <span className="text-zinc-300 font-mono">{wearRate.toFixed(1)}%/lap</span>
+                </div>
+                {estMaxLife > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span>Est. max life</span>
+                      <span className="text-zinc-300 font-mono">~{estMaxLife} laps</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Life used</span>
+                      <span className={`font-mono font-medium ${usageRatio > 0.8 ? "text-red-400" : usageRatio > 0.6 ? "text-amber-400" : "text-emerald-400"}`}>
+                        {usagePct}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.min(usagePct, 100)}%`,
+                          backgroundColor: usageRatio > 0.8 ? "#ef4444" : usageRatio > 0.6 ? "#f59e0b" : "#22c55e",
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-zinc-600 mt-1.5">
+        Max life estimated at {PUNCTURE_THRESHOLD}% worst-wheel wear (puncture risk threshold)
+      </p>
     </div>
   );
 }

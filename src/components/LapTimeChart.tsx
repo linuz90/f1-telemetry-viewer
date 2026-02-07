@@ -24,6 +24,8 @@ interface LapTimeChartProps {
   rivalName?: string;
   /** Per-lap info for SC/VSC status and ERS data */
   perLapInfo?: PerLapInfo[];
+  /** Laps where damage increased (shown with red shading) */
+  damageLaps?: number[];
 }
 
 const SC_COLORS: Record<string, string> = {
@@ -46,6 +48,7 @@ export function LapTimeChart({
   rivalLaps,
   rivalName,
   perLapInfo,
+  damageLaps = [],
 }: LapTimeChartProps) {
   if (!laps.length) {
     return <p className="text-sm text-zinc-500">No lap data.</p>;
@@ -90,6 +93,7 @@ export function LapTimeChart({
         s1: l["sector-1-time-in-ms"] / 1000,
         s2: l["sector-2-time-in-ms"] / 1000,
         s3: l["sector-3-time-in-ms"] / 1000,
+        topSpeed: info?.["top-speed-kmph"] ?? undefined,
         rivalTimeSec: rivalMap.get(lapNum) ?? undefined,
         scStatus,
         isSC: scStatus === "SAFETY_CAR" || scStatus === "FULL_SAFETY_CAR",
@@ -110,6 +114,10 @@ export function LapTimeChart({
 
   const hasRival = rivalLaps && rivalLaps.length > 0;
   const hasErs = data.some((d) => d.ersPct != null);
+  const hasTopSpeed = data.some((d) => d.topSpeed != null);
+  const bestTopSpeed = hasTopSpeed
+    ? Math.max(...data.filter((d) => d.valid && d.topSpeed != null).map((d) => d.topSpeed!))
+    : 0;
 
   // Best lap time for reference line
   const bestTime = Math.min(
@@ -217,6 +225,19 @@ export function LapTimeChart({
                 fontSize: 10,
                 position: "insideTopLeft",
               }}
+            />
+          ))}
+
+          {/* Damage lap shading */}
+          {damageLaps.map((lap) => (
+            <ReferenceArea
+              key={`dmg-${lap}`}
+              yAxisId="time"
+              x1={lap - 0.5}
+              x2={lap + 0.5}
+              fill="#ef4444"
+              fillOpacity={0.08}
+              stroke="none"
             />
           ))}
 
@@ -342,6 +363,7 @@ export function LapTimeChart({
               <th className="text-right py-1 px-2">S2</th>
               <th className="text-right py-1 px-2">S3</th>
               <th className="text-right py-1 px-2">Delta</th>
+              {hasTopSpeed && <th className="text-right py-1 px-2">Speed</th>}
               {hasErs && <th className="text-right py-1 px-2">ERS</th>}
             </tr>
           </thead>
@@ -393,6 +415,11 @@ export function LapTimeChart({
                         : `+${delta.toFixed(3)}`
                       : ""}
                   </td>
+                  {hasTopSpeed && (
+                    <td className={`text-right py-1 px-2 font-mono ${d.valid && d.topSpeed != null && d.topSpeed === bestTopSpeed ? "text-purple-400 font-semibold" : ""}`}>
+                      {d.topSpeed != null ? `${d.topSpeed}` : "–"}
+                    </td>
+                  )}
                   {hasErs && (
                     <td className="text-right py-1 px-2 font-mono text-emerald-400">
                       {d.ersPct != null ? `${d.ersPct.toFixed(0)}%` : "–"}

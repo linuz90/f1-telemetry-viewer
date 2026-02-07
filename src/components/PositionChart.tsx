@@ -6,21 +6,23 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceDot,
 } from "recharts";
-import type { PositionHistoryEntry } from "../types/telemetry";
+import type { OvertakeRecord, PositionHistoryEntry } from "../types/telemetry";
 import { getTeamColor, CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 
 interface PositionChartProps {
   positionHistory: PositionHistoryEntry[];
   playerName: string;
   rivalName?: string;
+  overtakes?: OvertakeRecord[];
 }
 
 /**
  * Position chart for races. Player line is thick, nearby competitors thin.
  * Y-axis inverted (P1 at top).
  */
-export function PositionChart({ positionHistory, playerName, rivalName }: PositionChartProps) {
+export function PositionChart({ positionHistory, playerName, rivalName, overtakes }: PositionChartProps) {
   if (!positionHistory.length) {
     return <p className="text-sm text-zinc-500">No position data.</p>;
   }
@@ -125,8 +127,46 @@ export function PositionChart({ positionHistory, playerName, rivalName }: Positi
               />
             );
           })}
+
+          {/* Overtake markers */}
+          {overtakes?.map((ot, i) => {
+            const isPlayerOvertaking = ot["overtaking-driver-name"] === playerName;
+            const isPlayerOvertaken = ot["being-overtaken-driver-name"] === playerName;
+            if (!isPlayerOvertaking && !isPlayerOvertaken) return null;
+            const lap = ot["lap-number"];
+            const position = data[lap]?.[playerName];
+            if (position == null) return null;
+            return (
+              <ReferenceDot
+                key={`ot-${i}`}
+                x={lap}
+                y={position}
+                r={5}
+                fill={isPlayerOvertaking ? "#22c55e" : "#ef4444"}
+                fillOpacity={0.8}
+                stroke={isPlayerOvertaking ? "#22c55e" : "#ef4444"}
+                strokeWidth={1.5}
+              />
+            );
+          })}
         </LineChart>
       </ResponsiveContainer>
+      {overtakes && overtakes.some((ot) => ot["overtaking-driver-name"] === playerName || ot["being-overtaken-driver-name"] === playerName) && (
+        <div className="flex items-center gap-4 mt-1.5 text-[10px] text-zinc-400">
+          {overtakes.some((ot) => ot["overtaking-driver-name"] === playerName) && (
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" />
+              Overtake
+            </span>
+          )}
+          {overtakes.some((ot) => ot["being-overtaken-driver-name"] === playerName) && (
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
+              Overtaken
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
