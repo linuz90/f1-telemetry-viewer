@@ -249,7 +249,7 @@ export function calculateCumulativeDeltas(
 // --- Insight generation ---
 
 export interface StrategyInsight {
-  type: "tyre" | "sector" | "pit" | "pace" | "history";
+  type: "tyre" | "sector" | "pit" | "pace" | "history" | "fuel";
   /** Short label shown above the value */
   label: string;
   /** The big prominent value (e.g. "3rd", "1:42.891", "+0.8%/lap") */
@@ -531,6 +531,39 @@ export function generateInsights(
       }
     }
   }
+
+  return insights;
+}
+
+/** Generate fuel insights for race sessions */
+export function generateFuelInsights(player: DriverData): StrategyInsight[] {
+  const insights: StrategyInsight[] = [];
+  const perLap = player["per-lap-info"];
+  if (!perLap?.length) return insights;
+
+  const lapsWithFuel = perLap.filter(
+    (l) => l["car-status-data"]?.["fuel-in-tank"] > 0,
+  );
+  if (lapsWithFuel.length < 6) return insights;
+
+  const lastLap = lapsWithFuel[lapsWithFuel.length - 1];
+  const fuelRemaining = lastLap["car-status-data"]["fuel-remaining-laps"];
+
+  let detail: string;
+  if (fuelRemaining > 0.5) {
+    detail = `remaining — try -${fuelRemaining.toFixed(1)} laps next race`;
+  } else if (fuelRemaining < -0.1) {
+    detail = `remaining — try +${Math.abs(fuelRemaining).toFixed(1)} laps next race`;
+  } else {
+    detail = `remaining — perfect fuel load`;
+  }
+
+  insights.push({
+    type: "fuel",
+    label: "Fuel at Finish",
+    value: `${fuelRemaining.toFixed(1)} laps`,
+    detail,
+  });
 
   return insights;
 }

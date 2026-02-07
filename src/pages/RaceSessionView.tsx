@@ -4,6 +4,7 @@ import {
   findPlayer,
   calculateCumulativeDeltas,
   generateInsights,
+  generateFuelInsights,
   generateRaceHistoryInsights,
 } from "../utils/stats";
 import { useTrackHistory } from "../hooks/useTrackHistory";
@@ -11,7 +12,7 @@ import { useSessionList } from "../hooks/useSessionList";
 import { SessionHeader } from "../components/SessionHeader";
 import { DriverComparisonPicker } from "../components/DriverComparisonPicker";
 import { StrategyInsightsCard } from "../components/StrategyInsightsCard";
-import { StintTimeline } from "../components/StintTimeline";
+import { StintTimeline, StintDetailCards } from "../components/StintTimeline";
 import { TyreWearChart } from "../components/TyreWearChart";
 import { StintComparisonTable } from "../components/StintComparisonTable";
 import { LapTimeChart } from "../components/LapTimeChart";
@@ -19,6 +20,8 @@ import { CompoundLapComparison } from "../components/CompoundLapComparison";
 import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
 import { PositionChart } from "../components/PositionChart";
 import { RaceResultsTable } from "../components/RaceResultsTable";
+import { DamageTimeline } from "../components/DamageTimeline";
+import { WeatherTimeline } from "../components/WeatherTimeline";
 import { Card } from "../components/Card";
 
 export function RaceSessionView({ session, slug }: { session: TelemetrySession; slug: string }) {
@@ -66,15 +69,47 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   const insights = useMemo(() => {
     if (!player) return [];
     const base = generateInsights(session, player, rival);
+    base.push(...generateFuelInsights(player));
     if (pbs) {
       base.push(...generateRaceHistoryInsights(player, pbs));
     }
     return base;
   }, [session, player, rival, pbs]);
 
+  // Compute laps where damage increased
+  const damageLaps = useMemo(() => {
+    const result: number[] = [];
+    for (let i = 1; i < perLapInfo.length; i++) {
+      const prev = perLapInfo[i - 1]["car-damage-data"];
+      const curr = perLapInfo[i]["car-damage-data"];
+      const fields = [
+        "front-left-wing-damage",
+        "front-right-wing-damage",
+        "rear-wing-damage",
+        "floor-damage",
+        "diffuser-damage",
+        "sidepod-damage",
+        "engine-damage",
+        "gear-box-damage",
+      ] as const;
+      for (const f of fields) {
+        if (((curr as unknown as Record<string, number>)[f] ?? 0) > ((prev as unknown as Record<string, number>)[f] ?? 0)) {
+          result.push(perLapInfo[i]["lap-number"]);
+          break;
+        }
+      }
+    }
+    return result;
+  }, [perLapInfo]);
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <SessionHeader session={session} />
+
+      {/* Weather timeline */}
+      {(info["weather-forecast-samples"]?.length ?? 0) > 1 && (
+        <WeatherTimeline forecastSamples={info["weather-forecast-samples"]!} />
+      )}
 
       {/* Driver comparison picker */}
       <DriverComparisonPicker
@@ -93,7 +128,9 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
           stints={stints}
           rivalStints={rival ? rivalStints : undefined}
           rivalName={rival?.["driver-name"]}
+          perLapInfo={perLapInfo}
         />
+        <StintDetailCards stints={stints} />
       </Card>
 
       {/* Stint comparison table */}
@@ -111,8 +148,16 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
           rivalLaps={rival ? rivalLaps : undefined}
           rivalName={rival?.["driver-name"]}
           perLapInfo={perLapInfo}
+          damageLaps={damageLaps}
         />
       </Card>
+
+      {/* Damage timeline */}
+      {perLapInfo.length > 0 && (
+        <Card as="section">
+          <DamageTimeline perLapInfo={perLapInfo} />
+        </Card>
+      )}
 
       {/* Compound comparison (only when rival selected) */}
       {rival && (
@@ -144,6 +189,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
             positionHistory={session["position-history"]}
             playerName={player?.["driver-name"] ?? ""}
             rivalName={rival?.["driver-name"]}
+            overtakes={session.overtakes?.records}
           />
         </Card>
       )}

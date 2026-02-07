@@ -1,4 +1,4 @@
-import { Crosshair, Circle, Wrench, Zap, Trophy, type LucideIcon } from "lucide-react";
+import { Crosshair, Circle, Fuel, Wrench, Zap, Trophy, type LucideIcon } from "lucide-react";
 import type { StrategyInsight } from "../utils/stats";
 import { cardClass } from "./Card";
 
@@ -12,6 +12,7 @@ const ICON_MAP: Record<StrategyInsight["type"], LucideIcon> = {
   pit: Wrench,
   pace: Zap,
   history: Trophy,
+  fuel: Fuel,
 };
 
 /** Get color for a ranking position relative to total */

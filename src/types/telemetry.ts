@@ -42,6 +42,15 @@ export interface SessionInfo {
   "network-game"?: number;
   formula: string;
   "gearbox-assist": string;
+  "weather-forecast-samples"?: WeatherForecastSample[];
+}
+
+export interface WeatherForecastSample {
+  "time-offset": number;
+  weather: string;
+  "track-temperature": number;
+  "air-temperature": number;
+  "rain-percentage": number;
 }
 
 export interface DriverData {
@@ -131,6 +140,12 @@ export interface CarDamage {
   "floor-damage": number;
   "diffuser-damage": number;
   "sidepod-damage": number;
+  "engine-damage"?: number;
+  "gear-box-damage"?: number;
+  "drs-fault"?: boolean;
+  "ers-fault"?: boolean;
+  "engine-blown"?: boolean;
+  "engine-seized"?: boolean;
 }
 
 export interface CarStatus {
@@ -139,6 +154,7 @@ export interface CarStatus {
   "tyres-age-laps": number;
   "fuel-in-tank": number;
   "fuel-remaining-laps": number;
+  "fuel-capacity"?: number;
   "engine-power-ice": number;
   "engine-power-mguk"?: number;
   "ers-store-energy"?: number;

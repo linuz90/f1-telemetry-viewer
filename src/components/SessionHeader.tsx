@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { Calendar, Cloud, Cpu, Flag, Gauge, Globe, Target, Timer, Trophy, User } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Calendar, Cloud, Cpu, Flag, Gauge, Globe, Target, Timer, Trophy, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { TelemetrySession } from "../types/telemetry";
 import { findPlayer, getBestLapTime, isRaceSession } from "../utils/stats";
@@ -69,6 +69,34 @@ export function SessionHeader({ session }: { session: TelemetrySession }) {
             P{player["final-classification"].position}
           </Pill>
         )}
+        {(() => {
+          if (!isRaceSession(session) || !player?.["final-classification"]) return null;
+          const fc = player["final-classification"];
+          const gained = fc["grid-position"] - fc.position;
+          if (fc["grid-position"] <= 0 || gained === 0) return null;
+          return gained > 0 ? (
+            <Pill icon={ArrowUp} className="text-emerald-400 bg-emerald-400/10">
+              +{gained}
+            </Pill>
+          ) : (
+            <Pill icon={ArrowDown} className="text-red-400 bg-red-400/10">
+              {gained}
+            </Pill>
+          );
+        })()}
+        {(() => {
+          if (!player?.["final-classification"]) return null;
+          const fc = player["final-classification"];
+          if (fc["num-penalties"] <= 0) return null;
+          const penaltyText = fc["penalties-time"] > 0
+            ? `${fc["num-penalties"]} ${fc["num-penalties"] === 1 ? "penalty" : "penalties"} (+${fc["penalties-time"]}s)`
+            : `${fc["num-penalties"]} ${fc["num-penalties"] === 1 ? "penalty" : "penalties"}`;
+          return (
+            <Pill icon={AlertTriangle} className="text-amber-400 bg-amber-400/10">
+              {penaltyText}
+            </Pill>
+          );
+        })()}
         <Pill icon={Calendar}>
           {formattedDate} · {formattedTime}
         </Pill>
@@ -88,9 +116,9 @@ export function SessionHeader({ session }: { session: TelemetrySession }) {
   );
 }
 
-function Pill({ icon: Icon, accent, children }: { icon: typeof Flag; accent?: boolean; children: React.ReactNode }) {
+function Pill({ icon: Icon, accent, className, children }: { icon: typeof Flag; accent?: boolean; className?: string; children: React.ReactNode }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${accent ? "bg-zinc-900 text-zinc-200" : "bg-zinc-900/50 text-zinc-400"}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${className ?? (accent ? "bg-zinc-900 text-zinc-200" : "bg-zinc-900/50 text-zinc-400")}`}>
       <Icon className="size-3" />
       {children}
     </span>
