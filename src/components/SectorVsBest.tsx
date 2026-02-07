@@ -1,5 +1,5 @@
 import type { TelemetrySession } from "../types/telemetry";
-import { msToSectorTime } from "../utils/format";
+import { msToSectorTime, msToLapTime } from "../utils/format";
 import { getValidLaps } from "../utils/stats";
 import { getTeamColor } from "../utils/colors";
 
@@ -23,11 +23,40 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
   const focused = drivers.find((d) => d.index === focusedDriverIndex);
   if (!focused) return null;
 
+  const focusedValid = getValidLaps(
+    focused["session-history"]["lap-history-data"],
+  );
+
+  // Compute focused driver's best lap time
+  const focusedBestLap = focusedValid.length
+    ? Math.min(...focusedValid.map((l) => l["lap-time-in-ms"]))
+    : null;
+
+  // Session best lap across all drivers
+  let sessionBestLap = Infinity;
+  let sessionBestLapDriver = "";
+  let sessionBestLapTeam = "";
+  for (const d of drivers) {
+    const valid = getValidLaps(d["session-history"]["lap-history-data"]);
+    for (const lap of valid) {
+      if (lap["lap-time-in-ms"] < sessionBestLap) {
+        sessionBestLap = lap["lap-time-in-ms"];
+        sessionBestLapDriver = d["driver-name"];
+        sessionBestLapTeam = d.team;
+      }
+    }
+  }
+  if (sessionBestLap === Infinity) sessionBestLap = 0;
+
+  const isFocusedBestLap =
+    focusedBestLap !== null &&
+    sessionBestLap > 0 &&
+    Math.abs(focusedBestLap - sessionBestLap) < 1;
+  const lapDeltaMs =
+    focusedBestLap !== null && sessionBestLap > 0 ? focusedBestLap - sessionBestLap : null;
+
   // Compute session-best and focused-driver-best for each sector
   const sectors = SECTOR_KEYS.map(({ key, label }) => {
-    const focusedValid = getValidLaps(
-      focused["session-history"]["lap-history-data"],
-    );
     const focusedBest = focusedValid.length
       ? Math.min(...focusedValid.map((l) => l[key]))
       : null;
@@ -73,7 +102,48 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
       <h3 className="text-base font-semibold text-zinc-300 mb-3">
         Sectors vs Best
       </h3>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
+        {/* Fastest lap */}
+        <div
+          className={`rounded-lg px-3 py-3 ${
+            isFocusedBestLap
+              ? "bg-purple-500/10 border border-purple-500/30"
+              : "bg-zinc-900/50"
+          }`}
+        >
+          <div className="text-xs uppercase text-zinc-500 mb-2">Lap</div>
+          <div className="font-mono text-lg font-semibold text-zinc-100">
+            {focusedBestLap !== null ? msToLapTime(focusedBestLap) : "–"}
+          </div>
+          {lapDeltaMs !== null && (
+            <div
+              className={`font-mono text-sm mt-0.5 ${
+                isFocusedBestLap
+                  ? "text-purple-400"
+                  : lapDeltaMs < 100
+                    ? "text-yellow-400"
+                    : "text-red-400"
+              }`}
+            >
+              {isFocusedBestLap
+                ? "Session best"
+                : `+${(lapDeltaMs / 1000).toFixed(3)}`}
+            </div>
+          )}
+          {!isFocusedBestLap && sessionBestLap > 0 && (
+            <div className="flex items-center gap-1.5 mt-2 text-xs text-zinc-500">
+              <span
+                className="inline-block w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: getTeamColor(sessionBestLapTeam) }}
+              />
+              <span className="truncate">
+                {sessionBestLapDriver}{" "}
+                <span className="font-mono">{msToLapTime(sessionBestLap)}</span>
+              </span>
+            </div>
+          )}
+        </div>
+
         {sectors.map((s) => (
           <div
             key={s.label}

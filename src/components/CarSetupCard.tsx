@@ -4,112 +4,281 @@ interface CarSetupCardProps {
   setup: CarSetup;
 }
 
-interface SetupGroup {
-  label: string;
-  fields: { label: string; value: string }[];
+// Min/max ranges for F1 setup parameters (based on F1 24)
+const RANGES: Record<string, [number, number]> = {
+  "front-wing": [0, 50],
+  "rear-wing": [0, 50],
+  "on-throttle": [50, 100],
+  "off-throttle": [50, 100],
+  "front-camber": [-3.5, -2.5],
+  "rear-camber": [-2.0, -1.0],
+  "front-toe": [0.0, 0.5],
+  "rear-toe": [0.0, 0.5],
+  "front-suspension": [1, 41],
+  "rear-suspension": [1, 41],
+  "front-anti-roll-bar": [1, 21],
+  "rear-anti-roll-bar": [1, 21],
+  "front-suspension-height": [1, 50],
+  "rear-suspension-height": [1, 75],
+  "brake-pressure": [80, 100],
+  "brake-bias": [50, 70],
+  "front-left-tyre-pressure": [21.0, 30.0],
+  "front-right-tyre-pressure": [21.0, 30.0],
+  "rear-left-tyre-pressure": [19.5, 27.0],
+  "rear-right-tyre-pressure": [19.5, 27.0],
+  "fuel-load": [0, 110],
+};
+
+function getRangePercent(key: string, value: number): number {
+  const range = RANGES[key];
+  if (!range) return 50;
+  const [min, max] = range;
+  if (max === min) return 50;
+  return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
 }
 
 function formatValue(key: string, value: number): string {
-  // Tyre pressures: 1 decimal + psi
-  if (key.includes("tyre-pressure")) return `${value.toFixed(1)} psi`;
-  // Fuel load: 1 decimal
+  if (key.includes("tyre-pressure")) return value.toFixed(1);
   if (key === "fuel-load") return `${value.toFixed(1)} kg`;
-  // Camber/toe: 1 decimal with degree sign
-  if (key.includes("camber") || key.includes("toe")) return `${value.toFixed(1)}°`;
-  // Percentage-style values
-  if (key === "on-throttle" || key === "off-throttle" || key === "brake-pressure" || key === "engine-braking")
+  if (key.includes("camber") || key.includes("toe"))
+    return `${value.toFixed(1)}°`;
+  if (
+    [
+      "on-throttle",
+      "off-throttle",
+      "brake-pressure",
+      "brake-bias",
+    ].includes(key)
+  )
     return `${value}%`;
-  // Brake bias
-  if (key === "brake-bias") return `${value}%`;
   return String(value);
 }
 
-function buildGroups(setup: CarSetup): SetupGroup[] {
-  return [
-    {
-      label: "Aero",
-      fields: [
-        { label: "Front Wing", value: formatValue("front-wing", setup["front-wing"]) },
-        { label: "Rear Wing", value: formatValue("rear-wing", setup["rear-wing"]) },
-      ],
-    },
-    {
-      label: "Suspension",
-      fields: [
-        { label: "Front Suspension", value: String(setup["front-suspension"]) },
-        { label: "Rear Suspension", value: String(setup["rear-suspension"]) },
-        { label: "Front Height", value: String(setup["front-suspension-height"]) },
-        { label: "Rear Height", value: String(setup["rear-suspension-height"]) },
-        { label: "Front ARB", value: String(setup["front-anti-roll-bar"]) },
-        { label: "Rear ARB", value: String(setup["rear-anti-roll-bar"]) },
-        { label: "Front Camber", value: formatValue("front-camber", setup["front-camber"]) },
-        { label: "Rear Camber", value: formatValue("rear-camber", setup["rear-camber"]) },
-        { label: "Front Toe", value: formatValue("front-toe", setup["front-toe"]) },
-        { label: "Rear Toe", value: formatValue("rear-toe", setup["rear-toe"]) },
-      ],
-    },
-    {
-      label: "Brakes",
-      fields: [
-        { label: "Brake Pressure", value: formatValue("brake-pressure", setup["brake-pressure"]) },
-        { label: "Brake Bias", value: formatValue("brake-bias", setup["brake-bias"]) },
-      ],
-    },
-    {
-      label: "Differential",
-      fields: [
-        { label: "On Throttle", value: formatValue("on-throttle", setup["on-throttle"]) },
-        { label: "Off Throttle", value: formatValue("off-throttle", setup["off-throttle"]) },
-        { label: "Engine Braking", value: formatValue("engine-braking", setup["engine-braking"]) },
-      ],
-    },
-    {
-      label: "Tyre Pressures",
-      fields: [
-        { label: "FL", value: formatValue("tyre-pressure", setup["front-left-tyre-pressure"]) },
-        { label: "FR", value: formatValue("tyre-pressure", setup["front-right-tyre-pressure"]) },
-        { label: "RL", value: formatValue("tyre-pressure", setup["rear-left-tyre-pressure"]) },
-        { label: "RR", value: formatValue("tyre-pressure", setup["rear-right-tyre-pressure"]) },
-      ],
-    },
-    {
-      label: "Other",
-      fields: [
-        { label: "Ballast", value: String(setup.ballast) },
-        { label: "Fuel Load", value: formatValue("fuel-load", setup["fuel-load"]) },
-      ],
-    },
-  ];
+function RangeBar({ setupKey, value }: { setupKey: string; value: number }) {
+  const pct = getRangePercent(setupKey, value);
+  return (
+    <div className="h-1.5 bg-zinc-800 rounded-full flex-1 min-w-[48px]">
+      <div
+        className="h-full rounded-full bg-blue-500/50"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
+function SetupRow({
+  label,
+  setupKey,
+  value,
+}: {
+  label: string;
+  setupKey: string;
+  value: number;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-zinc-500 w-20 shrink-0 truncate">{label}</span>
+      <RangeBar setupKey={setupKey} value={value} />
+      <span className="font-mono text-zinc-300 w-14 text-right shrink-0">
+        {formatValue(setupKey, value)}
+      </span>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium mb-2">
+        {title}
+      </div>
+      <div className="space-y-1.5">{children}</div>
+    </div>
+  );
+}
+
+function TyrePressureCell({
+  label,
+  setupKey,
+  value,
+}: {
+  label: string;
+  setupKey: string;
+  value: number;
+}) {
+  const pct = getRangePercent(setupKey, value);
+  return (
+    <div className="flex flex-col items-center gap-1 py-2.5 px-3 rounded-lg bg-zinc-800/40">
+      <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+        {label}
+      </span>
+      <span className="font-mono text-sm font-medium text-zinc-200">
+        {value.toFixed(1)}
+      </span>
+      <div className="w-full h-1 bg-zinc-700/60 rounded-full">
+        <div
+          className="h-full rounded-full bg-blue-500/50"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export function CarSetupCard({ setup }: CarSetupCardProps) {
   if (!setup["is-valid"]) return null;
 
-  // Check if all numeric values are zero (invalid/empty setup)
-  const allZero = Object.entries(setup).every(([k, v]) => k === "is-valid" || v === 0);
+  const allZero = Object.entries(setup).every(
+    ([k, v]) => k === "is-valid" || v === 0,
+  );
   if (allZero) return null;
-
-  const groups = buildGroups(setup);
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-3">Car Setup</h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        {groups.map((group) => (
-          <div key={group.label}>
-            <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">
-              {group.label}
+      <h3 className="text-sm font-semibold text-zinc-300 mb-4">Car Setup</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
+        {/* Column 1: Aero + Transmission + Brakes */}
+        <div className="space-y-5">
+          <Section title="Aerodynamics">
+            <SetupRow
+              label="Front Wing"
+              setupKey="front-wing"
+              value={setup["front-wing"]}
+            />
+            <SetupRow
+              label="Rear Wing"
+              setupKey="rear-wing"
+              value={setup["rear-wing"]}
+            />
+          </Section>
+
+          <Section title="Transmission">
+            <SetupRow
+              label="On Throttle"
+              setupKey="on-throttle"
+              value={setup["on-throttle"]}
+            />
+            <SetupRow
+              label="Off Throttle"
+              setupKey="off-throttle"
+              value={setup["off-throttle"]}
+            />
+          </Section>
+
+          <Section title="Brakes">
+            <SetupRow
+              label="Pressure"
+              setupKey="brake-pressure"
+              value={setup["brake-pressure"]}
+            />
+            <SetupRow
+              label="Bias"
+              setupKey="brake-bias"
+              value={setup["brake-bias"]}
+            />
+          </Section>
+        </div>
+
+        {/* Column 2: Suspension + Geometry */}
+        <div className="space-y-5">
+          <Section title="Suspension">
+            <SetupRow
+              label="Spring F"
+              setupKey="front-suspension"
+              value={setup["front-suspension"]}
+            />
+            <SetupRow
+              label="Spring R"
+              setupKey="rear-suspension"
+              value={setup["rear-suspension"]}
+            />
+            <SetupRow
+              label="ARB F"
+              setupKey="front-anti-roll-bar"
+              value={setup["front-anti-roll-bar"]}
+            />
+            <SetupRow
+              label="ARB R"
+              setupKey="rear-anti-roll-bar"
+              value={setup["rear-anti-roll-bar"]}
+            />
+            <SetupRow
+              label="Height F"
+              setupKey="front-suspension-height"
+              value={setup["front-suspension-height"]}
+            />
+            <SetupRow
+              label="Height R"
+              setupKey="rear-suspension-height"
+              value={setup["rear-suspension-height"]}
+            />
+          </Section>
+
+          <Section title="Geometry">
+            <SetupRow
+              label="Camber F"
+              setupKey="front-camber"
+              value={setup["front-camber"]}
+            />
+            <SetupRow
+              label="Camber R"
+              setupKey="rear-camber"
+              value={setup["rear-camber"]}
+            />
+            <SetupRow
+              label="Toe F"
+              setupKey="front-toe"
+              value={setup["front-toe"]}
+            />
+            <SetupRow
+              label="Toe R"
+              setupKey="rear-toe"
+              value={setup["rear-toe"]}
+            />
+          </Section>
+        </div>
+
+        {/* Column 3: Tyre Pressures + Other */}
+        <div className="space-y-5">
+          <Section title="Tyre Pressures (psi)">
+            <div className="grid grid-cols-2 gap-1.5">
+              <TyrePressureCell
+                label="FL"
+                setupKey="front-left-tyre-pressure"
+                value={setup["front-left-tyre-pressure"]}
+              />
+              <TyrePressureCell
+                label="FR"
+                setupKey="front-right-tyre-pressure"
+                value={setup["front-right-tyre-pressure"]}
+              />
+              <TyrePressureCell
+                label="RL"
+                setupKey="rear-left-tyre-pressure"
+                value={setup["rear-left-tyre-pressure"]}
+              />
+              <TyrePressureCell
+                label="RR"
+                setupKey="rear-right-tyre-pressure"
+                value={setup["rear-right-tyre-pressure"]}
+              />
             </div>
-            <div className="space-y-1">
-              {group.fields.map((f) => (
-                <div key={f.label} className="flex justify-between gap-2 text-xs">
-                  <span className="text-zinc-500 truncate">{f.label}</span>
-                  <span className="font-mono text-zinc-300 shrink-0">{f.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+          </Section>
+
+          <Section title="Fuel">
+            <SetupRow
+              label="Fuel Load"
+              setupKey="fuel-load"
+              value={setup["fuel-load"]}
+            />
+          </Section>
+        </div>
       </div>
     </div>
   );

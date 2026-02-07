@@ -7,10 +7,11 @@ interface SectorComparisonProps {
   stints?: TyreStintBasic[];
 }
 
-const SECTOR_COLORS = {
-  S1: { bg: "bg-blue-500", bar: "#3b82f6" },
-  S2: { bg: "bg-violet-500", bar: "#8b5cf6" },
-  S3: { bg: "bg-pink-500", bar: "#ec4899" },
+const PERF_COLORS = {
+  best: "#7c3aed",      // purple-600
+  normal: "#16a34a",    // green-600
+  worst: "#ca8a04",     // yellow-600
+  invalid: "#52525b40", // zinc-600 faded
 } as const;
 
 /**
@@ -57,10 +58,13 @@ export function SectorComparison({ laps, stints }: SectorComparisonProps) {
   // Common scale: max sector total across all laps
   const maxTotal = Math.max(...data.map((d) => d.s1 + d.s2 + d.s3));
 
-  // Best individual sectors across valid laps
+  // Best and worst individual sectors across valid laps
   const bestS1 = validLaps.length ? Math.min(...validLaps.map((d) => d.s1)) : Infinity;
   const bestS2 = validLaps.length ? Math.min(...validLaps.map((d) => d.s2)) : Infinity;
   const bestS3 = validLaps.length ? Math.min(...validLaps.map((d) => d.s3)) : Infinity;
+  const worstS1 = validLaps.length ? Math.max(...validLaps.map((d) => d.s1)) : -Infinity;
+  const worstS2 = validLaps.length ? Math.max(...validLaps.map((d) => d.s2)) : -Infinity;
+  const worstS3 = validLaps.length ? Math.max(...validLaps.map((d) => d.s3)) : -Infinity;
 
   return (
     <div>
@@ -70,10 +74,14 @@ export function SectorComparison({ laps, stints }: SectorComparisonProps) {
 
       {/* Legend */}
       <div className="flex gap-4 mb-3 text-sm text-zinc-400">
-        {(["S1", "S2", "S3"] as const).map((sector) => (
-          <span key={sector} className="flex items-center gap-1.5">
-            <span className={`inline-block w-2.5 h-2.5 rounded-sm ${SECTOR_COLORS[sector].bg}`} />
-            {sector}
+        {([
+          { color: PERF_COLORS.best, label: "Personal best" },
+          { color: PERF_COLORS.normal, label: "Normal" },
+          { color: PERF_COLORS.worst, label: "Worst" },
+        ] as const).map(({ color, label }) => (
+          <span key={label} className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+            {label}
           </span>
         ))}
       </div>
@@ -151,11 +159,16 @@ export function SectorComparison({ laps, stints }: SectorComparisonProps) {
                   const sectorKey = key.toUpperCase() as "S1" | "S2" | "S3";
                   const time = d[key];
                   const widthPct = (time / maxTotal) * 100;
-                  const isBestSector =
-                    d.valid &&
-                    ((key === "s1" && Math.abs(time - bestS1) < 0.001) ||
-                     (key === "s2" && Math.abs(time - bestS2) < 0.001) ||
-                     (key === "s3" && Math.abs(time - bestS3) < 0.001));
+                  const best = key === "s1" ? bestS1 : key === "s2" ? bestS2 : bestS3;
+                  const worst = key === "s1" ? worstS1 : key === "s2" ? worstS2 : worstS3;
+                  const isBestSector = d.valid && Math.abs(time - best) < 0.001;
+                  const isWorstSector = d.valid && validLaps.length > 1 && Math.abs(time - worst) < 0.001;
+
+                  let barColor: string;
+                  if (!d.valid) barColor = PERF_COLORS.invalid;
+                  else if (isBestSector) barColor = PERF_COLORS.best;
+                  else if (isWorstSector) barColor = PERF_COLORS.worst;
+                  else barColor = PERF_COLORS.normal;
 
                   return (
                     <div
@@ -163,9 +176,7 @@ export function SectorComparison({ laps, stints }: SectorComparisonProps) {
                       className="flex items-center justify-center text-xs font-mono relative overflow-hidden"
                       style={{
                         width: `${widthPct}%`,
-                        backgroundColor: d.valid
-                          ? SECTOR_COLORS[sectorKey].bar
-                          : `${SECTOR_COLORS[sectorKey].bar}40`,
+                        backgroundColor: barColor,
                         minWidth: "60px",
                       }}
                     >
