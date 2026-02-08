@@ -23,7 +23,7 @@ Every session includes the full grid — so whether you're racing AI or real peo
 
 **Running locally?** Point the app at your telemetry folder via the `TELEMETRY_DIR` env variable and it reads the JSON files directly.
 
-**Using a hosted version?** Just drag and drop a `.zip` of your telemetry folder — everything is processed in the browser, no upload to any server.
+**Using a hosted version?** The app ships with sample telemetry data so you can explore all the features right away. When you're ready, drag and drop a `.zip` of your own telemetry folder — everything is processed in the browser, no upload to any server.
 
 ## Setup
 
@@ -42,9 +42,11 @@ The app recursively scans this directory for `.json` files. Telemetry filenames 
 ## Development
 
 ```bash
-pnpm dev        # Start dev server at http://localhost:5173
-pnpm build      # Type-check + production build
-pnpm preview    # Preview production build locally
+pnpm dev            # Start dev server at http://localhost:5173
+pnpm dev:prod       # Dev server without local API (uses demo data, like production)
+pnpm build          # Type-check + production build
+pnpm preview        # Preview production build locally
+pnpm generate-demo  # Regenerate trimmed demo data in public/demo/
 ```
 
 ## Stack
@@ -64,4 +66,4 @@ src/
   types/         TypeScript types for the telemetry data model
 ```
 
-The `TelemetryProvider` context abstracts data access. On mount it tries to reach the local API — if that works, the app runs in API mode. If the fetch fails (deployed build), it switches to upload mode and shows a drop zone for zip files. All hooks and pages read from the context, so they work identically in both modes.
+The `TelemetryProvider` context abstracts data access with a three-step detection chain: first it tries the local API (dev mode) → then bundled demo data (`public/demo/`) → then falls back to upload mode with a drop zone. All hooks and pages read from the context, so they work identically across all modes.

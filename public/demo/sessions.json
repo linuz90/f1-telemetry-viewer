@@ -1,0 +1,29 @@
+[
+  {
+    "relativePath": "Short_Qualifying_Zandvoort_2026_02_07_11_33_48.json",
+    "slug": "short-qualifying-zandvoort-2026-02-07-11-33-48",
+    "sessionType": "Short Qualifying",
+    "track": "Zandvoort",
+    "date": "2026-02-07T11:33:48",
+    "validLapCount": 3,
+    "lapIndicators": [
+      "valid",
+      "valid",
+      "best"
+    ],
+    "bestLapTime": "01:08.793",
+    "bestLapTimeMs": 68793,
+    "aiDifficulty": 110,
+    "isSpectator": false
+  },
+  {
+    "relativePath": "Race_Spa_2026_01_26_22_14_52.json",
+    "slug": "race-spa-2026-01-26-22-14-52",
+    "sessionType": "Race",
+    "track": "Spa",
+    "date": "2026-01-26T22:14:52",
+    "validLapCount": 22,
+    "aiDifficulty": 0,
+    "isSpectator": false
+  }
+]

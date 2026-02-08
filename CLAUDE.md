@@ -9,9 +9,11 @@ F1 Telemetry Viewer — a React app for visualizing telemetry JSON files exporte
 ## Commands
 
 ```bash
-pnpm dev        # Start dev server (default: http://localhost:5173)
-pnpm build      # Type-check (tsc) + production build
-pnpm preview    # Preview production build
+pnpm dev            # Start dev server (default: http://localhost:5173)
+pnpm dev:prod       # Dev server without local API (uses demo data, like production)
+pnpm build          # Type-check (tsc) + production build
+pnpm preview        # Preview production build
+pnpm generate-demo  # Regenerate trimmed demo data in public/demo/
 ```
 
 No test runner or linter is configured.
@@ -35,7 +37,7 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 - `/session/*` — Session detail (delegates to `RaceSessionView` or `QualifyingSessionView` based on session data)
 - `/track/:trackId` — Track-specific progress over time
 
-**Data flow:** Pages use custom hooks (`useSessionList`, `useSession`) → API client (`src/api/client.ts`) → Vite plugin endpoints → local JSON files.
+**Data flow:** Pages use custom hooks (`useSessionList`, `useSession`) → `TelemetryContext` → Vite plugin endpoints (dev) or static demo files (prod) or in-memory store (upload).
 
 **Key directories:**
 - `src/components/` — Chart components (LapTimeChart, PositionChart, TyreWearChart, StintTimeline, SectorComparison) and data tables
@@ -43,6 +45,10 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 - `src/utils/` — Formatting (lap times, sectors), statistics (best laps, consistency, tyre wear rates), team/compound color mappings
 - `src/types/telemetry.ts` — All TypeScript types for the telemetry data model
 - `src/plugin/` — Vite plugin (has its own tsconfig: `tsconfig.node.json`)
+- `scripts/` — `generate-demo-data.ts` creates trimmed demo files from real telemetry
+- `public/demo/` — Bundled demo sessions (committed, deployed as static assets)
+
+**Mode detection:** On mount, `TelemetryContext` runs: `/api/sessions` → `/demo/sessions.json` → upload mode. `VITE_SKIP_API=true` skips the API step (used by `dev:prod`).
 
 **Styling:** Dark theme (slate-950 background). All styling via Tailwind utility classes.
 

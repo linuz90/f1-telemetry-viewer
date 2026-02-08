@@ -9,7 +9,7 @@ import {
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
 import { loadZipFile } from "./zipLoader";
 
-type Mode = "detecting" | "api" | "upload";
+type Mode = "detecting" | "api" | "demo" | "upload";
 
 interface TelemetryContextValue {
   mode: Mode;
@@ -51,9 +51,23 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
 
   // Detect mode on mount
   useEffect(() => {
-    if (import.meta.env.VITE_FORCE_UPLOAD === "true") {
-      setMode("upload");
-      setSessionsLoading(false);
+    const tryDemo = () =>
+      fetch("/demo/sessions.json")
+        .then((res) => {
+          if (!res.ok) throw new Error("No demo data");
+          return res.json() as Promise<SessionSummary[]>;
+        })
+        .then((data) => {
+          setMode("demo");
+          setSessions(data);
+        })
+        .catch(() => {
+          setMode("upload");
+        });
+
+    // Skip API in prod-like dev mode — run the same demo → upload fallback as production
+    if (import.meta.env.VITE_SKIP_API === "true") {
+      tryDemo().finally(() => setSessionsLoading(false));
       return;
     }
 
@@ -66,9 +80,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         setMode("api");
         setSessions(data);
       })
-      .catch(() => {
-        setMode("upload");
-      })
+      .catch(() => tryDemo())
       .finally(() => setSessionsLoading(false));
   }, []);
 
@@ -80,6 +92,23 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         if (!data)
           return Promise.reject(new Error(`Session not found: ${slug}`));
         return Promise.resolve(data);
+      }
+
+      // Demo mode — fetch from /demo/<slug>.json with cache
+      if (mode === "demo") {
+        const cached = apiCache.get(slug);
+        if (cached) return cached;
+
+        const promise = fetch(`/demo/${slug}.json`).then((res) => {
+          if (!res.ok) {
+            apiCache.delete(slug);
+            throw new Error(`Failed to load demo session: ${slug}`);
+          }
+          return res.json() as Promise<TelemetrySession>;
+        });
+
+        apiCache.set(slug, promise);
+        return promise;
       }
 
       // API mode — fetch with cache
