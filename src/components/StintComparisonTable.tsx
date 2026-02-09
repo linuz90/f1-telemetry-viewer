@@ -34,7 +34,7 @@ export function StintComparisonTable({
         <span className="font-normal text-zinc-500">vs best on compound</span>
       </h3>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-xs min-w-[520px]">
           <thead className="text-zinc-500">
             <tr>
               <th className="text-left py-1.5 px-2">Stint</th>

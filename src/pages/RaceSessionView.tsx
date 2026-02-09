@@ -131,7 +131,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   }, [perLapInfo]);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6 sm:space-y-8">
       <SessionHeader
         session={session}
         focusedDriverIndex={focusedDriverIndex}
@@ -163,7 +163,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
           rivalName={rival?.["driver-name"]}
           perLapInfo={perLapInfo}
         />
-        <StintDetailCards stints={stints} />
+        <StintDetailCards stints={stints} laps={laps} />
       </Card>
 
       {/* Stint comparison table */}
@@ -182,6 +182,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
           rivalName={rival?.["driver-name"]}
           perLapInfo={perLapInfo}
           damageLaps={damageLaps}
+          stints={stints}
         />
       </Card>
 

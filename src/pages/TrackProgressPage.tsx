@@ -694,7 +694,8 @@ export function TrackProgressPage() {
                     compound={cs.compound}
                     hero={{ value: `~${cs.estMaxLife}`, label: "pit by lap" }}
                     rows={[
-                      { label: "Avg wear", value: `${cs.avgWearRatePerLap.toFixed(1)}%/lap` },
+                      ...(cs.bestLapMs > 0 ? [{ label: "Best lap", value: msToLapTime(cs.bestLapMs), className: "font-mono text-purple-400" }] : []),
+                      { label: "Avg wear", value: `${cs.avgWearRatePerLap.toFixed(1)}%/lap`, divider: cs.bestLapMs > 0 },
                       { label: "Stints", value: `${cs.avgStintLength}–${cs.longestStint} laps` },
                     ]}
                   />
