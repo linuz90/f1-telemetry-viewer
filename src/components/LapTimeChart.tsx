@@ -10,9 +10,9 @@ import {
   Bar,
   ComposedChart,
 } from "recharts";
-import type { LapHistoryEntry, PerLapInfo } from "../types/telemetry";
+import type { LapHistoryEntry, PerLapInfo, TyreStint } from "../types/telemetry";
 import { msToLapTime, isLapValid } from "../utils/format";
-import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
+import { CHART_THEME, TOOLTIP_STYLE, COMPOUND_COLORS } from "../utils/colors";
 
 interface LapTimeChartProps {
   laps: LapHistoryEntry[];
@@ -26,6 +26,8 @@ interface LapTimeChartProps {
   perLapInfo?: PerLapInfo[];
   /** Laps where damage increased (shown with red shading) */
   damageLaps?: number[];
+  /** Tyre stints to group laps by */
+  stints?: TyreStint[];
 }
 
 const SC_COLORS: Record<string, string> = {
@@ -49,6 +51,7 @@ export function LapTimeChart({
   rivalName,
   perLapInfo,
   damageLaps = [],
+  stints,
 }: LapTimeChartProps) {
   if (!laps.length) {
     return <p className="text-sm text-zinc-500">No lap data.</p>;
@@ -352,84 +355,150 @@ export function LapTimeChart({
         </ComposedChart>
       </ResponsiveContainer>
 
-      {/* Compact lap table */}
-      <div className="mt-3 max-h-48 overflow-y-auto">
-        <table className="w-full text-xs">
-          <thead className="text-zinc-500 sticky top-0 bg-zinc-950">
+      {/* Lap table grouped by stint */}
+      <div className="mt-3 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        {(() => {
+          const hasWear = stints?.some((s) => s["tyre-wear-history"]?.length > 0) ?? false;
+          // Build wear lookup: lap number → average wear %
+          // Each stint's wear history starts with the pit-lap at 0% (fresh tyres),
+          // which would overwrite the previous stint's final wear. Keep the higher
+          // value so pit laps show the outgoing tyre wear, not the incoming 0%.
+          const wearMap = new Map<number, number>();
+          if (stints) {
+            for (const stint of stints) {
+              for (const entry of stint["tyre-wear-history"] ?? []) {
+                const existing = wearMap.get(entry["lap-number"]);
+                if (existing == null || entry.average > existing) {
+                  wearMap.set(entry["lap-number"], entry.average);
+                }
+              }
+            }
+          }
+
+          const colCount = 5 + (hasTopSpeed ? 1 : 0) + (hasErs ? 1 : 0) + (hasWear ? 1 : 0);
+          const headerRow = (
             <tr>
               <th className="text-left py-1 px-2">Lap</th>
               <th className="text-right py-1 px-2">Time</th>
               <th className="text-right py-1 px-2">S1</th>
               <th className="text-right py-1 px-2">S2</th>
               <th className="text-right py-1 px-2">S3</th>
-              <th className="text-right py-1 px-2">Delta</th>
               {hasTopSpeed && <th className="text-right py-1 px-2">Speed</th>}
+              {hasWear && <th className="text-right py-1 px-2">Wear</th>}
               {hasErs && <th className="text-right py-1 px-2">ERS</th>}
             </tr>
-          </thead>
-          <tbody>
-            {data.map((d) => {
-              const delta = d.valid ? d.timeSec - bestTime : null;
-              const isBestLap = d.valid && Math.abs(d.timeSec - bestTime) < 0.001;
-              const isBestS1 = d.valid && Math.abs(d.s1 - bestS1) < 0.001;
-              const isBestS2 = d.valid && Math.abs(d.s2 - bestS2) < 0.001;
-              const isBestS3 = d.valid && Math.abs(d.s3 - bestS3) < 0.001;
-              const scBg = d.isSC
-                ? "bg-amber-500/10"
-                : d.isVSC
-                  ? "bg-yellow-500/10"
-                  : "";
-              return (
-                <tr
-                  key={d.lap}
-                  className={`border-t border-zinc-800/50 ${!d.valid ? "bg-red-500/10" : scBg}`}
-                >
-                  <td className="py-1 px-2">
-                    {d.lap}
-                    {!d.valid && (
-                      <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400">
-                        INVALID
-                      </span>
-                    )}
-                    {d.isSC && (
-                      <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400">
-                        SC
-                      </span>
-                    )}
-                    {d.isVSC && (
-                      <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-bold bg-yellow-500/20 text-yellow-400">
-                        VSC
-                      </span>
-                    )}
-                  </td>
-                  <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-red-400/70 line-through" : isBestLap ? "text-purple-400 font-semibold" : ""}`}>
-                    {d.timeStr}
-                  </td>
-                  <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS1 ? "text-purple-400" : ""}`}>{d.s1.toFixed(3)}</td>
-                  <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS2 ? "text-purple-400" : ""}`}>{d.s2.toFixed(3)}</td>
-                  <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS3 ? "text-purple-400" : ""}`}>{d.s3.toFixed(3)}</td>
-                  <td className="text-right py-1 px-2 font-mono">
-                    {delta !== null
-                      ? delta < 0.001
-                        ? "–"
-                        : `+${delta.toFixed(3)}`
-                      : ""}
-                  </td>
-                  {hasTopSpeed && (
-                    <td className={`text-right py-1 px-2 font-mono ${d.valid && d.topSpeed != null && d.topSpeed === bestTopSpeed ? "text-purple-400 font-semibold" : ""}`}>
-                      {d.topSpeed != null ? `${d.topSpeed}` : "–"}
-                    </td>
+          );
+
+          const renderLapRow = (d: typeof data[number]) => {
+            const isBestLap = d.valid && Math.abs(d.timeSec - bestTime) < 0.001;
+            const isBestS1 = d.valid && Math.abs(d.s1 - bestS1) < 0.001;
+            const isBestS2 = d.valid && Math.abs(d.s2 - bestS2) < 0.001;
+            const isBestS3 = d.valid && Math.abs(d.s3 - bestS3) < 0.001;
+            const wear = wearMap.get(d.lap);
+            const scBg = d.isSC
+              ? "bg-amber-500/10"
+              : d.isVSC
+                ? "bg-yellow-500/10"
+                : "";
+            return (
+              <tr
+                key={d.lap}
+                className={`border-t border-zinc-800/50 ${!d.valid ? "bg-red-500/10" : scBg}`}
+              >
+                <td className="py-1 px-2">
+                  {d.lap}
+                  {!d.valid && (
+                    <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400">
+                      INVALID
+                    </span>
                   )}
-                  {hasErs && (
-                    <td className="text-right py-1 px-2 font-mono text-emerald-400">
-                      {d.ersPct != null ? `${d.ersPct.toFixed(0)}%` : "–"}
-                    </td>
+                  {d.isSC && (
+                    <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400">
+                      SC
+                    </span>
                   )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  {d.isVSC && (
+                    <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-bold bg-yellow-500/20 text-yellow-400">
+                      VSC
+                    </span>
+                  )}
+                </td>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-red-400/70 line-through" : isBestLap ? "text-purple-400 font-semibold" : ""}`}>
+                  {d.timeStr}
+                </td>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS1 ? "text-purple-400" : ""}`}>{d.s1.toFixed(3)}</td>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS2 ? "text-purple-400" : ""}`}>{d.s2.toFixed(3)}</td>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS3 ? "text-purple-400" : ""}`}>{d.s3.toFixed(3)}</td>
+                {hasTopSpeed && (
+                  <td className={`text-right py-1 px-2 font-mono ${d.valid && d.topSpeed != null && d.topSpeed === bestTopSpeed ? "text-purple-400 font-semibold" : ""}`}>
+                    {d.topSpeed != null ? `${d.topSpeed}` : "–"}
+                  </td>
+                )}
+                {hasWear && (
+                  <td className={`text-right py-1 px-2 font-mono ${wear != null && wear >= 75 ? "text-red-400" : wear != null && wear >= 50 ? "text-orange-400" : "text-zinc-400"}`}>
+                    {wear != null ? `${wear.toFixed(0)}%` : "–"}
+                  </td>
+                )}
+                {hasErs && (
+                  <td className="text-right py-1 px-2 font-mono text-emerald-400">
+                    {d.ersPct != null ? `${d.ersPct.toFixed(0)}%` : "–"}
+                  </td>
+                )}
+              </tr>
+            );
+          };
+
+          // Group laps by stint when stints are available
+          if (stints && stints.length > 0) {
+            return (
+              <table className="w-full text-xs min-w-[500px]">
+                <thead className="text-zinc-500">
+                  {headerRow}
+                </thead>
+                <tbody>
+                  {stints.map((stint, si) => {
+                    const compound = stint["tyre-set-data"]["visual-tyre-compound"];
+                    const color = COMPOUND_COLORS[compound] ?? "#a1a1aa";
+                    const stintLaps = data.filter(
+                      (d) => d.lap >= stint["start-lap"] && d.lap <= stint["end-lap"],
+                    );
+                    return [
+                      <tr key={`stint-${si}`}>
+                        <td colSpan={colCount} className={`py-1.5 px-2 ${si > 0 ? "pt-4" : ""}`}>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: color }}
+                            />
+                            <span className="text-[11px] font-semibold text-zinc-300">
+                              Stint {si + 1} — {compound}
+                            </span>
+                            <span className="text-[10px] text-zinc-500">
+                              Laps {stint["start-lap"]}–{stint["end-lap"]} ({stint["stint-length"]} laps)
+                            </span>
+                          </div>
+                        </td>
+                      </tr>,
+                      ...stintLaps.map(renderLapRow),
+                    ];
+                  })}
+                </tbody>
+              </table>
+            );
+          }
+
+          // Fallback: no stint grouping
+          return (
+            <table className="w-full text-xs min-w-[500px]">
+              <thead className="text-zinc-500">
+                {headerRow}
+              </thead>
+              <tbody>
+                {data.map(renderLapRow)}
+              </tbody>
+            </table>
+          );
+        })()}
       </div>
     </div>
   );

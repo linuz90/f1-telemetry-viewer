@@ -980,31 +980,56 @@ export interface CompoundLifeStats {
   avgStintLength: number;
   longestStint: number;
   stintCount: number;
+  /** Best valid lap time in ms on this compound (0 if none) */
+  bestLapMs: number;
 }
+
+/** Minimum stint length to include in aggregate compound stats */
+const MIN_STINT_LAPS = 3;
 
 /** Aggregate compound tyre life across all race sessions at a track */
 export function aggregateCompoundLife(
   sessions: TelemetrySession[],
 ): CompoundLifeStats[] {
-  const byCompound: Record<string, { rates: number[]; lengths: number[] }> = {};
+  const byCompound: Record<string, { rates: number[]; lengths: number[]; bestLapMs: number }> = {};
 
   for (const session of sessions) {
     if (!isRaceSession(session)) continue;
     const player = findPlayer(session);
     if (!player) continue;
 
+    const laps = player["session-history"]["lap-history-data"];
+
     for (const stint of player["tyre-set-history"]) {
+      if (stint["stint-length"] < MIN_STINT_LAPS) continue;
+
       const compound = stint["tyre-set-data"]["visual-tyre-compound"];
       const rate = stintWearRate(stint);
       if (rate <= 0) continue;
 
-      if (!byCompound[compound]) byCompound[compound] = { rates: [], lengths: [] };
+      if (!byCompound[compound]) byCompound[compound] = { rates: [], lengths: [], bestLapMs: 0 };
       byCompound[compound].rates.push(rate);
       byCompound[compound].lengths.push(stint["stint-length"]);
+
+      // Find best valid lap in this stint
+      let lapNum = 0;
+      for (const l of laps) {
+        if (l["lap-time-in-ms"] > 0) {
+          lapNum++;
+          if (lapNum >= stint["start-lap"] && lapNum <= stint["end-lap"]) {
+            if (isLapValid(l["lap-valid-bit-flags"]) && l["lap-time-in-ms"] > 0) {
+              const cur = byCompound[compound].bestLapMs;
+              if (cur === 0 || l["lap-time-in-ms"] < cur) {
+                byCompound[compound].bestLapMs = l["lap-time-in-ms"];
+              }
+            }
+          }
+        }
+      }
     }
   }
 
-  return Object.entries(byCompound).map(([compound, { rates, lengths }]) => {
+  return Object.entries(byCompound).map(([compound, { rates, lengths, bestLapMs }]) => {
     const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
     const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
     return {
@@ -1014,6 +1039,7 @@ export function aggregateCompoundLife(
       avgStintLength: Math.round(avgLength),
       longestStint: Math.max(...lengths),
       stintCount: rates.length,
+      bestLapMs,
     };
   });
 }
