@@ -90,11 +90,14 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   const insights = useMemo(() => {
     if (!focusedDriver) return [];
     const base = generateInsights(session, focusedDriver, rival);
-    base.push(
-      ...generateFuelInsights(focusedDriver, session["session-info"]["total-laps"]),
-    );
-    if (pbs) {
-      base.push(...generateRaceHistoryInsights(focusedDriver, pbs));
+    // Fuel and historical PB insights are only relevant when NOT comparing h2h
+    if (!rival) {
+      base.push(
+        ...generateFuelInsights(focusedDriver, session["session-info"]["total-laps"]),
+      );
+      if (pbs) {
+        base.push(...generateRaceHistoryInsights(focusedDriver, pbs));
+      }
     }
     return base;
   }, [session, focusedDriver, rival, pbs]);

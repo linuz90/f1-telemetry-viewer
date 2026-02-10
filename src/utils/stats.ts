@@ -46,6 +46,22 @@ export function getValidLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
   );
 }
 
+/**
+ * Get "clean" race laps: valid laps with pit/incident outliers removed.
+ * Uses median-based filtering — any lap > 1.2× the median is excluded.
+ * This catches pit in/out laps (~20-30s slow) and incidents/safety car periods
+ * while keeping legitimate slow laps from tyre degradation or dirty air.
+ */
+export function getCleanRaceLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
+  const valid = getValidLaps(laps);
+  if (valid.length < 3) return valid;
+  const times = valid.map((l) => l["lap-time-in-ms"]);
+  const sorted = [...times].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const threshold = median * 1.2;
+  return valid.filter((l) => l["lap-time-in-ms"] <= threshold);
+}
+
 /** Get the best lap time in ms from a set of laps */
 export function getBestLapTime(laps: LapHistoryEntry[]): number {
   const valid = getValidLaps(laps);
@@ -189,17 +205,15 @@ export function getBestDriverOnCompound(
   return best;
 }
 
-/** Calculate average pace (ms) for a driver's laps in a range */
+/** Calculate average pace (ms) for a driver's laps in a range, excluding outliers */
 export function avgPaceInRange(
   laps: LapHistoryEntry[],
   startLap: number,
   endLap: number,
 ): number {
-  const subset = laps.slice(startLap - 1, endLap).filter(
-    (l) => isLapValid(l["lap-valid-bit-flags"]) && l["lap-time-in-ms"] > 0,
-  );
-  if (subset.length === 0) return 0;
-  return subset.reduce((sum, l) => sum + l["lap-time-in-ms"], 0) / subset.length;
+  const clean = getCleanRaceLaps(laps.slice(startLap - 1, endLap));
+  if (clean.length === 0) return 0;
+  return clean.reduce((sum, l) => sum + l["lap-time-in-ms"], 0) / clean.length;
 }
 
 /** Calculate pace drop: avg of last N laps minus avg of first N laps (ms) */
@@ -209,14 +223,10 @@ export function paceDrop(
   endLap: number,
   n = 5,
 ): number {
-  const subset = laps
-    .slice(startLap - 1, endLap)
-    .filter(
-      (l) => isLapValid(l["lap-valid-bit-flags"]) && l["lap-time-in-ms"] > 0,
-    );
-  if (subset.length < n * 2) return 0;
-  const firstN = subset.slice(0, n);
-  const lastN = subset.slice(-n);
+  const clean = getCleanRaceLaps(laps.slice(startLap - 1, endLap));
+  if (clean.length < n * 2) return 0;
+  const firstN = clean.slice(0, n);
+  const lastN = clean.slice(-n);
   const avgFirst =
     firstN.reduce((s, l) => s + l["lap-time-in-ms"], 0) / firstN.length;
   const avgLast =
@@ -283,11 +293,16 @@ export interface StrategyInsight {
   value: string;
   /** Smaller context line below the value */
   detail: string;
+  /** Tooltip shown on hover — explains how the value was calculated */
+  tooltip?: string;
   /** Ranking position (0-indexed) — used for color coding. undefined = neutral. */
   rank?: number;
   /** Total drivers in ranking — used alongside rank */
   rankTotal?: number;
 }
+
+export const RACE_PACE_TOOLTIP =
+  "Average lap time excluding pit stops, safety car periods, and incident laps (laps slower than 1.2× the median are filtered out)";
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -318,14 +333,14 @@ export function generateInsights(
     const rivalLaps = rival["session-history"]["lap-history-data"];
     const rivalName = rival["driver-name"];
 
-    // 1. Pace delta vs rival
-    const playerValid = getValidLaps(playerLaps);
-    const rivalValid = getValidLaps(rivalLaps);
-    if (playerValid.length > 0 && rivalValid.length > 0) {
+    // 1. Pace delta vs rival (clean laps — pit/incident outliers excluded)
+    const playerClean = getCleanRaceLaps(playerLaps);
+    const rivalClean = getCleanRaceLaps(rivalLaps);
+    if (playerClean.length > 0 && rivalClean.length > 0) {
       const playerAvg =
-        playerValid.reduce((s, l) => s + l["lap-time-in-ms"], 0) / playerValid.length;
+        playerClean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / playerClean.length;
       const rivalAvg =
-        rivalValid.reduce((s, l) => s + l["lap-time-in-ms"], 0) / rivalValid.length;
+        rivalClean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / rivalClean.length;
       const delta = (playerAvg - rivalAvg) / 1000;
       insights.push({
         type: "pace",
@@ -334,6 +349,7 @@ export function generateInsights(
         detail: delta <= 0
           ? `faster per lap on average vs ${rivalName}`
           : `slower per lap on average vs ${rivalName}`,
+        tooltip: RACE_PACE_TOOLTIP,
       });
     }
 
@@ -358,10 +374,10 @@ export function generateInsights(
       });
     }
 
-    // 3. Sector deltas vs rival (all 3 sectors)
-    const playerValidLaps = getValidLaps(playerLaps);
-    const rivalValidLaps = getValidLaps(rivalLaps);
-    if (playerValidLaps.length > 0 && rivalValidLaps.length > 0) {
+    // 3. Sector deltas vs rival (all 3 sectors, clean laps only)
+    const playerCleanLaps = getCleanRaceLaps(playerLaps);
+    const rivalCleanLaps = getCleanRaceLaps(rivalLaps);
+    if (playerCleanLaps.length > 0 && rivalCleanLaps.length > 0) {
       const sectorKeys = [
         { key: "sector-1-time-in-ms" as const, label: "S1" },
         { key: "sector-2-time-in-ms" as const, label: "S2" },
@@ -372,8 +388,8 @@ export function generateInsights(
       let gains = 0;
       let losses = 0;
       for (const { key, label } of sectorKeys) {
-        const pAvg = playerValidLaps.reduce((s, l) => s + l[key], 0) / playerValidLaps.length;
-        const rAvg = rivalValidLaps.reduce((s, l) => s + l[key], 0) / rivalValidLaps.length;
+        const pAvg = playerCleanLaps.reduce((s, l) => s + l[key], 0) / playerCleanLaps.length;
+        const rAvg = rivalCleanLaps.reduce((s, l) => s + l[key], 0) / rivalCleanLaps.length;
         const d = (pAvg - rAvg) / 1000;
         parts.push(`${label}: ${d <= 0 ? "" : "+"}${d.toFixed(3)}s`);
         if (d < -0.001) gains++;
@@ -396,13 +412,13 @@ export function generateInsights(
   } else {
     // --- Field ranking mode (original behavior) ---
 
-    // 1. Pace ranking
+    // 1. Pace ranking (clean laps — pit/incident outliers excluded)
     const paceRanking: { driver: DriverData; avgPace: number }[] = [];
     for (const d of allDrivers) {
-      const valid = getValidLaps(d["session-history"]["lap-history-data"]);
-      if (valid.length === 0) continue;
+      const clean = getCleanRaceLaps(d["session-history"]["lap-history-data"]);
+      if (clean.length === 0) continue;
       const avg =
-        valid.reduce((s, l) => s + l["lap-time-in-ms"], 0) / valid.length;
+        clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / clean.length;
       paceRanking.push({ driver: d, avgPace: avg });
     }
     paceRanking.sort((a, b) => a.avgPace - b.avgPace);
@@ -417,6 +433,7 @@ export function generateInsights(
           delta < 10
             ? `of ${paceRanking.length}`
             : `of ${paceRanking.length} — +${(delta / 1000).toFixed(3)}s vs P1`,
+        tooltip: RACE_PACE_TOOLTIP,
         rank: pacePos,
         rankTotal: paceRanking.length,
       });
@@ -453,9 +470,9 @@ export function generateInsights(
       });
     }
 
-    // 3. Weakest & strongest sector (avg vs avg across all drivers)
-    const playerValidLaps = getValidLaps(playerLaps);
-    if (playerValidLaps.length > 0) {
+    // 3. Weakest & strongest sector (avg vs avg across all drivers, clean laps)
+    const playerCleanLaps2 = getCleanRaceLaps(playerLaps);
+    if (playerCleanLaps2.length > 0) {
       const sectorKeys = [
         { key: "sector-1-time-in-ms" as const, label: "S1" },
         { key: "sector-2-time-in-ms" as const, label: "S2" },
@@ -475,10 +492,10 @@ export function generateInsights(
       for (const { key, label } of sectorKeys) {
         const ranking: { driver: DriverData; avg: number }[] = [];
         for (const d of allDrivers) {
-          const valid = getValidLaps(d["session-history"]["lap-history-data"]);
-          if (!valid.length) continue;
+          const clean = getCleanRaceLaps(d["session-history"]["lap-history-data"]);
+          if (!clean.length) continue;
           const avg =
-            valid.reduce((s, l) => s + l[key], 0) / valid.length;
+            clean.reduce((s, l) => s + l[key], 0) / clean.length;
           if (avg > 0) ranking.push({ driver: d, avg });
         }
         ranking.sort((a, b) => a.avg - b.avg);
@@ -937,8 +954,8 @@ export function generateRaceHistoryInsights(
 ): StrategyInsight[] {
   const insights: StrategyInsight[] = [];
   const laps = player["session-history"]["lap-history-data"];
-  const valid = getValidLaps(laps);
-  if (valid.length === 0) return insights;
+  const clean = getCleanRaceLaps(laps);
+  if (clean.length === 0) return insights;
 
   const bestRaceLap = getBestLapTime(laps);
 
@@ -965,10 +982,10 @@ export function generateRaceHistoryInsights(
     }
   }
 
-  // 2. Race pace vs best-ever race pace
+  // 2. Race pace vs best-ever race pace (clean laps only)
   if (pbs.bestRacePaceMs > 0) {
     const avgPace =
-      valid.reduce((s, l) => s + l["lap-time-in-ms"], 0) / valid.length;
+      clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / clean.length;
     const delta = avgPace - pbs.bestRacePaceMs;
     if (delta <= 0) {
       insights.push({
@@ -979,6 +996,7 @@ export function generateRaceHistoryInsights(
           delta < 0
             ? `-${(Math.abs(delta) / 1000).toFixed(3)}s/lap improvement`
             : "matched your best pace",
+        tooltip: RACE_PACE_TOOLTIP,
       });
     } else {
       insights.push({
@@ -986,6 +1004,7 @@ export function generateRaceHistoryInsights(
         label: "Race Pace vs Best",
         value: `+${(delta / 1000).toFixed(3)}s/lap`,
         detail: "off your best average pace",
+        tooltip: RACE_PACE_TOOLTIP,
       });
     }
   }

@@ -1,6 +1,7 @@
 import { Crosshair, Circle, Fuel, Wrench, Zap, Trophy, type LucideIcon } from "lucide-react";
 import type { StrategyInsight } from "../utils/stats";
 import { cardClass } from "./Card";
+import { Tooltip } from "./Tooltip";
 
 interface StrategyInsightsCardProps {
   insights: StrategyInsight[];
@@ -41,15 +42,23 @@ export function StrategyInsightsCard({ insights }: StrategyInsightsCardProps) {
             ? rankColor(insight.rank, insight.rankTotal)
             : "text-zinc-200";
 
+          const label = (
+            <span className="text-xs text-zinc-400 w-28 shrink-0">
+              {insight.label}
+            </span>
+          );
+
           return (
             <div
               key={i}
               className="flex items-center gap-4 py-2.5 first:pt-0 last:pb-0"
             >
               <Icon className="w-4 h-4 text-zinc-600 shrink-0" />
-              <span className="text-xs text-zinc-400 w-28 shrink-0">
-                {insight.label}
-              </span>
+              {insight.tooltip ? (
+                <Tooltip text={insight.tooltip}>{label}</Tooltip>
+              ) : (
+                label
+              )}
               <span className={`text-sm font-bold font-mono shrink-0 ${valueColor}`}>
                 {insight.value}
               </span>

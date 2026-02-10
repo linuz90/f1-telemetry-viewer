@@ -56,6 +56,8 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 
 Commit messages feed a **user-facing changelog** (the "What's new" modal). A Vite plugin (`src/plugin/changelog.ts`) parses `git log` at build time, extracts the conventional commit type and subject, and displays them in the UI via `ChangelogModal.tsx`.
 
+DO NOT commit until you're asked to.
+
 **Rules:**
 
 - Use conventional commits: `feat:`, `fix:`, `docs:`, etc.

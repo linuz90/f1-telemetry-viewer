@@ -1,5 +1,5 @@
 import type { LapHistoryEntry, TyreStint } from "../types/telemetry";
-import { getValidLaps, getBestLapTime } from "../utils/stats";
+import { getCleanRaceLaps, getBestLapTime } from "../utils/stats";
 import { msToLapTime } from "../utils/format";
 import { getCompoundColor } from "../utils/colors";
 
@@ -39,7 +39,7 @@ export function CompoundLapComparison({
   const playerByCompound = new Map<string, LapHistoryEntry[]>();
   for (const stint of playerStints) {
     const compound = stint["tyre-set-data"]["visual-tyre-compound"];
-    const laps = getValidLaps(getLapsForStint(playerLaps, stint));
+    const laps = getCleanRaceLaps(getLapsForStint(playerLaps, stint));
     const existing = playerByCompound.get(compound) ?? [];
     playerByCompound.set(compound, [...existing, ...laps]);
   }
@@ -47,7 +47,7 @@ export function CompoundLapComparison({
   const rivalByCompound = new Map<string, LapHistoryEntry[]>();
   for (const stint of rivalStints) {
     const compound = stint["tyre-set-data"]["visual-tyre-compound"];
-    const laps = getValidLaps(getLapsForStint(rivalLaps, stint));
+    const laps = getCleanRaceLaps(getLapsForStint(rivalLaps, stint));
     const existing = rivalByCompound.get(compound) ?? [];
     rivalByCompound.set(compound, [...existing, ...laps]);
   }

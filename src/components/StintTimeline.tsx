@@ -136,7 +136,13 @@ export function StintDetailCards({ stints, laps }: { stints: TyreStint[]; laps: 
           const rows = [
             ...(avgTimeMs > 0 ? [{ label: "Average", value: msToLapTime(Math.round(avgTimeMs)), className: "font-mono" }] : []),
             ...(avgDevMs > 0 ? [{ label: "Consistency", value: `±${(avgDevMs / 1000).toFixed(3)}s`, className: "font-mono" }] : []),
-            ...(wearRate > 0 ? [{ label: "Wear rate", value: `${wearRate.toFixed(1)}%/lap`, divider: true }] : []),
+            ...(peakWear > 0 ? [{
+              label: "Peak wear",
+              value: `${peakWear.toFixed(1)}%`,
+              className: `font-mono ${peakWear > 60 ? "text-red-400" : peakWear > 40 ? "text-amber-400" : "text-zinc-300"}`,
+              divider: true,
+            }] : []),
+            ...(wearRate > 0 ? [{ label: "Wear rate", value: `${wearRate.toFixed(1)}%/lap` }] : []),
             ...(estLife > 0 ? [{ label: "Est. max life", value: `~${estLife} laps` }] : []),
           ];
 
