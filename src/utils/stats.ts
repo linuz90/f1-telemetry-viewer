@@ -2,6 +2,7 @@ import type {
   TelemetrySession,
   DriverData,
   LapHistoryEntry,
+  PerLapInfo,
   TyreStint,
   TyreWearEntry,
 } from "../types/telemetry";
@@ -579,7 +580,14 @@ export interface FuelCalcResult {
   suggestedLaps: number;
 }
 
-/** Calculate fuel burn rate and related metrics for a player in a race */
+/** True when a lap ran under normal green-flag racing conditions */
+function isGreenFlagLap(lap: PerLapInfo): boolean {
+  return (lap["max-safety-car-status"] ?? "NO_SAFETY_CAR") === "NO_SAFETY_CAR";
+}
+
+/** Calculate fuel burn rate and related metrics for a player in a race.
+ *  Uses the median of per-lap fuel deltas (green-flag laps only) for a burn
+ *  rate that's robust against outliers and not skewed by SC/VSC/formation laps. */
 export function calculateBurnRate(
   player: DriverData,
 ): FuelCalcResult | null {
@@ -591,19 +599,34 @@ export function calculateBurnRate(
   );
   if (lapsWithFuel.length < 6) return null;
 
+  // Build per-lap fuel deltas, keeping only consecutive green-flag pairs
+  const deltas: number[] = [];
+  for (let i = 1; i < lapsWithFuel.length; i++) {
+    const prev = lapsWithFuel[i - 1];
+    const curr = lapsWithFuel[i];
+    if (!isGreenFlagLap(prev) || !isGreenFlagLap(curr)) continue;
+    const delta =
+      prev["car-status-data"]["fuel-in-tank"] -
+      curr["car-status-data"]["fuel-in-tank"];
+    if (delta > 0) deltas.push(delta);
+  }
+
+  if (deltas.length < 3) return null;
+
+  // Median is more robust than mean against pit-in/out laps or one-off spikes
+  deltas.sort((a, b) => a - b);
+  const mid = Math.floor(deltas.length / 2);
+  const burnRateKg =
+    deltas.length % 2 === 0
+      ? (deltas[mid - 1] + deltas[mid]) / 2
+      : deltas[mid];
+
+  if (burnRateKg <= 0) return null;
+
   const firstLap = lapsWithFuel[0];
   const lastLap = lapsWithFuel[lapsWithFuel.length - 1];
 
-  const fuelFirst = firstLap["car-status-data"]["fuel-in-tank"];
-  const fuelLast = lastLap["car-status-data"]["fuel-in-tank"];
-  const lapSpan = lastLap["lap-number"] - firstLap["lap-number"];
-
-  if (lapSpan <= 0) return null;
-
-  const burnRateKg = (fuelFirst - fuelLast) / lapSpan;
-  if (burnRateKg <= 0) return null;
-
-  const startFuelKg = fuelFirst;
+  const startFuelKg = firstLap["car-status-data"]["fuel-in-tank"];
   const startFuelLaps = startFuelKg / burnRateKg;
   const fuelRemainingLaps = lastLap["car-status-data"]["fuel-remaining-laps"];
   const suggestedLaps = startFuelLaps - fuelRemainingLaps;
