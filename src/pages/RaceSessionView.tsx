@@ -6,6 +6,7 @@ import {
   generateInsights,
   generateFuelInsights,
   generateRaceHistoryInsights,
+  getCompletedStints,
 } from "../utils/stats";
 import { useTrackHistory } from "../hooks/useTrackHistory";
 import { useSessionList } from "../hooks/useSessionList";
@@ -21,7 +22,6 @@ import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
 import { PositionChart } from "../components/PositionChart";
 import { RaceResultsTable } from "../components/RaceResultsTable";
 import { DamageTimeline } from "../components/DamageTimeline";
-import { WeatherTimeline } from "../components/WeatherTimeline";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
 
@@ -57,7 +57,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   );
   const { pbs } = useTrackHistory(trackName, slug);
 
-  const stints = focusedDriver?.["tyre-set-history"] ?? [];
+  const stints = getCompletedStints(focusedDriver?.["tyre-set-history"] ?? []);
   const laps = focusedDriver?.["session-history"]["lap-history-data"] ?? [];
   const pitLaps = stints.slice(1).map((s) => s["start-lap"]);
   // Laps affected by pit stops (end of outgoing stint + start of incoming stint)
@@ -76,7 +76,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     [selectedRivalIndex, drivers],
   );
 
-  const rivalStints = rival?.["tyre-set-history"] ?? [];
+  const rivalStints = getCompletedStints(rival?.["tyre-set-history"] ?? []);
   const rivalLaps = rival?.["session-history"]["lap-history-data"] ?? [];
   const rivalPitLaps = rivalStints.slice(1).map((s) => s["start-lap"]);
 
@@ -140,11 +140,6 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
         focusedDriverIndex={focusedDriverIndex}
         onFocusedDriverChange={setFocusedDriverIndex}
       />
-
-      {/* Weather timeline */}
-      {(info["weather-forecast-samples"]?.length ?? 0) > 1 && (
-        <WeatherTimeline forecastSamples={info["weather-forecast-samples"]!} />
-      )}
 
       {/* Driver comparison picker */}
       <DriverComparisonPicker

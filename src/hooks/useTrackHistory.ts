@@ -81,8 +81,8 @@ export function useTrackHistory(
           if (best > 0 && (bestRaceLapMs === 0 || best < bestRaceLapMs)) {
             bestRaceLapMs = best;
           }
-          // Best average race pace (clean laps — pit/incident outliers excluded)
-          const clean = getCleanRaceLaps(laps);
+          // Best average race pace (clean laps — SC/pit/incident excluded)
+          const clean = getCleanRaceLaps(player);
           if (clean.length > 0) {
             const avg =
               clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
