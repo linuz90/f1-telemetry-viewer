@@ -1,4 +1,4 @@
-import { Crosshair, Circle, Fuel, Wrench, Zap, Trophy, type LucideIcon } from "lucide-react";
+import { Battery, Crosshair, Circle, Fuel, Gauge, Wrench, Zap, Trophy, type LucideIcon } from "lucide-react";
 import type { StrategyInsight } from "../utils/stats";
 import { cardClass } from "./Card";
 import { Tooltip } from "./Tooltip";
@@ -12,6 +12,8 @@ const ICON_MAP: Record<StrategyInsight["type"], LucideIcon> = {
   tyre: Circle,
   pit: Wrench,
   pace: Zap,
+  speed: Gauge,
+  ers: Battery,
   history: Trophy,
   fuel: Fuel,
 };

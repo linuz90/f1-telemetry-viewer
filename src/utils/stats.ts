@@ -39,6 +39,14 @@ export function findFocusedDriver(session: TelemetrySession): DriverData | undef
   return best;
 }
 
+/** Drop the last stint if it's a single incomplete lap (e.g. DNF retirement) */
+export function getCompletedStints(stints: TyreStint[]): TyreStint[] {
+  if (stints.length <= 1) return stints;
+  const last = stints[stints.length - 1];
+  if (last["stint-length"] <= 1) return stints.slice(0, -1);
+  return stints;
+}
+
 /** Get valid laps for a driver */
 export function getValidLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
   return laps.filter(
@@ -47,12 +55,12 @@ export function getValidLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
 }
 
 /**
- * Get "clean" race laps: valid laps with pit/incident outliers removed.
- * Uses median-based filtering — any lap > 1.2× the median is excluded.
- * This catches pit in/out laps (~20-30s slow) and incidents/safety car periods
- * while keeping legitimate slow laps from tyre degradation or dirty air.
+ * Filter outlier laps from a subset using median-based filtering.
+ * Any lap > 1.2× the median is excluded. Used for stint-level analysis
+ * (e.g. avgPaceInRange, paceDrop, compound comparisons) where we operate
+ * on a narrow range of laps and don't have full SC/pit context.
  */
-export function getCleanRaceLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
+export function filterOutlierLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
   const valid = getValidLaps(laps);
   if (valid.length < 3) return valid;
   const times = valid.map((l) => l["lap-time-in-ms"]);
@@ -60,6 +68,83 @@ export function getCleanRaceLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
   const median = sorted[Math.floor(sorted.length / 2)];
   const threshold = median * 1.2;
   return valid.filter((l) => l["lap-time-in-ms"] <= threshold);
+}
+
+/**
+ * Get pit in/out lap numbers from a driver's tyre stint history.
+ * The last lap of each stint (except the final one) is the pit-in lap,
+ * and the first lap of the next stint is the pit-out lap.
+ */
+function getPitLapNumbers(d: DriverData): Set<number> {
+  const stints = d["tyre-set-history"] ?? [];
+  const pitLaps = new Set<number>();
+  for (let i = 0; i < stints.length - 1; i++) {
+    const endLap = stints[i]["end-lap"];
+    pitLaps.add(endLap);     // pit-in lap (slow entry into pits)
+    pitLaps.add(endLap + 1); // pit-out lap (slow exit from pits)
+  }
+  return pitLaps;
+}
+
+/**
+ * Get "clean" race laps for computing race pace.
+ *
+ * Filtering strategy (chosen after comparing approaches on real data with
+ * SC, VSC, and formation laps — see Zandvoort 2026-02-09 analysis):
+ *
+ *  1. Exclude lap 1 — always an outlier (formation lap / standing start).
+ *  2. Exclude SC/VSC/formation laps — using `max-safety-car-status` from
+ *     per-lap-info. This catches the full safety car period including the
+ *     "entry" lap where the flag just came out.
+ *  3. Exclude pit in/out laps — identified from tyre stint boundaries.
+ *     The pit-in lap (diving into pits) and pit-out lap (rejoining) both
+ *     have artificially slow times that aren't representative of race pace.
+ *  4. Apply 1.2× median safety net — catches unlabeled incidents (spins,
+ *     off-tracks, rejoins) that the game still marks as green-flag. These
+ *     have no telemetry flag, so statistical filtering is the only option
+ *     (confirmed with ashwin_nat from Pits n' Giggles, 2026-02).
+ *
+ * Why not just use the median filter alone (previous approach)?
+ *  - It included formation laps and "SC entry" laps that were close enough
+ *    to the median to sneak through (e.g. 1:13.6 on a 1:12.8 median).
+ *  - It included pit-in laps at long tracks where the pit entry time loss
+ *    was under 20% of the median (e.g. Spa pit-in at 1:15 vs 1:12 median).
+ *  - Rankings were noticeably different (and less accurate) compared to
+ *    explicit SC/pit filtering on sessions with safety car periods.
+ */
+export function getCleanRaceLaps(d: DriverData): LapHistoryEntry[] {
+  const laps = d["session-history"]["lap-history-data"];
+  const perLapInfo = d["per-lap-info"] ?? [];
+  const pitLaps = getPitLapNumbers(d);
+
+  const clean: LapHistoryEntry[] = [];
+  for (let i = 1; i < laps.length; i++) {
+    const lap = laps[i];
+    const lapNum = i + 1; // lap-history-data is 0-indexed, lap numbers are 1-indexed
+
+    // Must be a valid lap with a recorded time
+    if (!isLapValid(lap["lap-valid-bit-flags"]) || lap["lap-time-in-ms"] <= 0)
+      continue;
+
+    // Exclude SC/VSC/formation laps
+    const pli = perLapInfo.find((p) => p["lap-number"] === lapNum);
+    const scStatus = pli?.["max-safety-car-status"] ?? "NO_SAFETY_CAR";
+    if (scStatus !== "NO_SAFETY_CAR") continue;
+
+    // Exclude pit in/out laps
+    if (pitLaps.has(lapNum)) continue;
+
+    clean.push(lap);
+  }
+
+  if (clean.length < 3) return clean;
+
+  // Final safety net: 1.2× median catches unlabeled incidents (spins, off-tracks)
+  const times = clean.map((l) => l["lap-time-in-ms"]);
+  const sorted = [...times].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const threshold = median * 1.2;
+  return clean.filter((l) => l["lap-time-in-ms"] <= threshold);
 }
 
 /** Get the best lap time in ms from a set of laps */
@@ -83,8 +168,8 @@ export function lapTimeStdDev(laps: LapHistoryEntry[]): number {
 
 /** Calculate average tyre wear rate (% per lap) across all stints */
 export function avgWearRate(player: DriverData): number {
-  const stints = player["tyre-set-history"];
-  if (!stints?.length) return 0;
+  const stints = getCompletedStints(player["tyre-set-history"] ?? []);
+  if (!stints.length) return 0;
 
   let totalWear = 0;
   let totalLaps = 0;
@@ -211,7 +296,7 @@ export function avgPaceInRange(
   startLap: number,
   endLap: number,
 ): number {
-  const clean = getCleanRaceLaps(laps.slice(startLap - 1, endLap));
+  const clean = filterOutlierLaps(laps.slice(startLap - 1, endLap));
   if (clean.length === 0) return 0;
   return clean.reduce((sum, l) => sum + l["lap-time-in-ms"], 0) / clean.length;
 }
@@ -223,7 +308,7 @@ export function paceDrop(
   endLap: number,
   n = 5,
 ): number {
-  const clean = getCleanRaceLaps(laps.slice(startLap - 1, endLap));
+  const clean = filterOutlierLaps(laps.slice(startLap - 1, endLap));
   if (clean.length < n * 2) return 0;
   const firstN = clean.slice(0, n);
   const lastN = clean.slice(-n);
@@ -286,7 +371,7 @@ export function calculateCumulativeDeltas(
 // --- Insight generation ---
 
 export interface StrategyInsight {
-  type: "tyre" | "sector" | "pit" | "pace" | "history" | "fuel";
+  type: "tyre" | "sector" | "pit" | "pace" | "history" | "fuel" | "speed" | "ers";
   /** Short label shown above the value */
   label: string;
   /** The big prominent value (e.g. "3rd", "1:42.891", "+0.8%/lap") */
@@ -302,7 +387,44 @@ export interface StrategyInsight {
 }
 
 export const RACE_PACE_TOOLTIP =
-  "Average lap time excluding pit stops, safety car periods, and incident laps (laps slower than 1.2× the median are filtered out)";
+  "Average lap time excluding lap 1, pit in/out laps, safety car periods, and incident outliers";
+
+/**
+ * Top speed for a driver — highest between session-level and per-lap values,
+ * with glitch filtering (per-lap speeds > 1.15× the driver's own median are excluded).
+ *
+ * Known Pits n' Giggles telemetry quirks (reported to ashwin_nat, 2026-02):
+ *  1. Session-level "top-speed-kmph" logic is flawed (confirmed by ashwin_nat).
+ *     Null for most drivers, wrong for others (e.g. 60 km/h when per-lap says
+ *     336). Will be fixed in a future Pits n' Giggles release to use max of
+ *     all laps' top speed.
+ *  2. Per-lap "top-speed-kmph" is a simple max(current, incoming) per lap, but
+ *     the F1 game's UDP export has bugs that can produce glitched values —
+ *     e.g. two drivers both showing 486 km/h on the same lap while their other
+ *     ~35 laps average ~310.
+ *  3. Per-lap values may understate actual top speed due to capture granularity.
+ *     The speed trap is at the end of the main straight (Zandvoort speed trap
+ *     record: 311.37 km/h, so a 313 max there is reasonable).
+ *
+ * Workaround: take the highest of session-level and per-lap max, filtering
+ * both against 1.15× the driver's per-lap median to exclude glitches.
+ */
+export function driverTopSpeed(d: DriverData): number {
+  const sessionSpeed = d["top-speed-kmph"] ?? 0;
+  const perLap = d["per-lap-info"] ?? [];
+  const lapSpeeds = perLap
+    .map((l) => l["top-speed-kmph"] ?? 0)
+    .filter((s) => s > 0);
+  if (lapSpeeds.length === 0) return sessionSpeed;
+  const sorted = [...lapSpeeds].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const cap = median * 1.15;
+  const clean = lapSpeeds.filter((s) => s <= cap);
+  const bestLapSpeed = clean.length > 0 ? Math.max(...clean) : Math.max(...lapSpeeds);
+  // Also cap the session-level field against the same threshold
+  const safeSessionSpeed = sessionSpeed > 0 && sessionSpeed <= cap ? sessionSpeed : 0;
+  return Math.max(bestLapSpeed, safeSessionSpeed);
+}
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -326,16 +448,14 @@ export function generateInsights(
 ): StrategyInsight[] {
   const insights: StrategyInsight[] = [];
   const allDrivers = session["classification-data"] ?? [];
-  const playerLaps = player["session-history"]["lap-history-data"];
 
   if (rival) {
     // --- Head-to-head mode ---
-    const rivalLaps = rival["session-history"]["lap-history-data"];
     const rivalName = rival["driver-name"];
 
-    // 1. Pace delta vs rival (clean laps — pit/incident outliers excluded)
-    const playerClean = getCleanRaceLaps(playerLaps);
-    const rivalClean = getCleanRaceLaps(rivalLaps);
+    // 1. Pace delta vs rival (clean laps — SC/pit/incident excluded)
+    const playerClean = getCleanRaceLaps(player);
+    const rivalClean = getCleanRaceLaps(rival);
     if (playerClean.length > 0 && rivalClean.length > 0) {
       const playerAvg =
         playerClean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / playerClean.length;
@@ -354,10 +474,10 @@ export function generateInsights(
     }
 
     // 2. Tyre wear delta vs rival
-    const playerRates = player["tyre-set-history"]
+    const playerRates = getCompletedStints(player["tyre-set-history"])
       .map((s) => stintWearRate(s))
       .filter((r) => r > 0);
-    const rivalRates = rival["tyre-set-history"]
+    const rivalRates = getCompletedStints(rival["tyre-set-history"])
       .map((s) => stintWearRate(s))
       .filter((r) => r > 0);
     if (playerRates.length > 0 && rivalRates.length > 0) {
@@ -375,8 +495,8 @@ export function generateInsights(
     }
 
     // 3. Sector deltas vs rival (all 3 sectors, clean laps only)
-    const playerCleanLaps = getCleanRaceLaps(playerLaps);
-    const rivalCleanLaps = getCleanRaceLaps(rivalLaps);
+    const playerCleanLaps = getCleanRaceLaps(player);
+    const rivalCleanLaps = getCleanRaceLaps(rival);
     if (playerCleanLaps.length > 0 && rivalCleanLaps.length > 0) {
       const sectorKeys = [
         { key: "sector-1-time-in-ms" as const, label: "S1" },
@@ -409,13 +529,45 @@ export function generateInsights(
               : `vs ${rivalName}`,
       });
     }
+
+    // 4. Top speed delta vs rival
+    const playerTopSpeed = driverTopSpeed(player);
+    const rivalTopSpeed = driverTopSpeed(rival);
+    if (playerTopSpeed > 0 && rivalTopSpeed > 0) {
+      const delta = Math.round(playerTopSpeed) - Math.round(rivalTopSpeed);
+      insights.push({
+        type: "speed",
+        label: "Top Speed",
+        value: `${delta <= 0 ? "" : "+"}${delta} km/h`,
+        detail: delta < 0
+          ? `slower than ${rivalName} (${Math.round(playerTopSpeed)} vs ${Math.round(rivalTopSpeed)})`
+          : delta > 0
+            ? `faster than ${rivalName} (${Math.round(playerTopSpeed)} vs ${Math.round(rivalTopSpeed)})`
+            : `same as ${rivalName} (${Math.round(playerTopSpeed)} km/h)`,
+      });
+    }
+
+    // 5. ERS deployment delta vs rival
+    const playerErs = avgErsDeployPct(player);
+    const rivalErs = avgErsDeployPct(rival);
+    if (playerErs > 0 && rivalErs > 0) {
+      const delta = playerErs - rivalErs;
+      insights.push({
+        type: "ers",
+        label: "ERS Deploy",
+        value: `${delta <= 0 ? "" : "+"}${delta.toFixed(1)}%`,
+        detail: `avg per lap vs ${rivalName} (${playerErs.toFixed(1)}% vs ${rivalErs.toFixed(1)}%)`,
+        tooltip:
+          "Average % of ERS battery deployed per lap (green-flag laps only, excluding first and last lap). Higher deployment = less energy wasted.",
+      });
+    }
   } else {
     // --- Field ranking mode (original behavior) ---
 
-    // 1. Pace ranking (clean laps — pit/incident outliers excluded)
+    // 1. Pace ranking (clean laps — SC/pit/incident excluded)
     const paceRanking: { driver: DriverData; avgPace: number }[] = [];
     for (const d of allDrivers) {
-      const clean = getCleanRaceLaps(d["session-history"]["lap-history-data"]);
+      const clean = getCleanRaceLaps(d);
       if (clean.length === 0) continue;
       const avg =
         clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / clean.length;
@@ -442,8 +594,8 @@ export function generateInsights(
     // 2. Tyre wear ranking
     const wearRanking: { driver: DriverData; avgRate: number }[] = [];
     for (const d of allDrivers) {
-      const stints = d["tyre-set-history"];
-      if (!stints?.length) continue;
+      const stints = getCompletedStints(d["tyre-set-history"] ?? []);
+      if (!stints.length) continue;
       const rates = stints.map((s) => stintWearRate(s)).filter((r) => r > 0);
       if (rates.length === 0) continue;
       const avg = rates.reduce((a, b) => a + b, 0) / rates.length;
@@ -470,8 +622,60 @@ export function generateInsights(
       });
     }
 
-    // 3. Weakest & strongest sector (avg vs avg across all drivers, clean laps)
-    const playerCleanLaps2 = getCleanRaceLaps(playerLaps);
+    // 3. Top speed ranking
+    const speedRanking: { driver: DriverData; topSpeed: number }[] = [];
+    for (const d of allDrivers) {
+      const spd = driverTopSpeed(d);
+      if (spd > 0) speedRanking.push({ driver: d, topSpeed: spd });
+    }
+    speedRanking.sort((a, b) => b.topSpeed - a.topSpeed);
+    const speedPos = speedRanking.findIndex(
+      (r) => r.driver.index === player.index,
+    );
+    if (speedPos >= 0 && speedRanking.length > 1) {
+      const playerSpd = speedRanking[speedPos].topSpeed;
+      const delta = speedRanking[0].topSpeed - playerSpd;
+      insights.push({
+        type: "speed",
+        label: "Top Speed",
+        value: ordinal(speedPos + 1),
+        detail:
+          delta < 1
+            ? `of ${speedRanking.length} — ${Math.round(playerSpd)} km/h`
+            : `of ${speedRanking.length} — ${Math.round(playerSpd)} km/h (${Math.round(delta)} off P1)`,
+        tooltip:
+          "Session top speed ranking across all drivers",
+        rank: speedPos,
+        rankTotal: speedRanking.length,
+      });
+    }
+
+    // 4. ERS deployment ranking
+    const ersRanking: { driver: DriverData; avgErs: number }[] = [];
+    for (const d of allDrivers) {
+      const avg = avgErsDeployPct(d);
+      if (avg > 0) ersRanking.push({ driver: d, avgErs: avg });
+    }
+    ersRanking.sort((a, b) => b.avgErs - a.avgErs); // highest first
+    const ersPos = ersRanking.findIndex(
+      (r) => r.driver.index === player.index,
+    );
+    if (ersPos >= 0 && ersRanking.length > 1) {
+      const playerErs = ersRanking[ersPos].avgErs;
+      insights.push({
+        type: "ers",
+        label: "ERS Deploy",
+        value: ordinal(ersPos + 1),
+        detail: `of ${ersRanking.length} — ${playerErs.toFixed(1)}% avg per lap`,
+        tooltip:
+          "Average % of ERS battery deployed per lap (green-flag laps only, excluding first and last lap). Higher deployment = better rank — deploying more means less energy left on the table.",
+        rank: ersPos,
+        rankTotal: ersRanking.length,
+      });
+    }
+
+    // 5. Weakest & strongest sector (avg vs avg across all drivers, clean laps)
+    const playerCleanLaps2 = getCleanRaceLaps(player);
     if (playerCleanLaps2.length > 0) {
       const sectorKeys = [
         { key: "sector-1-time-in-ms" as const, label: "S1" },
@@ -492,7 +696,7 @@ export function generateInsights(
       for (const { key, label } of sectorKeys) {
         const ranking: { driver: DriverData; avg: number }[] = [];
         for (const d of allDrivers) {
-          const clean = getCleanRaceLaps(d["session-history"]["lap-history-data"]);
+          const clean = getCleanRaceLaps(d);
           if (!clean.length) continue;
           const avg =
             clean.reduce((s, l) => s + l[key], 0) / clean.length;
@@ -555,10 +759,10 @@ export function generateInsights(
 
   // 4. Pit timing vs rival
   if (rival) {
-    const playerPits = player["tyre-set-history"]
+    const playerPits = getCompletedStints(player["tyre-set-history"])
       .slice(1)
       .map((s) => s["start-lap"]);
-    const rivalPits = rival["tyre-set-history"]
+    const rivalPits = getCompletedStints(rival["tyre-set-history"])
       .slice(1)
       .map((s) => s["start-lap"]);
 
@@ -600,6 +804,38 @@ export interface FuelCalcResult {
 /** True when a lap ran under normal green-flag racing conditions */
 function isGreenFlagLap(lap: PerLapInfo): boolean {
   return (lap["max-safety-car-status"] ?? "NO_SAFETY_CAR") === "NO_SAFETY_CAR";
+}
+
+/**
+ * Average ERS deployment % per lap for a driver (green-flag laps only,
+ * excluding first and last lap).
+ * Returns 0 if insufficient data.
+ *
+ * Known ERS telemetry issue (confirmed by ashwin_nat): ERS deployed/harvested
+ * reset to 0 at the start of every lap (CAR_STATUS packet), but the lap number
+ * change comes from a separate LAP_DATA packet. There's no guarantee CAR_STATUS
+ * arrives after LAP_DATA, so some laps get captured with the post-reset value.
+ * Fuel doesn't have this issue because it only decreases (no reset).
+ * We exclude laps below 5% as these are capture artifacts, not real data.
+ */
+export function avgErsDeployPct(d: DriverData): number {
+  const perLap = d["per-lap-info"] ?? [];
+  if (perLap.length < 3) return 0;
+  // Exclude first lap (index 0), last lap, and SC/VSC laps
+  const eligible = perLap.slice(1, -1).filter(isGreenFlagLap);
+  const pcts: number[] = [];
+  for (const lap of eligible) {
+    const cs = lap["car-status-data"];
+    const deployed = cs?.["ers-deployed-this-lap"] ?? 0;
+    const cap = cs?.["ers-max-capacity"] ?? 0;
+    if (cap > 0) {
+      const pct = (deployed / cap) * 100;
+      // Skip near-zero laps — telemetry capture gap, not real data
+      if (pct >= 5) pcts.push(pct);
+    }
+  }
+  if (pcts.length === 0) return 0;
+  return pcts.reduce((a, b) => a + b, 0) / pcts.length;
 }
 
 /** Calculate fuel burn rate and related metrics for a player in a race.
@@ -725,7 +961,35 @@ export function generateQualiInsights(
     });
   }
 
-  // 2. Sector rankings
+  // 2. Top speed ranking
+  const qualiSpeedRanking: { driver: DriverData; topSpeed: number }[] = [];
+  for (const d of allDrivers) {
+    const spd = driverTopSpeed(d);
+    if (spd > 0) qualiSpeedRanking.push({ driver: d, topSpeed: spd });
+  }
+  qualiSpeedRanking.sort((a, b) => b.topSpeed - a.topSpeed);
+  const qualiSpeedPos = qualiSpeedRanking.findIndex(
+    (r) => r.driver.index === player.index,
+  );
+  if (qualiSpeedPos >= 0 && qualiSpeedRanking.length > 1) {
+    const playerSpd = qualiSpeedRanking[qualiSpeedPos].topSpeed;
+    const delta = qualiSpeedRanking[0].topSpeed - playerSpd;
+    insights.push({
+      type: "speed",
+      label: "Top Speed",
+      value: ordinal(qualiSpeedPos + 1),
+      detail:
+        delta < 1
+          ? `of ${qualiSpeedRanking.length} — ${Math.round(playerSpd)} km/h`
+          : `of ${qualiSpeedRanking.length} — ${Math.round(playerSpd)} km/h (${Math.round(delta)} off P1)`,
+      tooltip:
+        "Session top speed ranking across all drivers",
+      rank: qualiSpeedPos,
+      rankTotal: qualiSpeedRanking.length,
+    });
+  }
+
+  // 3. Sector rankings
   const playerValid = getValidLaps(player["session-history"]["lap-history-data"]);
   if (playerValid.length > 0) {
     const sectorKeys = [
@@ -805,7 +1069,7 @@ export function generateQualiInsights(
       }
     }
 
-    // 3. Theoretical best lap
+    // 4. Theoretical best lap
     const bestS1 = Math.min(...playerValid.map((l) => l["sector-1-time-in-ms"]));
     const bestS2 = Math.min(...playerValid.map((l) => l["sector-2-time-in-ms"]));
     const bestS3 = Math.min(...playerValid.map((l) => l["sector-3-time-in-ms"]));
@@ -824,7 +1088,7 @@ export function generateQualiInsights(
     }
   }
 
-  // 4. Consistency
+  // 5. Consistency
   if (playerValid.length > 1) {
     const stdDev = lapTimeStdDev(playerValid);
     if (stdDev > 0) {
@@ -954,7 +1218,7 @@ export function generateRaceHistoryInsights(
 ): StrategyInsight[] {
   const insights: StrategyInsight[] = [];
   const laps = player["session-history"]["lap-history-data"];
-  const clean = getCleanRaceLaps(laps);
+  const clean = getCleanRaceLaps(player);
   if (clean.length === 0) return insights;
 
   const bestRaceLap = getBestLapTime(laps);
