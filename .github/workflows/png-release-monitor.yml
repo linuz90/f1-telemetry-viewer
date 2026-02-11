@@ -1,0 +1,167 @@
+name: Monitor Pits n' Giggles Releases
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      force_version:
+        description: 'Force analysis of a specific version tag (e.g. v3.1.7)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    outputs:
+      new_release: ${{ steps.check.outputs.new_release }}
+      version: ${{ steps.check.outputs.version }}
+      release_url: ${{ steps.check.outputs.release_url }}
+      release_notes: ${{ steps.check.outputs.release_notes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for new PnG release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_VERSION: ${{ inputs.force_version }}
+        run: |
+          LAST_VERSION=""
+          if [ -f .github/png-last-version.txt ]; then
+            LAST_VERSION=$(cat .github/png-last-version.txt | tr -d '[:space:]')
+          fi
+
+          if [ -n "$FORCE_VERSION" ]; then
+            RELEASE_JSON=$(gh api "repos/ashwin-nat/pits-n-giggles/releases/tags/$FORCE_VERSION")
+          else
+            RELEASE_JSON=$(gh api repos/ashwin-nat/pits-n-giggles/releases \
+              --jq '[.[] | select(.prerelease == false and (.tag_name | startswith("v")))][0]')
+          fi
+
+          TAG=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
+          URL=$(echo "$RELEASE_JSON" | jq -r '.html_url')
+          BODY=$(echo "$RELEASE_JSON" | jq -r '.body')
+
+          echo "Latest stable: $TAG | Last processed: $LAST_VERSION"
+
+          if [ "$TAG" = "$LAST_VERSION" ] && [ -z "$FORCE_VERSION" ]; then
+            echo "new_release=false" >> "$GITHUB_OUTPUT"
+            echo "No new release."
+          else
+            echo "new_release=true" >> "$GITHUB_OUTPUT"
+            echo "version=$TAG" >> "$GITHUB_OUTPUT"
+            echo "release_url=$URL" >> "$GITHUB_OUTPUT"
+            {
+              echo "release_notes<<RELEASE_EOF"
+              echo "$BODY"
+              echo "RELEASE_EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+  analyze-release:
+    needs: check-release
+    if: needs.check-release.outputs.new_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code analysis
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are analyzing a new release of Pits n' Giggles (PnG), an F1 game telemetry tool.
+            This repository (F1 Telemetry Viewer) consumes JSON telemetry files exported by PnG.
+
+            ## New PnG Release
+
+            **Version**: ${{ needs.check-release.outputs.version }}
+            **URL**: ${{ needs.check-release.outputs.release_url }}
+
+            ### Release Notes
+
+            ${{ needs.check-release.outputs.release_notes }}
+
+            ## Your Task
+
+            Analyze whether this PnG release requires any changes to the F1 Telemetry Viewer codebase.
+            Read the CLAUDE.md file first for full project context.
+
+            ### What to look for
+
+            1. **New telemetry JSON fields**: PnG may add new data fields to its exported JSON.
+               Check if the release notes mention new data, metrics, or telemetry features that
+               would add fields to the JSON export. If so, update the TypeScript types in
+               `src/types/telemetry.ts` and consider if any components should use the new data.
+
+            2. **Changed or renamed fields**: If existing fields are renamed or restructured,
+               update the types and all consuming code (utils, components, plugin).
+
+            3. **New session types or track IDs**: Check if new session types are mentioned that
+               `src/utils/parseFilename.ts` would need to handle.
+
+            4. **New tyre compounds, teams, or visual changes**: Check if `src/utils/colors.ts`
+               needs updates for new compound names or team changes.
+
+            5. **Deprecated or removed features**: If PnG removes data from the export format,
+               the viewer code that depends on it may break.
+
+            6. **Format version bumps**: Check if the `version` field in the telemetry JSON
+               format itself has changed.
+
+            ### Important context
+
+            - PnG is primarily a live overlay/HUD tool. NOT every PnG feature change affects
+              the JSON export format that this viewer consumes.
+            - Most PnG releases focus on UI/overlay improvements that do NOT change the
+              exported telemetry JSON structure.
+            - Only make code changes when there is clear evidence that the JSON export
+              format has changed.
+            - The PnG source code is at https://github.com/ashwin-nat/pits-n-giggles —
+              if the release notes are ambiguous, check the source (especially files under
+              `lib/` like `save_to_disk.py`) to confirm whether the JSON output changed.
+
+            ### Decision
+
+            After your analysis:
+
+            **If code changes ARE needed:**
+            - Create a branch named `png-<version>-updates` (e.g. `png-v3.2.0-updates`)
+            - Make the necessary code changes with conventional commits
+            - Type changes should use: `feat(types): ...`
+            - Follow all CLAUDE.md guidelines
+            - Create a PR targeting main. In the PR description, reference the PnG release
+              version and link, and explain what changed in the export format.
+
+            **If NO code changes are needed:**
+            - Create a GitHub issue titled: "PnG ${{ needs.check-release.outputs.version }}: no viewer changes needed"
+            - In the issue body, briefly explain what the release contained and why no
+              changes are required for the telemetry viewer
+            - Create a "png-release" label if it doesn't exist, and apply it to the issue
+            - Close the issue immediately after creation (it serves as a log entry)
+
+            Do NOT update `.github/png-last-version.txt` — that is handled by the workflow.
+          claude_args: '--max-turns 25 --model claude-sonnet-4-5-20250929'
+
+      - name: Update version tracking
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "${{ needs.check-release.outputs.version }}" > .github/png-last-version.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/png-last-version.txt
+          git diff --cached --quiet || {
+            git commit -m "chore: track PnG ${{ needs.check-release.outputs.version }} as processed"
+            git push
+          }
