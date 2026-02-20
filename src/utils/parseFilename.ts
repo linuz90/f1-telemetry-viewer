@@ -39,6 +39,9 @@ export function parseFilename(filename: string) {
   } else if (prefix[0] === "Short") {
     sessionType = "Short Qualifying";
     trackStart = 2;
+  } else if (prefix[0] === "Time" && prefix[1] === "Trial") {
+    sessionType = "Time Trial";
+    trackStart = 2;
   } else {
     sessionType = prefix[0];
     trackStart = 1;

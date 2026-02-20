@@ -14,6 +14,7 @@ const SESSION_ICONS: Record<string, typeof Flag> = {
   "Short Quali": Timer,
   "One Shot Qualifying": Target,
   "One-Shot Quali": Target,
+  "Time Trial": Gauge,
 };
 
 interface SessionHeaderProps {
