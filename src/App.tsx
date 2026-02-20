@@ -6,6 +6,7 @@ import { SessionPage } from "./pages/SessionPage";
 import { TrackProgressPage } from "./pages/TrackProgressPage";
 import { TelemetryProvider, useTelemetry } from "./context/TelemetryContext";
 import { ZipUploadScreen } from "./components/ZipUploadScreen";
+import { GlobalDropZone } from "./components/GlobalDropZone";
 
 function AppRoutes() {
   const { mode, sessions, sessionsLoading, showUploadModal } = useTelemetry();
@@ -32,6 +33,7 @@ function AppRoutes() {
       {(needsData || showUploadModal) && (
         <ZipUploadScreen dismissable={!needsData} />
       )}
+      <GlobalDropZone />
     </>
   );
 }

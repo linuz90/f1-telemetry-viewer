@@ -1,4 +1,4 @@
-import { Eye, Globe, Timer, Target, Flag } from "lucide-react";
+import { Eye, Globe, Timer, Target, Flag, Gauge } from "lucide-react";
 import { TrackFlag } from "./TrackFlag";
 
 interface SessionCardProps {
@@ -16,6 +16,7 @@ const TYPE_CONFIG: Record<string, { color: string; icon: typeof Flag }> = {
   Race: { color: "text-red-400/60", icon: Flag },
   "Short Quali": { color: "text-yellow-500/60", icon: Timer },
   "One-Shot Quali": { color: "text-purple-400/60", icon: Target },
+  "Time Trial": { color: "text-cyan-400/60", icon: Gauge },
 };
 
 const INDICATOR_COLORS = {

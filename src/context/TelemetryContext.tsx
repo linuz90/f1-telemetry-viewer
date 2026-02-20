@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
-import { loadZipFile } from "./zipLoader";
+import { loadZipFile, loadJsonFiles } from "./zipLoader";
 
 type Mode = "detecting" | "api" | "demo" | "upload";
 
@@ -17,10 +17,10 @@ interface TelemetryContextValue {
   sessionsLoading: boolean;
   sessionsError: string | null;
   getSession: (slug: string) => Promise<TelemetrySession>;
-  loadZip: (file: File) => Promise<void>;
+  loadFiles: (files: File[]) => Promise<void>;
   showUploadModal: boolean;
   setShowUploadModal: (show: boolean) => void;
-  zipLoading: boolean;
+  filesLoading: boolean;
 }
 
 const TelemetryContext = createContext<TelemetryContextValue | null>(null);
@@ -36,7 +36,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
-  const [zipLoading, setZipLoading] = useState(false);
+  const [filesLoading, setFilesLoading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
 
   // In-memory store for upload mode
@@ -129,20 +129,42 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
     [mode, sessionStore, apiCache],
   );
 
-  const loadZip = useCallback(
-    async (file: File) => {
-      setZipLoading(true);
+  const loadFiles = useCallback(
+    async (files: File[]) => {
+      setFilesLoading(true);
       try {
-        const result = await loadZipFile(file);
+        const zips = files.filter((f) => f.name.endsWith(".zip"));
+        const jsons = files.filter((f) => f.name.endsWith(".json"));
+
+        // Load zip(s) first, then JSON files on top
+        const allSessions: SessionSummary[] = [];
+        const allData = new Map<string, TelemetrySession>();
+
+        for (const zip of zips) {
+          const result = await loadZipFile(zip);
+          allSessions.push(...result.sessions);
+          for (const [slug, data] of result.sessionData) {
+            allData.set(slug, data);
+          }
+        }
+
+        if (jsons.length > 0) {
+          const result = await loadJsonFiles(jsons);
+          allSessions.push(...result.sessions);
+          for (const [slug, data] of result.sessionData) {
+            allData.set(slug, data);
+          }
+        }
+
         sessionStore.clear();
-        for (const [slug, data] of result.sessionData) {
+        for (const [slug, data] of allData) {
           sessionStore.set(slug, data);
         }
         setMode("upload");
         setSessionsError(null);
-        setSessions(result.sessions);
+        setSessions(allSessions);
       } finally {
-        setZipLoading(false);
+        setFilesLoading(false);
       }
     },
     [sessionStore],
@@ -156,10 +178,10 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         sessionsLoading,
         sessionsError,
         getSession,
-        loadZip,
+        loadFiles,
         showUploadModal,
         setShowUploadModal,
-        zipLoading,
+        filesLoading,
       }}
     >
       {children}

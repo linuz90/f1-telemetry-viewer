@@ -213,6 +213,8 @@ export function getSessionIcon(type: string): string {
     case "One Shot Qualifying":
     case "One-Shot Quali":
       return "\u{1F3AF}"; // 🎯
+    case "Time Trial":
+      return "\u{1F3CE}\uFE0F"; // 🏎️
     default:
       return "\u{1F3C1}"; // 🏁
   }

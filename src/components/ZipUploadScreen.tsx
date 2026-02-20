@@ -19,9 +19,8 @@ export function ZipUploadScreen({
 }: {
   dismissable?: boolean;
 }) {
-  const { loadZip, zipLoading, setShowUploadModal } = useTelemetry();
+  const { loadFiles, filesLoading, setShowUploadModal } = useTelemetry();
   const navigate = useNavigate();
-  const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -29,57 +28,38 @@ export function ZipUploadScreen({
     if (dismissable) setShowUploadModal(false);
   }, [dismissable, setShowUploadModal]);
 
-  const handleFile = useCallback(
-    async (file: File) => {
+  const handleFiles = useCallback(
+    async (files: File[]) => {
       setError(null);
-      if (!file.name.endsWith(".zip")) {
-        setError("Please upload a .zip file");
+      const valid = files.filter(
+        (f) => f.name.endsWith(".zip") || f.name.endsWith(".json"),
+      );
+      if (valid.length === 0) {
+        setError("Please upload .zip or .json files");
         return;
       }
       try {
-        await loadZip(file);
+        await loadFiles(valid);
         setShowUploadModal(false);
         navigate("/");
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load zip file");
+        setError(e instanceof Error ? e.message : "Failed to load files");
       }
     },
-    [loadZip, setShowUploadModal, navigate],
+    [loadFiles, setShowUploadModal, navigate],
   );
-
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
-    },
-    [handleFile],
-  );
-
-  const onDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  }, []);
-
-  const onDragLeave = useCallback(() => {
-    setDragOver(false);
-  }, []);
 
   const onFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) handleFile(file);
+      const files = Array.from(e.target.files ?? []);
+      if (files.length > 0) handleFiles(files);
     },
-    [handleFile],
+    [handleFiles],
   );
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onDrop={onDrop}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
       onClick={dismissable ? close : undefined}
     >
       <div
@@ -144,13 +124,9 @@ export function ZipUploadScreen({
         <div className="w-full px-8">
           <div
             onClick={() => inputRef.current?.click()}
-            className={`flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors ${
-              dragOver
-                ? "border-red-500 bg-red-500/5"
-                : "border-zinc-700 hover:border-zinc-500 hover:bg-zinc-900/30"
-            }`}
+            className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-zinc-700 hover:border-zinc-500 hover:bg-zinc-900/30 px-6 py-8 text-center transition-colors"
           >
-            {zipLoading ? (
+            {filesLoading ? (
               <>
                 <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-zinc-600 border-t-red-500" />
                 <div>
@@ -169,8 +145,10 @@ export function ZipUploadScreen({
                 </div>
                 <div>
                   <p className="text-sm font-medium text-zinc-200">
-                    Drop or select a <span className="text-zinc-100">.zip</span>{" "}
-                    with Pits n' Giggles telemetry
+                    Drop or select telemetry files
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    .json session files, or a .zip of your data folder
                   </p>
                 </div>
                 {error && <p className="text-xs text-red-400">{error}</p>}
@@ -179,7 +157,8 @@ export function ZipUploadScreen({
             <input
               ref={inputRef}
               type="file"
-              accept=".zip"
+              accept=".zip,.json"
+              multiple
               className="hidden"
               onChange={onFileSelect}
             />
