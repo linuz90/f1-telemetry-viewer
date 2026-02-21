@@ -11,7 +11,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "generate-demo": "npx tsx scripts/generate-demo-data.ts",
-    "find-session": "bash scripts/find-session.sh"
+    "find-session": "bash scripts/find-session.sh",
+    "start": "tsx server.ts"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
@@ -20,6 +21,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
     "tailwindcss": "^4.1.18",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "vite": "^7.2.4"
   },
