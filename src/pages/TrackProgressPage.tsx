@@ -23,6 +23,7 @@ import { CompoundStatCard } from "../components/CompoundStatCard";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 import { cardClass, cardClassCompact } from "../components/Card";
 import { Upload, ArrowLeft } from "lucide-react";
+import { CarSetupCard } from "../components/CarSetupCard";
 
 interface LapPoint {
   timeSec: number;
@@ -291,6 +292,28 @@ export function TrackProgressPage() {
   const bestRaceLapMs = raceData.some((d) => d.bestLapMs > 0)
     ? Math.min(...raceData.filter((d) => d.bestLapMs > 0).map((d) => d.bestLapMs))
     : 0;
+
+  // Find the session behind each all-time best lap (for setup display)
+  const bestQualiSession = qualiData.find(
+    (d) => d.bestLapMs > 0 && d.bestLapMs === actualBestQualiMs
+  ) ?? null;
+  const bestRaceSession = raceData.find(
+    (d) => d.bestLapMs > 0 && d.bestLapMs === bestRaceLapMs
+  ) ?? null;
+
+  // Extract valid setup from each best session
+  const bestQualiSetup = (() => {
+    if (!bestQualiSession) return null;
+    const player = findPlayer(bestQualiSession.session);
+    const setup = player?.["car-setup"];
+    return setup?.["is-valid"] ? setup : null;
+  })();
+  const bestRaceSetup = (() => {
+    if (!bestRaceSession) return null;
+    const player = findPlayer(bestRaceSession.session);
+    const setup = player?.["car-setup"];
+    return setup?.["is-valid"] ? setup : null;
+  })();
 
   // Qualifying chart data — group by day, keep best lap per day
   const lapTrend = (() => {
@@ -653,6 +676,20 @@ export function TrackProgressPage() {
               </ResponsiveContainer>
             </section>
           )}
+
+          {/* Best qualifying setup */}
+          {bestQualiSetup && bestQualiSession && (
+            <section className={cardClass}>
+              <h3 className="text-sm font-semibold text-zinc-300 mb-1">Your Best Qualifying Setup</h3>
+              <p className="text-xs text-zinc-500 mb-4">
+                From{" "}
+                <Link to={`/session/${bestQualiSession.summary.slug}`} className="text-zinc-400 hover:text-zinc-200 transition-colors">
+                  {formatSessionType(bestQualiSession.summary.sessionType)} · {formatDate(bestQualiSession.summary.date)} · {msToLapTime(bestQualiSession.bestLapMs)}
+                </Link>
+              </p>
+              <CarSetupCard setup={bestQualiSetup} />
+            </section>
+          )}
         </>
       )}
 
@@ -802,6 +839,20 @@ export function TrackProgressPage() {
                   <Line type="monotone" dataKey="speed" stroke="#22c55e" strokeWidth={2} dot={{ fill: "#22c55e", r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
+            </section>
+          )}
+
+          {/* Best race setup */}
+          {bestRaceSetup && bestRaceSession && (
+            <section className={cardClass}>
+              <h3 className="text-sm font-semibold text-zinc-300 mb-1">Your Best Race Setup</h3>
+              <p className="text-xs text-zinc-500 mb-4">
+                From{" "}
+                <Link to={`/session/${bestRaceSession.summary.slug}`} className="text-zinc-400 hover:text-zinc-200 transition-colors">
+                  {formatSessionType(bestRaceSession.summary.sessionType)} · {formatDate(bestRaceSession.summary.date)} · {msToLapTime(bestRaceSession.bestLapMs)}
+                </Link>
+              </p>
+              <CarSetupCard setup={bestRaceSetup} />
             </section>
           )}
         </>
