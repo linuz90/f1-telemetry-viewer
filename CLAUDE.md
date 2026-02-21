@@ -14,6 +14,7 @@ pnpm dev:prod       # Dev server without local API (uses demo data, like product
 pnpm build          # Type-check (tsc) + production build
 pnpm preview        # Preview production build
 pnpm generate-demo  # Regenerate trimmed demo data in public/demo/
+pnpm find-session <slug-or-url>  # Resolve a session URL/slug to its JSON file on disk
 ```
 
 No test runner or linter is configured.
@@ -45,12 +46,34 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 - `src/utils/` — Formatting (lap times, sectors), statistics (best laps, consistency, tyre wear rates), team/compound color mappings
 - `src/types/telemetry.ts` — All TypeScript types for the telemetry data model
 - `src/plugin/` — Vite plugin (has its own tsconfig: `tsconfig.node.json`)
-- `scripts/` — `generate-demo-data.ts` creates trimmed demo files from real telemetry
+- `scripts/` — `generate-demo-data.ts` creates trimmed demo files; `find-session.sh` resolves session slugs/URLs to file paths
 - `public/demo/` — Bundled demo sessions (committed, deployed as static assets)
 
 **Mode detection:** On mount, `TelemetryContext` runs: `/api/sessions` → `/demo/sessions.json` → upload mode. `VITE_SKIP_API=true` skips the API step (used by `dev:prod`).
 
 **Styling:** Dark theme (slate-950 background). All styling via Tailwind utility classes.
+
+## Reading Session Telemetry Data
+
+When the user references a session by URL, or when you're testing in the browser and land on a session page (e.g. `http://localhost:5173/session/race-baku-manual-2026-02-21-16-39-26`), you can read the raw telemetry JSON to understand the data. The URL slug maps to a file on disk under `TELEMETRY_DIR` (set in `.env`).
+
+**This only works in local dev mode (`pnpm dev`)**, where sessions are served from the `TELEMETRY_DIR` directory. It won't work for uploaded sessions (JSON/zip via drag-and-drop) or when running `dev:prod` / production, since those sessions live in-memory in the browser.
+
+**How the slug-to-file mapping works:**
+- Filenames follow: `Race_Baku_Manual_2026_02_21_16_39_26.json` (with date subdirs like `2026_02_21/race-info/`)
+- `toSlug()` in `src/utils/parseFilename.ts` lowercases the basename and replaces `_` with `-` → `race-baku-manual-2026-02-21-16-39-26`
+- To reverse: replace `-` with `_` and search case-insensitively under `TELEMETRY_DIR`
+
+**Use the helper script to find the file:**
+```bash
+pnpm find-session race-baku-manual-2026-02-21-16-39-26
+# → /Users/.../data/2026_02_21/race-info/Race_Baku_Manual_2026_02_21_16_39_26.json
+
+pnpm find-session http://localhost:5173/session/race-baku-manual-2026-02-21-16-39-26
+# Same result — accepts full URLs too
+```
+
+Then read the returned file path to inspect the raw telemetry JSON.
 
 ## Commit Message Guidelines
 

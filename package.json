@@ -10,7 +10,8 @@
     "dev:prod": "VITE_SKIP_API=true vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "generate-demo": "npx tsx scripts/generate-demo-data.ts"
+    "generate-demo": "npx tsx scripts/generate-demo-data.ts",
+    "find-session": "bash scripts/find-session.sh"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
