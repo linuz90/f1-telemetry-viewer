@@ -49,6 +49,25 @@ pnpm preview        # Preview production build locally
 pnpm generate-demo  # Regenerate trimmed demo data in public/demo/
 ```
 
+## Self-hosting
+
+Want to keep the telemetry viewer running permanently on your machine or a server? Build the app once and use the included production server:
+
+```bash
+pnpm build
+TELEMETRY_DIR=/path/to/your/telemetry pnpm start
+```
+
+This starts a lightweight Node.js server on `http://localhost:3080` that serves the pre-built frontend and the telemetry API. Unlike `pnpm dev`, it doesn't run Vite's dev toolchain (no HMR, no file watchers, no source maps), so it uses very little memory and CPU.
+
+| Variable | Default | Description |
+|---|---|---|
+| `TELEMETRY_DIR` | *(required)* | Path to your Pits n' Giggles telemetry folder |
+| `PORT` | `3080` | HTTP port |
+| `DIST_DIR` | `./dist` | Path to the build output (rarely needed) |
+
+Works on macOS, Linux, and Windows.
+
 ## Stack
 
 React 19, TypeScript, Vite 7, Tailwind CSS 4, Recharts 3, React Router 7
