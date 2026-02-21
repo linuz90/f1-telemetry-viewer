@@ -794,9 +794,16 @@ export function estimateMaxLife(wearRatePerLap: number): number {
 /** Result of a fuel burn-rate calculation for a single race session */
 export interface FuelCalcResult {
   burnRateKg: number;
+  greenFlagLapCount: number;
   startFuelKg: number;
   startFuelLaps: number;
+  /** Game's fuel-remaining-laps at lap 0 — what the player loaded */
+  startFuelRemaining: number;
+  /** Fuel in tank (kg) at last recorded lap */
+  endFuelKg: number;
+  /** Game's fuel-remaining-laps at last recorded lap */
   fuelRemainingLaps: number;
+  lastLapNumber: number;
   suggestedKg: number;
   suggestedLaps: number;
 }
@@ -881,15 +888,22 @@ export function calculateBurnRate(
 
   const startFuelKg = firstLap["car-status-data"]["fuel-in-tank"];
   const startFuelLaps = startFuelKg / burnRateKg;
+  const startFuelRemaining = firstLap["car-status-data"]["fuel-remaining-laps"];
+  const endFuelKg = lastLap["car-status-data"]["fuel-in-tank"];
   const fuelRemainingLaps = lastLap["car-status-data"]["fuel-remaining-laps"];
+  const lastLapNumber = lastLap["lap-number"] as number;
   const suggestedLaps = startFuelLaps - fuelRemainingLaps;
   const suggestedKg = suggestedLaps * burnRateKg;
 
   return {
     burnRateKg,
+    greenFlagLapCount: deltas.length,
     startFuelKg,
     startFuelLaps,
+    startFuelRemaining,
+    endFuelKg,
     fuelRemainingLaps,
+    lastLapNumber,
     suggestedKg,
     suggestedLaps,
   };
@@ -908,25 +922,64 @@ export function generateFuelInsights(
   const result = calculateBurnRate(player);
   if (!result) return [];
 
-  const { startFuelKg, startFuelLaps, fuelRemainingLaps, suggestedKg, suggestedLaps } = result;
-  const startDelta = startFuelLaps - totalRaceLaps;
-  const suggestedDelta = suggestedLaps - totalRaceLaps;
+  const {
+    burnRateKg, greenFlagLapCount, startFuelRemaining, lastLapNumber,
+  } = result;
 
-  let detail: string;
-  if (Math.abs(fuelRemainingLaps) < 0.3) {
-    detail = "remaining — perfect fuel load";
-  } else {
-    detail =
-      `started ${formatLapDelta(startDelta)} laps (${Math.round(startFuelKg)}kg), ` +
-      `suggested ${formatLapDelta(suggestedDelta)} laps (${Math.round(suggestedKg)}kg)`;
+  const insights: StrategyInsight[] = [];
+
+  // Row 1: Fuel Load — always shown
+  insights.push({
+    type: "fuel",
+    label: "Initial Fuel",
+    value: `${formatLapDelta(startFuelRemaining)} laps`,
+    detail: `${Math.round(result.startFuelKg)} kg — ${burnRateKg.toFixed(2)} kg/lap avg`,
+  });
+
+  // Row 2: Fuel Recommendation — always uses our green-flag burn rate
+  // (avoids SC/VSC laps inflating the excess and skewing the recommendation)
+  if (greenFlagLapCount >= 5) {
+    const endFuelRemaining = result.endFuelKg / burnRateKg;
+    const raceComplete = lastLapNumber >= totalRaceLaps - 2;
+    if (!raceComplete) {
+      const lapsToGo = totalRaceLaps - lastLapNumber;
+      const projectedKg = result.endFuelKg - burnRateKg * lapsToGo;
+      const projectedRemaining = projectedKg / burnRateKg;
+      const recommended = startFuelRemaining - projectedRemaining;
+      let detail: string;
+      if (Math.abs(projectedRemaining) < 0.3) {
+        detail = "fuel load was spot on";
+      } else if (projectedRemaining > 0) {
+        detail = `projected ${formatLapDelta(projectedRemaining)} excess (${greenFlagLapCount} green laps)`;
+      } else {
+        detail = `projected ${formatLapDelta(projectedRemaining)} short (${greenFlagLapCount} green laps)`;
+      }
+      insights.push({
+        type: "fuel",
+        label: "Recommended Fuel",
+        value: `${formatLapDelta(recommended)} laps`,
+        detail,
+      });
+    } else {
+      const recommended = startFuelRemaining - endFuelRemaining;
+      let detail: string;
+      if (Math.abs(endFuelRemaining) < 0.3) {
+        detail = "fuel load was spot on";
+      } else if (endFuelRemaining > 0) {
+        detail = `${formatLapDelta(endFuelRemaining)} excess at finish (green-flag pace)`;
+      } else {
+        detail = `${formatLapDelta(endFuelRemaining)} short at finish (green-flag pace)`;
+      }
+      insights.push({
+        type: "fuel",
+        label: "Recommended Fuel",
+        value: `${formatLapDelta(recommended)} laps`,
+        detail,
+      });
+    }
   }
 
-  return [{
-    type: "fuel",
-    label: "Fuel at Finish",
-    value: `${fuelRemainingLaps.toFixed(1)} laps`,
-    detail,
-  }];
+  return insights;
 }
 
 /** Generate qualifying-specific insights for the player */
