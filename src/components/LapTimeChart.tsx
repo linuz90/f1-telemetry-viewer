@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import type { LapHistoryEntry, PerLapInfo, TyreStint } from "../types/telemetry";
 import { msToLapTime, isLapValid } from "../utils/format";
+import { getWorstWheelWear } from "../utils/stats";
 import { CHART_THEME, TOOLTIP_STYLE, COMPOUND_COLORS } from "../utils/colors";
 
 interface LapTimeChartProps {
@@ -367,9 +368,10 @@ export function LapTimeChart({
           if (stints) {
             for (const stint of stints) {
               for (const entry of stint["tyre-wear-history"] ?? []) {
+                const worst = getWorstWheelWear(entry);
                 const existing = wearMap.get(entry["lap-number"]);
-                if (existing == null || entry.average > existing) {
-                  wearMap.set(entry["lap-number"], entry.average);
+                if (existing == null || worst > existing) {
+                  wearMap.set(entry["lap-number"], worst);
                 }
               }
             }
