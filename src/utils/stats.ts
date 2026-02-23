@@ -804,8 +804,6 @@ export interface FuelCalcResult {
   /** Game's fuel-remaining-laps at last recorded lap */
   fuelRemainingLaps: number;
   lastLapNumber: number;
-  suggestedKg: number;
-  suggestedLaps: number;
 }
 
 /** True when a lap ran under normal green-flag racing conditions */
@@ -892,8 +890,6 @@ export function calculateBurnRate(
   const endFuelKg = lastLap["car-status-data"]["fuel-in-tank"];
   const fuelRemainingLaps = lastLap["car-status-data"]["fuel-remaining-laps"];
   const lastLapNumber = lastLap["lap-number"] as number;
-  const suggestedLaps = startFuelLaps - fuelRemainingLaps;
-  const suggestedKg = suggestedLaps * burnRateKg;
 
   return {
     burnRateKg,
@@ -904,8 +900,6 @@ export function calculateBurnRate(
     endFuelKg,
     fuelRemainingLaps,
     lastLapNumber,
-    suggestedKg,
-    suggestedLaps,
   };
 }
 
@@ -1407,9 +1401,12 @@ export function aggregateCompoundLife(
 export interface TrackFuelStats {
   avgBurnRateKgPerLap: number;
   avgStartingFuelKg: number;
-  avgFuelRemainingLaps: number;
-  suggestedFuelKg: number;
-  suggestedFuelLaps: number;
+  /** Average game fuel-remaining-laps at start (matches session "Initial Fuel") */
+  avgInitialFuelLaps: number;
+  /** Average recommended fuel delta in laps (matches session "Recommended Fuel") */
+  avgRecommendedFuelLaps: number;
+  /** Average projected excess at finish in green-flag laps (our burn rate) */
+  avgExcessAtFinishLaps: number;
   raceCount: number;
 }
 
@@ -1417,26 +1414,45 @@ export interface TrackFuelStats {
 export function aggregateFuelData(
   sessions: TelemetrySession[],
 ): TrackFuelStats | null {
-  const results: FuelCalcResult[] = [];
+  const perRace: { result: FuelCalcResult; totalLaps: number }[] = [];
 
   for (const session of sessions) {
     if (!isRaceSession(session)) continue;
     const player = findPlayer(session);
     if (!player) continue;
     const result = calculateBurnRate(player);
-    if (result) results.push(result);
+    const totalLaps = session["session-info"]["total-laps"];
+    if (result && totalLaps > 0) perRace.push({ result, totalLaps });
   }
 
-  if (results.length === 0) return null;
+  if (perRace.length === 0) return null;
 
   const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
 
+  // Compute per-race excess at finish using green-flag burn rate consistently
+  // (same formula as generateFuelInsights: endFuelKg / burnRateKg)
+  const excessAtFinish = perRace.map(({ result, totalLaps }) => {
+    const raceComplete = result.lastLapNumber >= totalLaps - 2;
+    if (raceComplete) {
+      return result.endFuelKg / result.burnRateKg;
+    }
+    // Incomplete race: project remaining fuel at green-flag pace
+    const lapsToGo = totalLaps - result.lastLapNumber;
+    return (result.endFuelKg - result.burnRateKg * lapsToGo) / result.burnRateKg;
+  });
+
+  // Recommended fuel delta per race (same formula as generateFuelInsights):
+  // recommended = startFuelRemaining - projected/actual end excess
+  const recommendedPerRace = perRace.map(({ result }, i) =>
+    result.startFuelRemaining - excessAtFinish[i],
+  );
+
   return {
-    avgBurnRateKgPerLap: avg(results.map((r) => r.burnRateKg)),
-    avgStartingFuelKg: avg(results.map((r) => r.startFuelKg)),
-    avgFuelRemainingLaps: avg(results.map((r) => r.fuelRemainingLaps)),
-    suggestedFuelKg: avg(results.map((r) => r.suggestedKg)),
-    suggestedFuelLaps: avg(results.map((r) => r.suggestedLaps)),
-    raceCount: results.length,
+    avgBurnRateKgPerLap: avg(perRace.map((r) => r.result.burnRateKg)),
+    avgStartingFuelKg: avg(perRace.map((r) => r.result.startFuelKg)),
+    avgInitialFuelLaps: avg(perRace.map((r) => r.result.startFuelRemaining)),
+    avgRecommendedFuelLaps: avg(recommendedPerRace),
+    avgExcessAtFinishLaps: avg(excessAtFinish),
+    raceCount: perRace.length,
   };
 }
