@@ -748,7 +748,34 @@ export function TrackProgressPage() {
           {trackFuelStats && (
             <div>
               <h4 className="text-sm font-semibold text-zinc-300 mb-2">Fuel Management</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className={cardClass}>
+                  <div className="text-xs text-zinc-500 mb-1">Avg Initial Fuel</div>
+                  <div className={`font-mono text-lg ${
+                    trackFuelStats.avgInitialFuelLaps >= 0
+                      ? "text-emerald-400"
+                      : Math.abs(trackFuelStats.avgInitialFuelLaps) <= 1
+                        ? "text-amber-400"
+                        : "text-red-400"
+                  }`}>
+                    {trackFuelStats.avgInitialFuelLaps >= 0 ? "+" : ""}{trackFuelStats.avgInitialFuelLaps.toFixed(1)} laps
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-0.5">
+                    {Math.round(trackFuelStats.avgStartingFuelKg)} kg avg
+                  </div>
+                </div>
+                <div className={cardClass}>
+                  <div className="text-xs text-zinc-500 mb-1">Rec. Initial Fuel</div>
+                  <div className={`font-mono text-lg ${
+                    Math.abs(trackFuelStats.avgRecommendedFuelLaps) <= 0.3
+                      ? "text-emerald-400"
+                      : trackFuelStats.avgRecommendedFuelLaps < -1
+                        ? "text-red-400"
+                        : "text-cyan-400"
+                  }`}>
+                    {trackFuelStats.avgRecommendedFuelLaps >= 0 ? "+" : ""}{trackFuelStats.avgRecommendedFuelLaps.toFixed(1)} laps
+                  </div>
+                </div>
                 <div className={cardClass}>
                   <div className="text-xs text-zinc-500 mb-1">Avg Burn Rate</div>
                   <div className="font-mono text-lg text-amber-400">
@@ -756,24 +783,15 @@ export function TrackProgressPage() {
                   </div>
                 </div>
                 <div className={cardClass}>
-                  <div className="text-xs text-zinc-500 mb-1">Recommended Fuel</div>
-                  <div className="font-mono text-lg text-cyan-400">
-                    {Math.round(trackFuelStats.suggestedFuelKg)} kg
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-0.5">
-                    ~{trackFuelStats.suggestedFuelLaps.toFixed(1)} laps
-                  </div>
-                </div>
-                <div className={cardClass}>
                   <div className="text-xs text-zinc-500 mb-1">Avg Excess at Finish</div>
                   <div className={`font-mono text-lg ${
-                    trackFuelStats.avgFuelRemainingLaps > 1
+                    trackFuelStats.avgExcessAtFinishLaps > 1
                       ? "text-amber-400"
-                      : trackFuelStats.avgFuelRemainingLaps < 0
+                      : trackFuelStats.avgExcessAtFinishLaps < 0
                         ? "text-red-400"
                         : "text-emerald-400"
                   }`}>
-                    {trackFuelStats.avgFuelRemainingLaps.toFixed(1)} laps
+                    {trackFuelStats.avgExcessAtFinishLaps.toFixed(1)} laps
                   </div>
                 </div>
                 <div className={cardClass}>
