@@ -31,7 +31,7 @@ export function DriverComparisonPicker({
 
   const presets: Preset[] = [
     {
-      label: "Race Winner",
+      label: "Winner",
       driver: findRaceWinner(session),
       tag: "P1",
     },
@@ -52,15 +52,12 @@ export function DriverComparisonPicker({
     (p) => p.driver && p.driver.index !== focusedDriverIndex,
   );
 
-  // Other drivers (not focused, not already a preset)
-  const presetIndices = new Set(validPresets.map((p) => p.driver!.index));
-  const otherDrivers = drivers
-    .filter((d) => d.index !== focusedDriverIndex && !presetIndices.has(d.index))
-    .sort(
-      (a, b) =>
-        (a["final-classification"]?.position ?? 999) -
-        (b["final-classification"]?.position ?? 999),
-    );
+  // All drivers sorted by position (for the dropdown)
+  const dropdownDrivers = [...drivers].sort(
+    (a, b) =>
+      (a["final-classification"]?.position ?? 999) -
+      (b["final-classification"]?.position ?? 999),
+  );
 
   // All non-focused drivers
   const allRivals = drivers.filter((d) => d.index !== focusedDriverIndex);
@@ -154,9 +151,7 @@ export function DriverComparisonPicker({
       {/* Full driver dropdown */}
       <select
         value={
-          selectedIndex !== null && !presetIndices.has(selectedIndex)
-            ? selectedIndex
-            : ""
+          selectedIndex !== null ? selectedIndex : ""
         }
         onChange={(e) => {
           const val = e.target.value;
@@ -164,13 +159,16 @@ export function DriverComparisonPicker({
         }}
         className="bg-zinc-900/60 text-zinc-400 text-xs rounded-md px-2 py-1.5 border border-zinc-700/50 hover:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/40"
       >
-        <option value="">Other driver...</option>
-        {otherDrivers.map((d) => (
-          <option key={d.index} value={d.index}>
-            P{d["final-classification"]?.position ?? "?"} {d["driver-name"]} (
-            {d.team})
-          </option>
-        ))}
+        <option value="">Any driver...</option>
+        <optgroup label="Drivers">
+          {dropdownDrivers
+            .filter((d) => d.index !== focusedDriverIndex)
+            .map((d) => (
+              <option key={d.index} value={d.index}>
+                P{d["final-classification"]?.position ?? "?"} - {d["driver-name"]} - {d.team}
+              </option>
+            ))}
+        </optgroup>
       </select>
     </div>
   );

@@ -7,6 +7,7 @@ import {
   generateFuelInsights,
   generateRaceHistoryInsights,
   getCompletedStints,
+  getDriverStints,
 } from "../utils/stats";
 import { useTrackHistory } from "../hooks/useTrackHistory";
 import { useSessionList } from "../hooks/useSessionList";
@@ -24,6 +25,7 @@ import { RaceResultsTable } from "../components/RaceResultsTable";
 import { DamageTimeline } from "../components/DamageTimeline";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
+import { DuplicateNotice } from "../components/DuplicateNotice";
 
 export function RaceSessionView({ session, slug }: { session: TelemetrySession; slug: string }) {
   const drivers = session["classification-data"] ?? [];
@@ -42,6 +44,12 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     setSelectedRivalIndex(null);
   }, [session]);
 
+  useEffect(() => {
+    if (selectedRivalIndex === focusedDriverIndex) {
+      setSelectedRivalIndex(null);
+    }
+  }, [focusedDriverIndex, selectedRivalIndex]);
+
   const focusedDriver = useMemo(
     () => drivers.find((d) => d.index === focusedDriverIndex),
     [drivers, focusedDriverIndex],
@@ -51,13 +59,16 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
 
   // Find track name from session list to match history
   const { sessions: allSessions } = useSessionList();
-  const trackName = useMemo(
-    () => allSessions.find((s) => s.slug === slug)?.track,
+  const sessionMeta = useMemo(
+    () => allSessions.find((s) => s.slug === slug),
     [allSessions, slug],
   );
+  const trackName = sessionMeta?.track;
   const { pbs } = useTrackHistory(trackName, slug);
 
-  const stints = getCompletedStints(focusedDriver?.["tyre-set-history"] ?? []);
+  const stints = getCompletedStints(
+    focusedDriver ? getDriverStints(focusedDriver) : [],
+  );
   const laps = focusedDriver?.["session-history"]["lap-history-data"] ?? [];
   const pitLaps = stints.slice(1).map((s) => s["start-lap"]);
   // Laps affected by pit stops (end of outgoing stint + start of incoming stint)
@@ -76,7 +87,9 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     [selectedRivalIndex, drivers],
   );
 
-  const rivalStints = getCompletedStints(rival?.["tyre-set-history"] ?? []);
+  const rivalStints = getCompletedStints(
+    rival ? getDriverStints(rival) : [],
+  );
   const rivalLaps = rival?.["session-history"]["lap-history-data"] ?? [];
   const rivalPitLaps = rivalStints.slice(1).map((s) => s["start-lap"]);
 
@@ -153,19 +166,21 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
       <StrategyInsightsCard insights={insights} />
 
       {/* Stint strategy + tyre wear */}
-      <Card as="section" className="space-y-4">
-        <StintTimeline stints={stints} totalLaps={info["total-laps"]} />
-        <TyreWearChart
-          stints={stints}
-          rivalStints={rival ? rivalStints : undefined}
-          rivalName={rival?.["driver-name"]}
-          perLapInfo={perLapInfo}
-        />
-        <StintDetailCards stints={stints} laps={laps} />
-      </Card>
+      {stints.length > 0 && (
+        <Card as="section" className="space-y-4">
+          <StintTimeline stints={stints} totalLaps={info["total-laps"]} />
+          <TyreWearChart
+            stints={stints}
+            rivalStints={rival ? rivalStints : undefined}
+            rivalName={rival?.["driver-name"]}
+            perLapInfo={perLapInfo}
+          />
+          <StintDetailCards stints={stints} laps={laps} />
+        </Card>
+      )}
 
       {/* Stint comparison table */}
-      {focusedDriver && (
+      {focusedDriver && stints.length > 0 && (
         <Card as="section">
           <StintComparisonTable player={focusedDriver} allDrivers={drivers} />
         </Card>
@@ -192,11 +207,9 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
       )}
 
       {/* Damage timeline */}
-      {perLapInfo.length > 0 && (
-        <Card as="section">
-          <DamageTimeline perLapInfo={perLapInfo} />
-        </Card>
-      )}
+      <Card as="section">
+        <DamageTimeline perLapInfo={perLapInfo} />
+      </Card>
 
       {/* Compound comparison (only when rival selected) */}
       {rival && (
@@ -222,21 +235,21 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
       )}
 
       {/* Position changes */}
-      {session["position-history"]?.length > 0 && (
-        <Card as="section">
-          <PositionChart
-            positionHistory={session["position-history"]}
-            playerName={focusedDriver?.["driver-name"] ?? ""}
-            rivalName={rival?.["driver-name"]}
-            overtakes={session.overtakes?.records.filter((ot) => !pitAffectedLaps.has(ot["overtaking-driver-lap"]))}
-          />
-        </Card>
-      )}
+      <Card as="section">
+        <PositionChart
+          positionHistory={session["position-history"] ?? []}
+          playerName={focusedDriver?.["driver-name"] ?? ""}
+          rivalName={rival?.["driver-name"]}
+          overtakes={session.overtakes?.records.filter((ot) => !pitAffectedLaps.has(ot["overtaking-driver-lap"]))}
+        />
+      </Card>
 
       {/* Results table */}
       <Card as="section">
         <RaceResultsTable session={session} focusedDriverIndex={focusedDriverIndex} />
       </Card>
+
+      <DuplicateNotice count={sessionMeta?.duplicateCount ?? 0} />
     </div>
   );
 }

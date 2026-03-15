@@ -10,6 +10,7 @@ import { SectorComparison } from "../components/SectorComparison";
 import { SectorVsBest } from "../components/SectorVsBest";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
+import { DuplicateNotice } from "../components/DuplicateNotice";
 
 export function QualifyingSessionView({
   session,
@@ -39,10 +40,11 @@ export function QualifyingSessionView({
   const stints = focusedDriver?.["session-history"]["tyre-stints-history-data"] ?? [];
   // Find track name from session list to match history
   const { sessions: allSessions } = useSessionList();
-  const trackName = useMemo(
-    () => allSessions.find((s) => s.slug === slug)?.track,
+  const sessionMeta = useMemo(
+    () => allSessions.find((s) => s.slug === slug),
     [allSessions, slug],
   );
+  const trackName = sessionMeta?.track;
   const { pbs } = useTrackHistory(trackName, slug);
 
   const insights = useMemo(() => {
@@ -94,6 +96,7 @@ export function QualifyingSessionView({
         </Card>
       )}
 
+      <DuplicateNotice count={sessionMeta?.duplicateCount ?? 0} />
     </div>
   );
 }

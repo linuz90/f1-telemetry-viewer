@@ -1,9 +1,12 @@
 import JSZip from "jszip";
 import { parseFilename, toSlug } from "../utils/parseFilename";
+import { deduplicateSessions } from "../utils/deduplicateSessions";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
 
+export type LoadedSessionSummary = SessionSummary & { fileSize: number };
+
 export interface LoadResult {
-  sessions: SessionSummary[];
+  sessions: LoadedSessionSummary[];
   sessionData: Map<string, TelemetrySession>;
 }
 
@@ -11,7 +14,8 @@ export interface LoadResult {
 function buildSummary(
   relativePath: string,
   json: TelemetrySession,
-): { summary: SessionSummary; valid: boolean } {
+  fileSize: number,
+): { summary: LoadedSessionSummary; valid: boolean } {
   const parsed = parseFilename(relativePath);
   const slug = toSlug(relativePath);
 
@@ -86,6 +90,7 @@ function buildSummary(
       bestLapTimeMs,
       aiDifficulty,
       isSpectator,
+      fileSize,
     },
     valid: validLapCount > 0,
   };
@@ -100,7 +105,7 @@ function sortByDateDesc(sessions: SessionSummary[]) {
 export async function loadZipFile(file: File): Promise<LoadResult> {
   const zip = await JSZip.loadAsync(file);
 
-  const sessions: SessionSummary[] = [];
+  const sessions: LoadedSessionSummary[] = [];
   const sessionData = new Map<string, TelemetrySession>();
 
   const jsonEntries: [string, JSZip.JSZipObject][] = [];
@@ -114,7 +119,7 @@ export async function loadZipFile(file: File): Promise<LoadResult> {
     try {
       const text = await entry.async("text");
       const json = JSON.parse(text) as TelemetrySession;
-      const { summary, valid } = buildSummary(relativePath, json);
+      const { summary, valid } = buildSummary(relativePath, json, new Blob([text]).size);
       if (valid) {
         sessions.push(summary);
         sessionData.set(summary.slug, json);
@@ -124,19 +129,26 @@ export async function loadZipFile(file: File): Promise<LoadResult> {
     }
   }
 
-  sortByDateDesc(sessions);
-  return { sessions, sessionData };
+  const deduplicated = deduplicateSessions(sessions);
+  // Remove session data for deduplicated entries
+  const keptSlugs = new Set(deduplicated.map((s) => s.slug));
+  for (const s of sessions) {
+    if (!keptSlugs.has(s.slug)) sessionData.delete(s.slug);
+  }
+
+  sortByDateDesc(deduplicated);
+  return { sessions: deduplicated, sessionData };
 }
 
 export async function loadJsonFiles(files: File[]): Promise<LoadResult> {
-  const sessions: SessionSummary[] = [];
+  const sessions: LoadedSessionSummary[] = [];
   const sessionData = new Map<string, TelemetrySession>();
 
   for (const file of files) {
     try {
       const text = await file.text();
       const json = JSON.parse(text) as TelemetrySession;
-      const { summary, valid } = buildSummary(file.name, json);
+      const { summary, valid } = buildSummary(file.name, json, file.size);
       if (valid) {
         sessions.push(summary);
         sessionData.set(summary.slug, json);
@@ -146,6 +158,12 @@ export async function loadJsonFiles(files: File[]): Promise<LoadResult> {
     }
   }
 
-  sortByDateDesc(sessions);
-  return { sessions, sessionData };
+  const deduplicated = deduplicateSessions(sessions);
+  const keptSlugs = new Set(deduplicated.map((s) => s.slug));
+  for (const s of sessions) {
+    if (!keptSlugs.has(s.slug)) sessionData.delete(s.slug);
+  }
+
+  sortByDateDesc(deduplicated);
+  return { sessions: deduplicated, sessionData };
 }

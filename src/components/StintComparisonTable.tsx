@@ -4,6 +4,7 @@ import {
   getBestDriverOnCompound,
   avgPaceInRange,
   paceDrop,
+  getDriverStints,
 } from "../utils/stats";
 import { msToLapTime } from "../utils/format";
 import { getCompoundColor } from "../utils/colors";
@@ -21,7 +22,7 @@ export function StintComparisonTable({
   player,
   allDrivers,
 }: StintComparisonTableProps) {
-  const stints = player["tyre-set-history"];
+  const stints = getDriverStints(player);
   const playerLaps = player["session-history"]["lap-history-data"];
   const others = allDrivers.filter((d) => d.index !== player.index);
 

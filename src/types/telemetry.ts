@@ -11,6 +11,8 @@ export interface SessionSummary {
   bestLapTimeMs?: number;
   aiDifficulty?: number;
   isSpectator?: boolean;
+  fileSize?: number;
+  duplicateCount?: number;
 }
 
 // --- Full session JSON types ---

@@ -2,6 +2,7 @@ import type { Plugin } from "vite";
 import fs from "fs";
 import path from "path";
 import { parseFilename, toSlug } from "../utils/parseFilename.ts";
+import { deduplicateSessions } from "../utils/deduplicateSessions.ts";
 
 /** Recursively find all .json files under a directory */
 function findJsonFiles(dir: string, base: string): string[] {
@@ -56,11 +57,13 @@ export function telemetryServer(telemetryDir?: string): Plugin {
               let bestLapTimeMs: number | undefined;
               let aiDifficulty: number | undefined;
               let isSpectator = false;
+              let fileSize = 0;
               try {
                 const raw = fs.readFileSync(
                   path.join(telemetryDir, relativePath),
                   "utf-8",
                 );
+                fileSize = Buffer.byteLength(raw);
                 const json = JSON.parse(raw);
                 const sessionInfo = json["session-info"];
                 const isOnline = sessionInfo?.["network-game"] === 1;
@@ -133,18 +136,25 @@ export function telemetryServer(telemetryDir?: string): Plugin {
                 // If we can't parse, include the session with 0
               }
 
-              slugMap.set(slug, relativePath);
-              return { relativePath, slug, ...parsed, validLapCount, lapIndicators, bestLapTime, bestLapTimeMs, aiDifficulty, isSpectator };
+              return { relativePath, slug, ...parsed, validLapCount, lapIndicators, bestLapTime, bestLapTimeMs, aiDifficulty, isSpectator, fileSize };
             })
             .filter((s) => s.validLapCount > 0);
 
+          // Remove duplicate auto-save / manual-save pairs
+          const deduplicated = deduplicateSessions(sessions);
+
           // Sort by date descending
-          sessions.sort(
+          deduplicated.sort(
             (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
           );
 
+          // Populate slug map only for surviving sessions
+          for (const s of deduplicated) {
+            slugMap.set(s.slug, s.relativePath);
+          }
+
           res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify(sessions));
+          res.end(JSON.stringify(deduplicated));
           return;
         }
 

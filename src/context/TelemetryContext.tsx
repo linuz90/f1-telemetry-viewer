@@ -7,7 +7,12 @@ import {
   type ReactNode,
 } from "react";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
-import { loadZipFile, loadJsonFiles } from "./zipLoader";
+import {
+  loadZipFile,
+  loadJsonFiles,
+  type LoadedSessionSummary,
+} from "./zipLoader";
+import { deduplicateSessions } from "../utils/deduplicateSessions";
 
 type Mode = "detecting" | "api" | "demo" | "upload";
 
@@ -137,7 +142,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         const jsons = files.filter((f) => f.name.endsWith(".json"));
 
         // Load zip(s) first, then JSON files on top
-        const allSessions: SessionSummary[] = [];
+        const allSessions: LoadedSessionSummary[] = [];
         const allData = new Map<string, TelemetrySession>();
 
         for (const zip of zips) {
@@ -156,13 +161,21 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        const deduplicatedSessions = deduplicateSessions(allSessions);
+        deduplicatedSessions.sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        );
+        const keptSlugs = new Set(deduplicatedSessions.map((s) => s.slug));
+
         sessionStore.clear();
         for (const [slug, data] of allData) {
-          sessionStore.set(slug, data);
+          if (keptSlugs.has(slug)) {
+            sessionStore.set(slug, data);
+          }
         }
         setMode("upload");
         setSessionsError(null);
-        setSessions(allSessions);
+        setSessions(deduplicatedSessions);
       } finally {
         setFilesLoading(false);
       }

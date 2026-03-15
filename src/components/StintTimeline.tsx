@@ -118,17 +118,23 @@ export function StintDetailCards({ stints, laps }: { stints: TyreStint[]; laps: 
 
           // Compute per-stint lap time stats (valid laps only, skip first lap of each stint after pit)
           const stintTimes: number[] = [];
+          const stintTimesWithOutlap: number[] = [];
           for (let lap = stint["start-lap"]; lap <= stint["end-lap"]; lap++) {
-            // Skip the in-lap (first lap after a pit stop) for non-first stints
-            if (i > 0 && lap === stint["start-lap"]) continue;
             const ms = validLapsByNum.get(lap);
-            if (ms != null) stintTimes.push(ms);
+            if (ms != null) {
+              stintTimesWithOutlap.push(ms);
+              // Skip the in-lap (first lap after a pit stop) for non-first stints
+              if (i > 0 && lap === stint["start-lap"]) continue;
+              stintTimes.push(ms);
+            }
           }
+          // Fall back to including the out-lap if skipping it leaves no data
+          const effectiveTimes = stintTimes.length > 0 ? stintTimes : stintTimesWithOutlap;
 
-          const bestTimeMs = stintTimes.length > 0 ? Math.min(...stintTimes) : 0;
-          const avgTimeMs = stintTimes.length > 0 ? stintTimes.reduce((a, b) => a + b, 0) / stintTimes.length : 0;
-          const avgDevMs = stintTimes.length > 1
-            ? stintTimes.reduce((sum, t) => sum + Math.abs(t - avgTimeMs), 0) / stintTimes.length
+          const bestTimeMs = effectiveTimes.length > 0 ? Math.min(...effectiveTimes) : 0;
+          const avgTimeMs = effectiveTimes.length > 0 ? effectiveTimes.reduce((a, b) => a + b, 0) / effectiveTimes.length : 0;
+          const avgDevMs = effectiveTimes.length > 1
+            ? effectiveTimes.reduce((sum, t) => sum + Math.abs(t - avgTimeMs), 0) / effectiveTimes.length
             : 0;
 
           const hero = bestTimeMs > 0 ? { value: msToLapTime(bestTimeMs), label: "Best lap" } : undefined;

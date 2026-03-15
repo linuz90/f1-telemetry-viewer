@@ -13,6 +13,7 @@ import {
 import type { PerLapInfo, TyreStint } from "../types/telemetry";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 import { getWorstWheelWear } from "../utils/stats";
+import { EmptyState } from "./EmptyState";
 
 const SC_COLORS: Record<string, string> = {
   SAFETY_CAR: "#f59e0b",
@@ -37,8 +38,14 @@ export function TyreWearChart({
   rivalName,
   perLapInfo,
 }: TyreWearChartProps) {
-  if (!stints.length) {
-    return <p className="text-sm text-zinc-500">No tyre wear data.</p>;
+  const hasAnyWearData = stints.some((s) => s["tyre-wear-history"].length > 0);
+  if (!stints.length || !hasAnyWearData) {
+    return (
+      <EmptyState
+        title="Tyre Wear"
+        message="Per-lap tyre wear data wasn't recorded for this session."
+      />
+    );
   }
 
   // Player data: worst wheel per lap, with gaps between stints
@@ -171,7 +178,12 @@ export function TyreWearChart({
             labelFormatter={(lap) => {
               const entry = data.find((d) => d.lap === lap);
               const sc = scStatusMap.get(lap as number);
-              const scLabel = sc === "SAFETY_CAR" || sc === "FULL_SAFETY_CAR" ? " \u{1F7E1} SC" : sc === "VIRTUAL_SAFETY_CAR" ? " \u{1F7E1} VSC" : "";
+              const scLabel =
+                sc === "SAFETY_CAR" || sc === "FULL_SAFETY_CAR"
+                  ? " [SC]"
+                  : sc === "VIRTUAL_SAFETY_CAR"
+                    ? " [VSC]"
+                    : "";
               return `Lap ${lap} (${entry?.compound ?? ""})${scLabel}`;
             }}
           />

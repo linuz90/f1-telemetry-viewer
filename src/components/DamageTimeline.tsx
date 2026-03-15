@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import type { PerLapInfo } from "../types/telemetry";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
+import { EmptyState } from "./EmptyState";
 
 interface DamageTimelineProps {
   perLapInfo: PerLapInfo[];
@@ -83,7 +84,15 @@ const FAULT_CHECKS: { key: keyof PerLapInfo["car-damage-data"]; label: string }[
 ];
 
 export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
-  if (!perLapInfo.length) return null;
+  // Need at least 2 data points to draw a meaningful timeline
+  if (perLapInfo.length < 2) {
+    return (
+      <EmptyState
+        title="Damage"
+        message="Not enough lap data was recorded to show the damage timeline."
+      />
+    );
+  }
 
   // Build chart data
   const data = perLapInfo.map((lap) => {

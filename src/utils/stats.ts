@@ -4,6 +4,7 @@ import type {
   LapHistoryEntry,
   PerLapInfo,
   TyreStint,
+  TyreStintBasic,
   TyreWearEntry,
 } from "../types/telemetry";
 import { isLapValid } from "./format";
@@ -37,6 +38,49 @@ export function findFocusedDriver(session: TelemetrySession): DriverData | undef
     }
   }
   return best;
+}
+
+/**
+ * Build TyreStint[] from the basic tyre-stints-history-data when
+ * the detailed tyre-set-history is missing (short/incomplete sessions).
+ */
+export function synthesizeStints(
+  basics: TyreStintBasic[],
+  numLaps: number,
+): TyreStint[] {
+  return basics.map((b, i) => {
+    const startLap = i === 0 ? 1 : basics[i - 1]["end-lap"] + 1;
+    // end-lap 255 means "still running" — clamp to actual lap count
+    const endLap = b["end-lap"] === 255 ? numLaps : b["end-lap"];
+    const stintLength = endLap - startLap + 1;
+    return {
+      "start-lap": startLap,
+      "end-lap": endLap,
+      "stint-length": stintLength,
+      "fitted-index": i,
+      "tyre-set-key": "",
+      "tyre-set-data": {
+        "actual-tyre-compound": b["tyre-actual-compound"],
+        "visual-tyre-compound": b["tyre-visual-compound"],
+        wear: 0,
+        available: false,
+        "recommended-session": "",
+        "life-span": stintLength,
+        "usable-life": stintLength,
+        "lap-delta-time": 0,
+        fitted: true,
+      },
+      "tyre-wear-history": [],
+    };
+  });
+}
+
+/** Get stints for a driver, falling back to basic stint data when detailed history is missing */
+export function getDriverStints(driver: DriverData): TyreStint[] {
+  if (driver["tyre-set-history"]?.length) return driver["tyre-set-history"];
+  const basics = driver["session-history"]["tyre-stints-history-data"];
+  if (!basics?.length) return [];
+  return synthesizeStints(basics, driver["session-history"]["num-laps"]);
 }
 
 /** Drop the last stint if it's a single incomplete lap (e.g. DNF retirement) */
@@ -914,7 +958,21 @@ export function generateFuelInsights(
   totalRaceLaps: number,
 ): StrategyInsight[] {
   const result = calculateBurnRate(player);
-  if (!result) return [];
+
+  // Not enough data — show placeholder rows explaining why
+  if (!result) {
+    const perLap = player["per-lap-info"];
+    const lapsWithFuel = perLap?.filter(
+      (l) => l["car-status-data"]?.["fuel-in-tank"] > 0,
+    ).length ?? 0;
+    const detail = lapsWithFuel < 6
+      ? `need 6+ laps with fuel data, got ${lapsWithFuel}`
+      : "need 3+ green-flag lap pairs";
+    return [
+      { type: "fuel", label: "Initial Fuel", value: "—", detail },
+      { type: "fuel", label: "Recommended Fuel", value: "—", detail },
+    ];
+  }
 
   const {
     burnRateKg, greenFlagLapCount, startFuelRemaining, lastLapNumber,
@@ -971,6 +1029,13 @@ export function generateFuelInsights(
         detail,
       });
     }
+  } else {
+    insights.push({
+      type: "fuel",
+      label: "Recommended Fuel",
+      value: "—",
+      detail: `need 5+ green-flag laps, got ${greenFlagLapCount}`,
+    });
   }
 
   return insights;

@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { OvertakeRecord, PositionHistoryEntry } from "../types/telemetry";
 import { getTeamColor, CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
+import { EmptyState } from "./EmptyState";
 
 interface PositionChartProps {
   positionHistory: PositionHistoryEntry[];
@@ -23,8 +24,18 @@ interface PositionChartProps {
  * Y-axis inverted (P1 at top).
  */
 export function PositionChart({ positionHistory, playerName, rivalName, overtakes }: PositionChartProps) {
-  if (!positionHistory.length) {
-    return <p className="text-sm text-zinc-500">No position data.</p>;
+  // Need at least 2 position snapshots per driver to draw meaningful lines
+  const maxPoints = Math.max(
+    ...positionHistory.map((d) => d["driver-position-history"].length),
+    0,
+  );
+  if (!positionHistory.length || maxPoints < 2) {
+    return (
+      <EmptyState
+        title="Position Changes"
+        message="Not enough lap data was recorded to show position changes."
+      />
+    );
   }
 
   // Build lap-indexed data: { lap: 1, HAMILTON: 1, VERSTAPPEN: 2, ... }

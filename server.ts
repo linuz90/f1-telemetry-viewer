@@ -33,6 +33,7 @@ import {
 import { join, relative, extname, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseFilename, toSlug } from "./src/utils/parseFilename.ts";
+import { deduplicateSessions } from "./src/utils/deduplicateSessions.ts";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -127,9 +128,11 @@ function buildSessionList() {
       let bestLapTimeMs: number | undefined;
       let aiDifficulty: number | undefined;
       let isSpectator = false;
+      let fileSize = 0;
 
       try {
         const raw = readFileSync(join(TELEMETRY_DIR, relativePath), "utf-8");
+        fileSize = Buffer.byteLength(raw);
         const json = JSON.parse(raw);
 
         // Determine online/offline and AI difficulty
@@ -204,7 +207,6 @@ function buildSessionList() {
         // If we can't parse the file, include the session with 0 valid laps (filtered below)
       }
 
-      slugMap.set(slug, relativePath);
       return {
         relativePath,
         slug,
@@ -215,16 +217,25 @@ function buildSessionList() {
         bestLapTimeMs,
         aiDifficulty,
         isSpectator,
+        fileSize,
       };
     })
     .filter((s) => s.validLapCount > 0);
 
+  // Remove duplicate auto-save / manual-save pairs
+  const deduplicated = deduplicateSessions(sessions);
+
   // Most recent sessions first
-  sessions.sort(
+  deduplicated.sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
 
-  return sessions;
+  // Populate slug map only for surviving sessions
+  for (const s of deduplicated) {
+    slugMap.set(s.slug, s.relativePath);
+  }
+
+  return deduplicated;
 }
 
 // ---------------------------------------------------------------------------
