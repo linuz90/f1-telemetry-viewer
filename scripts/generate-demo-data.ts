@@ -9,7 +9,7 @@
 
 import fs from "fs";
 import path from "path";
-import { parseFilename, toSlug } from "../src/utils/parseFilename.ts";
+import { resolveSessionMeta, toSlug } from "../src/utils/parseFilename.ts";
 
 const TELEMETRY_DIR =
   "/Users/linuz90/Library/CloudStorage/OneDrive-Personal/Pits & Giggles/data";
@@ -101,7 +101,10 @@ function trimSession(raw: Record<string, unknown>, keepNames: Set<string>): Reco
 }
 
 function buildSummary(filename: string, data: Record<string, unknown>) {
-  const parsed = parseFilename(filename);
+  const sessionInfoForMeta = data["session-info"] as
+    | { "track-id"?: unknown; "session-type"?: unknown }
+    | undefined;
+  const parsed = resolveSessionMeta(filename, sessionInfoForMeta);
   const slug = toSlug(filename);
 
   const classData = data["classification-data"] as DriverEntry[];

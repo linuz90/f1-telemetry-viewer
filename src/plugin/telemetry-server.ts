@@ -1,7 +1,7 @@
 import type { Plugin } from "vite";
 import fs from "fs";
 import path from "path";
-import { parseFilename, toSlug } from "../utils/parseFilename.ts";
+import { parseFilename, resolveSessionMeta, toSlug } from "../utils/parseFilename.ts";
 import { deduplicateSessions } from "../utils/deduplicateSessions.ts";
 
 /** Recursively find all .json files under a directory */
@@ -47,7 +47,6 @@ export function telemetryServer(telemetryDir?: string): Plugin {
           const files = findJsonFiles(telemetryDir, telemetryDir);
           const sessions = files
             .map((relativePath) => {
-              const parsed = parseFilename(relativePath);
               const slug = toSlug(relativePath);
 
               // Count valid laps to filter out empty sessions
@@ -58,6 +57,8 @@ export function telemetryServer(telemetryDir?: string): Plugin {
               let aiDifficulty: number | undefined;
               let isSpectator = false;
               let fileSize = 0;
+              // JSON may be unreadable — fall back to filename-only parse for metadata
+              let parsed = parseFilename(relativePath);
               try {
                 const raw = fs.readFileSync(
                   path.join(telemetryDir, relativePath),
@@ -66,6 +67,7 @@ export function telemetryServer(telemetryDir?: string): Plugin {
                 fileSize = Buffer.byteLength(raw);
                 const json = JSON.parse(raw);
                 const sessionInfo = json["session-info"];
+                parsed = resolveSessionMeta(relativePath, sessionInfo);
                 const isOnline = sessionInfo?.["network-game"] === 1;
                 aiDifficulty = isOnline ? 0 : (sessionInfo?.["ai-difficulty"] ?? 0);
                 let focusDriver = json["classification-data"]?.find(

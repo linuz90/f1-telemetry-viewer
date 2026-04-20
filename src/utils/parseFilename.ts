@@ -51,3 +51,28 @@ export function parseFilename(filename: string) {
 
   return { sessionType, track, date };
 }
+
+/**
+ * Resolve final session metadata by combining filename-derived date with the
+ * canonical `track-id` / `session-type` from the telemetry JSON when available.
+ *
+ * Filenames only preserve the date reliably — track names get chopped when they
+ * contain spaces (e.g. `Race_Abu_Dhabi_Manual_...` → "Abu") and trailing
+ * modifiers like `_Manual` get mistaken for track name parts. The in-JSON
+ * `session-info.track-id` is the game's own display name, so we prefer it.
+ */
+export function resolveSessionMeta(
+  filename: string,
+  sessionInfo?: { "track-id"?: unknown; "session-type"?: unknown },
+): { sessionType: string; track: string; date: string } {
+  const parsed = parseFilename(filename);
+  const rawTrack = sessionInfo?.["track-id"];
+  const rawType = sessionInfo?.["session-type"];
+  const track =
+    typeof rawTrack === "string" && rawTrack.length > 0
+      ? rawTrack.replace(/_/g, " ")
+      : parsed.track;
+  const sessionType =
+    typeof rawType === "string" && rawType.length > 0 ? rawType : parsed.sessionType;
+  return { sessionType, track, date: parsed.date };
+}

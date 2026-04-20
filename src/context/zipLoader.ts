@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { parseFilename, toSlug } from "../utils/parseFilename";
+import { resolveSessionMeta, toSlug } from "../utils/parseFilename";
 import { deduplicateSessions } from "../utils/deduplicateSessions";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
 
@@ -16,7 +16,6 @@ function buildSummary(
   json: TelemetrySession,
   fileSize: number,
 ): { summary: LoadedSessionSummary; valid: boolean } {
-  const parsed = parseFilename(relativePath);
   const slug = toSlug(relativePath);
 
   let validLapCount = 0;
@@ -27,6 +26,7 @@ function buildSummary(
   let isSpectator = false;
 
   const sessionInfo = json["session-info"];
+  const parsed = resolveSessionMeta(relativePath, sessionInfo);
   const isOnline = sessionInfo?.["network-game"] === 1;
   aiDifficulty = isOnline ? 0 : (sessionInfo?.["ai-difficulty"] ?? 0);
 
