@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "setup": "pnpm install && ln -s \"$CONDUCTOR_ROOT_PATH/.env\" .env",
+    "run": "pnpm dev --port $CONDUCTOR_PORT"
+  }
+}
