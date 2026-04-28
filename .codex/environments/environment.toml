@@ -1,0 +1,30 @@
+version = 1
+name = "f1-telemetry-viewer"
+
+[setup]
+script = "for f in .env; do [ -f \"$CODEX_SOURCE_TREE_PATH/$f\" ] && ln -sf \"$CODEX_SOURCE_TREE_PATH/$f\" \"$f\"; done; pnpm install"
+
+[[actions]]
+name = "Run"
+icon = "run"
+command = "pnpm dev"
+
+[[actions]]
+name = "Run Demo"
+icon = "run"
+command = "pnpm dev:prod"
+
+[[actions]]
+name = "Build"
+icon = "test"
+command = "pnpm build"
+
+[[actions]]
+name = "Preview"
+icon = "run"
+command = "pnpm preview"
+
+[[actions]]
+name = "Generate Demo"
+icon = "tool"
+command = "pnpm generate-demo"
