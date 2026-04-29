@@ -8,6 +8,7 @@ import type {
   TyreWearEntry,
 } from "../types/telemetry";
 import { isLapValid } from "./format";
+import { isRaceSession as isRaceTelemetrySession } from "./sessionTypes";
 
 /** Find the player driver in a session */
 export function findPlayer(session: TelemetrySession): DriverData | undefined {
@@ -232,7 +233,7 @@ export function avgWearRate(player: DriverData): number {
 
 /** Check if a session is a race (vs qualifying) */
 export function isRaceSession(session: TelemetrySession): boolean {
-  return session["session-info"]["session-type"] === "Race";
+  return isRaceTelemetrySession(session);
 }
 
 // --- Comparison utilities ---

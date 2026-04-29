@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { resolveSessionMeta, toSlug } from "../utils/parseFilename";
 import { deduplicateSessions } from "../utils/deduplicateSessions";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
+import { isQualifyingSessionType } from "../utils/sessionTypes";
 
 export type LoadedSessionSummary = SessionSummary & { fileSize: number };
 
@@ -53,9 +54,7 @@ function buildSummary(
     const laps = focusDriver["session-history"]?.["lap-history-data"] ?? [];
     validLapCount = laps.filter((l) => l["lap-time-in-ms"] > 0).length;
 
-    const isQuali =
-      parsed.sessionType === "Short Qualifying" ||
-      parsed.sessionType === "One Shot Qualifying";
+    const isQuali = isQualifyingSessionType(parsed.sessionType);
     if (isQuali) {
       const bestLapNum =
         focusDriver["session-history"]?.["best-lap-time-lap-num"] ?? -1;

@@ -4,6 +4,7 @@ export interface SessionSummary {
   slug: string;
   sessionType: string;
   track: string;
+  formula?: string;
   date: string;
   validLapCount: number;
   lapIndicators?: ("valid" | "invalid" | "best")[];

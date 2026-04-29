@@ -44,8 +44,8 @@ export function QualifyingSessionView({
     () => allSessions.find((s) => s.slug === slug),
     [allSessions, slug],
   );
-  const trackName = sessionMeta?.track;
-  const { pbs } = useTrackHistory(trackName, slug);
+  const trackName = sessionMeta?.track ?? session["session-info"]["track-id"];
+  const { pbs } = useTrackHistory(trackName, slug, session["session-info"].formula);
 
   const insights = useMemo(() => {
     if (!focusedDriver) return [];

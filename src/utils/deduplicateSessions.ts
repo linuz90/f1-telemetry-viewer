@@ -6,8 +6,8 @@ type WithFileSize = SessionSummary & { fileSize: number };
 
 /**
  * Remove duplicate sessions caused by auto-save + manual-save within seconds.
- * When two sessions share the same type, track, and lap count and are within
- * 30 s of each other, keep the larger file (more complete telemetry).
+ * When two sessions share the same formula, type, track, and lap count and are
+ * within 30 s of each other, keep the larger file (more complete telemetry).
  * The surviving session gets a `duplicateCount` reflecting how many were merged.
  */
 export function deduplicateSessions<T extends WithFileSize>(sessions: T[]): T[] {
@@ -17,7 +17,7 @@ export function deduplicateSessions<T extends WithFileSize>(sessions: T[]): T[] 
   // Group by identity key
   const groups = new Map<string, T[]>();
   for (const s of sessions) {
-    const key = `${s.sessionType}|${s.track}|${s.validLapCount}`;
+    const key = `${s.formula ?? ""}|${s.sessionType}|${s.track}|${s.validLapCount}`;
     let group = groups.get(key);
     if (!group) {
       group = [];

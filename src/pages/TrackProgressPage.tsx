@@ -21,6 +21,7 @@ import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate,
 import { TrackFlag } from "../components/TrackFlag";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
+import { getFormulaKey, getFormulaLabel, isPrimaryFormula } from "../utils/sessionTypes";
 import { cardClass, cardClassCompact } from "../components/Card";
 import { Upload, ArrowLeft } from "lucide-react";
 import { CarSetupCard } from "../components/CarSetupCard";
@@ -116,22 +117,63 @@ export function TrackProgressPage() {
   const [data, setData] = useState<TrackSessionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"qualifying" | "race">("race");
+  const [formulaSelection, setFormulaSelection] = useState<{ trackId: string; key: string }>({
+    trackId: "",
+    key: "f1",
+  });
 
   // Case-insensitive match: slug is lowercase, track names from data may be capitalized
-  const trackSessions = sessions.filter(
-    (s) => s.track.toLowerCase() === (trackId ?? ""),
+  const allTrackSessions = useMemo(
+    () => sessions.filter((s) => s.track.toLowerCase() === (trackId ?? "")),
+    [sessions, trackId],
   );
+  const formulaOptions = useMemo(() => {
+    const byKey = new Map<string, { key: string; label: string; count: number; isPrimary: boolean }>();
+    for (const session of allTrackSessions) {
+      const key = getFormulaKey(session.formula);
+      const option = byKey.get(key);
+      if (option) {
+        option.count += 1;
+      } else {
+        byKey.set(key, {
+          key,
+          label: getFormulaLabel(session.formula),
+          count: 1,
+          isPrimary: isPrimaryFormula(session.formula),
+        });
+      }
+    }
+    return [...byKey.values()].sort((a, b) => {
+      if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [allTrackSessions]);
+  const defaultFormulaKey = formulaOptions.find((f) => f.isPrimary)?.key ?? formulaOptions[0]?.key ?? "f1";
+  const activeFormulaKey =
+    formulaSelection.trackId === (trackId ?? "") &&
+    formulaOptions.some((formula) => formula.key === formulaSelection.key)
+      ? formulaSelection.key
+      : defaultFormulaKey;
+
+  const trackSessions = allTrackSessions.filter(
+    (s) => getFormulaKey(s.formula) === activeFormulaKey,
+  );
+  const trackSessionKey = trackSessions.map((s) => s.slug).join("|");
+  const activeFormula = formulaOptions.find((f) => f.key === activeFormulaKey);
+  const showFormulaSwitcher = formulaOptions.length > 1;
 
   // Resolve the original (display) track name from session data
-  const displayTrackName = trackSessions.length > 0 ? trackSessions[0].track : trackId ?? "";
+  const displayTrackName = allTrackSessions.length > 0 ? allTrackSessions[0].track : trackId ?? "";
 
   useEffect(() => {
     if (!trackSessions.length) {
+      setData([]);
       setLoading(false);
       return;
     }
 
     setLoading(true);
+    let cancelled = false;
     Promise.all(
       trackSessions.map(async (s) => {
         try {
@@ -191,10 +233,15 @@ export function TrackProgressPage() {
         (a, b) =>
           new Date(a.summary.date).getTime() - new Date(b.summary.date).getTime(),
       );
-      setData(deduplicateRuns(valid));
-      setLoading(false);
+      if (!cancelled) {
+        setData(deduplicateRuns(valid));
+        setLoading(false);
+      }
     });
-  }, [trackSessions.length]);
+    return () => {
+      cancelled = true;
+    };
+  }, [trackSessionKey, getSession]);
 
   // Compound life + fuel aggregations (race only) — must be before early returns
   const raceSessions = useMemo(
@@ -390,13 +437,14 @@ export function TrackProgressPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold mb-1">
             <TrackFlag track={displayTrackName} className="mr-2" />
             {displayTrackName}
           </h2>
           <p className="text-sm text-zinc-500">
+            {activeFormula && !activeFormula.isPrimary ? `${activeFormula.label} · ` : ""}
             {data.length} session{data.length !== 1 ? "s" : ""}{(() => {
               const totalAttempts = data.reduce((sum, d) => sum + d.attemptCount, 0);
               return totalAttempts > data.length ? ` (${totalAttempts} total attempts)` : "";
@@ -404,24 +452,44 @@ export function TrackProgressPage() {
           </p>
         </div>
 
-        {/* Tab switcher — only when both qualifying and race data exist */}
-        {hasBoth && (
-          <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80 shrink-0">
-            {(["qualifying", "race"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${
-                  activeTab === tab
-                    ? "bg-zinc-800 text-zinc-100"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          {showFormulaSwitcher && (
+            <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80">
+              {formulaOptions.map((formula) => (
+                <button
+                  key={formula.key}
+                  onClick={() => setFormulaSelection({ trackId: trackId ?? "", key: formula.key })}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600 focus-visible:ring-offset-0 ${
+                    activeFormulaKey === formula.key
+                      ? "bg-zinc-800 text-zinc-100"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {formula.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Tab switcher — only when both qualifying and race data exist */}
+          {hasBoth && (
+            <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80">
+              {(["qualifying", "race"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-1.5 rounded-md text-xs font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600 focus-visible:ring-offset-0 ${
+                    activeTab === tab
+                      ? "bg-zinc-800 text-zinc-100"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          )}
           </div>
-        )}
       </div>
 
       {/* ── Qualifying Section ── */}

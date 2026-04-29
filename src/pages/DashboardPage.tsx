@@ -13,6 +13,7 @@ import { useTelemetry } from "../context/TelemetryContext";
 import type { SessionSummary } from "../types/telemetry";
 import { findPlayer, getBestLapTime, isRaceSession } from "../utils/stats";
 import { msToLapTime, formatSessionType, formatDate, formatShortDate, toTrackSlug, sortTracksByCalendar } from "../utils/format";
+import { getFormulaLabel, isPrimaryFormula } from "../utils/sessionTypes";
 import { CHART_THEME } from "../utils/colors";
 import { cardClassCompact } from "../components/Card";
 import { TrackFlag } from "../components/TrackFlag";
@@ -70,9 +71,21 @@ export function DashboardPage() {
     );
   }
 
+  // Keep the top-level dashboard focused on F1 when mixed formula data exists.
+  // Secondary formulas stay available through session pages and track-level toggles.
+  const hasPrimaryFormulaStats = stats.some((s) => isPrimaryFormula(s.summary.formula));
+  const dashboardStats = hasPrimaryFormulaStats
+    ? stats.filter((s) => isPrimaryFormula(s.summary.formula))
+    : stats;
+  const dashboardFormulaLabel = hasPrimaryFormulaStats
+    ? "F1"
+    : dashboardStats.length === 1
+      ? getFormulaLabel(dashboardStats[0].summary.formula)
+      : "sim racing";
+
   // Group stats by track
   const trackGroups: Record<string, SessionStats[]> = {};
-  for (const s of stats) {
+  for (const s of dashboardStats) {
     const t = s.summary.track;
     if (!trackGroups[t]) trackGroups[t] = [];
     trackGroups[t].push(s);
@@ -90,14 +103,14 @@ export function DashboardPage() {
   }
 
   // --- Headline stats ---
-  const allTimeBestEntry = stats
+  const allTimeBestEntry = dashboardStats
     .filter((s) => !s.isRace && s.bestLapMs > 0)
     .sort((a, b) => a.bestLapMs - b.bestLapMs)[0];
-  const totalLaps = stats.reduce((sum, s) => sum + s.validLapCount, 0);
+  const totalLaps = dashboardStats.reduce((sum, s) => sum + s.validLapCount, 0);
   const trackCount = Object.keys(trackGroups).length;
 
   // --- Recent sessions (first 6, already sorted most-recent-first from API) ---
-  const recentSessions = stats.slice(0, 6);
+  const recentSessions = dashboardStats.slice(0, 6);
 
   // --- Per-track sparkline data: group qualifying sessions by day, best lap per day ---
   const sparklineData: Record<string, { points: { day: string; bestLap: number }[]; pbMs: number }> = {};
@@ -131,7 +144,7 @@ export function DashboardPage() {
       <div>
         <h2 className="text-2xl font-bold mb-1">Dashboard</h2>
         <p className="text-sm text-zinc-500">
-          Your F1 telemetry at a glance
+          Your {dashboardFormulaLabel} telemetry at a glance
         </p>
       </div>
 
@@ -155,7 +168,7 @@ export function DashboardPage() {
         <div className={cardClassCompact}>
           <div className="text-xs text-zinc-500 mb-1">Sessions</div>
           <div className="text-lg font-semibold text-zinc-100">
-            {stats.length}
+            {dashboardStats.length}
           </div>
         </div>
         <div className={cardClassCompact}>

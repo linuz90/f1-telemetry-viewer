@@ -204,9 +204,9 @@ export function getTrackCountryCode(track: string): string | null {
 
 /** Get emoji icon for a session type */
 export function getSessionIcon(type: string): string {
+  if (type.startsWith("Race")) return "\u{1F3C1}"; // 🏁
+
   switch (type) {
-    case "Race":
-      return "\u{1F3C1}"; // 🏁
     case "Short Qualifying":
     case "Short Quali":
       return "\u23F1\uFE0F"; // ⏱️

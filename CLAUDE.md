@@ -28,10 +28,10 @@ Copy `.env.example` to `.env` and set `TELEMETRY_DIR` to the directory containin
 **Stack:** React 19 + TypeScript + Vite 7 + Tailwind CSS 4 + Recharts 3 + React Router 7
 
 **Custom Vite plugin** (`src/plugin/telemetry-server.ts`) acts as the backend during development:
-- `GET /api/sessions` — lists all sessions (metadata parsed from filenames)
+- `GET /api/sessions` — lists all sessions (date from filename; track, session type, and formula from JSON when available)
 - `GET /api/sessions/:relativePath` — returns raw session JSON
 
-Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_ss.json`. The plugin parses this to extract session type, track name, and date.
+Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_ss.json`. The plugin parses filenames for stable dates/slugs, then prefers `session-info` fields from the JSON for display metadata because filenames may include modifiers like `Manual` or numbered sessions like `Race_2`.
 
 **Routing** (defined in `src/App.tsx`):
 - `/` — Dashboard with performance trends across all sessions
@@ -50,6 +50,8 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 - `public/demo/` — Bundled demo sessions (committed, deployed as static assets)
 
 **Mode detection:** On mount, `TelemetryContext` runs: `/api/sessions` → `/demo/sessions.json` → upload mode. `VITE_SKIP_API=true` skips the API step (used by `dev:prod`).
+
+**Formula handling:** F1 is the primary/default formula and is usually implied in the UI. Non-F1 sessions (for example F2) are still listed in the sidebar and render on their own session pages, but aggregate analytics default to F1 when mixed formula data exists. Track pages show a formula switcher only when that track has multiple formulas; F2-only tracks fall back to F2.
 
 **Styling:** Dark theme (slate-950 background). All styling via Tailwind utility classes.
 

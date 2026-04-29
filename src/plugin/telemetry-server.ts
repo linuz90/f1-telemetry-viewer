@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { parseFilename, resolveSessionMeta, toSlug } from "../utils/parseFilename.ts";
 import { deduplicateSessions } from "../utils/deduplicateSessions.ts";
+import { isQualifyingSessionType } from "../utils/sessionTypes.ts";
 
 /** Recursively find all .json files under a directory */
 function findJsonFiles(dir: string, base: string): string[] {
@@ -98,9 +99,7 @@ export function telemetryServer(telemetryDir?: string): Plugin {
                   ).length;
 
                   // For qualifying sessions, build per-lap indicators
-                  const isQuali =
-                    parsed.sessionType === "Short Qualifying" ||
-                    parsed.sessionType === "One Shot Qualifying";
+                  const isQuali = isQualifyingSessionType(parsed.sessionType);
                   if (isQuali) {
                     const bestLapNum =
                       focusDriver["session-history"]?.["best-lap-time-lap-num"] ?? -1;

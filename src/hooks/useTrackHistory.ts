@@ -8,6 +8,7 @@ import {
   getBestLapTime,
   isRaceSession,
 } from "../utils/stats";
+import { getFormulaKey } from "../utils/sessionTypes";
 
 export interface TrackPBs {
   /** All-time best qualifying lap time (ms) on this track */
@@ -31,6 +32,7 @@ export interface TrackPBs {
 export function useTrackHistory(
   trackName: string | undefined,
   currentSlug: string | undefined,
+  formula: string | undefined,
 ): { pbs: TrackPBs | null; loading: boolean } {
   const { sessions } = useSessionList();
   const { getSession } = useTelemetry();
@@ -38,8 +40,12 @@ export function useTrackHistory(
   const [loading, setLoading] = useState(true);
 
   const trackSessions = sessions.filter(
-    (s) => s.track === trackName && s.slug !== currentSlug,
+    (s) =>
+      s.track === trackName &&
+      s.slug !== currentSlug &&
+      getFormulaKey(s.formula) === getFormulaKey(formula),
   );
+  const trackSessionKey = trackSessions.map((s) => s.slug).join("|");
 
   useEffect(() => {
     if (!trackName || trackSessions.length === 0) {
@@ -133,7 +139,7 @@ export function useTrackHistory(
       });
       setLoading(false);
     });
-  }, [trackName, trackSessions.length]);
+  }, [trackName, formula, trackSessionKey, getSession]);
 
   return { pbs, loading };
 }

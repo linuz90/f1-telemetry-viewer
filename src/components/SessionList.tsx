@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useSessionList } from "../hooks/useSessionList";
 import type { SessionSummary } from "../types/telemetry";
 import { formatDate, formatTime, formatSessionType, toTrackSlug, sortTracksByCalendar } from "../utils/format";
+import { isQualifyingSessionType, isRaceSessionType } from "../utils/sessionTypes";
 import { TrackFlag } from "./TrackFlag";
 import { SessionCard } from "./SessionCard";
 
@@ -42,8 +43,8 @@ export function SessionList() {
   }
 
   const filteredSessions = sessions.filter((s) => {
-    if (typeFilter === "race" && s.sessionType !== "Race") return false;
-    if (typeFilter === "quali" && !s.sessionType.includes("Qualifying")) return false;
+    if (typeFilter === "race" && !isRaceSessionType(s.sessionType)) return false;
+    if (typeFilter === "quali" && !isQualifyingSessionType(s.sessionType)) return false;
     if (modeFilter === "online" && !(s.aiDifficulty == null || s.aiDifficulty === 0)) return false;
     if (modeFilter === "ai" && (s.aiDifficulty == null || s.aiDifficulty === 0)) return false;
     return true;
@@ -154,6 +155,7 @@ export function SessionList() {
                       isTrackBest={!!s.bestLapTimeMs && s.bestLapTimeMs === bestTimeByTrack[s.track]}
                       aiDifficulty={s.aiDifficulty}
                       isSpectator={s.isSpectator}
+                      formula={s.formula}
                     />
                   </NavLink>
                 ))}

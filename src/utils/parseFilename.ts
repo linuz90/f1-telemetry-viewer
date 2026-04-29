@@ -42,6 +42,9 @@ export function parseFilename(filename: string) {
   } else if (prefix[0] === "Time" && prefix[1] === "Trial") {
     sessionType = "Time Trial";
     trackStart = 2;
+  } else if (prefix[0] === "Race" && /^\d+$/.test(prefix[1] ?? "")) {
+    sessionType = `Race ${prefix[1]}`;
+    trackStart = 2;
   } else {
     sessionType = prefix[0];
     trackStart = 1;
@@ -63,8 +66,8 @@ export function parseFilename(filename: string) {
  */
 export function resolveSessionMeta(
   filename: string,
-  sessionInfo?: { "track-id"?: unknown; "session-type"?: unknown },
-): { sessionType: string; track: string; date: string } {
+  sessionInfo?: { "track-id"?: unknown; "session-type"?: unknown; formula?: unknown },
+): { sessionType: string; track: string; formula?: string; date: string } {
   const parsed = parseFilename(filename);
   const rawTrack = sessionInfo?.["track-id"];
   const rawType = sessionInfo?.["session-type"];
@@ -74,5 +77,6 @@ export function resolveSessionMeta(
       : parsed.track;
   const sessionType =
     typeof rawType === "string" && rawType.length > 0 ? rawType : parsed.sessionType;
-  return { sessionType, track, date: parsed.date };
+  const formula = typeof sessionInfo?.formula === "string" ? sessionInfo.formula : undefined;
+  return { sessionType, track, formula, date: parsed.date };
 }

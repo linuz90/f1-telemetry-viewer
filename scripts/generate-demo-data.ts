@@ -10,6 +10,7 @@
 import fs from "fs";
 import path from "path";
 import { resolveSessionMeta, toSlug } from "../src/utils/parseFilename.ts";
+import { isQualifyingSessionType } from "../src/utils/sessionTypes.ts";
 
 const TELEMETRY_DIR =
   "/Users/linuz90/Library/CloudStorage/OneDrive-Personal/Pits & Giggles/data";
@@ -102,7 +103,7 @@ function trimSession(raw: Record<string, unknown>, keepNames: Set<string>): Reco
 
 function buildSummary(filename: string, data: Record<string, unknown>) {
   const sessionInfoForMeta = data["session-info"] as
-    | { "track-id"?: unknown; "session-type"?: unknown }
+    | { "track-id"?: unknown; "session-type"?: unknown; formula?: unknown }
     | undefined;
   const parsed = resolveSessionMeta(filename, sessionInfoForMeta);
   const slug = toSlug(filename);
@@ -137,9 +138,7 @@ function buildSummary(filename: string, data: Record<string, unknown>) {
     const laps = focusDriver["session-history"]["lap-history-data"];
     validLapCount = laps.filter((l) => l["lap-time-in-ms"] > 0).length;
 
-    const isQuali =
-      parsed.sessionType === "Short Qualifying" ||
-      parsed.sessionType === "One Shot Qualifying";
+    const isQuali = isQualifyingSessionType(parsed.sessionType);
 
     if (isQuali) {
       const bestLapNum = focusDriver["session-history"]["best-lap-time-lap-num"] ?? -1;

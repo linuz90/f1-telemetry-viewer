@@ -63,8 +63,8 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     () => allSessions.find((s) => s.slug === slug),
     [allSessions, slug],
   );
-  const trackName = sessionMeta?.track;
-  const { pbs } = useTrackHistory(trackName, slug);
+  const trackName = sessionMeta?.track ?? info["track-id"];
+  const { pbs } = useTrackHistory(trackName, slug, info.formula);
 
   const stints = getCompletedStints(
     focusedDriver ? getDriverStints(focusedDriver) : [],

@@ -6,6 +6,7 @@ import type { TelemetrySession } from "../types/telemetry";
 import { getBestLapTime, isRaceSession } from "../utils/stats";
 import { formatSessionType, msToLapTime, toTrackSlug } from "../utils/format";
 import { getTeamColor } from "../utils/colors";
+import { isNonF1Formula } from "../utils/sessionTypes";
 import { TrackFlag } from "./TrackFlag";
 
 const SESSION_ICONS: Record<string, typeof Flag> = {
@@ -33,6 +34,7 @@ export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChan
 
   const sessionType = formatSessionType(info["session-type"]);
   const TypeIcon = SESSION_ICONS[info["session-type"]] ?? SESSION_ICONS[sessionType] ?? Flag;
+  const showFormula = isNonF1Formula(info.formula);
 
   let bestLapTimeStr: string | undefined;
   if (isQuali && focusedDriver) {
@@ -78,6 +80,11 @@ export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChan
           <TypeIcon className="size-3.5" />
           {sessionType}
         </span>
+        {showFormula && (
+          <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-zinc-400">
+            {info.formula}
+          </span>
+        )}
         {bestLapTimeStr && (
           <span className="text-lg font-mono font-semibold text-purple-400">
             {bestLapTimeStr}

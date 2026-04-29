@@ -1,5 +1,6 @@
 import { Eye, Globe, Timer, Target, Flag, Gauge } from "lucide-react";
 import { TrackFlag } from "./TrackFlag";
+import { isNonF1Formula, isRaceSessionType } from "../utils/sessionTypes";
 
 interface SessionCardProps {
   sessionType: string;
@@ -10,6 +11,7 @@ interface SessionCardProps {
   isTrackBest?: boolean;
   aiDifficulty?: number;
   isSpectator?: boolean;
+  formula?: string;
 }
 
 const TYPE_CONFIG: Record<string, { color: string; icon: typeof Flag }> = {
@@ -25,9 +27,14 @@ const INDICATOR_COLORS = {
   best: "bg-purple-400",
 };
 
-export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTime, isTrackBest, aiDifficulty, isSpectator }: SessionCardProps) {
-  const typeConfig = TYPE_CONFIG[sessionType] ?? { color: "text-zinc-500", icon: Flag };
+export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTime, isTrackBest, aiDifficulty, isSpectator, formula }: SessionCardProps) {
+  const typeConfig =
+    TYPE_CONFIG[sessionType] ??
+    (isRaceSessionType(sessionType)
+      ? TYPE_CONFIG.Race
+      : { color: "text-zinc-500", icon: Flag });
   const TypeIcon = typeConfig.icon;
+  const showFormula = isNonF1Formula(formula);
 
   return (
     <div className="min-w-0">
@@ -53,6 +60,9 @@ export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTi
             <span className="text-[10px] font-medium text-zinc-600">AI {aiDifficulty}</span>
           ) : (
             <span className="flex items-center gap-0.5 text-[10px] font-medium text-sky-500/70"><Globe className="size-3" />Online</span>
+          )}
+          {showFormula && (
+            <span className="text-[10px] font-semibold text-zinc-500">{formula}</span>
           )}
         </div>
         <div className="flex items-center gap-1">
