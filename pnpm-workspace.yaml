@@ -1,0 +1,6 @@
+packages: []
+minimumReleaseAge: 10080
+blockExoticSubdeps: true
+strictDepBuilds: true
+allowBuilds:
+  esbuild: true
