@@ -10,6 +10,28 @@ import {
 } from "../utils/stats";
 import { getFormulaKey } from "../utils/sessionTypes";
 
+async function fetchTrackPbs(
+  trackName: string,
+  formula: string | undefined,
+  excludeSlug: string | undefined,
+): Promise<TrackPBs | null> {
+  const params = new URLSearchParams({ track: trackName });
+  if (formula) params.set("formula", formula);
+  if (excludeSlug) params.set("exclude", excludeSlug);
+  const res = await fetch(`/api/track-pbs?${params}`);
+  if (!res.ok) return null;
+  const d = await res.json();
+  return {
+    bestQualiLapMs: d.bestQualiLapMs ?? 0,
+    bestS1Ms: d.bestS1Ms ?? 0,
+    bestS2Ms: d.bestS2Ms ?? 0,
+    bestS3Ms: d.bestS3Ms ?? 0,
+    bestRaceLapMs: d.bestRaceLapMs ?? 0,
+    bestRacePaceMs: d.bestRacePaceMs ?? 0,
+    sessionCount: d.sessionCount ?? 0,
+  };
+}
+
 export interface TrackPBs {
   /** All-time best qualifying lap time (ms) on this track */
   bestQualiLapMs: number;
@@ -35,7 +57,7 @@ export function useTrackHistory(
   formula: string | undefined,
 ): { pbs: TrackPBs | null; loading: boolean } {
   const { sessions } = useSessionList();
-  const { getSession } = useTelemetry();
+  const { getSession, mode } = useTelemetry();
   const [pbs, setPbs] = useState<TrackPBs | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +70,7 @@ export function useTrackHistory(
   const trackSessionKey = trackSessions.map((s) => s.slug).join("|");
 
   useEffect(() => {
-    if (!trackName || trackSessions.length === 0) {
+    if (!trackName) {
       setLoading(false);
       setPbs(null);
       return;
@@ -56,15 +78,44 @@ export function useTrackHistory(
 
     setLoading(true);
 
-    Promise.all(
-      trackSessions.map(async (s) => {
-        try {
-          return await getSession(s.slug);
-        } catch {
-          return null;
-        }
-      }),
-    ).then((results) => {
+    if (mode === "api") {
+      fetchTrackPbs(trackName, formula, currentSlug)
+        .then((result) => {
+          if (result !== null) {
+            setPbs(result);
+            setLoading(false);
+            return;
+          }
+          // endpoint not available (e.g. Vite dev plugin) — fall through to per-session
+          computeFromSessions();
+        })
+        .catch(() => computeFromSessions());
+      return;
+    }
+
+    if (trackSessions.length === 0) {
+      setLoading(false);
+      setPbs(null);
+      return;
+    }
+
+    computeFromSessions();
+
+    function computeFromSessions() {
+      if (trackSessions.length === 0) {
+        setLoading(false);
+        setPbs(null);
+        return;
+      }
+      Promise.all(
+        trackSessions.map(async (s) => {
+          try {
+            return await getSession(s.slug);
+          } catch {
+            return null;
+          }
+        }),
+      ).then((results) => {
       const loaded = results.filter((r) => r !== null);
 
       let bestQualiLapMs = 0;
@@ -128,18 +179,19 @@ export function useTrackHistory(
         }
       }
 
-      setPbs({
-        bestQualiLapMs,
-        bestS1Ms,
-        bestS2Ms,
-        bestS3Ms,
-        bestRaceLapMs,
-        bestRacePaceMs,
-        sessionCount: trackSessions.length,
+        setPbs({
+          bestQualiLapMs,
+          bestS1Ms,
+          bestS2Ms,
+          bestS3Ms,
+          bestRaceLapMs,
+          bestRacePaceMs,
+          sessionCount: trackSessions.length,
+        });
+        setLoading(false);
       });
-      setLoading(false);
-    });
-  }, [trackName, formula, trackSessionKey, getSession]);
+    }
+  }, [trackName, formula, trackSessionKey, getSession, mode, currentSlug]);
 
   return { pbs, loading };
 }

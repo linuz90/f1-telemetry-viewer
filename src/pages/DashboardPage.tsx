@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   LineChart,
@@ -9,11 +8,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useSessionList } from "../hooks/useSessionList";
-import { useTelemetry } from "../context/TelemetryContext";
 import type { SessionSummary } from "../types/telemetry";
-import { findPlayer, getBestLapTime, isRaceSession } from "../utils/stats";
 import { msToLapTime, formatSessionType, formatDate, formatShortDate, toTrackSlug, sortTracksByCalendar } from "../utils/format";
-import { getFormulaLabel, isPrimaryFormula } from "../utils/sessionTypes";
+import { getFormulaLabel, isPrimaryFormula, isRaceSessionType } from "../utils/sessionTypes";
 import { CHART_THEME } from "../utils/colors";
 import { cardClassCompact } from "../components/Card";
 import { TrackFlag } from "../components/TrackFlag";
@@ -26,47 +23,21 @@ interface SessionStats {
 }
 
 export function DashboardPage() {
-  const { sessions, loading: listLoading } = useSessionList();
-  const { getSession } = useTelemetry();
-  const [stats, setStats] = useState<SessionStats[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { sessions, loading } = useSessionList();
 
-  // Load all sessions to compute cross-session stats
-  useEffect(() => {
-    if (!sessions.length) return;
+  const stats: SessionStats[] = sessions
+    .filter((s) => s.validLapCount > 0)
+    .map((s) => ({
+      summary: s,
+      isRace: isRaceSessionType(s.sessionType),
+      bestLapMs: s.bestLapTimeMs ?? 0,
+      validLapCount: s.validLapCount,
+    }));
 
-    setLoading(true);
-    Promise.all(
-      sessions.map(async (s) => {
-        try {
-          const data = await getSession(s.slug);
-          const player = findPlayer(data);
-          if (!player) return null;
-
-          const laps = player["session-history"]["lap-history-data"];
-          const validLaps = laps.filter(
-            (l) => l["lap-valid-bit-flags"] === 15 && l["lap-time-in-ms"] > 0,
-          );
-          return {
-            summary: s,
-            isRace: isRaceSession(data),
-            bestLapMs: getBestLapTime(laps),
-            validLapCount: validLaps.length,
-          } satisfies SessionStats;
-        } catch {
-          return null;
-        }
-      }),
-    ).then((results) => {
-      setStats(results.filter((r): r is SessionStats => r !== null));
-      setLoading(false);
-    });
-  }, [sessions]);
-
-  if (listLoading || loading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-full text-zinc-500">
-        Loading dashboard...
+        Loading sessions...
       </div>
     );
   }

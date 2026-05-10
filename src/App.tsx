@@ -38,11 +38,13 @@ function AppRoutes() {
   );
 }
 
+const analyticsEnabled = import.meta.env.VITE_DISABLE_ANALYTICS !== "true";
+
 export function App() {
   return (
     <TelemetryProvider>
       <AppRoutes />
-      <Analytics />
+      {analyticsEnabled && <Analytics />}
     </TelemetryProvider>
   );
 }
