@@ -18,11 +18,14 @@ function groupByDate(sessions: SessionSummary[]) {
   return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
 }
 
+const PAGE_SIZE = 50;
+
 export function SessionList() {
   const { sessions, loading, error } = useSessionList();
   const [tab, setTab] = useState<"sessions" | "tracks">("sessions");
   const [typeFilter, setTypeFilter] = useState<"all" | "race" | "quali">("all");
   const [modeFilter, setModeFilter] = useState<"all" | "online" | "ai">("all");
+  const [page, setPage] = useState(0);
 
   if (loading) {
     return (
@@ -50,7 +53,11 @@ export function SessionList() {
     return true;
   });
 
-  const grouped = groupByDate(filteredSessions);
+  const pageCount = Math.ceil(filteredSessions.length / PAGE_SIZE);
+  const safePage = Math.min(page, Math.max(0, pageCount - 1));
+  const pagedSessions = filteredSessions.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  const grouped = groupByDate(pagedSessions);
   const tracks = sortTracksByCalendar([...new Set(filteredSessions.map((s) => s.track))]);
 
   // Compute best lap time per track (lowest ms wins)
@@ -99,7 +106,7 @@ export function SessionList() {
               {(["all", "race", "quali"] as const).map((value) => (
                 <button
                   key={value}
-                  onClick={() => setTypeFilter(value)}
+                  onClick={() => { setTypeFilter(value); setPage(0); }}
                   className={`flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                     typeFilter === value
                       ? "bg-zinc-900 text-zinc-200 shadow-sm"
@@ -111,7 +118,7 @@ export function SessionList() {
               ))}
             </div>
             <button
-              onClick={() => setModeFilter((prev) => prev === "all" ? "online" : prev === "online" ? "ai" : "all")}
+              onClick={() => { setModeFilter((prev) => prev === "all" ? "online" : prev === "online" ? "ai" : "all"); setPage(0); }}
               className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                 modeFilter === "all"
                   ? "text-zinc-500 hover:text-zinc-400 bg-zinc-950/50"
@@ -121,6 +128,28 @@ export function SessionList() {
               }`}
             >
               {modeFilter === "all" ? "All" : modeFilter === "online" ? "Online" : "AI"}
+            </button>
+          </div>
+        )}
+
+        {tab === "sessions" && pageCount > 1 && (
+          <div className="flex items-center justify-between px-2 py-1 border-t border-zinc-900">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              className="px-2 py-0.5 text-xs text-zinc-400 hover:text-zinc-200 disabled:text-zinc-700 disabled:cursor-default transition-colors"
+            >
+              ←
+            </button>
+            <span className="text-xs text-zinc-500 tabular-nums">
+              {safePage + 1} / {pageCount}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              disabled={safePage === pageCount - 1}
+              className="px-2 py-0.5 text-xs text-zinc-400 hover:text-zinc-200 disabled:text-zinc-700 disabled:cursor-default transition-colors"
+            >
+              →
             </button>
           </div>
         )}

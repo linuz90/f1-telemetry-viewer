@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation } from "react-router-dom";
 import { Bell, FolderUp, Menu, Upload, X } from "lucide-react";
 import { SessionList } from "./SessionList";
 import { ChangelogModal } from "./ChangelogModal";
+import { AppBrand } from "./AppBrand";
 import { useTelemetry } from "../context/TelemetryContext";
 import changelog from "virtual:changelog";
 
@@ -95,7 +96,7 @@ export function Layout() {
         <div className="p-4 border-b border-zinc-800/60">
           <div className="flex items-center justify-between">
             <Link to="/" className="text-lg font-bold tracking-tight hover:opacity-80 transition-opacity">
-              <span className="text-red-500">F1</span> Telemetry Viewer
+              <AppBrand />
             </Link>
             <div className="flex items-center gap-1">
               <button
@@ -147,7 +148,7 @@ export function Layout() {
             <Menu className="h-5 w-5" />
           </button>
           <Link to="/" className="text-base font-bold tracking-tight">
-            <span className="text-red-500">F1</span> Telemetry Viewer
+            <AppBrand />
           </Link>
         </div>
 
@@ -156,7 +157,7 @@ export function Layout() {
             <div className="mx-auto flex max-w-5xl items-center justify-between gap-6">
               <div className="min-w-0">
                 <h2 className="text-lg font-bold tracking-tight">
-                  <span className="text-red-500">F1</span> Telemetry Viewer
+                  <AppBrand />
                 </h2>
                 <p className="mt-0.5 text-sm text-zinc-400">
                   Dive into your{" "}

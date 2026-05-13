@@ -66,6 +66,8 @@ This starts a lightweight Node.js server on `http://localhost:3080` that serves 
 | `PORT` | `3080` | HTTP port |
 | `DIST_DIR` | `./dist` | Path to the build output (rarely needed) |
 
+Embedded builds can override the displayed product name with `VITE_APP_NAME`, for example `VITE_APP_NAME="F1 Save Viewer"`.
+
 Works on macOS, Linux, and Windows.
 
 ## Stack

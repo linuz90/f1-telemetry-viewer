@@ -135,6 +135,14 @@ const TRACK_COUNTRY_CODES: Record<string, string> = {
   Vietnam: "vn",
   Hanoi: "vn",
   Hockenheim: "de",
+  // Reverse / short layouts
+  "Austria Reverse": "at",
+  "Silverstone Reverse": "gb",
+  "Zandvoort Reverse": "nl",
+  "Sakhir Short": "bh",
+  "Silverstone Short": "gb",
+  "Texas Short": "us",
+  "Suzuka Short": "jp",
 };
 
 /**

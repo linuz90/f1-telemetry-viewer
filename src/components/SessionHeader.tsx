@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import dayjs from "dayjs";
-import { AlertTriangle, ArrowDown, ArrowUp, Calendar, ChevronDown, Cloud, Cpu, Flag, Gauge, Globe, Target, Timer, Trophy } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Calendar, ChevronDown, Cloud, Cpu, ExternalLink, Flag, Gauge, Globe, Target, Timer, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { TelemetrySession } from "../types/telemetry";
 import { getBestLapTime, isRaceSession } from "../utils/stats";
@@ -8,6 +8,9 @@ import { formatSessionType, msToLapTime, toTrackSlug } from "../utils/format";
 import { getTeamColor } from "../utils/colors";
 import { isNonF1Formula } from "../utils/sessionTypes";
 import { TrackFlag } from "./TrackFlag";
+
+const EXT_LINK_TEMPLATE = import.meta.env.VITE_EXTERNAL_LINK_TEMPLATE as string | undefined;
+const EXT_LINK_LABEL = import.meta.env.VITE_EXTERNAL_LINK_LABEL as string | undefined;
 
 const SESSION_ICONS: Record<string, typeof Flag> = {
   Race: Flag,
@@ -22,9 +25,10 @@ interface SessionHeaderProps {
   session: TelemetrySession;
   focusedDriverIndex: number;
   onFocusedDriverChange: (index: number) => void;
+  slug?: string;
 }
 
-export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChange }: SessionHeaderProps) {
+export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChange, slug }: SessionHeaderProps) {
   const info = session["session-info"];
   const drivers = session["classification-data"] ?? [];
   const focusedDriver = drivers.find((d) => d.index === focusedDriverIndex);
@@ -165,6 +169,17 @@ export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChan
         ) : null}
         {info["total-laps"] > 0 && (
           <Pill icon={Gauge}>{info["total-laps"]} laps</Pill>
+        )}
+        {slug && EXT_LINK_TEMPLATE && EXT_LINK_LABEL && (
+          <a
+            href={EXT_LINK_TEMPLATE.replace("{slug}", slug)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 bg-zinc-900/50 text-zinc-400 hover:text-zinc-200 transition-colors text-xs"
+          >
+            <ExternalLink className="size-3" />
+            {EXT_LINK_LABEL}
+          </a>
         )}
       </div>
     </div>

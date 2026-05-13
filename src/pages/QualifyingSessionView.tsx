@@ -67,6 +67,7 @@ export function QualifyingSessionView({
         session={session}
         focusedDriverIndex={focusedDriverIndex}
         onFocusedDriverChange={setFocusedDriverIndex}
+        slug={slug}
       />
 
       {/* Qualifying insights */}

@@ -152,6 +152,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
         session={session}
         focusedDriverIndex={focusedDriverIndex}
         onFocusedDriverChange={setFocusedDriverIndex}
+        slug={slug}
       />
 
       {/* Driver comparison picker */}

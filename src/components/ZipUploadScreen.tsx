@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useTelemetry } from "../context/TelemetryContext";
+import { AppBrand } from "./AppBrand";
 
 export function ZipUploadScreen({
   dismissable = false,
@@ -78,7 +79,7 @@ export function ZipUploadScreen({
         {/* Header */}
         <div className="w-full px-10 pt-10 pb-6 text-center">
           <h2 className="text-2xl font-bold tracking-tight">
-            <span className="text-red-500">F1</span> Telemetry Viewer
+            <AppBrand />
           </h2>
           <p className="mt-4 text-base text-zinc-300">
             Dive into your{" "}
