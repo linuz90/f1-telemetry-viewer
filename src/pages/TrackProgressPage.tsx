@@ -21,7 +21,7 @@ import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate,
 import { TrackFlag } from "../components/TrackFlag";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
-import { getFormulaComparisonAliases, getFormulaComparisonKey, getFormulaLabel, isPrimaryFormula, shouldShowFormulaLabel } from "../utils/sessionTypes";
+import { compareFormulaComparisonKeys, getFormulaComparisonAliases, getFormulaComparisonKey, getFormulaLabel, shouldShowFormulaLabel } from "../utils/sessionTypes";
 import { cardClass, cardClassCompact } from "../components/Card";
 import { Upload, ArrowLeft } from "lucide-react";
 import { CarSetupCard } from "../components/CarSetupCard";
@@ -125,7 +125,7 @@ export function TrackProgressPage() {
     [sessions, trackId],
   );
   const formulaOptions = useMemo(() => {
-    const byKey = new Map<string, { key: string; label: string; aliases: Set<string>; count: number; isPrimary: boolean; showLabel: boolean; latestMs: number }>();
+    const byKey = new Map<string, { key: string; label: string; aliases: Set<string>; count: number; showLabel: boolean; latestMs: number }>();
     for (const session of allTrackSessions) {
       const key = getFormulaComparisonKey(session.formula, session.gameYear);
       const sessionMs = new Date(session.date).getTime();
@@ -142,7 +142,6 @@ export function TrackProgressPage() {
           label: getFormulaLabel(session.formula, session.gameYear),
           aliases: new Set(getFormulaComparisonAliases(session.formula, session.gameYear)),
           count: 1,
-          isPrimary: isPrimaryFormula(session.formula),
           showLabel: shouldShowFormulaLabel(session.formula, session.gameYear),
           latestMs: sessionMs,
         });
@@ -152,10 +151,8 @@ export function TrackProgressPage() {
       ...option,
       aliases: [...option.aliases],
     })).sort((a, b) => {
-      const aGeneration = Number(a.key.match(/-(\d{2})$/)?.[1] ?? 0);
-      const bGeneration = Number(b.key.match(/-(\d{2})$/)?.[1] ?? 0);
-      if (aGeneration !== bGeneration) return bGeneration - aGeneration;
-      if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+      const formulaOrder = compareFormulaComparisonKeys(a.key, b.key);
+      if (formulaOrder !== 0) return formulaOrder;
       if (a.latestMs !== b.latestMs) return b.latestMs - a.latestMs;
       return a.label.localeCompare(b.label);
     });
@@ -447,6 +444,7 @@ export function TrackProgressPage() {
   const sessionHistory = [...data].reverse();
 
   const hasBoth = qualiData.length > 0 && raceData.length > 0;
+  const onlySessionType = hasBoth ? null : raceData.length > 0 ? "race" : "qualifying";
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -488,8 +486,15 @@ export function TrackProgressPage() {
               ))}
             </div>
           )}
+          {!showFormulaSwitcher && activeFormula && (
+            <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80" aria-label="Formula">
+              <span className="rounded-md bg-zinc-800/70 px-3 py-1.5 text-xs font-medium text-zinc-300">
+                {activeFormula.label}
+              </span>
+            </div>
+          )}
 
-          {/* Tab switcher — only when both qualifying and race data exist */}
+          {/* Tab switcher: interactive with both data types, static when only one exists. */}
           {hasBoth && (
             <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80">
               {(["qualifying", "race"] as const).map((tab) => (
@@ -507,7 +512,14 @@ export function TrackProgressPage() {
               ))}
             </div>
           )}
-          </div>
+          {!hasBoth && onlySessionType && (
+            <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80" aria-label="Session type">
+              <span className="rounded-md bg-zinc-800/70 px-4 py-1.5 text-xs font-medium capitalize text-zinc-300">
+                {onlySessionType}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Qualifying Section ── */}

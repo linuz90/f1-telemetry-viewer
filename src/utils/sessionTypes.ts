@@ -4,6 +4,16 @@ const PRIMARY_FORMULA_KEY = "f1";
 const DEFAULT_F1_COMPARISON_KEY = "f1-modern";
 const F1_26_COMPARISON_KEY = "f1-26";
 
+function getFormulaGenerationRank(formulaKey: string): number {
+  return Number(formulaKey.match(/-(\d{2})$/)?.[1] ?? 0);
+}
+
+function getFormulaFamilyRank(formulaKey: string): number {
+  if (formulaKey === PRIMARY_FORMULA_KEY || formulaKey === DEFAULT_F1_COMPARISON_KEY || formulaKey.startsWith("f1-")) return 0;
+  if (formulaKey === "f2" || formulaKey.startsWith("f2-")) return 1;
+  return 2;
+}
+
 function normalizeFormula(formula: SessionInfo["formula"] | undefined): string {
   return formula?.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ") ?? "";
 }
@@ -74,6 +84,16 @@ export function getFormulaComparisonAliases(formula: SessionInfo["formula"] | un
   if (key === "f2-25") aliases.push("f2");
 
   return aliases;
+}
+
+export function compareFormulaComparisonKeys(aKey: string, bKey: string): number {
+  const generationDiff = getFormulaGenerationRank(bKey) - getFormulaGenerationRank(aKey);
+  if (generationDiff !== 0) return generationDiff;
+
+  const familyDiff = getFormulaFamilyRank(aKey) - getFormulaFamilyRank(bKey);
+  if (familyDiff !== 0) return familyDiff;
+
+  return aKey.localeCompare(bKey);
 }
 
 export function getFormulaLabel(formula: SessionInfo["formula"] | undefined, gameYear?: number): string {
