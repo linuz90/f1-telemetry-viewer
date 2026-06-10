@@ -10,7 +10,7 @@ import {
 import { useSessionList } from "../hooks/useSessionList";
 import type { SessionSummary } from "../types/telemetry";
 import { msToLapTime, formatSessionType, formatDate, formatShortDate, toTrackSlug, sortTracksByCalendar } from "../utils/format";
-import { getFormulaLabel, isPrimaryFormula, isRaceSessionType } from "../utils/sessionTypes";
+import { getFormulaComparisonKey, getFormulaLabel, isPrimaryFormula, isRaceSessionType, shouldShowFormulaLabel } from "../utils/sessionTypes";
 import { CHART_THEME } from "../utils/colors";
 import { cardClassCompact } from "../components/Card";
 import { TrackFlag } from "../components/TrackFlag";
@@ -20,6 +20,23 @@ interface SessionStats {
   isRace: boolean;
   bestLapMs: number;
   validLapCount: number;
+}
+
+interface TrackGroup {
+  key: string;
+  track: string;
+  formulaKey: string;
+  formulaLabel: string;
+  showFormula: boolean;
+  stats: SessionStats[];
+}
+
+function trackComparisonGroupKey(summary: SessionSummary): string {
+  return `${summary.track}::${getFormulaComparisonKey(summary.formula, summary.gameYear)}`;
+}
+
+function trackFormulaPath(track: string, formulaKey: string): string {
+  return `/track/${toTrackSlug(track)}?formula=${encodeURIComponent(formulaKey)}`;
 }
 
 export function DashboardPage() {
@@ -51,25 +68,36 @@ export function DashboardPage() {
   const dashboardFormulaLabel = hasPrimaryFormulaStats
     ? "F1"
     : dashboardStats.length === 1
-      ? getFormulaLabel(dashboardStats[0].summary.formula)
+      ? getFormulaLabel(dashboardStats[0].summary.formula, dashboardStats[0].summary.gameYear)
       : "sim racing";
 
-  // Group stats by track
-  const trackGroups: Record<string, SessionStats[]> = {};
+  // Group PB-like surfaces by track + formula generation so F1 26 does not
+  // borrow best laps from older F1 regulations.
+  const trackGroups: Record<string, TrackGroup> = {};
   for (const s of dashboardStats) {
-    const t = s.summary.track;
-    if (!trackGroups[t]) trackGroups[t] = [];
-    trackGroups[t].push(s);
+    const formulaKey = getFormulaComparisonKey(s.summary.formula, s.summary.gameYear);
+    const key = `${s.summary.track}::${formulaKey}`;
+    if (!trackGroups[key]) {
+      trackGroups[key] = {
+        key,
+        track: s.summary.track,
+        formulaKey,
+        formulaLabel: getFormulaLabel(s.summary.formula, s.summary.gameYear),
+        showFormula: shouldShowFormulaLabel(s.summary.formula, s.summary.gameYear),
+        stats: [],
+      };
+    }
+    trackGroups[key].stats.push(s);
   }
 
   // Compute per-track best qualifying lap times
   const trackBestQuali: Record<string, number> = {};
-  for (const [track, trackStats] of Object.entries(trackGroups)) {
-    const qualiBests = trackStats
+  for (const [key, group] of Object.entries(trackGroups)) {
+    const qualiBests = group.stats
       .filter((s) => !s.isRace && s.bestLapMs > 0)
       .map((s) => s.bestLapMs);
     if (qualiBests.length > 0) {
-      trackBestQuali[track] = Math.min(...qualiBests);
+      trackBestQuali[key] = Math.min(...qualiBests);
     }
   }
 
@@ -78,15 +106,15 @@ export function DashboardPage() {
     .filter((s) => !s.isRace && s.bestLapMs > 0)
     .sort((a, b) => a.bestLapMs - b.bestLapMs)[0];
   const totalLaps = dashboardStats.reduce((sum, s) => sum + s.validLapCount, 0);
-  const trackCount = Object.keys(trackGroups).length;
+  const trackCount = new Set(dashboardStats.map((s) => s.summary.track)).size;
 
   // --- Recent sessions (first 6, already sorted most-recent-first from API) ---
   const recentSessions = dashboardStats.slice(0, 6);
 
   // --- Per-track sparkline data: group qualifying sessions by day, best lap per day ---
-  const sparklineData: Record<string, { points: { day: string; bestLap: number }[]; pbMs: number }> = {};
-  for (const [track, trackStats] of Object.entries(trackGroups)) {
-    const qualiSessions = trackStats.filter((s) => !s.isRace && s.bestLapMs > 0);
+  const sparklineData: Record<string, TrackGroup & { points: { day: string; bestLap: number }[]; pbMs: number }> = {};
+  for (const [key, group] of Object.entries(trackGroups)) {
+    const qualiSessions = group.stats.filter((s) => !s.isRace && s.bestLapMs > 0);
     const byDay: Record<string, number> = {};
     for (const s of qualiSessions) {
       const dayKey = s.summary.date.split("T")[0];
@@ -97,7 +125,8 @@ export function DashboardPage() {
     }
     const dayEntries = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
     if (dayEntries.length < 3) continue;
-    sparklineData[track] = {
+    sparklineData[key] = {
+      ...group,
       points: dayEntries.map(([dayKey, ms]) => ({
         day: new Date(dayKey).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
         bestLap: ms / 1000,
@@ -105,10 +134,18 @@ export function DashboardPage() {
       pbMs: Math.min(...Object.values(byDay)),
     };
   }
-  const sparklineTracks = sortTracksByCalendar(Object.keys(sparklineData));
+  const sortedTrackGroups = Object.values(trackGroups).sort((a, b) => {
+    const [trackA] = sortTracksByCalendar([a.track, b.track]);
+    if (a.track !== b.track) return trackA === a.track ? -1 : 1;
+    return a.formulaLabel.localeCompare(b.formulaLabel);
+  });
+  const sparklineGroups = Object.values(sparklineData).sort((a, b) => {
+    const [trackA] = sortTracksByCalendar([a.track, b.track]);
+    if (a.track !== b.track) return trackA === a.track ? -1 : 1;
+    return a.formulaLabel.localeCompare(b.formulaLabel);
+  });
 
   // --- Tracks sorted by calendar order ---
-  const sortedTracks = sortTracksByCalendar(Object.keys(trackGroups));
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -163,7 +200,7 @@ export function DashboardPage() {
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {recentSessions.map((s) => {
-            const pb = trackBestQuali[s.summary.track];
+            const pb = trackBestQuali[trackComparisonGroupKey(s.summary)];
             const hasDelta = !s.isRace && s.bestLapMs > 0 && pb != null && pb > 0;
             const isPB = hasDelta && s.bestLapMs <= pb;
             const deltaMs = hasDelta ? s.bestLapMs - pb : 0;
@@ -178,6 +215,7 @@ export function DashboardPage() {
                 <div className="text-xs text-zinc-500">
                   {formatSessionType(s.summary.sessionType)} ·{" "}
                   {formatDate(s.summary.date)}
+                  {shouldShowFormulaLabel(s.summary.formula, s.summary.gameYear) ? ` · ${getFormulaLabel(s.summary.formula, s.summary.gameYear)}` : ""}
                 </div>
                 {s.bestLapMs > 0 && (
                   <div className="mt-1 flex items-center gap-2">
@@ -206,25 +244,25 @@ export function DashboardPage() {
       </section>
 
       {/* Per-track qualifying pace sparklines */}
-      {sparklineTracks.length > 0 && (
+      {sparklineGroups.length > 0 && (
         <section>
           <h3 className="text-sm font-semibold text-zinc-300 mb-1">
             Qualifying Pace
           </h3>
           <p className="text-xs text-zinc-500 mb-3">Best lap per day</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {sparklineTracks.map((track) => {
-              const { points, pbMs } = sparklineData[track];
+            {sparklineGroups.map(({ key, track, formulaKey, showFormula, formulaLabel, points, pbMs }) => {
               return (
                 <Link
-                  key={track}
-                  to={`/track/${toTrackSlug(track)}`}
+                  key={key}
+                  to={trackFormulaPath(track, formulaKey)}
                   className={`${cardClassCompact} !p-3 hover:bg-zinc-900/70 transition-colors block`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-1.5">
                       <TrackFlag track={track} />
                       <span className="text-sm font-medium">{track}</span>
+                      {showFormula && <span className="text-[11px] text-zinc-500">{formulaLabel}</span>}
                       <span className="text-[11px] text-zinc-500 ml-1">{points.length} days</span>
                     </div>
                     <span className="text-sm font-mono text-purple-400">{msToLapTime(pbMs)}</span>
@@ -266,8 +304,7 @@ export function DashboardPage() {
       <section>
         <h3 className="text-sm font-semibold text-zinc-300 mb-2">Tracks</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {sortedTracks.map((track) => {
-            const trackStats = trackGroups[track];
+          {sortedTrackGroups.map(({ key, track, formulaKey, showFormula, formulaLabel, stats: trackStats }) => {
             const bestEver = Math.min(
               ...trackStats.filter((s) => s.bestLapMs > 0).map((s) => s.bestLapMs),
             );
@@ -277,11 +314,15 @@ export function DashboardPage() {
 
             return (
               <Link
-                key={track}
-                to={`/track/${toTrackSlug(track)}`}
+                key={key}
+                to={trackFormulaPath(track, formulaKey)}
                 className={`${cardClassCompact} !p-4 hover:bg-zinc-900/70 transition-colors`}
               >
-                <div className="text-base font-semibold flex items-center gap-1.5"><TrackFlag track={track} />{track}</div>
+                <div className="text-base font-semibold flex items-center gap-1.5">
+                  <TrackFlag track={track} />
+                  {track}
+                  {showFormula && <span className="text-xs font-medium text-zinc-500">{formulaLabel}</span>}
+                </div>
                 <div className="flex gap-4 mt-1 text-xs text-zinc-400">
                   <span>{trackStats.length} sessions</span>
                   {bestEver > 0 && bestEver < Infinity && (

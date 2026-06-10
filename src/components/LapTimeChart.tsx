@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import type { LapHistoryEntry, PerLapInfo, TyreStint } from "../types/telemetry";
 import { msToLapTime, isLapValid } from "../utils/format";
-import { getWorstWheelWear } from "../utils/stats";
+import { ersDeployMjForLap, getWorstWheelWear } from "../utils/stats";
 import { CHART_THEME, TOOLTIP_STYLE, COMPOUND_COLORS } from "../utils/colors";
 
 interface LapTimeChartProps {
@@ -37,13 +37,11 @@ const SC_COLORS: Record<string, string> = {
   VIRTUAL_SAFETY_CAR: "#eab308", // yellow for VSC
 };
 
-const ERS_MAX = 4_000_000; // 4 MJ max capacity
-
 /**
  * Line chart showing lap time progression.
  * Invalid laps shown in red, valid laps in cyan.
  * SC/VSC laps highlighted with colored backgrounds.
- * ERS deployment shown as bars.
+ * ERS deployment energy shown as bars.
  */
 export function LapTimeChart({
   laps,
@@ -84,9 +82,7 @@ export function LapTimeChart({
       const lapNum = i + 1;
       const info = lapInfoMap.get(lapNum);
       const scStatus = info?.["max-safety-car-status"] ?? "NO_SAFETY_CAR";
-      const ersDeployed = info?.["car-status-data"]?.["ers-deployed-this-lap"];
-      const ersMax = info?.["car-status-data"]?.["ers-max-capacity"] ?? ERS_MAX;
-      const ersPct = ersDeployed != null && ersMax > 0 ? (ersDeployed / ersMax) * 100 : undefined;
+      const ersMj = info ? ersDeployMjForLap(info) : undefined;
 
       return {
         lap: lapNum,
@@ -102,7 +98,7 @@ export function LapTimeChart({
         scStatus,
         isSC: scStatus === "SAFETY_CAR" || scStatus === "FULL_SAFETY_CAR",
         isVSC: scStatus === "VIRTUAL_SAFETY_CAR",
-        ersPct,
+        ersMj,
       };
     });
 
@@ -117,7 +113,10 @@ export function LapTimeChart({
   const yMax = Math.ceil(maxTime);
 
   const hasRival = rivalLaps && rivalLaps.length > 0;
-  const hasErs = data.some((d) => d.ersPct != null);
+  const hasErs = data.some((d) => d.ersMj != null && d.ersMj > 0);
+  const maxErsMj = hasErs
+    ? Math.max(...data.filter((d) => d.ersMj != null).map((d) => d.ersMj!))
+    : 0;
   const hasTopSpeed = data.some((d) => d.topSpeed != null);
   const bestTopSpeed = hasTopSpeed
     ? Math.max(...data.filter((d) => d.valid && d.topSpeed != null).map((d) => d.topSpeed!))
@@ -191,17 +190,16 @@ export function LapTimeChart({
               orientation="right"
               stroke="#10b98166"
               fontSize={10}
-              domain={[0, 100]}
-              ticks={[0, 25, 50, 75, 100]}
-              tickFormatter={(v) => `${v}%`}
-              width={35}
+              domain={[0, Math.ceil(maxErsMj)]}
+              tickFormatter={(v) => `${v} MJ`}
+              width={45}
             />
           )}
           <Tooltip
             {...TOOLTIP_STYLE}
             formatter={(value: number | undefined, name: string | undefined) => {
               if (value == null) return ["–", name ?? ""];
-              if (name === "ERS Used") return [`${value.toFixed(0)}%`, name];
+              if (name === "ERS Deploy") return [`${value.toFixed(1)} MJ`, name];
               return [msToLapTime(value * 1000), name ?? ""];
             }}
             labelFormatter={(lap) => {
@@ -273,8 +271,8 @@ export function LapTimeChart({
           {hasErs && (
             <Bar
               yAxisId="ers"
-              dataKey="ersPct"
-              name="ERS Used"
+              dataKey="ersMj"
+              name="ERS Deploy"
               fill="#10b981"
               fillOpacity={0.15}
               stroke="none"
@@ -387,7 +385,7 @@ export function LapTimeChart({
               <th className="text-right py-1 px-2">S3</th>
               {hasTopSpeed && <th className="text-right py-1 px-2">Speed</th>}
               {hasWear && <th className="text-right py-1 px-2">Wear</th>}
-              {hasErs && <th className="text-right py-1 px-2">ERS</th>}
+              {hasErs && <th className="text-right py-1 px-2">ERS MJ</th>}
             </tr>
           );
 
@@ -443,7 +441,7 @@ export function LapTimeChart({
                 )}
                 {hasErs && (
                   <td className="text-right py-1 px-2 font-mono text-emerald-400">
-                    {d.ersPct != null ? `${d.ersPct.toFixed(0)}%` : "–"}
+                    {d.ersMj != null && d.ersMj > 0 ? d.ersMj.toFixed(1) : "–"}
                   </td>
                 )}
               </tr>

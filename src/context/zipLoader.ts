@@ -83,6 +83,8 @@ function buildSummary(
       relativePath,
       slug,
       ...parsed,
+      gameYear: json["game-year"],
+      packetFormat: json["packet-format"],
       validLapCount,
       lapIndicators,
       bestLapTime,

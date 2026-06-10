@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import type { TelemetrySession } from "../types/telemetry";
-import { getTeamColor } from "../utils/colors";
+import { getTeamColor, getTeamName } from "../utils/colors";
 import { msToLapTime } from "../utils/format";
-import { getCleanRaceLaps, getBestLapTime, driverTopSpeed, avgErsDeployPct, getCompletedStints, RACE_PACE_TOOLTIP } from "../utils/stats";
+import { getCleanRaceLaps, getBestLapTime, driverTopSpeed, avgErsDeployMj, getCompletedStints, RACE_PACE_TOOLTIP } from "../utils/stats";
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { Tooltip } from "./Tooltip";
@@ -71,7 +71,7 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
         ? clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / clean.length
         : 0;
       const topSpeed = driverTopSpeed(d);
-      const ers = avgErsDeployPct(d);
+      const ers = avgErsDeployMj(d);
       map.set(d["driver-name"], { bestLap, racePace, topSpeed, ers });
     }
     return map;
@@ -182,8 +182,8 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
                   <SortIcon column="topSpeed" sortKey={sortKey} sortDir={sortDir} side="left" />Top Speed
                 </th>
                 <th className={`text-right ${thClass}`} onClick={() => toggleSort("ers")}>
-                  <Tooltip text="Average % of ERS battery deployed per lap (green-flag laps only, excluding first and last lap). Higher = better — more energy used, less wasted.">
-                    <span><SortIcon column="ers" sortKey={sortKey} sortDir={sortDir} side="left" />ERS</span>
+                  <Tooltip text="Average ERS energy deployed per lap (green-flag laps only, excluding first and last lap).">
+                    <span><SortIcon column="ers" sortKey={sortKey} sortDir={sortDir} side="left" />ERS MJ</span>
                   </Tooltip>
                 </th>
                 <th className="text-right py-1.5 px-2">Strategy</th>
@@ -232,7 +232,7 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
                       />
                       {entry.name}
                     </td>
-                    <td className="py-1.5 px-2 text-zinc-400">{entry.team}</td>
+                    <td className="py-1.5 px-2 text-zinc-400">{getTeamName(entry.team)}</td>
                     <td className={`py-1.5 px-2 text-right font-mono ${status === "DNF" || status === "DSQ" ? "text-red-400" : ""}`}>
                       {gapStr}
                     </td>
@@ -246,7 +246,7 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
                       {topSpeed > 0 ? `${Math.round(topSpeed)}` : "–"}
                     </td>
                     <td className={`py-1.5 px-2 text-right font-mono ${isBestErs ? "text-purple-400" : ""}`}>
-                      {ers > 0 ? `${ers.toFixed(1)}%` : "–"}
+                      {ers > 0 ? ers.toFixed(1) : "–"}
                     </td>
                     <td className="py-1.5 px-2 text-right text-zinc-400">
                       {stintStr}
@@ -304,7 +304,7 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
                     />
                     {d["driver-name"]}
                   </td>
-                  <td className="py-1.5 px-2 text-zinc-400">{d.team}</td>
+                  <td className="py-1.5 px-2 text-zinc-400">{getTeamName(d.team)}</td>
                   <td className="py-1.5 px-2 text-right font-mono">
                     {fc["best-lap-time-str"] || "–"}
                   </td>

@@ -21,6 +21,11 @@ if [[ ! -f "$PROJECT_ROOT/.env" ]]; then
 fi
 
 TELEMETRY_DIR="$(grep '^TELEMETRY_DIR=' "$PROJECT_ROOT/.env" | cut -d'=' -f2-)"
+TELEMETRY_DIR="${TELEMETRY_DIR%$'\r'}"
+TELEMETRY_DIR="${TELEMETRY_DIR%\"}"
+TELEMETRY_DIR="${TELEMETRY_DIR#\"}"
+TELEMETRY_DIR="${TELEMETRY_DIR%\'}"
+TELEMETRY_DIR="${TELEMETRY_DIR#\'}"
 if [[ -z "$TELEMETRY_DIR" ]]; then
   echo "Error: TELEMETRY_DIR not set in .env" >&2
   exit 1

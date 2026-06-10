@@ -2,7 +2,9 @@
 
 A web app for visualizing telemetry data exported by [Pits n' Giggles](https://github.com/ashwin-nat/pits-n-giggles), the F1 sim racing self-engineering tool. Reads the JSON session files that Pits n' Giggles auto-saves after each session and presents them as interactive charts and tables.
 
-Works with telemetry from **F1 23**, **F1 24**, and **F1 25**.
+Works with telemetry from **F1 23**, **F1 24**, **F1 25**, and **F1 25: 2026 Season Pack / F1 26** Pits n' Giggles exports.
+
+Track history views keep game generations separate: for example, F1 25, F2 25, and F1 26 sessions get their own comparison groups, with the latest game generation selected by default.
 
 ![F1 Telemetry Viewer](assets/preview.png)
 

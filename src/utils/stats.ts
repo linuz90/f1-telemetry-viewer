@@ -593,17 +593,17 @@ export function generateInsights(
     }
 
     // 5. ERS deployment delta vs rival
-    const playerErs = avgErsDeployPct(player);
-    const rivalErs = avgErsDeployPct(rival);
+    const playerErs = avgErsDeployMj(player);
+    const rivalErs = avgErsDeployMj(rival);
     if (playerErs > 0 && rivalErs > 0) {
       const delta = playerErs - rivalErs;
       insights.push({
         type: "ers",
         label: "ERS Deploy",
-        value: `${delta <= 0 ? "" : "+"}${delta.toFixed(1)}%`,
-        detail: `avg per lap vs ${rivalName} (${playerErs.toFixed(1)}% vs ${rivalErs.toFixed(1)}%)`,
+        value: `${delta <= 0 ? "" : "+"}${delta.toFixed(1)} MJ`,
+        detail: `avg per lap vs ${rivalName} (${playerErs.toFixed(1)} vs ${rivalErs.toFixed(1)} MJ)`,
         tooltip:
-          "Average % of ERS battery deployed per lap (green-flag laps only, excluding first and last lap). Higher deployment = less energy wasted.",
+          "Average ERS energy deployed per lap (green-flag laps only, excluding first and last lap).",
       });
     }
   } else {
@@ -698,7 +698,7 @@ export function generateInsights(
     // 4. ERS deployment ranking
     const ersRanking: { driver: DriverData; avgErs: number }[] = [];
     for (const d of allDrivers) {
-      const avg = avgErsDeployPct(d);
+      const avg = avgErsDeployMj(d);
       if (avg > 0) ersRanking.push({ driver: d, avgErs: avg });
     }
     ersRanking.sort((a, b) => b.avgErs - a.avgErs); // highest first
@@ -711,9 +711,9 @@ export function generateInsights(
         type: "ers",
         label: "ERS Deploy",
         value: ordinal(ersPos + 1),
-        detail: `of ${ersRanking.length} — ${playerErs.toFixed(1)}% avg per lap`,
+        detail: `of ${ersRanking.length} — ${playerErs.toFixed(1)} MJ/lap`,
         tooltip:
-          "Average % of ERS battery deployed per lap (green-flag laps only, excluding first and last lap). Higher deployment = better rank — deploying more means less energy left on the table.",
+          "Average ERS energy deployed per lap (green-flag laps only, excluding first and last lap).",
         rank: ersPos,
         rankTotal: ersRanking.length,
       });
@@ -856,36 +856,35 @@ function isGreenFlagLap(lap: PerLapInfo): boolean {
   return (lap["max-safety-car-status"] ?? "NO_SAFETY_CAR") === "NO_SAFETY_CAR";
 }
 
+/** ERS energy deployed on a lap, preferring Pits n' Giggles' saved lap aggregate. */
+export function ersDeployJForLap(lap: PerLapInfo): number {
+  return lap["ers-stats"]?.["ers-deployed-j"] ?? lap["car-status-data"]?.["ers-deployed-this-lap"] ?? 0;
+}
+
+export function ersDeployMjForLap(lap: PerLapInfo): number {
+  return ersDeployJForLap(lap) / 1_000_000;
+}
+
 /**
- * Average ERS deployment % per lap for a driver (green-flag laps only,
- * excluding first and last lap).
- * Returns 0 if insufficient data.
- *
- * Known ERS telemetry issue (confirmed by ashwin_nat): ERS deployed/harvested
- * reset to 0 at the start of every lap (CAR_STATUS packet), but the lap number
- * change comes from a separate LAP_DATA packet. There's no guarantee CAR_STATUS
- * arrives after LAP_DATA, so some laps get captured with the post-reset value.
- * Fuel doesn't have this issue because it only decreases (no reset).
- * We exclude laps below 5% as these are capture artifacts, not real data.
+ * Average ERS deployment in MJ per lap (green-flag laps only, excluding first
+ * and last lap). Pits n' Giggles' per-lap `ers-stats` is more reliable than
+ * the end-of-lap car-status snapshot for F1 26 and remains optional for older
+ * exports.
  */
-export function avgErsDeployPct(d: DriverData): number {
+export function avgErsDeployMj(d: DriverData): number {
   const perLap = d["per-lap-info"] ?? [];
   if (perLap.length < 3) return 0;
   // Exclude first lap (index 0), last lap, and SC/VSC laps
   const eligible = perLap.slice(1, -1).filter(isGreenFlagLap);
-  const pcts: number[] = [];
+  const deployMj: number[] = [];
   for (const lap of eligible) {
-    const cs = lap["car-status-data"];
-    const deployed = cs?.["ers-deployed-this-lap"] ?? 0;
-    const cap = cs?.["ers-max-capacity"] ?? 0;
-    if (cap > 0) {
-      const pct = (deployed / cap) * 100;
-      // Skip near-zero laps — telemetry capture gap, not real data
-      if (pct >= 5) pcts.push(pct);
-    }
+    const deployedMj = ersDeployMjForLap(lap);
+    // Skip near-zero laps; with car-status fallback these are usually capture
+    // gaps around the lap reset rather than useful deployment data.
+    if (deployedMj >= 0.2) deployMj.push(deployedMj);
   }
-  if (pcts.length === 0) return 0;
-  return pcts.reduce((a, b) => a + b, 0) / pcts.length;
+  if (deployMj.length === 0) return 0;
+  return deployMj.reduce((a, b) => a + b, 0) / deployMj.length;
 }
 
 /** Calculate fuel burn rate and related metrics for a player in a race.

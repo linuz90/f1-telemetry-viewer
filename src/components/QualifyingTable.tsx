@@ -1,7 +1,7 @@
 import type { TelemetrySession, DriverData } from "../types/telemetry";
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
 import { msToLapTime, msToSectorTime } from "../utils/format";
-import { getTeamColor } from "../utils/colors";
+import { getTeamColor, getTeamName } from "../utils/colors";
 import { getValidLaps } from "../utils/stats";
 
 interface QualifyingTableProps {
@@ -125,7 +125,7 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
                     {row.driver["driver-name"]}
                   </td>
                   <td className="py-1.5 px-2 text-zinc-400">
-                    {row.driver.team}
+                    {getTeamName(row.driver.team)}
                   </td>
                   <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestLapTime !== null && row.bestLap["lap-time-in-ms"] === bestLapTime ? "text-purple-400 font-bold" : ""}`}>
                     {row.bestLap

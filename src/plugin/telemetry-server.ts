@@ -58,6 +58,8 @@ export function telemetryServer(telemetryDir?: string): Plugin {
               let aiDifficulty: number | undefined;
               let isSpectator = false;
               let fileSize = 0;
+              let gameYear: number | undefined;
+              let packetFormat: number | undefined;
               // JSON may be unreadable — fall back to filename-only parse for metadata
               let parsed = parseFilename(relativePath);
               try {
@@ -68,6 +70,8 @@ export function telemetryServer(telemetryDir?: string): Plugin {
                 fileSize = Buffer.byteLength(raw);
                 const json = JSON.parse(raw);
                 const sessionInfo = json["session-info"];
+                gameYear = typeof json["game-year"] === "number" ? json["game-year"] : undefined;
+                packetFormat = typeof json["packet-format"] === "number" ? json["packet-format"] : undefined;
                 parsed = resolveSessionMeta(relativePath, sessionInfo);
                 const isOnline = sessionInfo?.["network-game"] === 1;
                 aiDifficulty = isOnline ? 0 : (sessionInfo?.["ai-difficulty"] ?? 0);
@@ -137,7 +141,7 @@ export function telemetryServer(telemetryDir?: string): Plugin {
                 // If we can't parse, include the session with 0
               }
 
-              return { relativePath, slug, ...parsed, validLapCount, lapIndicators, bestLapTime, bestLapTimeMs, aiDifficulty, isSpectator, fileSize };
+              return { relativePath, slug, ...parsed, gameYear, packetFormat, validLapCount, lapIndicators, bestLapTime, bestLapTimeMs, aiDifficulty, isSpectator, fileSize };
             })
             .filter((s) => s.validLapCount > 0);
 

@@ -8,29 +8,7 @@ import {
   getBestLapTime,
   isRaceSession,
 } from "../utils/stats";
-import { getFormulaKey } from "../utils/sessionTypes";
-
-async function fetchTrackPbs(
-  trackName: string,
-  formula: string | undefined,
-  excludeSlug: string | undefined,
-): Promise<TrackPBs | null> {
-  const params = new URLSearchParams({ track: trackName });
-  if (formula) params.set("formula", formula);
-  if (excludeSlug) params.set("exclude", excludeSlug);
-  const res = await fetch(`/api/track-pbs?${params}`);
-  if (!res.ok) return null;
-  const d = await res.json();
-  return {
-    bestQualiLapMs: d.bestQualiLapMs ?? 0,
-    bestS1Ms: d.bestS1Ms ?? 0,
-    bestS2Ms: d.bestS2Ms ?? 0,
-    bestS3Ms: d.bestS3Ms ?? 0,
-    bestRaceLapMs: d.bestRaceLapMs ?? 0,
-    bestRacePaceMs: d.bestRacePaceMs ?? 0,
-    sessionCount: d.sessionCount ?? 0,
-  };
-}
+import { getFormulaComparisonKey } from "../utils/sessionTypes";
 
 export interface TrackPBs {
   /** All-time best qualifying lap time (ms) on this track */
@@ -55,9 +33,10 @@ export function useTrackHistory(
   trackName: string | undefined,
   currentSlug: string | undefined,
   formula: string | undefined,
+  gameYear: number | undefined,
 ): { pbs: TrackPBs | null; loading: boolean } {
   const { sessions } = useSessionList();
-  const { getSession, mode } = useTelemetry();
+  const { getSession } = useTelemetry();
   const [pbs, setPbs] = useState<TrackPBs | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,7 +44,7 @@ export function useTrackHistory(
     (s) =>
       s.track === trackName &&
       s.slug !== currentSlug &&
-      getFormulaKey(s.formula) === getFormulaKey(formula),
+      getFormulaComparisonKey(s.formula, s.gameYear) === getFormulaComparisonKey(formula, gameYear),
   );
   const trackSessionKey = trackSessions.map((s) => s.slug).join("|");
 
@@ -77,26 +56,14 @@ export function useTrackHistory(
     }
 
     setLoading(true);
-
-    if (mode === "api") {
-      fetchTrackPbs(trackName, formula, currentSlug)
-        .then((result) => {
-          if (result !== null) {
-            setPbs(result);
-            setLoading(false);
-            return;
-          }
-          // endpoint not available (e.g. Vite dev plugin) — fall through to per-session
-          computeFromSessions();
-        })
-        .catch(() => computeFromSessions());
-      return;
-    }
+    let cancelled = false;
 
     if (trackSessions.length === 0) {
       setLoading(false);
       setPbs(null);
-      return;
+      return () => {
+        cancelled = true;
+      };
     }
 
     computeFromSessions();
@@ -116,68 +83,70 @@ export function useTrackHistory(
           }
         }),
       ).then((results) => {
-      const loaded = results.filter((r) => r !== null);
+        if (cancelled) return;
 
-      let bestQualiLapMs = 0;
-      let bestS1Ms = 0;
-      let bestS2Ms = 0;
-      let bestS3Ms = 0;
-      let bestRaceLapMs = 0;
-      let bestRacePaceMs = 0;
+        const loaded = results.filter((r) => r !== null);
 
-      for (const sessionData of loaded) {
-        const player = findPlayer(sessionData);
-        if (!player) continue;
+        let bestQualiLapMs = 0;
+        let bestS1Ms = 0;
+        let bestS2Ms = 0;
+        let bestS3Ms = 0;
+        let bestRaceLapMs = 0;
+        let bestRacePaceMs = 0;
 
-        const laps = player["session-history"]["lap-history-data"];
-        const valid = getValidLaps(laps);
+        for (const sessionData of loaded) {
+          const player = findPlayer(sessionData);
+          if (!player) continue;
 
-        if (isRaceSession(sessionData)) {
-          // Best single race lap
-          const best = getBestLapTime(laps);
-          if (best > 0 && (bestRaceLapMs === 0 || best < bestRaceLapMs)) {
-            bestRaceLapMs = best;
-          }
-          // Best average race pace (clean laps — SC/pit/incident excluded)
-          const clean = getCleanRaceLaps(player);
-          if (clean.length > 0) {
-            const avg =
-              clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
-              clean.length;
-            if (bestRacePaceMs === 0 || avg < bestRacePaceMs) {
-              bestRacePaceMs = avg;
+          const laps = player["session-history"]["lap-history-data"];
+          const valid = getValidLaps(laps);
+
+          if (isRaceSession(sessionData)) {
+            // Best single race lap
+            const best = getBestLapTime(laps);
+            if (best > 0 && (bestRaceLapMs === 0 || best < bestRaceLapMs)) {
+              bestRaceLapMs = best;
+            }
+            // Best average race pace (clean laps — SC/pit/incident excluded)
+            const clean = getCleanRaceLaps(player);
+            if (clean.length > 0) {
+              const avg =
+                clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
+                clean.length;
+              if (bestRacePaceMs === 0 || avg < bestRacePaceMs) {
+                bestRacePaceMs = avg;
+              }
+            }
+          } else {
+            // Qualifying: best lap and sectors
+            const best = getBestLapTime(laps);
+            if (best > 0 && (bestQualiLapMs === 0 || best < bestQualiLapMs)) {
+              bestQualiLapMs = best;
+            }
+
+            if (valid.length > 0) {
+              const s1 = Math.min(
+                ...valid
+                  .map((l) => l["sector-1-time-in-ms"])
+                  .filter((v) => v > 0),
+              );
+              const s2 = Math.min(
+                ...valid
+                  .map((l) => l["sector-2-time-in-ms"])
+                  .filter((v) => v > 0),
+              );
+              const s3 = Math.min(
+                ...valid
+                  .map((l) => l["sector-3-time-in-ms"])
+                  .filter((v) => v > 0),
+              );
+
+              if (s1 > 0 && (bestS1Ms === 0 || s1 < bestS1Ms)) bestS1Ms = s1;
+              if (s2 > 0 && (bestS2Ms === 0 || s2 < bestS2Ms)) bestS2Ms = s2;
+              if (s3 > 0 && (bestS3Ms === 0 || s3 < bestS3Ms)) bestS3Ms = s3;
             }
           }
-        } else {
-          // Qualifying: best lap and sectors
-          const best = getBestLapTime(laps);
-          if (best > 0 && (bestQualiLapMs === 0 || best < bestQualiLapMs)) {
-            bestQualiLapMs = best;
-          }
-
-          if (valid.length > 0) {
-            const s1 = Math.min(
-              ...valid
-                .map((l) => l["sector-1-time-in-ms"])
-                .filter((v) => v > 0),
-            );
-            const s2 = Math.min(
-              ...valid
-                .map((l) => l["sector-2-time-in-ms"])
-                .filter((v) => v > 0),
-            );
-            const s3 = Math.min(
-              ...valid
-                .map((l) => l["sector-3-time-in-ms"])
-                .filter((v) => v > 0),
-            );
-
-            if (s1 > 0 && (bestS1Ms === 0 || s1 < bestS1Ms)) bestS1Ms = s1;
-            if (s2 > 0 && (bestS2Ms === 0 || s2 < bestS2Ms)) bestS2Ms = s2;
-            if (s3 > 0 && (bestS3Ms === 0 || s3 < bestS3Ms)) bestS3Ms = s3;
-          }
         }
-      }
 
         setPbs({
           bestQualiLapMs,
@@ -191,7 +160,11 @@ export function useTrackHistory(
         setLoading(false);
       });
     }
-  }, [trackName, formula, trackSessionKey, getSession, mode, currentSlug]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trackName, formula, gameYear, trackSessionKey, getSession]);
 
   return { pbs, loading };
 }

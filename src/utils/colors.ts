@@ -27,6 +27,33 @@ export const TEAM_COLORS: Record<string, string> = {
   "RB F1 Team": "#6692ff",
   "Kick Sauber": "#52e252",
   Haas: "#b6babd",
+  Audi: "#52e252",
+  Cadillac: "#fbbf24",
+  "220": "#27f4d2",
+  "221": "#e8002d",
+  "222": "#3671c6",
+  "223": "#64c4ff",
+  "224": "#229971",
+  "225": "#ff87bc",
+  "226": "#6692ff",
+  "227": "#b6babd",
+  "228": "#ff8000",
+  "229": "#52e252",
+  "230": "#fbbf24",
+};
+
+const TEAM_NAMES: Record<string, string> = {
+  "220": "Mercedes",
+  "221": "Ferrari",
+  "222": "Red Bull Racing",
+  "223": "Williams",
+  "224": "Aston Martin",
+  "225": "Alpine",
+  "226": "RB F1 Team",
+  "227": "Haas",
+  "228": "McLaren",
+  "229": "Audi",
+  "230": "Cadillac",
 };
 
 /** Get compound color with fallback */
@@ -37,6 +64,11 @@ export function getCompoundColor(compound: string): string {
 /** Get team color with fallback */
 export function getTeamColor(team: string): string {
   return TEAM_COLORS[team] ?? "#a1a1aa";
+}
+
+/** Get display name for teams exported as numeric IDs in newer telemetry. */
+export function getTeamName(team: string): string {
+  return TEAM_NAMES[team] ?? team;
 }
 
 /** Per-wheel colors for tyre wear charts */

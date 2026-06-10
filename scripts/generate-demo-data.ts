@@ -164,6 +164,8 @@ function buildSummary(filename: string, data: Record<string, unknown>) {
     relativePath: filename,
     slug,
     ...parsed,
+    gameYear: typeof data["game-year"] === "number" ? data["game-year"] : undefined,
+    packetFormat: typeof data["packet-format"] === "number" ? data["packet-format"] : undefined,
     validLapCount,
     lapIndicators,
     bestLapTime,

@@ -5,6 +5,8 @@ export interface SessionSummary {
   sessionType: string;
   track: string;
   formula?: string;
+  gameYear?: number;
+  packetFormat?: number;
   date: string;
   validLapCount: number;
   lapIndicators?: ("valid" | "invalid" | "best")[];
@@ -28,6 +30,7 @@ export interface TelemetrySession {
   overtakes: { records: OvertakeRecord[] };
   debug: DebugInfo;
   "game-year": number;
+  "packet-format"?: number;
   version: string;
 }
 
@@ -47,6 +50,19 @@ export interface SessionInfo {
   formula: string;
   "gearbox-assist": string;
   "weather-forecast-samples"?: WeatherForecastSample[];
+  "active-aero-track-status"?: string;
+  "num-active-aero-zones-full"?: number;
+  "active-aero-zones-full"?: unknown[];
+  "num-active-aero-zones-partial"?: number;
+  "active-aero-zones-partial"?: unknown[];
+  "num-drs-zones"?: number;
+  "drs-zones"?: unknown[];
+  "start-reaction-time"?: number;
+  "anti-lock-brakes-assist"?: number;
+  "traction-control-assist"?: string | number;
+  "dynamic-racing-line-hi-vis"?: number;
+  "dynamic-racing-line-colour-blind"?: string | number;
+  "recurring-rewind-prompt"?: number;
 }
 
 export interface WeatherForecastSample {
@@ -193,8 +209,15 @@ export interface CarStatus {
   "ers-deploy-mode"?: string;
   "ers-harvested-this-lap-mguk"?: number;
   "ers-harvested-this-lap-mguh"?: number;
+  "ers-harvested-limit-per-lap"?: number;
   "ers-deployed-this-lap"?: number;
   "ers-max-capacity"?: number;
+}
+
+export interface ErsStats {
+  "ers-deployed-j"?: number;
+  "ers-harv-mguk-j"?: number;
+  "ers-harv-mguh-j"?: number;
 }
 
 export interface LapDataCurrent {
@@ -290,6 +313,7 @@ export interface PerLapInfo {
   "lap-number": number;
   "car-damage-data": CarDamage;
   "car-status-data": CarStatus;
+  "ers-stats"?: ErsStats;
   "max-safety-car-status": string;
   "track-position"?: number;
   "top-speed-kmph"?: number;

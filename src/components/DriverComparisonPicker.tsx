@@ -4,7 +4,7 @@ import {
   findClosestRival,
   findFastestLapDriver,
 } from "../utils/stats";
-import { getTeamColor } from "../utils/colors";
+import { getTeamColor, getTeamName } from "../utils/colors";
 
 interface DriverComparisonPickerProps {
   session: TelemetrySession;
@@ -165,7 +165,7 @@ export function DriverComparisonPicker({
             .filter((d) => d.index !== focusedDriverIndex)
             .map((d) => (
               <option key={d.index} value={d.index}>
-                P{d["final-classification"]?.position ?? "?"} - {d["driver-name"]} - {d.team}
+                P{d["final-classification"]?.position ?? "?"} - {d["driver-name"]} - {getTeamName(d.team)}
               </option>
             ))}
         </optgroup>
