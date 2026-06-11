@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useSessionList } from "../hooks/useSessionList";
 import type { SessionSummary } from "../types/telemetry";
 import { formatDate, formatTime, formatSessionType, toTrackSlug, sortTracksByCalendar } from "../utils/format";
-import { compareFormulaComparisonKeys, getFormulaComparisonKey, isQualifyingSessionType, isRaceSessionType } from "../utils/sessionTypes";
+import { compareFormulaComparisonKeys, getFormulaComparisonKey, getFormulaLabel, isQualifyingSessionType, isRaceSessionType } from "../utils/sessionTypes";
 import { TrackFlag } from "./TrackFlag";
 import { SessionCard } from "./SessionCard";
 
@@ -19,6 +19,13 @@ function groupByDate(sessions: SessionSummary[]) {
 }
 
 const PAGE_SIZE = 50;
+
+interface TrackFormulaOption {
+  key: string;
+  label: string;
+  timedSessionCount: number;
+  latestTime: number;
+}
 
 function representativeFormulaKey(sessions: SessionSummary[]): string | undefined {
   // Track-list times come from summary best laps, so rank groups that can
@@ -38,11 +45,40 @@ function representativeFormulaKey(sessions: SessionSummary[]): string | undefine
     })[0]?.formulaKey;
 }
 
+function getFormulaOptions(sessions: SessionSummary[]): TrackFormulaOption[] {
+  const options = new Map<string, TrackFormulaOption>();
+
+  for (const session of sessions) {
+    const key = getFormulaComparisonKey(session.formula, session.gameYear);
+    const option = options.get(key) ?? {
+      key,
+      label: getFormulaLabel(session.formula, session.gameYear),
+      timedSessionCount: 0,
+      latestTime: 0,
+    };
+
+    if (session.bestLapTimeMs && session.bestLapTimeMs > 0) {
+      option.timedSessionCount += 1;
+    }
+    option.latestTime = Math.max(option.latestTime, new Date(session.date).getTime());
+    options.set(key, option);
+  }
+
+  return [...options.values()]
+    .filter((option) => option.timedSessionCount > 0)
+    .sort((a, b) => {
+      const formulaOrder = compareFormulaComparisonKeys(a.key, b.key);
+      if (formulaOrder !== 0) return formulaOrder;
+      return b.latestTime - a.latestTime;
+    });
+}
+
 export function SessionList() {
   const { sessions, loading, error } = useSessionList();
   const [tab, setTab] = useState<"sessions" | "tracks">("sessions");
   const [typeFilter, setTypeFilter] = useState<"all" | "race" | "quali">("all");
   const [modeFilter, setModeFilter] = useState<"all" | "online" | "ai">("all");
+  const [trackFormulaFilter, setTrackFormulaFilter] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
   if (loading) {
@@ -76,7 +112,14 @@ export function SessionList() {
   const pagedSessions = filteredSessions.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const grouped = groupByDate(pagedSessions);
-  const tracks = sortTracksByCalendar([...new Set(filteredSessions.map((s) => s.track))]);
+  const trackFormulaOptions = getFormulaOptions(filteredSessions);
+  const activeTrackFormulaKey = trackFormulaOptions.some((option) => option.key === trackFormulaFilter)
+    ? trackFormulaFilter
+    : trackFormulaOptions[0]?.key;
+  const trackListSessions = activeTrackFormulaKey
+    ? filteredSessions.filter((s) => getFormulaComparisonKey(s.formula, s.gameYear) === activeTrackFormulaKey)
+    : filteredSessions;
+  const tracks = sortTracksByCalendar([...new Set(trackListSessions.map((s) => s.track))]);
 
   // Compute best lap time per track (lowest ms wins)
   const bestTimeByTrack: Record<string, number> = {};
@@ -149,6 +192,26 @@ export function SessionList() {
           </div>
         )}
 
+        {tab === "tracks" && trackFormulaOptions.length > 1 && (
+          <div className="mx-2 mt-2 mb-1 overflow-x-auto">
+            <div className="flex min-w-max gap-0.5 p-0.5 rounded-lg bg-zinc-950/50" aria-label="Formula">
+              {trackFormulaOptions.map((formula) => (
+                <button
+                  key={formula.key}
+                  onClick={() => setTrackFormulaFilter(formula.key)}
+                  className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                    activeTrackFormulaKey === formula.key
+                      ? "bg-zinc-900 text-zinc-200 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-400"
+                  }`}
+                >
+                  {formula.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {tab === "sessions" && pageCount > 1 && (
           <div className="flex items-center justify-between px-2 py-1 border-t border-zinc-900">
             <button
@@ -212,16 +275,19 @@ export function SessionList() {
 
         {tab === "tracks" &&
           tracks.map((track) => {
-            const count = sessions.filter((s) => s.track === track).length;
-            const trackSessions = filteredSessions.filter((s) => s.track === track);
-            const formulaKey = representativeFormulaKey(trackSessions);
+            const trackSessions = trackListSessions.filter((s) => s.track === track);
+            const count = trackSessions.length;
+            const formulaKey = activeTrackFormulaKey ?? representativeFormulaKey(trackSessions);
             const bestTime = trackSessions
               .filter((s) => getFormulaComparisonKey(s.formula, s.gameYear) === formulaKey && s.bestLapTimeMs)
               .sort((a, b) => (a.bestLapTimeMs ?? Infinity) - (b.bestLapTimeMs ?? Infinity))[0]?.bestLapTime;
+            const trackPath = formulaKey
+              ? `/track/${toTrackSlug(track)}?formula=${encodeURIComponent(formulaKey)}`
+              : `/track/${toTrackSlug(track)}`;
             return (
               <NavLink
                 key={track}
-                to={`/track/${toTrackSlug(track)}`}
+                to={trackPath}
                 className={({ isActive }) =>
                   `flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors ${
                     isActive
