@@ -77,7 +77,10 @@ export function DashboardPage() {
   const trackGroups = buildTrackGroups(scopedSessionStats);
   const sparklineGroups = Object.values(buildQualifyingPaceData(trackGroups))
     .sort((a, b) => {
-      const [trackA] = sortTracksByCalendar([a.track, b.track]);
+      const [trackA] = sortTracksByCalendar(
+        [a.track, b.track],
+        activeFormulaKey,
+      );
       if (a.track !== b.track) return trackA === a.track ? -1 : 1;
       return a.formulaLabel.localeCompare(b.formulaLabel);
     })
@@ -97,9 +100,10 @@ export function DashboardPage() {
   const tracksWithResults = new Set(
     dashboardStats.resultSessions.map((session) => session.track),
   ).size;
-  const uniqueTracks = sortTracksByCalendar([
-    ...new Set(scopedSessions.map((session) => session.track)),
-  ]);
+  const uniqueTracks = sortTracksByCalendar(
+    [...new Set(scopedSessions.map((session) => session.track))],
+    activeFormulaKey,
+  );
   const hasScopedData = scopedSessions.length > 0;
   // Aggregate stats (avg finish, DNF rate, podium counts) are noisy or misleading
   // with one or two races, and downright depressing when every race is a DNF

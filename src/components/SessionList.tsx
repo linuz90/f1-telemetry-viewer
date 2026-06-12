@@ -115,7 +115,10 @@ export function SessionList() {
   const pagedSessions = filteredSessions.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const grouped = groupByDate(pagedSessions);
-  const tracks = sortTracksByCalendar([...new Set(filteredSessions.map((s) => s.track))]);
+  const tracks = sortTracksByCalendar(
+    [...new Set(filteredSessions.map((s) => s.track))],
+    activeTrackFormulaKey,
+  );
 
   // Compute best lap time per track (lowest ms wins)
   const bestTimeByTrack: Record<string, number> = {};
