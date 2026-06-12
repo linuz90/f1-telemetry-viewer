@@ -1,92 +1,134 @@
 # F1 Telemetry Viewer
 
-A web app for visualizing telemetry data exported by [Pits n' Giggles](https://github.com/ashwin-nat/pits-n-giggles), the F1 sim racing self-engineering tool. Reads the JSON session files that Pits n' Giggles auto-saves after each session and presents them as interactive charts and tables.
+A local-first dashboard for telemetry exported by [Pits n' Giggles](https://github.com/ashwin-nat/pits-n-giggles). It turns the JSON files saved after each F1 game session into a fast, private web app for race results, rival comparisons, qualifying pace, tyre strategy, and track progress.
 
-Works with telemetry from **F1 23**, **F1 24**, **F1 25**, and **F1 25: 2026 Season Pack / F1 26** Pits n' Giggles exports.
+Supports recent F1 (and F2) telemetry, including the newly released **2026 Season Pack**.
 
-Track history views keep game generations separate: for example, F1 25, F2 25, and F1 26 sessions get their own comparison groups, with the latest game generation selected by default.
-
-![F1 Telemetry Viewer](assets/preview.png)
-
-Vibe-coded with AI by [Fabrizio Rinaldi](https://fabrizio.so), so expect some small bugs and issues.
+<p align="center">
+  <img src="assets/demo.gif" alt="F1 Telemetry Viewer dashboard showing race results, recent sessions, insights, rivals, and track progress" width="900">
+</p>
 
 > [!NOTE]
-> This project is not affiliated with Pits n' Giggles — it just reads its custom JSON telemetry format. Check out [pitsngiggles.com](https://www.pitsngiggles.com/) for the tool itself.
+> Created by [Fabrizio Rinaldi](https://fabrizio.so) ([@linuz90](https://x.com/linuz90)). Built for the [Pits n' Giggles](https://www.pitsngiggles.com/) telemetry format and now integrated into Pits n' Giggles itself, thanks to the kind help of its founder.
 
-## What you get
+## What It Does
 
-- **Dashboard** — Performance trends across all your sessions: lap times, consistency, tyre wear rates
-- **Session detail** — Lap-by-lap breakdown for race and qualifying sessions. In races, pick any rival (or use smart presets like closest rival, race winner, fastest lap) and see a cumulative delta chart showing exactly where you gained or lost time. In qualifying, compare sector times across all your laps to find where you left time on the table
-- **Track progress** — See how your pace on a specific track improves over time. Computes your theoretical best lap (best S1 + S2 + S3 from any session), tracks sector trends, and plots every qualifying lap across sessions so you can spot the progression
+- 🏁 **Results dashboard** - See your real race form at a glance: average finish, podiums, wins, front-row starts, top-five rate, DNFs, grid gain, recent results, best and toughest tracks, comeback drives, lap-one gains, fastest-lap highlights, and tyre-management patterns.
+- 🧭 **Formula scopes** - Keep F1 26, F1 25, F2 25, and older data separate. The dashboard and sidebar default to the latest game generation while still letting you switch back to older sessions.
+- 🤝 **Rivals & teammates** - Aggregate online race rosters into teammate pace, frequent rivals, head-to-heads, fastest-lap threats, pole sitters, overtakers, and other repeat patterns.
+- 📊 **Session detail** - Open any race or qualifying session for lap-by-lap charts, sector tables, stint timelines, tyre wear, damage, ERS, fuel, position history, and driver-vs-driver deltas.
+- 🗺️ **Track progress** - Drill into a circuit to compare game generations, review best laps, qualifying progression, race pace, setup history, tyre life, fuel usage, and every saved session for that track.
+- 🔒 **Private data loading** - Use the local API during development, self-host against your telemetry folder, or drag in `.json` files / a `.zip` in the browser. Hosted uploads stay in memory and never leave your device.
 
-Every session includes the full grid — so whether you're racing AI or real people online, you can compare yourself against any driver on the grid.
+The dashboard prefers representative online races when there is enough human-grid data. If that is not available for a formula scope, it gracefully falls back to whatever race results or session history exists, so you only see an empty state when there is truly no data to show.
 
-## Loading your data
+## Loading Your Data
 
-**Running locally?** Point the app at your telemetry folder via the `TELEMETRY_DIR` env variable and it reads the JSON files directly.
+There are three ways to use the app:
 
-**Using a hosted version?** The app ships with sample telemetry data so you can explore all the features right away. When you're ready, drag and drop a `.zip` of your own telemetry folder — everything is processed in the browser, no upload to any server.
+| Mode               | Best for                                   | How it works                                                           |
+| ------------------ | ------------------------------------------ | ---------------------------------------------------------------------- |
+| Local development  | Your full telemetry folder while building  | Set `TELEMETRY_DIR`; Vite serves `/api/sessions` from disk             |
+| Hosted/static demo | Trying the app or sharing it publicly      | Bundled sample data loads first; users can drag in their own files     |
+| Self-hosted server | Running it permanently on a machine or NAS | Build once, then serve `dist/` and the telemetry API with `pnpm start` |
 
-## Setup
+Telemetry files are scanned recursively, so your normal Pits n' Giggles folder structure can stay as-is. Filenames are expected to follow the Pits n' Giggles pattern:
+
+```txt
+SessionType_Track_YYYY_MM_DD_HH_mm_ss.json
+```
+
+For example:
+
+```txt
+Race_Monza_2026_05_18_21_40_00.json
+Short_Qualifying_Madrid_2026_06_12_20_18_00.json
+```
+
+## Quick Start
 
 ```bash
 pnpm install
+cp .env.example .env
 ```
 
-Copy `.env.example` to `.env` and set the path to your Pits n' Giggles telemetry directory:
+Edit `.env` and point it at your telemetry folder:
 
-```
+```bash
 TELEMETRY_DIR=/path/to/your/telemetry/files
 ```
 
-The app recursively scans this directory for `.json` files. Telemetry filenames follow the pattern `SessionType_Track_YYYY_MM_DD_HH_mm_ss.json` (e.g. `Race_Monza_2024_07_15_20_30_00.json`).
+Then start the app:
 
-## Development
+```bash
+pnpm dev
+```
+
+Open [http://localhost:5173](http://localhost:5173).
+
+## Commands
 
 ```bash
 pnpm dev            # Start dev server at http://localhost:5173
-pnpm dev:prod       # Dev server without local API (uses demo data, like production)
-pnpm build          # Type-check + production build
-pnpm preview        # Preview production build locally
+pnpm dev:prod       # Run the production-like demo/upload flow locally
+pnpm build          # Type-check and build the production app
+pnpm preview        # Preview the production build locally
+pnpm start          # Serve dist/ plus the telemetry API
 pnpm generate-demo  # Regenerate trimmed demo data in public/demo/
+pnpm find-session <slug-or-url>  # Resolve a session URL or slug to JSON
 ```
 
-## Self-hosting
+No test runner or linter is configured yet; `pnpm build` is the main validation command.
 
-Want to keep the telemetry viewer running permanently on your machine or a server? Build the app once and use the included production server:
+## Self-Hosting
+
+Build the frontend once, then run the lightweight production server against your telemetry folder:
 
 ```bash
 pnpm build
 TELEMETRY_DIR=/path/to/your/telemetry pnpm start
 ```
 
-This starts a lightweight Node.js server on `http://localhost:3080` that serves the pre-built frontend and the telemetry API. Unlike `pnpm dev`, it doesn't run Vite's dev toolchain (no HMR, no file watchers, no source maps), so it uses very little memory and CPU.
+By default this serves the app at [http://localhost:3080](http://localhost:3080). Unlike `pnpm dev`, it does not run Vite's dev toolchain, file watchers, HMR, or source maps, so it is much lighter for an always-on setup.
 
-| Variable | Default | Description |
-|---|---|---|
-| `TELEMETRY_DIR` | *(required)* | Path to your Pits n' Giggles telemetry folder |
-| `PORT` | `3080` | HTTP port |
-| `DIST_DIR` | `./dist` | Path to the build output (rarely needed) |
-
-Embedded builds can override the displayed product name with `VITE_APP_NAME`, for example `VITE_APP_NAME="F1 Save Viewer"`.
+| Variable        | Default               | Description                                        |
+| --------------- | --------------------- | -------------------------------------------------- |
+| `TELEMETRY_DIR` | _(required)_          | Path to your Pits n' Giggles telemetry folder      |
+| `PORT`          | `3080`                | HTTP port for the production server                |
+| `DIST_DIR`      | `./dist`              | Path to the built frontend                         |
+| `VITE_APP_NAME` | `F1 Telemetry Viewer` | Optional product-name override for embedded builds |
 
 Works on macOS, Linux, and Windows.
 
 ## Stack
 
-React 19, TypeScript, Vite 7, Tailwind CSS 4, Recharts 3, React Router 7
+React 19, TypeScript, Vite 7, Tailwind CSS 4, Recharts 3, React Router 7, JSZip, Motion, and lucide-react.
+
+## Supported Data
+
+- Race, short qualifying, one-shot qualifying, time trial, practice, and other Pits n' Giggles session JSON files
+- Formula-aware comparisons for F1 26 / 2026 DLC, F1 25, F2 25, and older F1 generations
+- Current F1 26 track ordering, including Madrid / Madring support
+- Online race rosters when available, including rival identity, team, lap stats, overtakes, grid position, finish position, penalties, DNFs, and fastest-lap flags
+- Older exports that do not include all summary fields; the UI falls back to the data it can infer
 
 ## Architecture
 
-```
+```txt
 src/
-  components/    Charts, data tables, layout, upload screen
-  context/       TelemetryProvider (dual-mode data loading), zip loader
-  hooks/         useSessionList, useSession, useTrackHistory
-  pages/         Dashboard, Session detail, Track progress
-  plugin/        Vite plugin that serves telemetry JSON as a local API
-  utils/         Formatting, statistics, filename parsing, color mappings
-  types/         TypeScript types for the telemetry data model
+  components/    Layout, charts, tables, upload UI, dashboard sections
+  context/       TelemetryProvider and browser zip/json loader
+  hooks/         Session list, session detail, and track history hooks
+  pages/         Dashboard, session detail, and track progress routes
+  plugin/        Vite local API for reading telemetry JSON from disk
+  utils/         Formatting, formula scopes, statistics, summaries, routes
+  types/         TypeScript telemetry model
 ```
 
-The `TelemetryProvider` context abstracts data access with a three-step detection chain: first it tries the local API (dev mode) → then bundled demo data (`public/demo/`) → then falls back to upload mode with a drop zone. All hooks and pages read from the context, so they work identically across all modes.
+The `TelemetryProvider` uses one data-access path for every screen:
+
+1. Try the local telemetry API (`/api/sessions`).
+2. Fall back to bundled demo data (`public/demo/`).
+3. Fall back to browser upload mode.
+
+That keeps dashboard cards, track pages, and session pages working the same way whether the app is reading your local folder, serving demo data, or parsing files dropped into the browser.
