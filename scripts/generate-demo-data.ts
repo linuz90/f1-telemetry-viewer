@@ -158,8 +158,8 @@ for (const relPath of SOURCES) {
 
 // Append synthetic online race summaries (no backing detail JSON). These exist
 // purely so the prod (no-data) Dashboard renders a rich Rivals & Teammates
-// section instead of one or two lonely cards. They are filtered out of the
-// sidebar SessionList and the Recent Results/Sessions strips via `isSynthetic`.
+// section instead of one or two lonely cards. The `isSynthetic` flag tells UI
+// surfaces to avoid assuming there is a real detail JSON behind every row.
 const synthetic = buildSyntheticOnlineRaces();
 console.log(`\nGenerated ${synthetic.length} synthetic online race summaries.`);
 const fullManifest: SessionSummary[] = [...manifest, ...synthetic];

@@ -93,8 +93,8 @@ export function SessionList() {
   const typeModeFiltered = sessions.filter((s) => {
     if (filters.type === "race" && !isRaceSessionType(s.sessionType)) return false;
     if (filters.type === "quali" && !isQualifyingSessionType(s.sessionType)) return false;
-    if (filters.mode === "online" && !(s.aiDifficulty == null || s.aiDifficulty === 0)) return false;
-    if (filters.mode === "ai" && (s.aiDifficulty == null || s.aiDifficulty === 0)) return false;
+    if (filters.mode === "online" && s.isOnline !== true) return false;
+    if (filters.mode === "ai" && (s.isOnline === true || (s.aiDifficulty ?? 0) <= 0)) return false;
     return true;
   });
 

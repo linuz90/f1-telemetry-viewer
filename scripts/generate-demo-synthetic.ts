@@ -3,9 +3,9 @@
  *
  * These entries are listed in `public/demo/sessions.json` but have NO backing
  * detail JSON file. They power the Dashboard's Rivals & Teammates aggregation
- * so the no-data demo doesn't look empty. They are filtered out of any list
- * whose items navigate to a detail page (sidebar SessionList, Recent Results,
- * Recent Sessions) via the `isSynthetic` flag.
+ * so the no-data demo doesn't look empty. The `isSynthetic` flag lets list
+ * surfaces render them as static demo rows, and lets `SessionPage` show a
+ * friendly placeholder if a dashboard chart links to one.
  *
  * Deterministic — uses a seeded PRNG so output is stable across runs and
  * across machines without an upstream telemetry directory.

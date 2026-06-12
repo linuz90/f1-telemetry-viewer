@@ -58,8 +58,9 @@ export interface SessionSummary {
   /**
    * True for demo-only summary entries that have no backing detail JSON.
    * Used to enrich the prod (no-data) dashboard with realistic Rivals &
-   * Teammates aggregates. Filtered out of the sidebar SessionList and
-   * any list whose item navigates to a detail page.
+   * Teammates aggregates. UI surfaces that can navigate to a detail page
+   * must either render these as static demo rows or route to the demo
+   * placeholder state in `SessionPage`.
    */
   isSynthetic?: boolean;
 }

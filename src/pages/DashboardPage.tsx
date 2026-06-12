@@ -49,9 +49,8 @@ export function DashboardPage() {
   // Synthetic entries are demo-only summary stubs with no backing detail JSON.
   // They flow into every dashboard section (hero, recent results, insights,
   // rivals, tracks) so the prod no-data preview looks like a real dashboard.
-  // The sidebar SessionList filters them out (its rows always navigate to
-  // detail); the SessionPage renders a friendly "demo preview" placeholder
-  // when one is clicked.
+  // List/card surfaces either render them as static demo rows or rely on the
+  // SessionPage's friendly "demo preview" placeholder when a chart links to one.
   const formulaOptions = getFormulaScopeOptions(validSessions);
   const requestedFormulaKey = searchParams.get("formula");
   const defaultFormulaKey = getDefaultFormulaScopeKey(validSessions);
