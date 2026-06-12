@@ -2,6 +2,7 @@ import type { LapHistoryEntry, TyreStint } from "../types/telemetry";
 import { filterOutlierLaps, getBestLapTime } from "../utils/stats";
 import { msToLapTime } from "../utils/format";
 import { getCompoundColor } from "../utils/colors";
+import { tableRowClass } from "./ui/table";
 
 interface CompoundLapComparisonProps {
   playerStints: TyreStint[];
@@ -101,7 +102,7 @@ export function CompoundLapComparison({
               const delta = (s.playerAvg - s.rivalAvg) / 1000;
               const positive = delta > 0;
               return (
-                <tr key={s.compound} className="border-t border-zinc-800/50">
+                <tr key={s.compound} className={tableRowClass}>
                   <td className="py-1.5 px-2">
                     <span className="flex items-center gap-1.5">
                       <span
@@ -124,8 +125,8 @@ export function CompoundLapComparison({
                       Math.abs(delta) < 0.001
                         ? "text-zinc-400"
                         : positive
-                          ? "text-red-400"
-                          : "text-emerald-400"
+                          ? "text-behind"
+                          : "text-ahead"
                     }`}
                   >
                     {delta <= 0 ? "" : "+"}

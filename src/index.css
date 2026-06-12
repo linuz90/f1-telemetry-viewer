@@ -3,6 +3,28 @@
 
 @theme {
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  /* Pure black for the chrome (sidebar + body fallback). The main content area
+   * lifts off this with a slightly lighter canvas so cards have something to
+   * sit on. */
+  --color-shell: #000000;
+  --color-canvas: hsl(240deg, 14.3%, 3.75%);
+
+  /* Semantic palette — clear UI states mapped to specific hues. Use these
+   * (text-best, bg-ahead/10, ring-behind/15, …) for anything that carries one
+   * of these meanings; reach for the raw Tailwind tint only when the color is
+   * decorative. Chart equivalents live in CHART_THEME (utils/colors.ts) using
+   * a brighter -500 shade for legibility on Recharts surfaces. */
+  --color-best: #c084fc; /* purple-400 — session best, records */
+  --color-active: #22d3ee; /* cyan-400 — current/active driver */
+  --color-ahead: #4ade80; /* green-400 — gains, improvement, valid */
+  --color-behind: #f87171; /* red-400 — losses, errors, invalid */
+  --color-warning: #fb923c; /* orange-400 — caution, rival, pit */
+}
+
+html,
+body {
+  background-color: var(--color-shell);
+  color-scheme: dark;
 }
 
 /* Custom scrollbar for dark theme */
@@ -19,6 +41,24 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: theme("--color-zinc-700");
+}
+
+/* Sidebar scroll: thin, subtle, and ALWAYS reserves gutter space so layout
+ * doesn't shift when the content fits without scrolling (e.g. Tracks tab). */
+.sidebar-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.06) transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* Remove focus ring on Recharts containers */

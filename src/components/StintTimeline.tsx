@@ -145,7 +145,7 @@ export function StintDetailCards({ stints, laps }: { stints: TyreStint[]; laps: 
             ...(peakWear > 0 ? [{
               label: "Peak wear",
               value: `${peakWear.toFixed(1)}%`,
-              className: `font-mono ${peakWear > 60 ? "text-red-400" : peakWear > 40 ? "text-amber-400" : "text-zinc-300"}`,
+              className: `font-mono ${peakWear > 60 ? "text-behind" : peakWear > 40 ? "text-warning" : "text-zinc-300"}`,
               divider: true,
             }] : []),
             ...(wearRate > 0 ? [{ label: "Wear rate", value: `${wearRate.toFixed(1)}%/lap` }] : []),

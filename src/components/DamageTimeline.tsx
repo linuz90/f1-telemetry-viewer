@@ -8,6 +8,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { PerLapInfo } from "../types/telemetry";
+import { Badge } from "./ui/Badge";
+import { DAMAGE_COLORS } from "../utils/colors";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 import { EmptyState } from "./EmptyState";
 
@@ -26,7 +28,7 @@ const DAMAGE_FIELDS: DamageField[] = [
   {
     key: "frontWing",
     label: "Front Wing",
-    color: "#f97316",
+    color: DAMAGE_COLORS.frontWing,
     getValue: (d) =>
       Math.max(
         d["car-damage-data"]["front-left-wing-damage"] ?? 0,
@@ -36,37 +38,37 @@ const DAMAGE_FIELDS: DamageField[] = [
   {
     key: "rearWing",
     label: "Rear Wing",
-    color: "#eab308",
+    color: DAMAGE_COLORS.rearWing,
     getValue: (d) => d["car-damage-data"]["rear-wing-damage"] ?? 0,
   },
   {
     key: "floor",
     label: "Floor",
-    color: "#22d3ee",
+    color: DAMAGE_COLORS.floor,
     getValue: (d) => d["car-damage-data"]["floor-damage"] ?? 0,
   },
   {
     key: "diffuser",
     label: "Diffuser",
-    color: "#a855f7",
+    color: DAMAGE_COLORS.diffuser,
     getValue: (d) => d["car-damage-data"]["diffuser-damage"] ?? 0,
   },
   {
     key: "sidepod",
     label: "Sidepod",
-    color: "#ec4899",
+    color: DAMAGE_COLORS.sidepod,
     getValue: (d) => d["car-damage-data"]["sidepod-damage"] ?? 0,
   },
   {
     key: "engine",
     label: "Engine",
-    color: "#ef4444",
+    color: DAMAGE_COLORS.engine,
     getValue: (d) => d["car-damage-data"]["engine-damage"] ?? 0,
   },
   {
     key: "gearbox",
     label: "Gearbox",
-    color: "#10b981",
+    color: DAMAGE_COLORS.gearbox,
     getValue: (d) => d["car-damage-data"]["gear-box-damage"] ?? 0,
   },
 ];
@@ -187,12 +189,9 @@ function FaultBadges({ faults }: { faults: FaultEvent[] }) {
   return (
     <div className="flex flex-wrap gap-2 mt-2">
       {faults.map((fault, i) => (
-        <span
-          key={i}
-          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-red-500/15 text-red-400"
-        >
+        <Badge key={i} tone="red">
           Lap {fault.lap}: {fault.label}
-        </span>
+        </Badge>
       ))}
     </div>
   );

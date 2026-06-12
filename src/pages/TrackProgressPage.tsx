@@ -20,11 +20,15 @@ import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, i
 import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getSessionIcon } from "../utils/format";
 import { TrackFlag } from "../components/TrackFlag";
 import { CompoundStatCard } from "../components/CompoundStatCard";
-import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
+import { CHART_THEME, TOOLTIP_STYLE, SECTOR_COLORS } from "../utils/colors";
 import { compareFormulaComparisonKeys, getFormulaComparisonAliases, getFormulaComparisonKey, getFormulaLabel, shouldShowFormulaLabel } from "../utils/sessionTypes";
-import { cardClass, cardClassCompact } from "../components/Card";
+import { accentCardClass, cardClass, cardClassFeature } from "../components/Card";
 import { Upload, ArrowLeft } from "lucide-react";
 import { CarSetupCard } from "../components/CarSetupCard";
+import { SessionRow } from "../components/SessionRow";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { SectionHeader } from "../components/ui/SectionHeader";
+import { Badge } from "../components/ui/Badge";
 
 interface LapPoint {
   timeSec: number;
@@ -407,7 +411,7 @@ export function TrackProgressPage() {
     .map((d, i) => ({
       idx: i + 1,
       stdDev: +(d.stdDevMs / 1000).toFixed(3),
-      label: `${formatSessionType(d.summary.sessionType)} · ${formatTime(d.summary.date)}`,
+      label: `${formatSessionType(d.summary.sessionType, d.summary.formula)} · ${formatTime(d.summary.date)}`,
     }));
 
   // Race chart data
@@ -430,9 +434,9 @@ export function TrackProgressPage() {
   const tooltipStyle = TOOLTIP_STYLE;
 
   const sectorCards: { label: string; color: string; bestMs: number; latestMs: number }[] = [
-    { label: "S1", color: "#3b82f6", bestMs: theoreticalBestS1, latestMs: latestQuali?.bestS1 ?? 0 },
-    { label: "S2", color: "#8b5cf6", bestMs: theoreticalBestS2, latestMs: latestQuali?.bestS2 ?? 0 },
-    { label: "S3", color: "#ec4899", bestMs: theoreticalBestS3, latestMs: latestQuali?.bestS3 ?? 0 },
+    { label: "S1", color: SECTOR_COLORS.S1, bestMs: theoreticalBestS1, latestMs: latestQuali?.bestS1 ?? 0 },
+    { label: "S2", color: SECTOR_COLORS.S2, bestMs: theoreticalBestS2, latestMs: latestQuali?.bestS2 ?? 0 },
+    { label: "S3", color: SECTOR_COLORS.S3, bestMs: theoreticalBestS3, latestMs: latestQuali?.bestS3 ?? 0 },
   ];
 
   // Date range for subtitle
@@ -451,7 +455,7 @@ export function TrackProgressPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold mb-1">
+          <h2 className="text-xl font-bold mb-1">
             <TrackFlag track={displayTrackName} className="mr-2" />
             {displayTrackName}
           </h2>
@@ -465,59 +469,46 @@ export function TrackProgressPage() {
         </div>
 
         <div className="flex flex-col items-end gap-2 shrink-0">
-          {showFormulaSwitcher && (
-            <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80">
-              {formulaOptions.map((formula) => (
-                <button
-                  key={formula.key}
-                  onClick={() => {
-                    const nextParams = new URLSearchParams(searchParams);
-                    nextParams.set("formula", formula.key);
-                    setSearchParams(nextParams);
-                  }}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600 focus-visible:ring-offset-0 ${
-                    activeFormulaKey === formula.key
-                      ? "bg-zinc-800 text-zinc-100"
-                      : "text-zinc-500 hover:text-zinc-300"
-                  }`}
-                >
-                  {formula.label}
-                </button>
-              ))}
-            </div>
+          {showFormulaSwitcher && activeFormulaKey && (
+            <SegmentedControl
+              ariaLabel="Formula"
+              options={formulaOptions.map((f) => ({ value: f.key, label: f.label }))}
+              value={activeFormulaKey}
+              onChange={(key) => {
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.set("formula", key);
+                setSearchParams(nextParams);
+              }}
+            />
           )}
           {!showFormulaSwitcher && activeFormula && (
-            <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80" aria-label="Formula">
-              <span className="rounded-md bg-zinc-800/70 px-3 py-1.5 text-xs font-medium text-zinc-300">
-                {activeFormula.label}
-              </span>
-            </div>
+            <SegmentedControl
+              ariaLabel="Formula"
+              options={[{ value: activeFormula.key, label: activeFormula.label }]}
+              value={activeFormula.key}
+              onChange={() => {}}
+            />
           )}
 
           {/* Tab switcher: interactive with both data types, static when only one exists. */}
           {hasBoth && (
-            <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80">
-              {(["qualifying", "race"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-1.5 rounded-md text-xs font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600 focus-visible:ring-offset-0 ${
-                    activeTab === tab
-                      ? "bg-zinc-800 text-zinc-100"
-                      : "text-zinc-500 hover:text-zinc-300"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl<"qualifying" | "race">
+              ariaLabel="Session type"
+              options={[
+                { value: "qualifying", label: "Qualifying" },
+                { value: "race", label: "Race" },
+              ]}
+              value={activeTab}
+              onChange={setActiveTab}
+            />
           )}
           {!hasBoth && onlySessionType && (
-            <div className="flex gap-1 p-1 rounded-lg bg-zinc-900/80" aria-label="Session type">
-              <span className="rounded-md bg-zinc-800/70 px-4 py-1.5 text-xs font-medium capitalize text-zinc-300">
-                {onlySessionType}
-              </span>
-            </div>
+            <SegmentedControl
+              ariaLabel="Session type"
+              options={[{ value: onlySessionType, label: onlySessionType.charAt(0).toUpperCase() + onlySessionType.slice(1) }]}
+              value={onlySessionType}
+              onChange={() => {}}
+            />
           )}
         </div>
       </div>
@@ -525,34 +516,31 @@ export function TrackProgressPage() {
       {/* ── Qualifying Section ── */}
       {qualiData.length > 0 && (!hasBoth || activeTab === "qualifying") && (
         <>
-          <div className="flex items-center gap-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Qualifying Progress</h3>
-            <div className="flex-1 h-px bg-zinc-900" />
-          </div>
+          <SectionHeader>Qualifying Progress</SectionHeader>
 
           {/* Stat cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className={cardClass}>
-              <div className="text-xs text-zinc-500 mb-1">Best Lap</div>
-              <div className="font-mono text-lg text-cyan-400">
+            <div className={cardClassFeature}>
+              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Best Lap</div>
+              <div className="font-mono text-xl font-semibold bg-gradient-to-r from-cyan-300 to-cyan-500 bg-clip-text text-transparent">
                 {actualBestQualiMs > 0 ? msToLapTime(actualBestQualiMs) : "–"}
               </div>
             </div>
             <div className={cardClass}>
-              <div className="text-xs text-zinc-500 mb-1">Theoretical Best</div>
-              <div className="font-mono text-lg text-green-400">
+              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Theoretical Best</div>
+              <div className="font-mono text-xl text-ahead">
                 {theoreticalBestMs > 0 ? msToLapTime(theoreticalBestMs) : "–"}
               </div>
             </div>
             <div className={cardClass}>
-              <div className="text-xs text-zinc-500 mb-1">Gap to Theoretical</div>
-              <div className="font-mono text-lg text-amber-400">
+              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Gap to Theoretical</div>
+              <div className="font-mono text-xl text-warning">
                 {gapMs > 0 ? `+${(gapMs / 1000).toFixed(3)}s` : "–"}
               </div>
             </div>
             <div className={cardClass}>
-              <div className="text-xs text-zinc-500 mb-1">Sessions</div>
-              <div className="text-lg text-zinc-200">
+              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Sessions</div>
+              <div className="text-xl text-zinc-100 tabular-nums">
                 {qualiData.length}
               </div>
             </div>
@@ -580,13 +568,13 @@ export function TrackProgressPage() {
                   {theoreticalBestMs > 0 && (
                     <ReferenceLine
                       y={theoreticalBestMs / 1000}
-                      stroke="#22c55e"
+                      stroke={CHART_THEME.ahead}
                       strokeDasharray="6 4"
                       strokeWidth={1.5}
-                      label={{ value: "Theoretical", fill: "#22c55e", fontSize: 10, position: "right" }}
+                      label={{ value: "Theoretical", fill: CHART_THEME.ahead, fontSize: 10, position: "right" }}
                     />
                   )}
-                  <Line type="monotone" dataKey="bestLap" stroke="#a855f7" strokeWidth={2} dot={{ fill: "#a855f7", r: 4 }} />
+                  <Line type="monotone" dataKey="bestLap" stroke={CHART_THEME.best} strokeWidth={2} dot={{ fill: CHART_THEME.best, r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </section>
@@ -612,12 +600,12 @@ export function TrackProgressPage() {
                         <span className="text-zinc-500">Latest: </span>
                         <span className="font-mono text-zinc-300">{msToSectorTime(s.latestMs)}</span>
                         {deltaMs > 0 && (
-                          <span className="font-mono text-amber-400 ml-1">
+                          <span className="font-mono text-warning ml-1">
                             +{(deltaMs / 1000).toFixed(3)}
                           </span>
                         )}
                         {deltaMs === 0 && s.latestMs > 0 && s.bestMs > 0 && (
-                          <span className="font-mono text-green-400 ml-1">PB</span>
+                          <span className="font-mono text-ahead ml-1">PB</span>
                         )}
                       </div>
                     )}
@@ -646,9 +634,9 @@ export function TrackProgressPage() {
                     ]}
                     labelFormatter={(v) => `Session ${v}`}
                   />
-                  <Line type="monotone" dataKey="S1" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 3 }} />
-                  <Line type="monotone" dataKey="S2" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: "#8b5cf6", r: 3 }} />
-                  <Line type="monotone" dataKey="S3" stroke="#ec4899" strokeWidth={2} dot={{ fill: "#ec4899", r: 3 }} />
+                  <Line type="monotone" dataKey="S1" stroke={SECTOR_COLORS.S1} strokeWidth={2} dot={{ fill: SECTOR_COLORS.S1, r: 3 }} />
+                  <Line type="monotone" dataKey="S2" stroke={SECTOR_COLORS.S2} strokeWidth={2} dot={{ fill: SECTOR_COLORS.S2, r: 3 }} />
+                  <Line type="monotone" dataKey="S3" stroke={SECTOR_COLORS.S3} strokeWidth={2} dot={{ fill: SECTOR_COLORS.S3, r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </section>
@@ -662,7 +650,7 @@ export function TrackProgressPage() {
 
             qualiData.forEach((d, i) => {
               const sessionIdx = i + 1;
-              const sessionLabel = `${formatSessionType(d.summary.sessionType)} · ${formatTime(d.summary.date)}`;
+              const sessionLabel = `${formatSessionType(d.summary.sessionType, d.summary.formula)} · ${formatTime(d.summary.date)}`;
               const bestSec = d.bestLapMs > 0 ? d.bestLapMs / 1000 : null;
 
               for (const lap of d.allLaps) {
@@ -724,9 +712,9 @@ export function TrackProgressPage() {
                         );
                       }}
                     />
-                    <Scatter data={invalidPoints} fill="#ef4444" fillOpacity={0.4} shape="circle" />
-                    <Scatter data={validPoints} fill="#22d3ee" fillOpacity={0.6} shape="circle" />
-                    <Scatter data={bestPoints} fill="#a855f7" fillOpacity={1} shape="circle" />
+                    <Scatter data={invalidPoints} fill={CHART_THEME.behind} fillOpacity={0.4} shape="circle" />
+                    <Scatter data={validPoints} fill={CHART_THEME.player} fillOpacity={0.6} shape="circle" />
+                    <Scatter data={bestPoints} fill={CHART_THEME.best} fillOpacity={1} shape="circle" />
                   </ScatterChart>
                 </ResponsiveContainer>
                 <div className="flex gap-4 mt-2 text-xs text-zinc-500">
@@ -782,7 +770,7 @@ export function TrackProgressPage() {
               <p className="text-xs text-zinc-500 mb-4">
                 From{" "}
                 <Link to={`/session/${bestQualiSession.summary.slug}`} className="text-zinc-400 hover:text-zinc-200 transition-colors">
-                  {formatSessionType(bestQualiSession.summary.sessionType)} · {formatDate(bestQualiSession.summary.date)} · {msToLapTime(bestQualiSession.bestLapMs)}
+                  {formatSessionType(bestQualiSession.summary.sessionType, bestQualiSession.summary.formula)} · {formatDate(bestQualiSession.summary.date)} · {msToLapTime(bestQualiSession.bestLapMs)}
                 </Link>
               </p>
               <CarSetupCard setup={bestQualiSetup} />
@@ -794,22 +782,19 @@ export function TrackProgressPage() {
       {/* ── Race Section ── */}
       {raceData.length > 0 && (!hasBoth || activeTab === "race") && (
         <>
-          <div className="flex items-center gap-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Race Performance</h3>
-            <div className="flex-1 h-px bg-zinc-900" />
-          </div>
+          <SectionHeader>Race Performance</SectionHeader>
 
           {/* Race stat cards */}
           <div className="grid grid-cols-2 gap-3">
-            <div className={cardClass}>
-              <div className="text-xs text-zinc-500 mb-1">Best Race Lap</div>
-              <div className="font-mono text-lg text-cyan-400">
+            <div className={cardClassFeature}>
+              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Best Race Lap</div>
+              <div className="font-mono text-xl font-semibold bg-gradient-to-r from-cyan-300 to-cyan-500 bg-clip-text text-transparent">
                 {bestRaceLapMs > 0 ? msToLapTime(bestRaceLapMs) : "–"}
               </div>
             </div>
             <div className={cardClass}>
-              <div className="text-xs text-zinc-500 mb-1">Races</div>
-              <div className="text-lg text-zinc-200">
+              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Races</div>
+              <div className="text-xl text-zinc-100 tabular-nums">
                 {raceData.length}
               </div>
             </div>
@@ -829,7 +814,7 @@ export function TrackProgressPage() {
                     compound={cs.compound}
                     hero={{ value: `~${cs.estMaxLife}`, label: "pit by lap" }}
                     rows={[
-                      ...(cs.bestLapMs > 0 ? [{ label: "Best lap", value: msToLapTime(cs.bestLapMs), className: "font-mono text-purple-400" }] : []),
+                      ...(cs.bestLapMs > 0 ? [{ label: "Best lap", value: msToLapTime(cs.bestLapMs), className: "font-mono text-best" }] : []),
                       { label: "Avg wear", value: `${cs.avgWearRatePerLap.toFixed(1)}%/lap`, divider: cs.bestLapMs > 0 },
                       { label: "Stints", value: `${cs.avgStintLength}–${cs.longestStint} laps` },
                     ]}
@@ -851,10 +836,10 @@ export function TrackProgressPage() {
                   <div className="text-xs text-zinc-500 mb-1">Avg Initial Fuel</div>
                   <div className={`font-mono text-lg ${
                     trackFuelStats.avgInitialFuelLaps >= 0
-                      ? "text-emerald-400"
+                      ? "text-ahead"
                       : Math.abs(trackFuelStats.avgInitialFuelLaps) <= 1
-                        ? "text-amber-400"
-                        : "text-red-400"
+                        ? "text-warning"
+                        : "text-behind"
                   }`}>
                     {trackFuelStats.avgInitialFuelLaps >= 0 ? "+" : ""}{trackFuelStats.avgInitialFuelLaps.toFixed(1)} laps
                   </div>
@@ -866,9 +851,9 @@ export function TrackProgressPage() {
                   <div className="text-xs text-zinc-500 mb-1">Rec. Initial Fuel</div>
                   <div className={`font-mono text-lg ${
                     Math.abs(trackFuelStats.avgRecommendedFuelLaps) <= 0.3
-                      ? "text-emerald-400"
+                      ? "text-ahead"
                       : trackFuelStats.avgRecommendedFuelLaps < -1
-                        ? "text-red-400"
+                        ? "text-behind"
                         : "text-cyan-400"
                   }`}>
                     {trackFuelStats.avgRecommendedFuelLaps >= 0 ? "+" : ""}{trackFuelStats.avgRecommendedFuelLaps.toFixed(1)} laps
@@ -876,7 +861,7 @@ export function TrackProgressPage() {
                 </div>
                 <div className={cardClass}>
                   <div className="text-xs text-zinc-500 mb-1">Avg Burn Rate</div>
-                  <div className="font-mono text-lg text-amber-400">
+                  <div className="font-mono text-lg text-warning">
                     {trackFuelStats.avgBurnRateKgPerLap.toFixed(2)} kg/lap
                   </div>
                 </div>
@@ -884,10 +869,10 @@ export function TrackProgressPage() {
                   <div className="text-xs text-zinc-500 mb-1">Avg Excess at Finish</div>
                   <div className={`font-mono text-lg ${
                     trackFuelStats.avgExcessAtFinishLaps > 1
-                      ? "text-amber-400"
+                      ? "text-warning"
                       : trackFuelStats.avgExcessAtFinishLaps < 0
-                        ? "text-red-400"
-                        : "text-emerald-400"
+                        ? "text-behind"
+                        : "text-ahead"
                   }`}>
                     {trackFuelStats.avgExcessAtFinishLaps.toFixed(1)} laps
                   </div>
@@ -965,7 +950,7 @@ export function TrackProgressPage() {
               <p className="text-xs text-zinc-500 mb-4">
                 From{" "}
                 <Link to={`/session/${bestRaceSession.summary.slug}`} className="text-zinc-400 hover:text-zinc-200 transition-colors">
-                  {formatSessionType(bestRaceSession.summary.sessionType)} · {formatDate(bestRaceSession.summary.date)} · {msToLapTime(bestRaceSession.bestLapMs)}
+                  {formatSessionType(bestRaceSession.summary.sessionType, bestRaceSession.summary.formula)} · {formatDate(bestRaceSession.summary.date)} · {msToLapTime(bestRaceSession.bestLapMs)}
                 </Link>
               </p>
               <CarSetupCard setup={bestRaceSetup} />
@@ -976,57 +961,61 @@ export function TrackProgressPage() {
 
       {/* ── Session History ── */}
       <div>
-        <div className="flex items-center gap-3 mb-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Session History</h3>
-          <div className="flex-1 h-px bg-zinc-900" />
+        <div className="mb-3">
+          <SectionHeader>Session History</SectionHeader>
         </div>
-        <div className="space-y-1">
-          {sessionHistory.map((d) => (
-            <Link
-              key={d.summary.relativePath}
-              to={`/session/${d.summary.slug}`}
-              className={`flex items-center gap-4 ${cardClassCompact} !px-4 !py-2.5 hover:bg-zinc-900/70 transition-colors text-sm`}
-            >
-              <span className="text-zinc-500 w-36 shrink-0">
-                {formatDate(d.summary.date)}
-              </span>
-              <span className="text-zinc-400 w-32 shrink-0 flex items-center gap-1.5">
-                <span className="text-xs">{getSessionIcon(d.summary.sessionType)}</span>
-                {formatSessionType(d.summary.sessionType)}
-                {d.attemptCount > 1 && (
-                  <span className="ml-1 text-[10px] font-medium text-amber-400/80 bg-amber-400/10 rounded px-1 py-0.5">
-                    x{d.attemptCount}
-                  </span>
-                )}
-              </span>
-              <span className="font-mono text-cyan-400 w-20 shrink-0">
-                {d.bestLapMs > 0 ? msToLapTime(d.bestLapMs) : "–"}
-              </span>
-              <span className="text-xs text-zinc-500 w-20 shrink-0">
-                {d.weather}
-              </span>
-              {d.trackTemp > 0 && (
-                <span className="text-xs text-zinc-500 shrink-0">
-                  T:{d.trackTemp}° A:{d.airTemp}°
-                </span>
-              )}
-              {d.aiDifficulty > 0 && (
-                <span className="text-xs text-zinc-500 shrink-0">
-                  AI {d.aiDifficulty}
-                </span>
-              )}
-              {d.topSpeed > 0 && (
-                <span className="text-xs text-zinc-500 shrink-0">
-                  {d.topSpeed} km/h
-                </span>
-              )}
-              {d.wearRate > 0 && (
-                <span className="text-xs text-zinc-500">
-                  {d.wearRate.toFixed(1)}%/lap wear
-                </span>
-              )}
-            </Link>
-          ))}
+        <div className="space-y-1.5">
+          {sessionHistory.map((d) => {
+            const metaParts: string[] = [
+              `${formatDate(d.summary.date)} · ${formatTime(d.summary.date)}`,
+            ];
+            if (d.weather) metaParts.push(d.weather);
+            if (d.trackTemp > 0) metaParts.push(`T:${d.trackTemp}° A:${d.airTemp}°`);
+            if (d.aiDifficulty > 0) metaParts.push(`AI ${d.aiDifficulty}`);
+            if (d.topSpeed > 0) metaParts.push(`${d.topSpeed} km/h`);
+            if (d.wearRate > 0) metaParts.push(`${d.wearRate.toFixed(1)}%/lap wear`);
+
+            // Purple = all-time best at this track for the row's session category
+            // (pole for qualifying, fastest race lap for races). Matches the
+            // "session best" purple convention used elsewhere (LapTimeChart, etc.).
+            const isAllTimeBest =
+              d.bestLapMs > 0 &&
+              (d.isRace
+                ? d.bestLapMs === bestRaceLapMs
+                : d.bestLapMs === actualBestQualiMs);
+
+            return (
+              <SessionRow
+                key={d.summary.relativePath}
+                to={`/session/${d.summary.slug}`}
+                leading={
+                  <>
+                    <span className="text-sm leading-none">
+                      {getSessionIcon(d.summary.sessionType)}
+                    </span>
+                    <span className="truncate text-sm font-medium text-zinc-100">
+                      {formatSessionType(d.summary.sessionType, d.summary.formula)}
+                    </span>
+                    {d.attemptCount > 1 && <Badge tone="amber">×{d.attemptCount}</Badge>}
+                  </>
+                }
+                meta={metaParts.join(" · ")}
+                trailing={
+                  <div
+                    className={`inline-flex h-9 items-center justify-center rounded-lg px-2.5 font-mono text-sm font-bold tabular-nums ${
+                      d.bestLapMs <= 0
+                        ? "ring-1 ring-inset ring-white/[0.06] bg-zinc-900/70 text-zinc-500"
+                        : isAllTimeBest
+                          ? `${accentCardClass("purple")} text-purple-300`
+                          : `${accentCardClass("cyan")} text-cyan-300`
+                    }`}
+                  >
+                    {d.bestLapMs > 0 ? msToLapTime(d.bestLapMs) : "—"}
+                  </div>
+                }
+              />
+            );
+          })}
         </div>
       </div>
     </div>

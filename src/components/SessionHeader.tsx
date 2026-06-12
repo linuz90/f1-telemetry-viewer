@@ -8,6 +8,7 @@ import { formatSessionType, msToLapTime, toTrackSlug } from "../utils/format";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { getFormulaComparisonKey, getFormulaLabel, shouldShowFormulaLabel } from "../utils/sessionTypes";
 import { TrackFlag } from "./TrackFlag";
+import { TrackLayout } from "./TrackLayout";
 
 const EXT_LINK_TEMPLATE = import.meta.env.VITE_EXTERNAL_LINK_TEMPLATE as string | undefined;
 const EXT_LINK_LABEL = import.meta.env.VITE_EXTERNAL_LINK_LABEL as string | undefined;
@@ -36,7 +37,7 @@ export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChan
   const isQuali = !isRaceSession(session);
   const isOnline = info["network-game"] === 1;
 
-  const sessionType = formatSessionType(info["session-type"]);
+  const sessionType = formatSessionType(info["session-type"], info.formula);
   const TypeIcon = SESSION_ICONS[info["session-type"]] ?? SESSION_ICONS[sessionType] ?? Flag;
   const formulaKey = getFormulaComparisonKey(info.formula, session["game-year"]);
   const showFormula = shouldShowFormulaLabel(info.formula, session["game-year"]);
@@ -73,11 +74,12 @@ export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChan
   }, [drivers]);
 
   return (
-    <div className="mb-6">
+    <div className="mb-6 flex items-start gap-4">
+      <div className="min-w-0 flex-1">
       {/* Title row */}
       <div className="flex items-center gap-3 mb-3">
-        <h2 className="text-2xl font-bold">
-          <Link to={`/track/${toTrackSlug(info["track-id"])}?formula=${encodeURIComponent(formulaKey)}`} className="hover:text-purple-400 transition-colors">
+        <h2 className="text-xl font-bold">
+          <Link to={`/track/${toTrackSlug(info["track-id"])}?formula=${encodeURIComponent(formulaKey)}`} className="hover:text-best transition-colors">
             <TrackFlag track={info["track-id"]} className="mr-1" /> {info["track-id"]}
           </Link>
         </h2>
@@ -91,7 +93,7 @@ export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChan
           </span>
         )}
         {bestLapTimeStr && (
-          <span className="text-lg font-mono font-semibold text-purple-400">
+          <span className="text-lg font-mono font-semibold text-best">
             {bestLapTimeStr}
           </span>
         )}
@@ -135,11 +137,11 @@ export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChan
           const gained = fc["grid-position"] - fc.position;
           if (fc["grid-position"] <= 0 || gained === 0) return null;
           return gained > 0 ? (
-            <Pill icon={ArrowUp} className="text-emerald-400 bg-emerald-400/10">
+            <Pill icon={ArrowUp} className="text-ahead bg-ahead/10">
               +{gained}
             </Pill>
           ) : (
-            <Pill icon={ArrowDown} className="text-red-400 bg-red-400/10">
+            <Pill icon={ArrowDown} className="text-behind bg-behind/10">
               {gained}
             </Pill>
           );
@@ -152,7 +154,7 @@ export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChan
             ? `${fc["num-penalties"]} ${fc["num-penalties"] === 1 ? "penalty" : "penalties"} (+${fc["penalties-time"]}s)`
             : `${fc["num-penalties"]} ${fc["num-penalties"] === 1 ? "penalty" : "penalties"}`;
           return (
-            <Pill icon={AlertTriangle} className="text-amber-400 bg-amber-400/10">
+            <Pill icon={AlertTriangle} className="text-warning bg-warning/10">
               {penaltyText}
             </Pill>
           );
@@ -183,6 +185,11 @@ export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChan
           </a>
         )}
       </div>
+      </div>
+      <TrackLayout
+        track={info["track-id"]}
+        className="hidden sm:block size-20 shrink-0 text-zinc-600 [&>svg]:size-full"
+      />
     </div>
   );
 }

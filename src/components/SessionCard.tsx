@@ -1,4 +1,4 @@
-import { Eye, Globe, Timer, Target, Flag, Gauge } from "lucide-react";
+import { Eye, Globe, Timer, Target, Flag, Gauge, Save } from "lucide-react";
 import { TrackFlag } from "./TrackFlag";
 import { getFormulaLabel, isRaceSessionType, shouldShowFormulaLabel } from "../utils/sessionTypes";
 
@@ -13,6 +13,8 @@ interface SessionCardProps {
   isSpectator?: boolean;
   formula?: string;
   gameYear?: number;
+  /** P&G periodic safety-net snapshot — surfaced when not deduped away. */
+  isAutoSave?: boolean;
 }
 
 const TYPE_CONFIG: Record<string, { color: string; icon: typeof Flag }> = {
@@ -28,7 +30,7 @@ const INDICATOR_COLORS = {
   best: "bg-purple-400",
 };
 
-export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTime, isTrackBest, aiDifficulty, isSpectator, formula, gameYear }: SessionCardProps) {
+export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTime, isTrackBest, aiDifficulty, isSpectator, formula, gameYear, isAutoSave }: SessionCardProps) {
   const typeConfig =
     TYPE_CONFIG[sessionType] ??
     (isRaceSessionType(sessionType)
@@ -46,6 +48,19 @@ export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTi
             <span className="flex items-center gap-0.5 text-[10px] font-medium text-zinc-500">
               <Eye className="size-3" />
               Spectator
+            </span>
+          )}
+          {isAutoSave && (
+            // Surviving auto-saves are ones the dedup pipeline couldn't
+            // collapse against a regular save — surfacing the badge makes
+            // it obvious why this row exists even when a sibling save
+            // doesn't.
+            <span
+              className="flex items-center gap-0.5 text-[10px] font-medium text-amber-500/70"
+              title="Pits n' Giggles periodic auto-save"
+            >
+              <Save className="size-3" />
+              Auto-save
             </span>
           )}
           <span className={`flex items-center gap-0.5 text-[10px] font-medium uppercase leading-none ${typeConfig.color}`}>

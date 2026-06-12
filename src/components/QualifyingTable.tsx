@@ -3,6 +3,8 @@ import { usePlayerOnly } from "../hooks/usePlayerOnly";
 import { msToLapTime, msToSectorTime } from "../utils/format";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { getValidLaps } from "../utils/stats";
+import { FocusToggle } from "./ui/FocusToggle";
+import { tableRowClass } from "./ui/table";
 
 interface QualifyingTableProps {
   session: TelemetrySession;
@@ -72,20 +74,7 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
         <h3 className="text-base font-semibold text-zinc-300">
           Qualifying Results
         </h3>
-        <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer select-none">
-          Focus driver only
-          <button
-            type="button"
-            role="switch"
-            aria-checked={focusedOnly}
-            onClick={toggleFocusedOnly}
-            className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${focusedOnly ? "bg-cyan-600" : "bg-zinc-800"}`}
-          >
-            <span
-              className={`inline-block h-3 w-3 rounded-full bg-white transition-transform ${focusedOnly ? "translate-x-3.5" : "translate-x-0.5"}`}
-            />
-          </button>
-        </label>
+        <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -114,7 +103,7 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
               return (
                 <tr
                   key={row.driver.index}
-                  className={`border-t border-zinc-800/50 ${isFocused ? "bg-zinc-900/50 text-white font-medium" : ""}`}
+                  className={`${tableRowClass} ${isFocused ? "bg-zinc-800/40 text-white font-medium" : ""}`}
                 >
                   <td className="py-1.5 px-2">{i + 1}</td>
                   <td className="py-1.5 px-2">
@@ -127,27 +116,27 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
                   <td className="py-1.5 px-2 text-zinc-400">
                     {getTeamName(row.driver.team)}
                   </td>
-                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestLapTime !== null && row.bestLap["lap-time-in-ms"] === bestLapTime ? "text-purple-400 font-bold" : ""}`}>
+                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestLapTime !== null && row.bestLap["lap-time-in-ms"] === bestLapTime ? "text-best font-bold" : ""}`}>
                     {row.bestLap
                       ? msToLapTime(row.bestLap["lap-time-in-ms"])
                       : "–"}
                   </td>
-                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS1 !== null && row.bestLap["sector-1-time-in-ms"] === bestS1 ? "text-purple-400 font-bold" : "text-zinc-400"}`}>
+                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS1 !== null && row.bestLap["sector-1-time-in-ms"] === bestS1 ? "text-best font-bold" : "text-zinc-400"}`}>
                     {row.bestLap
                       ? msToSectorTime(row.bestLap["sector-1-time-in-ms"])
                       : "–"}
                   </td>
-                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS2 !== null && row.bestLap["sector-2-time-in-ms"] === bestS2 ? "text-purple-400 font-bold" : "text-zinc-400"}`}>
+                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS2 !== null && row.bestLap["sector-2-time-in-ms"] === bestS2 ? "text-best font-bold" : "text-zinc-400"}`}>
                     {row.bestLap
                       ? msToSectorTime(row.bestLap["sector-2-time-in-ms"])
                       : "–"}
                   </td>
-                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS3 !== null && row.bestLap["sector-3-time-in-ms"] === bestS3 ? "text-purple-400 font-bold" : "text-zinc-400"}`}>
+                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS3 !== null && row.bestLap["sector-3-time-in-ms"] === bestS3 ? "text-best font-bold" : "text-zinc-400"}`}>
                     {row.bestLap
                       ? msToSectorTime(row.bestLap["sector-3-time-in-ms"])
                       : "–"}
                   </td>
-                  <td className={`py-1.5 px-2 text-right font-mono ${row.allInvalid ? "text-red-400" : ""}`}>{gap}</td>
+                  <td className={`py-1.5 px-2 text-right font-mono ${row.allInvalid ? "text-behind" : ""}`}>{gap}</td>
                 </tr>
               );
             })}

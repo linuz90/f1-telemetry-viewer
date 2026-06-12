@@ -2,6 +2,7 @@ import type { TelemetrySession } from "../types/telemetry";
 import { msToSectorTime, msToLapTime } from "../utils/format";
 import { getValidLaps } from "../utils/stats";
 import { getTeamColor } from "../utils/colors";
+import { accentCardClass, neutralCardClass } from "./Card";
 
 interface SectorVsBestProps {
   session: TelemetrySession;
@@ -107,8 +108,8 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
         <div
           className={`rounded-lg px-3 py-3 ${
             isFocusedBestLap
-              ? "bg-purple-500/10 border border-purple-500/30"
-              : "bg-zinc-900/50"
+              ? accentCardClass("purple")
+              : neutralCardClass
           }`}
         >
           <div className="text-xs uppercase text-zinc-500 mb-2">Lap</div>
@@ -119,10 +120,10 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
             <div
               className={`font-mono text-sm mt-0.5 ${
                 isFocusedBestLap
-                  ? "text-purple-400"
+                  ? "text-best"
                   : lapDeltaMs < 100
                     ? "text-yellow-400"
-                    : "text-red-400"
+                    : "text-behind"
               }`}
             >
               {isFocusedBestLap
@@ -149,8 +150,8 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
             key={s.label}
             className={`rounded-lg px-3 py-3 ${
               s.isFocusedBest
-                ? "bg-purple-500/10 border border-purple-500/30"
-                : "bg-zinc-900/50"
+                ? accentCardClass("purple")
+                : neutralCardClass
             }`}
           >
             <div className="text-xs uppercase text-zinc-500 mb-2">
@@ -167,10 +168,10 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
               <div
                 className={`font-mono text-sm mt-0.5 ${
                   s.isFocusedBest
-                    ? "text-purple-400"
+                    ? "text-best"
                     : s.deltaMs < 100
                       ? "text-yellow-400"
-                      : "text-red-400"
+                      : "text-behind"
                 }`}
               >
                 {s.isFocusedBest

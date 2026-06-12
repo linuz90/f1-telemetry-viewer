@@ -36,7 +36,7 @@ export function StrategyInsightsCard({ insights }: StrategyInsightsCardProps) {
       <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
         Insights
       </h3>
-      <div className="space-y-0 divide-y divide-zinc-800/60">
+      <div className="space-y-0 divide-y divide-white/[0.04]">
         {insights.map((insight, i) => {
           const Icon = ICON_MAP[insight.type];
           const hasRank = insight.rank != null;

@@ -12,8 +12,9 @@ import {
 } from "recharts";
 import type { LapHistoryEntry, PerLapInfo, TyreStint } from "../types/telemetry";
 import { msToLapTime, isLapValid } from "../utils/format";
-import { ersDeployMjForLap, getWorstWheelWear } from "../utils/stats";
-import { CHART_THEME, TOOLTIP_STYLE, COMPOUND_COLORS } from "../utils/colors";
+import { ersDeployMjForLap, ersHarvestMjForLap, getWorstWheelWear } from "../utils/stats";
+import { tableRowClass } from "./ui/table";
+import { CHART_THEME, TOOLTIP_STYLE, COMPOUND_COLORS, SC_COLORS, SC_FALLBACK } from "../utils/colors";
 
 interface LapTimeChartProps {
   laps: LapHistoryEntry[];
@@ -30,12 +31,6 @@ interface LapTimeChartProps {
   /** Tyre stints to group laps by */
   stints?: TyreStint[];
 }
-
-const SC_COLORS: Record<string, string> = {
-  SAFETY_CAR: "#f59e0b",       // amber for SC
-  FULL_SAFETY_CAR: "#f59e0b",  // amber for SC (alternate key)
-  VIRTUAL_SAFETY_CAR: "#eab308", // yellow for VSC
-};
 
 /**
  * Line chart showing lap time progression.
@@ -83,6 +78,7 @@ export function LapTimeChart({
       const info = lapInfoMap.get(lapNum);
       const scStatus = info?.["max-safety-car-status"] ?? "NO_SAFETY_CAR";
       const ersMj = info ? ersDeployMjForLap(info) : undefined;
+      const ersHarvMj = info ? ersHarvestMjForLap(info) : undefined;
 
       return {
         lap: lapNum,
@@ -99,6 +95,7 @@ export function LapTimeChart({
         isSC: scStatus === "SAFETY_CAR" || scStatus === "FULL_SAFETY_CAR",
         isVSC: scStatus === "VIRTUAL_SAFETY_CAR",
         ersMj,
+        ersHarvMj,
       };
     });
 
@@ -114,8 +111,13 @@ export function LapTimeChart({
 
   const hasRival = rivalLaps && rivalLaps.length > 0;
   const hasErs = data.some((d) => d.ersMj != null && d.ersMj > 0);
-  const maxErsMj = hasErs
-    ? Math.max(...data.filter((d) => d.ersMj != null).map((d) => d.ersMj!))
+  const hasErsHarv = data.some((d) => d.ersHarvMj != null && d.ersHarvMj > 0);
+  const maxErsMj = hasErs || hasErsHarv
+    ? Math.max(
+        0,
+        ...data.filter((d) => d.ersMj != null).map((d) => d.ersMj!),
+        ...data.filter((d) => d.ersHarvMj != null).map((d) => d.ersHarvMj!),
+      )
     : 0;
   const hasTopSpeed = data.some((d) => d.topSpeed != null);
   const bestTopSpeed = hasTopSpeed
@@ -167,7 +169,7 @@ export function LapTimeChart({
           </div>
         )}
       </div>
-      <ResponsiveContainer width="100%" height={hasErs ? 320 : 280}>
+      <ResponsiveContainer width="100%" height={hasErs || hasErsHarv ? 320 : 280}>
         <ComposedChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
           <XAxis
@@ -184,7 +186,7 @@ export function LapTimeChart({
             allowDecimals={false}
             tickFormatter={(v) => msToLapTime(Math.round(v) * 1000)}
           />
-          {hasErs && (
+          {(hasErs || hasErsHarv) && (
             <YAxis
               yAxisId="ers"
               orientation="right"
@@ -199,7 +201,7 @@ export function LapTimeChart({
             {...TOOLTIP_STYLE}
             formatter={(value: number | undefined, name: string | undefined) => {
               if (value == null) return ["–", name ?? ""];
-              if (name === "ERS Deploy") return [`${value.toFixed(1)} MJ`, name];
+              if (name === "ERS Deploy" || name === "ERS Harv") return [`${value.toFixed(1)} MJ`, name];
               return [msToLapTime(value * 1000), name ?? ""];
             }}
             labelFormatter={(lap) => {
@@ -217,13 +219,13 @@ export function LapTimeChart({
               yAxisId="time"
               x1={range.x1 - 0.5}
               x2={range.x2 + 0.5}
-              fill={SC_COLORS[range.status] ?? "#f59e0b"}
+              fill={SC_COLORS[range.status] ?? SC_FALLBACK}
               fillOpacity={0.12}
-              stroke={SC_COLORS[range.status] ?? "#f59e0b"}
+              stroke={SC_COLORS[range.status] ?? SC_FALLBACK}
               strokeOpacity={0.3}
               label={{
                 value: range.status === "SAFETY_CAR" || range.status === "FULL_SAFETY_CAR" ? "SC" : "VSC",
-                fill: SC_COLORS[range.status] ?? "#f59e0b",
+                fill: SC_COLORS[range.status] ?? SC_FALLBACK,
                 fontSize: 10,
                 position: "insideTopLeft",
               }}
@@ -237,7 +239,7 @@ export function LapTimeChart({
               yAxisId="time"
               x1={lap - 0.5}
               x2={lap + 0.5}
-              fill="#ef4444"
+              fill={CHART_THEME.behind}
               fillOpacity={0.08}
               stroke="none"
             />
@@ -248,10 +250,10 @@ export function LapTimeChart({
             <ReferenceLine
               yAxisId="time"
               y={bestTime}
-              stroke="#a855f7"
+              stroke={CHART_THEME.best}
               strokeDasharray="4 4"
               strokeOpacity={0.5}
-              label={{ value: `Best: ${msToLapTime(bestTime * 1000)}`, fill: "#a855f7", fontSize: 10, position: "right" }}
+              label={{ value: `Best: ${msToLapTime(bestTime * 1000)}`, fill: CHART_THEME.best, fontSize: 10, position: "right" }}
             />
           )}
 
@@ -273,7 +275,19 @@ export function LapTimeChart({
               yAxisId="ers"
               dataKey="ersMj"
               name="ERS Deploy"
-              fill="#10b981"
+              fill={CHART_THEME.valid}
+              fillOpacity={0.15}
+              stroke="none"
+              barSize={6}
+              radius={[2, 2, 0, 0]}
+            />
+          )}
+          {hasErsHarv && (
+            <Bar
+              yAxisId="ers"
+              dataKey="ersHarvMj"
+              name="ERS Harv"
+              fill={CHART_THEME.harvest}
               fillOpacity={0.15}
               stroke="none"
               barSize={6}
@@ -287,7 +301,7 @@ export function LapTimeChart({
               type="monotone"
               dataKey="rivalTimeSec"
               name={rivalName ?? "Rival"}
-              stroke="#f97316"
+              stroke={CHART_THEME.rival}
               strokeWidth={2}
               strokeDasharray="6 3"
               strokeOpacity={0.6}
@@ -301,7 +315,7 @@ export function LapTimeChart({
             type="monotone"
             dataKey="timeSec"
             name="Player"
-            stroke="#22d3ee"
+            stroke={CHART_THEME.player}
             strokeWidth={2}
             dot={(props) => {
               const { cx, cy, index } = props as { cx?: number; cy?: number; index?: number };
@@ -310,7 +324,7 @@ export function LapTimeChart({
 
               // SC/VSC dot styling
               if (entry.isSC || entry.isVSC) {
-                const color = entry.isSC ? "#f59e0b" : "#eab308";
+                const color = entry.isSC ? SC_COLORS.SAFETY_CAR : SC_COLORS.VIRTUAL_SAFETY_CAR;
                 return (
                   <circle
                     key={index}
@@ -329,14 +343,14 @@ export function LapTimeChart({
                 // Invalid: larger red circle with X
                 return (
                   <g key={index}>
-                    <circle cx={cx} cy={cy} r={5} fill="#ef4444" fillOpacity={0.2} stroke="#ef4444" strokeWidth={2} />
-                    <line x1={cx - 2.5} y1={cy - 2.5} x2={cx + 2.5} y2={cy + 2.5} stroke="#ef4444" strokeWidth={1.5} />
-                    <line x1={cx + 2.5} y1={cy - 2.5} x2={cx - 2.5} y2={cy + 2.5} stroke="#ef4444" strokeWidth={1.5} />
+                    <circle cx={cx} cy={cy} r={5} fill={CHART_THEME.behind} fillOpacity={0.2} stroke={CHART_THEME.behind} strokeWidth={2} />
+                    <line x1={cx - 2.5} y1={cy - 2.5} x2={cx + 2.5} y2={cy + 2.5} stroke={CHART_THEME.behind} strokeWidth={1.5} />
+                    <line x1={cx + 2.5} y1={cy - 2.5} x2={cx - 2.5} y2={cy + 2.5} stroke={CHART_THEME.behind} strokeWidth={1.5} />
                   </g>
                 );
               }
               const isBest = Math.abs(entry.timeSec - bestTime) < 0.001;
-              const color = isBest ? "#a855f7" : "#22d3ee";
+              const color = isBest ? CHART_THEME.best : CHART_THEME.player;
               return (
                 <circle
                   key={index}
@@ -375,7 +389,7 @@ export function LapTimeChart({
             }
           }
 
-          const colCount = 5 + (hasTopSpeed ? 1 : 0) + (hasErs ? 1 : 0) + (hasWear ? 1 : 0);
+          const colCount = 5 + (hasTopSpeed ? 1 : 0) + (hasErs ? 1 : 0) + (hasErsHarv ? 1 : 0) + (hasWear ? 1 : 0);
           const headerRow = (
             <tr>
               <th className="text-left py-1 px-2">Lap</th>
@@ -385,7 +399,8 @@ export function LapTimeChart({
               <th className="text-right py-1 px-2">S3</th>
               {hasTopSpeed && <th className="text-right py-1 px-2">Speed</th>}
               {hasWear && <th className="text-right py-1 px-2">Wear</th>}
-              {hasErs && <th className="text-right py-1 px-2">ERS MJ</th>}
+              {hasErs && <th className="text-right py-1 px-2">ERS Dep</th>}
+              {hasErsHarv && <th className="text-right py-1 px-2">ERS Harv</th>}
             </tr>
           );
 
@@ -403,12 +418,12 @@ export function LapTimeChart({
             return (
               <tr
                 key={d.lap}
-                className={`border-t border-zinc-800/50 ${!d.valid ? "bg-red-500/10" : scBg}`}
+                className={`${tableRowClass} ${!d.valid ? "bg-red-500/10" : scBg}`}
               >
                 <td className="py-1 px-2">
                   {d.lap}
                   {!d.valid && (
-                    <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400">
+                    <span className="ml-1.5 px-1 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-behind">
                       INVALID
                     </span>
                   )}
@@ -423,25 +438,30 @@ export function LapTimeChart({
                     </span>
                   )}
                 </td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-red-400/70 line-through" : isBestLap ? "text-purple-400 font-semibold" : ""}`}>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-behind/70 line-through" : isBestLap ? "text-best font-semibold" : ""}`}>
                   {d.timeStr}
                 </td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS1 ? "text-purple-400" : ""}`}>{d.s1.toFixed(3)}</td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS2 ? "text-purple-400" : ""}`}>{d.s2.toFixed(3)}</td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS3 ? "text-purple-400" : ""}`}>{d.s3.toFixed(3)}</td>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS1 ? "text-best" : ""}`}>{d.s1.toFixed(3)}</td>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS2 ? "text-best" : ""}`}>{d.s2.toFixed(3)}</td>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS3 ? "text-best" : ""}`}>{d.s3.toFixed(3)}</td>
                 {hasTopSpeed && (
-                  <td className={`text-right py-1 px-2 font-mono ${d.valid && d.topSpeed != null && d.topSpeed === bestTopSpeed ? "text-purple-400 font-semibold" : ""}`}>
+                  <td className={`text-right py-1 px-2 font-mono ${d.valid && d.topSpeed != null && d.topSpeed === bestTopSpeed ? "text-best font-semibold" : ""}`}>
                     {d.topSpeed != null ? `${d.topSpeed}` : "–"}
                   </td>
                 )}
                 {hasWear && (
-                  <td className={`text-right py-1 px-2 font-mono ${wear != null && wear >= 75 ? "text-red-400" : wear != null && wear >= 50 ? "text-orange-400" : "text-zinc-400"}`}>
+                  <td className={`text-right py-1 px-2 font-mono ${wear != null && wear >= 75 ? "text-behind" : wear != null && wear >= 50 ? "text-warning" : "text-zinc-400"}`}>
                     {wear != null ? `${wear.toFixed(0)}%` : "–"}
                   </td>
                 )}
                 {hasErs && (
-                  <td className="text-right py-1 px-2 font-mono text-emerald-400">
+                  <td className="text-right py-1 px-2 font-mono text-ahead">
                     {d.ersMj != null && d.ersMj > 0 ? d.ersMj.toFixed(1) : "–"}
+                  </td>
+                )}
+                {hasErsHarv && (
+                  <td className="text-right py-1 px-2 font-mono text-sky-400">
+                    {d.ersHarvMj != null && d.ersHarvMj > 0 ? d.ersHarvMj.toFixed(1) : "–"}
                   </td>
                 )}
               </tr>

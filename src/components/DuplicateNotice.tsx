@@ -10,7 +10,7 @@ export function DuplicateNotice({ count }: DuplicateNoticeProps) {
   return (
     <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-600">
       <Copy className="h-3 w-3" />
-      {count} duplicate {count === 1 ? "save" : "saves"} hidden (auto-save/manual-save)
+      {count} duplicate {count === 1 ? "save" : "saves"} hidden (auto-saves & near-duplicates)
     </p>
   );
 }

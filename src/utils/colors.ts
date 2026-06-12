@@ -79,14 +79,67 @@ export const WHEEL_COLORS = {
   RR: "#ef4444",
 } as const;
 
-/** Shared chart theme colors (zinc palette) */
+/** Safety car / VSC reference-area shading. Amber for full SC, yellow for VSC. */
+export const SC_COLORS: Record<string, string> = {
+  SAFETY_CAR: "#f59e0b",
+  FULL_SAFETY_CAR: "#f59e0b",
+  VIRTUAL_SAFETY_CAR: "#eab308",
+};
+
+/** Fallback when a SC status doesn't resolve — keeps shading on screen. */
+export const SC_FALLBACK = "#f59e0b";
+
+/** Sector ranking colors for qualifying / sector comparisons. Purple is the
+ *  app-wide "session best" accent; green/yellow are the relative tiers below. */
+export const PERF_COLORS = {
+  best: "#7c3aed",      // purple-600
+  normal: "#16a34a",    // green-600
+  worst: "#ca8a04",     // yellow-600
+  invalid: "#52525b40", // zinc-600 @ 25% alpha
+} as const;
+
+/** Per-sector colors used in sector-improvement charts and best-sector cards. */
+export const SECTOR_COLORS = {
+  S1: "#3b82f6", // blue-500
+  S2: "#8b5cf6", // violet-500
+  S3: "#ec4899", // pink-500
+} as const;
+
+/** Per-component damage colors used in the damage timeline chart. */
+export const DAMAGE_COLORS = {
+  frontWing: "#f97316", // orange-500
+  rearWing: "#eab308",  // yellow-500
+  floor: "#22d3ee",     // cyan-400
+  diffuser: "#a855f7",  // purple-500
+  sidepod: "#ec4899",   // pink-500
+  engine: "#ef4444",    // red-500
+  gearbox: "#10b981",   // emerald-500
+} as const;
+
+/** Shared chart theme colors (zinc palette + semantic series tokens).
+ *
+ *  Semantic mapping mirrors the rest of the UI:
+ *   - `best`    → purple, app-wide "session best" accent
+ *   - `player`  → cyan, the active/current driver
+ *   - `ahead`   → green, gains / improvement / valid
+ *   - `behind`  → red, losses / errors / invalid
+ *   - `rival`   → orange, alternate series / pit / wear warning
+ *   - `harvest` → sky, ERS harvest line
+ */
 export const CHART_THEME = {
-  grid: "#27272a",       // zinc-800
-  axis: "#71717a",       // zinc-500
-  tooltipBg: "#18181b",  // zinc-900
+  grid: "#27272a",          // zinc-800
+  axis: "#71717a",          // zinc-500
+  tooltipBg: "#18181b",     // zinc-900
   tooltipBorder: "#27272a", // zinc-800
   tooltipLabel: "#a1a1aa",  // zinc-400
-  muted: "#52525b",      // zinc-600
+  muted: "#52525b",         // zinc-600
+  best: "#a855f7",          // purple-500
+  player: "#22d3ee",        // cyan-400
+  ahead: "#22c55e",         // green-500
+  behind: "#ef4444",        // red-500
+  rival: "#f97316",         // orange-500
+  harvest: "#38bdf8",       // sky-400
+  valid: "#10b981",         // emerald-500
 } as const;
 
 /** Reusable tooltip content style */

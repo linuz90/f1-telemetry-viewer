@@ -103,7 +103,7 @@ export function GlobalDropZone() {
             ) : (
               <>
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-red-500/60 bg-red-500/10">
-                  <Upload className="h-7 w-7 text-red-400" />
+                  <Upload className="h-7 w-7 text-behind" />
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-medium text-zinc-200">

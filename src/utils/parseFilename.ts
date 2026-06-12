@@ -16,6 +16,21 @@ export function toSlug(filename: string): string {
 }
 
 /**
+ * Detect Pits n' Giggles periodic "just-in-case" auto-saves.
+ *
+ * P&G writes a snapshot every ~N minutes during a session as a safety net so
+ * data isn't lost if the game crashes. Those filenames contain a
+ * `Just_in_case` token between the track name and the date, e.g.
+ *   `Race_Silverstone_Just_in_case_2026_05_01_18_22_10.json`
+ *
+ * We detect this purely from the filename so it works in every environment
+ * (Vite plugin, prod server, zip upload, demo) without touching the JSON.
+ */
+export function isAutoSaveFilename(filename: string): boolean {
+  return /(^|_)just_in_case(_|$)/i.test(basename(filename));
+}
+
+/**
  * Parses a P&G telemetry filename into structured metadata.
  * Pattern: [SessionType]_[Track]_[YYYY]_[MM]_[DD]_[HH]_[mm]_[ss].json
  */

@@ -13,9 +13,132 @@ export interface SessionSummary {
   bestLapTime?: string;
   bestLapTimeMs?: number;
   aiDifficulty?: number;
+  isOnline?: boolean;
   isSpectator?: boolean;
+  classifiedDriverCount?: number;
+  onlineDriverCount?: number;
+  activeHumanDriverCount?: number;
+  /** session-info.weather string when available (e.g. "Clear", "Light Rain", "Heavy Rain") */
+  weather?: string;
+  /** True when the player set the session's fastest lap (records.fastest.lap driver index match) */
+  playerSetFastestLap?: boolean;
+  /** Player's track position at the end of lap 1 (per-lap-info[0]["track-position"]). Race sessions only. */
+  lapOnePosition?: number;
+  /** Player's rank in the speed-trap table (1 = fastest). Race sessions only. */
+  topSpeedTrapRank?: number;
+  /** Number of drivers in the speed-trap table — denominator for topSpeedTrapRank. */
+  topSpeedTrapTotal?: number;
+  /** Player's tyre stints (one entry per stint) — race sessions only. */
+  stints?: PlayerStintSummary[];
+  /** Whether the player owns the purple sector in S1/S2/S3 for this session. */
+  purpleSectors?: { s1: boolean; s2: boolean; s3: boolean };
+  /** Overtakes the player completed on track (from overtakes.records). */
+  overtakesMade?: number;
+  /** Overtakes against the player on track. */
+  overtakesTaken?: number;
+  /** Player's team identifier for this session (raw value from JSON — Ferrari, "211", etc.). */
+  playerTeam?: string;
+  /** Per-driver lap stats for the player (mean + stddev of valid laps) — race sessions only. */
+  playerLapStats?: { meanLapMs: number; stddevLapMs: number; validLapCount: number };
+  /**
+   * Slim roster of non-player drivers from this race, used by the Rivals & Teammates
+   * section. Only emitted for online race sessions. See {@link RivalEntry}.
+   */
+  rivals?: RivalEntry[];
+  playerRaceResult?: PlayerRaceResult;
   fileSize?: number;
   duplicateCount?: number;
+  /**
+   * True when the save was produced by Pits n' Giggles' periodic
+   * "just-in-case" auto-save (detected from the filename). Used for the
+   * dominance-based dedup rule and to render an "Auto-save" badge in the
+   * session list. See `src/utils/deduplicateSessions.ts`.
+   */
+  isAutoSave?: boolean;
+  /**
+   * True for demo-only summary entries that have no backing detail JSON.
+   * Used to enrich the prod (no-data) dashboard with realistic Rivals &
+   * Teammates aggregates. Filtered out of the sidebar SessionList and
+   * any list whose item navigates to a detail page.
+   */
+  isSynthetic?: boolean;
+}
+
+export interface PlayerStintSummary {
+  /** Visual compound name (Soft, Medium, Hard, Intermediate, Wet). */
+  compound: string;
+  laps: number;
+  /** Average tyre wear percentage at the end of the stint (0-100). */
+  endWearAvg: number;
+}
+
+/**
+ * One non-player driver from a race, with the per-race signals the dashboard's
+ * Rivals & Teammates cards aggregate over. Identity key is the normalized driver
+ * name — the only stable handle across sessions; `driver-id` and `network-id`
+ * reset each session.
+ */
+export interface RivalEntry {
+  /** Normalized driver-name (trim + lowercase) — stable identity across sessions. */
+  key: string;
+  /** Display name (raw `driver-name`). */
+  name: string;
+  /** Raw team identifier — string brand ("Ferrari") in F1, numeric ID ("211") in F2. */
+  team?: string;
+  /** True when the driver shares the player's team in this session. */
+  isTeammate: boolean;
+  /** Final classification position, when present. */
+  position?: number;
+  /** Grid (starting) position from final-classification. */
+  gridPosition?: number;
+  /** result-status from final-classification (FINISHED, DNF, etc.). */
+  status?: string;
+  /** Number of penalties accumulated in this race. */
+  penaltyCount?: number;
+  /** Best valid lap time (ms) for this driver in this race. */
+  bestLapMs?: number;
+  /** Count of valid laps (lap-time>0, lap-valid-bit-flags=15). */
+  validLapCount: number;
+  /** Mean valid lap time (ms). */
+  meanLapMs?: number;
+  /** Std-deviation of valid lap times (ms). */
+  stddevLapMs?: number;
+  /** Times this driver overtook anyone on track (overtakes.records). */
+  overtakes: number;
+  /** Times this driver overtook the player. */
+  overtakesOnPlayer: number;
+  /** Times the player overtook this driver. */
+  overtakesByPlayer: number;
+  /** Mean per-lap absolute position gap to the player across the race. */
+  avgPositionGap?: number;
+  /** Count of laps both drivers were on the same lap number for the gap calculation. */
+  positionGapSamples?: number;
+  /** True when this driver set the overall fastest valid lap of the race. */
+  hadFastestLap?: boolean;
+  /**
+   * True when the slot was filled by an AI driver — typically real F1/F2
+   * surnames like VERSTAPPEN or ANTONELLI that the game inserts for empty
+   * lobby seats (or for players whose telemetry isn't published). Used by
+   * the dashboard's rivals aggregation to keep the leaderboards focused on
+   * actual humans the player has raced. Undefined for older exports that
+   * predate the participant-data capture.
+   */
+  isAi?: boolean;
+}
+
+export interface PlayerRaceResult {
+  position: number;
+  gridPosition?: number;
+  status?: string;
+  points?: number;
+  penaltiesTime?: number;
+  penaltyCount?: number;
+  playerLaps: number;
+  totalLaps?: number;
+  lapRatio?: number;
+  fieldSize: number;
+  bestLapTime?: string;
+  bestLapTimeMs?: number;
 }
 
 // --- Full session JSON types ---
@@ -106,6 +229,7 @@ export interface DriverData {
   "driver-name": string;
   "track-position": number;
   team: string;
+  "participant-data"?: ParticipantData;
   "current-lap": number;
   "top-speed-kmph": number;
   "car-damage": CarDamage;
@@ -116,6 +240,21 @@ export interface DriverData {
   "tyre-set-history": TyreStint[];
   "per-lap-info": PerLapInfo[];
   "car-setup"?: CarSetup | null;
+}
+
+export interface ParticipantData {
+  "ai-controlled"?: boolean;
+  "driver-id"?: number;
+  "network-id"?: number;
+  "team-id"?: string;
+  "my-team"?: boolean;
+  "race-number"?: number;
+  nationality?: string;
+  name?: string;
+  "telemetry-setting"?: string;
+  "show-online-names"?: boolean;
+  "tech-level"?: number;
+  platform?: string;
 }
 
 export interface SessionHistory {
@@ -242,6 +381,7 @@ export interface FinalClassification {
   "num-pit-stops": number;
   "result-status": string;
   "best-lap-time-in-ms": number;
+  "best-lap-time-ms"?: number;
   "best-lap-time-str": string;
   "total-race-time": number;
   "total-race-time-str": string;
@@ -267,6 +407,7 @@ export interface SpeedTrapRecord {
 export interface TyreStintHistoryV2Entry {
   name: string;
   team: string;
+  index?: number;
   position: number;
   "grid-position": number;
   "delta-to-leader": number | string | null;

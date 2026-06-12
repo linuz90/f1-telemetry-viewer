@@ -606,6 +606,21 @@ export function generateInsights(
           "Average ERS energy deployed per lap (green-flag laps only, excluding first and last lap).",
       });
     }
+
+    // 6. ERS harvest delta vs rival (lift-and-coast signal in F1 26)
+    const playerHarv = avgErsHarvestMj(player);
+    const rivalHarv = avgErsHarvestMj(rival);
+    if (playerHarv > 0 && rivalHarv > 0) {
+      const delta = playerHarv - rivalHarv;
+      insights.push({
+        type: "ers",
+        label: "ERS Harv",
+        value: `${delta <= 0 ? "" : "+"}${delta.toFixed(1)} MJ`,
+        detail: `avg per lap vs ${rivalName} (${playerHarv.toFixed(1)} vs ${rivalHarv.toFixed(1)} MJ)`,
+        tooltip:
+          "Average ERS energy harvested per lap, MGU-K + MGU-H combined. Higher values indicate more lift-and-coast.",
+      });
+    }
   } else {
     // --- Field ranking mode (original behavior) ---
 
@@ -719,7 +734,31 @@ export function generateInsights(
       });
     }
 
-    // 5. Weakest & strongest sector (avg vs avg across all drivers, clean laps)
+    // 5. ERS harvest ranking (lift-and-coast signal in F1 26)
+    const harvRanking: { driver: DriverData; avgHarv: number }[] = [];
+    for (const d of allDrivers) {
+      const avg = avgErsHarvestMj(d);
+      if (avg > 0) harvRanking.push({ driver: d, avgHarv: avg });
+    }
+    harvRanking.sort((a, b) => b.avgHarv - a.avgHarv); // highest first
+    const harvPos = harvRanking.findIndex(
+      (r) => r.driver.index === player.index,
+    );
+    if (harvPos >= 0 && harvRanking.length > 1) {
+      const playerHarv = harvRanking[harvPos].avgHarv;
+      insights.push({
+        type: "ers",
+        label: "ERS Harv",
+        value: ordinal(harvPos + 1),
+        detail: `of ${harvRanking.length} — ${playerHarv.toFixed(1)} MJ/lap`,
+        tooltip:
+          "Average ERS energy harvested per lap, MGU-K + MGU-H combined. Higher values indicate more lift-and-coast.",
+        rank: harvPos,
+        rankTotal: harvRanking.length,
+      });
+    }
+
+    // 6. Weakest & strongest sector (avg vs avg across all drivers, clean laps)
     const playerCleanLaps2 = getCleanRaceLaps(player);
     if (playerCleanLaps2.length > 0) {
       const sectorKeys = [
@@ -865,6 +904,25 @@ export function ersDeployMjForLap(lap: PerLapInfo): number {
   return ersDeployJForLap(lap) / 1_000_000;
 }
 
+/** Total ERS energy harvested on a lap (MGU-K + MGU-H combined), in joules.
+ *  Prefers Pits n' Giggles' per-lap `ers-stats`; falls back to end-of-lap
+ *  car-status snapshots from older exports. Useful for analyzing lift-and-coast
+ *  efficiency in F1 26, where harvested energy isn't deploy-capped. */
+export function ersHarvestJForLap(lap: PerLapInfo): number {
+  const stats = lap["ers-stats"];
+  if (stats?.["ers-harv-mguk-j"] != null || stats?.["ers-harv-mguh-j"] != null) {
+    return (stats["ers-harv-mguk-j"] ?? 0) + (stats["ers-harv-mguh-j"] ?? 0);
+  }
+  const car = lap["car-status-data"];
+  const mguk = car?.["ers-harvested-this-lap-mguk"] ?? 0;
+  const mguh = car?.["ers-harvested-this-lap-mguh"] ?? 0;
+  return mguk + mguh;
+}
+
+export function ersHarvestMjForLap(lap: PerLapInfo): number {
+  return ersHarvestJForLap(lap) / 1_000_000;
+}
+
 /**
  * Average ERS deployment in MJ per lap (green-flag laps only, excluding first
  * and last lap). Pits n' Giggles' per-lap `ers-stats` is more reliable than
@@ -885,6 +943,21 @@ export function avgErsDeployMj(d: DriverData): number {
   }
   if (deployMj.length === 0) return 0;
   return deployMj.reduce((a, b) => a + b, 0) / deployMj.length;
+}
+
+/** Average ERS harvested in MJ per lap (green-flag laps only, excluding first
+ *  and last lap). In F1 26 this is the key signal for lift-and-coast usage. */
+export function avgErsHarvestMj(d: DriverData): number {
+  const perLap = d["per-lap-info"] ?? [];
+  if (perLap.length < 3) return 0;
+  const eligible = perLap.slice(1, -1).filter(isGreenFlagLap);
+  const harvMj: number[] = [];
+  for (const lap of eligible) {
+    const mj = ersHarvestMjForLap(lap);
+    if (mj >= 0.2) harvMj.push(mj);
+  }
+  if (harvMj.length === 0) return 0;
+  return harvMj.reduce((a, b) => a + b, 0) / harvMj.length;
 }
 
 /** Calculate fuel burn rate and related metrics for a player in a race.
@@ -1228,7 +1301,46 @@ export function generateQualiInsights(
     }
   }
 
+  // 6. ERS harvest ranking — in quali, signals out-lap charging discipline (F1 26)
+  const qualiHarv = qualiAvgErsHarvestMj(player);
+  if (qualiHarv > 0) {
+    const harvRanking: { driver: DriverData; avgHarv: number }[] = [];
+    for (const d of allDrivers) {
+      const avg = qualiAvgErsHarvestMj(d);
+      if (avg > 0) harvRanking.push({ driver: d, avgHarv: avg });
+    }
+    harvRanking.sort((a, b) => b.avgHarv - a.avgHarv);
+    const pos = harvRanking.findIndex((r) => r.driver.index === player.index);
+    if (pos >= 0 && harvRanking.length > 1) {
+      insights.push({
+        type: "ers",
+        label: "ERS Harv",
+        value: ordinal(pos + 1),
+        detail: `of ${harvRanking.length} — ${qualiHarv.toFixed(1)} MJ/lap`,
+        tooltip:
+          "Average ERS energy harvested per lap, MGU-K + MGU-H combined. In quali this reflects out-lap charging — higher values give more push-lap deploy.",
+        rank: pos,
+        rankTotal: harvRanking.length,
+      });
+    }
+  }
+
   return insights;
+}
+
+/** Quali variant of avgErsHarvestMj: no SC filtering, no first/last exclusion.
+ *  Quali laps are short and structured (out/push/in); averaging every lap with
+ *  meaningful harvest captures the driver's overall charging discipline. */
+function qualiAvgErsHarvestMj(d: DriverData): number {
+  const perLap = d["per-lap-info"] ?? [];
+  if (perLap.length === 0) return 0;
+  const values: number[] = [];
+  for (const lap of perLap) {
+    const mj = ersHarvestMjForLap(lap);
+    if (mj >= 0.2) values.push(mj);
+  }
+  if (values.length === 0) return 0;
+  return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
 /** Historical PB data for a track */

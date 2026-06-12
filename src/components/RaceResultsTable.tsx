@@ -2,48 +2,27 @@ import { useState, useMemo } from "react";
 import type { TelemetrySession } from "../types/telemetry";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { msToLapTime } from "../utils/format";
-import { getCleanRaceLaps, getBestLapTime, driverTopSpeed, avgErsDeployMj, getCompletedStints, RACE_PACE_TOOLTIP } from "../utils/stats";
+import { getCleanRaceLaps, getBestLapTime, driverTopSpeed, avgErsDeployMj, avgErsHarvestMj, getCompletedStints, RACE_PACE_TOOLTIP } from "../utils/stats";
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { Tooltip } from "./Tooltip";
+import { FocusToggle } from "./ui/FocusToggle";
+import { tableRowClass } from "./ui/table";
 
 interface RaceResultsTableProps {
   session: TelemetrySession;
   focusedDriverIndex: number;
 }
 
-type SortKey = "pos" | "bestLap" | "racePace" | "gap" | "topSpeed" | "ers";
+type SortKey = "pos" | "bestLap" | "racePace" | "gap" | "topSpeed" | "ers" | "ersHarv";
 type SortDir = "asc" | "desc";
-
-const FocusDriverToggle = ({
-  value,
-  onChange,
-}: {
-  value: boolean;
-  onChange: () => void;
-}) => (
-  <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer select-none">
-    Focus driver only
-    <button
-      type="button"
-      role="switch"
-      aria-checked={value}
-      onClick={onChange}
-      className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${value ? "bg-cyan-600" : "bg-zinc-800"}`}
-    >
-      <span
-        className={`inline-block h-3 w-3 rounded-full bg-white transition-transform ${value ? "translate-x-3.5" : "translate-x-0.5"}`}
-      />
-    </button>
-  </label>
-);
 
 function SortIcon({ column, sortKey, sortDir, side = "right" }: { column: SortKey; sortKey: SortKey; sortDir: SortDir; side?: "left" | "right" }) {
   const margin = side === "left" ? "mr-1" : "ml-1";
   if (column !== sortKey) return <ChevronDown className={`inline w-3 h-3 ${margin} opacity-0 group-hover:opacity-30`} />;
   return sortDir === "asc"
-    ? <ChevronDown className={`inline w-3 h-3 ${margin} text-cyan-400`} />
-    : <ChevronUp className={`inline w-3 h-3 ${margin} text-cyan-400`} />;
+    ? <ChevronDown className={`inline w-3 h-3 ${margin} text-active`} />
+    : <ChevronUp className={`inline w-3 h-3 ${margin} text-active`} />;
 }
 
 /**
@@ -62,7 +41,7 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
 
   // Pre-compute race pace and best lap for each driver (by name)
   const driverStats = useMemo(() => {
-    const map = new Map<string, { bestLap: number; racePace: number; topSpeed: number; ers: number }>();
+    const map = new Map<string, { bestLap: number; racePace: number; topSpeed: number; ers: number; ersHarv: number }>();
     for (const d of drivers) {
       const laps = d["session-history"]["lap-history-data"];
       const bestLap = getBestLapTime(laps);
@@ -72,7 +51,8 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
         : 0;
       const topSpeed = driverTopSpeed(d);
       const ers = avgErsDeployMj(d);
-      map.set(d["driver-name"], { bestLap, racePace, topSpeed, ers });
+      const ersHarv = avgErsHarvestMj(d);
+      map.set(d["driver-name"], { bestLap, racePace, topSpeed, ers, ersHarv });
     }
     return map;
   }, [drivers]);
@@ -134,6 +114,12 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
             cmp = eb - ea; // highest first by default
             break;
           }
+          case "ersHarv": {
+            const ha = statsA?.ersHarv || 0;
+            const hb = statsB?.ersHarv || 0;
+            cmp = hb - ha; // highest first by default
+            break;
+          }
           case "gap": {
             const ga = typeof a["delta-to-leader"] === "number" ? a["delta-to-leader"] : 0;
             const gb = typeof b["delta-to-leader"] === "number" ? b["delta-to-leader"] : 0;
@@ -151,12 +137,14 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
     const bestPaceMs = Math.min(...[...driverStats.values()].map((s) => s.racePace).filter((v) => v > 0));
     const bestSpeedKmh = Math.max(...[...driverStats.values()].map((s) => s.topSpeed));
     const bestErs = Math.max(...[...driverStats.values()].map((s) => s.ers));
+    const bestErsHarv = Math.max(...[...driverStats.values()].map((s) => s.ersHarv));
+    const hasErsHarv = [...driverStats.values()].some((s) => s.ersHarv > 0);
 
     return (
       <div>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-zinc-300">Classification</h3>
-          <FocusDriverToggle value={focusedOnly} onChange={toggleFocusedOnly} />
+          <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -183,9 +171,16 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
                 </th>
                 <th className={`text-right ${thClass}`} onClick={() => toggleSort("ers")}>
                   <Tooltip text="Average ERS energy deployed per lap (green-flag laps only, excluding first and last lap).">
-                    <span><SortIcon column="ers" sortKey={sortKey} sortDir={sortDir} side="left" />ERS MJ</span>
+                    <span><SortIcon column="ers" sortKey={sortKey} sortDir={sortDir} side="left" />ERS Dep</span>
                   </Tooltip>
                 </th>
+                {hasErsHarv && (
+                  <th className={`text-right ${thClass}`} onClick={() => toggleSort("ersHarv")}>
+                    <Tooltip text="Average ERS energy harvested per lap, MGU-K + MGU-H combined (green-flag laps only, excluding first and last lap). Higher values indicate more lift-and-coast.">
+                      <span><SortIcon column="ersHarv" sortKey={sortKey} sortDir={sortDir} side="left" />ERS Harv</span>
+                    </Tooltip>
+                  </th>
+                )}
                 <th className="text-right py-1.5 px-2">Strategy</th>
               </tr>
             </thead>
@@ -214,15 +209,17 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
                 const racePace = stats?.racePace ?? 0;
                 const topSpeed = stats?.topSpeed ?? 0;
                 const ers = stats?.ers ?? 0;
+                const ersHarv = stats?.ersHarv ?? 0;
                 const isBestLap = bestLap > 0 && Math.abs(bestLap - bestLapMs) < 1;
                 const isBestPace = racePace > 0 && Math.abs(racePace - bestPaceMs) < 1;
                 const isBestSpeed = topSpeed > 0 && Math.abs(topSpeed - bestSpeedKmh) < 1;
                 const isBestErs = ers > 0 && Math.abs(ers - bestErs) < 0.1;
+                const isBestErsHarv = ersHarv > 0 && Math.abs(ersHarv - bestErsHarv) < 0.1;
 
                 return (
                   <tr
                     key={i}
-                    className={`border-t border-zinc-800/50 ${isFocused ? "bg-zinc-900/50 text-white font-medium" : ""}`}
+                    className={`${tableRowClass} ${isFocused ? "bg-zinc-800/40 text-white font-medium" : ""}`}
                   >
                     <td className="py-1.5 px-2">{entry.position}</td>
                     <td className="py-1.5 px-2">
@@ -233,21 +230,26 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
                       {entry.name}
                     </td>
                     <td className="py-1.5 px-2 text-zinc-400">{getTeamName(entry.team)}</td>
-                    <td className={`py-1.5 px-2 text-right font-mono ${status === "DNF" || status === "DSQ" ? "text-red-400" : ""}`}>
+                    <td className={`py-1.5 px-2 text-right font-mono ${status === "DNF" || status === "DSQ" ? "text-behind" : ""}`}>
                       {gapStr}
                     </td>
-                    <td className={`py-1.5 px-2 text-right font-mono ${isBestLap ? "text-purple-400" : ""}`}>
+                    <td className={`py-1.5 px-2 text-right font-mono ${isBestLap ? "text-best" : ""}`}>
                       {bestLap > 0 ? msToLapTime(bestLap) : "–"}
                     </td>
-                    <td className={`py-1.5 px-2 text-right font-mono ${isBestPace ? "text-purple-400" : ""}`}>
+                    <td className={`py-1.5 px-2 text-right font-mono ${isBestPace ? "text-best" : ""}`}>
                       {racePace > 0 ? msToLapTime(racePace) : "–"}
                     </td>
-                    <td className={`py-1.5 px-2 text-right font-mono ${isBestSpeed ? "text-purple-400" : ""}`}>
+                    <td className={`py-1.5 px-2 text-right font-mono ${isBestSpeed ? "text-best" : ""}`}>
                       {topSpeed > 0 ? `${Math.round(topSpeed)}` : "–"}
                     </td>
-                    <td className={`py-1.5 px-2 text-right font-mono ${isBestErs ? "text-purple-400" : ""}`}>
+                    <td className={`py-1.5 px-2 text-right font-mono ${isBestErs ? "text-best" : ""}`}>
                       {ers > 0 ? ers.toFixed(1) : "–"}
                     </td>
+                    {hasErsHarv && (
+                      <td className={`py-1.5 px-2 text-right font-mono ${isBestErsHarv ? "text-best" : ""}`}>
+                        {ersHarv > 0 ? ersHarv.toFixed(1) : "–"}
+                      </td>
+                    )}
                     <td className="py-1.5 px-2 text-right text-zinc-400">
                       {stintStr}
                     </td>
@@ -275,7 +277,7 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
     <div>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-zinc-300">Classification</h3>
-        <FocusDriverToggle value={focusedOnly} onChange={toggleFocusedOnly} />
+        <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -294,7 +296,7 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
               return (
                 <tr
                   key={d.index}
-                  className={`border-t border-zinc-800/50 ${d.index === focusedDriverIndex ? "bg-zinc-900/50 text-white font-medium" : ""}`}
+                  className={`${tableRowClass} ${d.index === focusedDriverIndex ? "bg-zinc-800/40 text-white font-medium" : ""}`}
                 >
                   <td className="py-1.5 px-2">{fc.position}</td>
                   <td className="py-1.5 px-2">

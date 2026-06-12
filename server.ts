@@ -32,8 +32,9 @@ import {
 } from "node:fs";
 import { join, relative, extname, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseFilename, toSlug } from "./src/utils/parseFilename.ts";
+import type { TelemetrySession } from "./src/types/telemetry.ts";
 import { deduplicateSessions } from "./src/utils/deduplicateSessions.ts";
+import { buildSessionSummary } from "./src/utils/sessionSummary.ts";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -119,106 +120,14 @@ function buildSessionList() {
 
   const sessions = files
     .map((relativePath) => {
-      const parsed = parseFilename(relativePath);
-      const slug = toSlug(relativePath);
-
-      let validLapCount = 0;
-      let lapIndicators: ("valid" | "invalid" | "best")[] | undefined;
-      let bestLapTime: string | undefined;
-      let bestLapTimeMs: number | undefined;
-      let aiDifficulty: number | undefined;
-      let isSpectator = false;
-      let fileSize = 0;
-
       try {
         const raw = readFileSync(join(TELEMETRY_DIR, relativePath), "utf-8");
-        fileSize = Buffer.byteLength(raw);
-        const json = JSON.parse(raw);
-
-        // Determine online/offline and AI difficulty
-        const sessionInfo = json["session-info"];
-        const isOnline = sessionInfo?.["network-game"] === 1;
-        aiDifficulty = isOnline ? 0 : (sessionInfo?.["ai-difficulty"] ?? 0);
-
-        // Find the player driver, or fall back to the driver with the most laps (spectator mode)
-        let focusDriver = json["classification-data"]?.find(
-          (d: { "is-player": boolean }) => d["is-player"],
-        );
-
-        if (!focusDriver) {
-          isSpectator = true;
-          const drivers = json["classification-data"] ?? [];
-          let maxLaps = 0;
-          for (const d of drivers) {
-            const count = (
-              d["session-history"]?.["lap-history-data"] ?? []
-            ).filter(
-              (l: { "lap-time-in-ms": number }) => l["lap-time-in-ms"] > 0,
-            ).length;
-            if (count > maxLaps) {
-              maxLaps = count;
-              focusDriver = d;
-            }
-          }
-        }
-
-        if (focusDriver) {
-          const laps =
-            focusDriver["session-history"]?.["lap-history-data"] ?? [];
-          validLapCount = laps.filter(
-            (l: { "lap-time-in-ms": number }) => l["lap-time-in-ms"] > 0,
-          ).length;
-
-          // For qualifying sessions, build per-lap validity indicators
-          const isQuali =
-            parsed.sessionType === "Short Qualifying" ||
-            parsed.sessionType === "One Shot Qualifying";
-
-          if (isQuali) {
-            const bestLapNum =
-              focusDriver["session-history"]?.["best-lap-time-lap-num"] ?? -1;
-            lapIndicators = laps
-              .filter(
-                (l: { "lap-time-in-ms": number }) => l["lap-time-in-ms"] > 0,
-              )
-              .map(
-                (l: { "lap-valid-bit-flags": number }, i: number) => {
-                  const lapNum = i + 1;
-                  if (lapNum === bestLapNum) return "best" as const;
-                  return l["lap-valid-bit-flags"] === 15
-                    ? ("valid" as const)
-                    : ("invalid" as const);
-                },
-              );
-
-            // Extract best valid lap time for the session list
-            if (bestLapNum > 0) {
-              const bestLap = laps[bestLapNum - 1] as
-                | { "lap-time-str": string; "lap-time-in-ms": number }
-                | undefined;
-              if (bestLap?.["lap-time-str"]) {
-                bestLapTime = bestLap["lap-time-str"];
-                bestLapTimeMs = bestLap["lap-time-in-ms"];
-              }
-            }
-          }
-        }
+        const json = JSON.parse(raw) as TelemetrySession;
+        return buildSessionSummary(relativePath, json, Buffer.byteLength(raw)).summary;
       } catch {
         // If we can't parse the file, include the session with 0 valid laps (filtered below)
+        return buildSessionSummary(relativePath).summary;
       }
-
-      return {
-        relativePath,
-        slug,
-        ...parsed,
-        validLapCount,
-        lapIndicators,
-        bestLapTime,
-        bestLapTimeMs,
-        aiDifficulty,
-        isSpectator,
-        fileSize,
-      };
     })
     .filter((s) => s.validLapCount > 0);
 

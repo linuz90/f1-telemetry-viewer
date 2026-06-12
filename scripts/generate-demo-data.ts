@@ -9,11 +9,31 @@
 
 import fs from "fs";
 import path from "path";
-import { resolveSessionMeta, toSlug } from "../src/utils/parseFilename.ts";
-import { isQualifyingSessionType } from "../src/utils/sessionTypes.ts";
+import type { SessionSummary, TelemetrySession } from "../src/types/telemetry.ts";
+import { toSlug } from "../src/utils/parseFilename.ts";
+import { buildSessionSummary } from "../src/utils/sessionSummary.ts";
+import { buildSyntheticOnlineRaces } from "./generate-demo-synthetic.ts";
 
-const TELEMETRY_DIR =
+const FALLBACK_TELEMETRY_DIR =
   "/Users/linuz90/Library/CloudStorage/OneDrive-Personal/Pits & Giggles/data";
+
+function unquote(value: string): string {
+  return value.trim().replace(/^['"]|['"]$/g, "");
+}
+
+function readTelemetryDir(): string {
+  if (process.env.TELEMETRY_DIR) return unquote(process.env.TELEMETRY_DIR);
+
+  const envPath = path.resolve(import.meta.dirname, "../.env");
+  if (fs.existsSync(envPath)) {
+    const match = fs.readFileSync(envPath, "utf-8").match(/^TELEMETRY_DIR=(.+)$/m);
+    if (match?.[1]) return unquote(match[1]);
+  }
+
+  return FALLBACK_TELEMETRY_DIR;
+}
+
+const TELEMETRY_DIR = readTelemetryDir();
 
 const SOURCES = [
   // Race at Spa — full 20-driver race, ~3.1MB → trimmed
@@ -101,80 +121,6 @@ function trimSession(raw: Record<string, unknown>, keepNames: Set<string>): Reco
   return data;
 }
 
-function buildSummary(filename: string, data: Record<string, unknown>) {
-  const sessionInfoForMeta = data["session-info"] as
-    | { "track-id"?: unknown; "session-type"?: unknown; formula?: unknown }
-    | undefined;
-  const parsed = resolveSessionMeta(filename, sessionInfoForMeta);
-  const slug = toSlug(filename);
-
-  const classData = data["classification-data"] as DriverEntry[];
-  let focusDriver = classData.find((d) => d["is-player"]);
-  let isSpectator = false;
-
-  if (!focusDriver) {
-    isSpectator = true;
-    let maxLaps = 0;
-    for (const d of classData) {
-      const count = (d["session-history"]?.["lap-history-data"] ?? [])
-        .filter((l) => l["lap-time-in-ms"] > 0).length;
-      if (count > maxLaps) {
-        maxLaps = count;
-        focusDriver = d;
-      }
-    }
-  }
-
-  let validLapCount = 0;
-  let lapIndicators: ("valid" | "invalid" | "best")[] | undefined;
-  let bestLapTime: string | undefined;
-  let bestLapTimeMs: number | undefined;
-
-  const sessionInfo = data["session-info"] as Record<string, unknown> | undefined;
-  const isOnline = sessionInfo?.["network-game"] === 1;
-  const aiDifficulty = isOnline ? 0 : ((sessionInfo?.["ai-difficulty"] as number) ?? 0);
-
-  if (focusDriver) {
-    const laps = focusDriver["session-history"]["lap-history-data"];
-    validLapCount = laps.filter((l) => l["lap-time-in-ms"] > 0).length;
-
-    const isQuali = isQualifyingSessionType(parsed.sessionType);
-
-    if (isQuali) {
-      const bestLapNum = focusDriver["session-history"]["best-lap-time-lap-num"] ?? -1;
-      lapIndicators = laps
-        .filter((l) => l["lap-time-in-ms"] > 0)
-        .map((l, i) => {
-          const lapNum = i + 1;
-          if (lapNum === bestLapNum) return "best" as const;
-          return l["lap-valid-bit-flags"] === 15 ? ("valid" as const) : ("invalid" as const);
-        });
-
-      if (bestLapNum > 0) {
-        const bestLap = laps[bestLapNum - 1] as { "lap-time-str"?: string; "lap-time-in-ms"?: number } | undefined;
-        if (bestLap?.["lap-time-str"]) {
-          bestLapTime = bestLap["lap-time-str"];
-          bestLapTimeMs = bestLap["lap-time-in-ms"];
-        }
-      }
-    }
-  }
-
-  return {
-    relativePath: filename,
-    slug,
-    ...parsed,
-    gameYear: typeof data["game-year"] === "number" ? data["game-year"] : undefined,
-    packetFormat: typeof data["packet-format"] === "number" ? data["packet-format"] : undefined,
-    validLapCount,
-    lapIndicators,
-    bestLapTime,
-    bestLapTimeMs,
-    aiDifficulty,
-    isSpectator,
-  };
-}
-
 // --- Main ---
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -186,11 +132,13 @@ for (const relPath of SOURCES) {
   const filename = path.basename(relPath);
 
   console.log(`Processing ${filename}...`);
-  const raw = JSON.parse(fs.readFileSync(srcPath, "utf-8"));
+  const raw = JSON.parse(fs.readFileSync(srcPath, "utf-8")) as TelemetrySession;
+  const rawText = JSON.stringify(raw);
+  const rawSummary = buildSessionSummary(filename, raw, Buffer.byteLength(rawText)).summary;
   const keepNames = pickDrivers(raw["classification-data"]);
   console.log(`  Keeping ${keepNames.size} drivers: ${[...keepNames].join(", ")}`);
 
-  const trimmed = trimSession(raw, keepNames);
+  const trimmed = trimSession(raw as unknown as Record<string, unknown>, keepNames);
   const slug = toSlug(filename);
   const outPath = path.join(OUT_DIR, `${slug}.json`);
   const json = JSON.stringify(trimmed);
@@ -198,12 +146,27 @@ for (const relPath of SOURCES) {
   fs.writeFileSync(outPath, json);
   console.log(`  Written ${outPath} (${(json.length / 1024).toFixed(0)} KB)`);
 
-  manifest.push(buildSummary(filename, trimmed));
+  // Don't surface the user's real online opponents in the no-data demo.
+  // The Spa race's `rivals` roster contains the actual gamertags of people
+  // the user races with — stripping it keeps the dashboard's Rivals &
+  // Teammates section sourced entirely from synthetic fictional names.
+  // The detail page (raceResultsTable etc.) still shows real names from the
+  // underlying JSON, which is acceptable as an authentic sample race.
+  const sanitizedSummary = { ...rawSummary, rivals: undefined };
+  manifest.push(sanitizedSummary);
 }
 
+// Append synthetic online race summaries (no backing detail JSON). These exist
+// purely so the prod (no-data) Dashboard renders a rich Rivals & Teammates
+// section instead of one or two lonely cards. They are filtered out of the
+// sidebar SessionList and the Recent Results/Sessions strips via `isSynthetic`.
+const synthetic = buildSyntheticOnlineRaces();
+console.log(`\nGenerated ${synthetic.length} synthetic online race summaries.`);
+const fullManifest: SessionSummary[] = [...manifest, ...synthetic];
+
 // Sort manifest by date descending
-manifest.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+fullManifest.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
 const manifestPath = path.join(OUT_DIR, "sessions.json");
-fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-console.log(`\nManifest written to ${manifestPath} (${manifest.length} sessions)`);
+fs.writeFileSync(manifestPath, JSON.stringify(fullManifest, null, 2));
+console.log(`Manifest written to ${manifestPath} (${fullManifest.length} sessions)`);

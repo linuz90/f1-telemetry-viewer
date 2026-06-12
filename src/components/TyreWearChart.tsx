@@ -11,15 +11,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { PerLapInfo, TyreStint } from "../types/telemetry";
-import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
+import { CHART_THEME, TOOLTIP_STYLE, SC_COLORS, SC_FALLBACK } from "../utils/colors";
 import { getWorstWheelWear } from "../utils/stats";
 import { EmptyState } from "./EmptyState";
-
-const SC_COLORS: Record<string, string> = {
-  SAFETY_CAR: "#f59e0b",
-  FULL_SAFETY_CAR: "#f59e0b",
-  VIRTUAL_SAFETY_CAR: "#eab308",
-};
 
 interface TyreWearChartProps {
   stints: TyreStint[];
@@ -200,7 +194,7 @@ export function TyreWearChart({
               key={`sc-${range.x1}`}
               x1={range.x1 - 0.5}
               x2={range.x2 + 0.5}
-              fill={SC_COLORS[range.status] ?? "#f59e0b"}
+              fill={SC_COLORS[range.status] ?? SC_FALLBACK}
               fillOpacity={0.12}
               stroke="none"
             />
@@ -235,7 +229,7 @@ export function TyreWearChart({
               type="monotone"
               dataKey="rivalWear"
               name={rivalName ?? "Rival"}
-              stroke="#f97316"
+              stroke={CHART_THEME.rival}
               strokeWidth={2}
               strokeDasharray="6 3"
               strokeOpacity={0.6}

@@ -52,8 +52,18 @@ export function formatGap(ms: number): string {
   return `${sign}${(Math.abs(ms) / 1000).toFixed(3)}s`;
 }
 
-/** Format session type for display (shorter labels) */
-export function formatSessionType(type: string): string {
+/**
+ * Format session type for display (shorter labels).
+ *
+ * F2 weekends in PnG exports use `session-type: "Race"` for the Sprint and
+ * `session-type: "Race 2"` for the Feature Race. F1 never uses "Race 2", so the
+ * formula check here is the safe way to relabel without affecting F1 results.
+ */
+export function formatSessionType(type: string, formula?: string): string {
+  if (formula && /^\s*(formula\s+)?f2\b/i.test(formula)) {
+    if (type === "Race") return "Sprint";
+    if (type === "Race 2") return "Feature Race";
+  }
   switch (type) {
     case "One Shot Qualifying":
       return "One-Shot Quali";
@@ -88,6 +98,8 @@ const TRACK_COUNTRY_CODES: Record<string, string> = {
   Spain: "es",
   Barcelona: "es",
   Catalunya: "es",
+  Madrid: "es",
+  Madring: "es",
   Canada: "ca",
   Montreal: "ca",
   Austria: "at",

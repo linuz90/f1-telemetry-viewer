@@ -63,12 +63,12 @@ export function PerformanceDeltaChart({
         >
           <defs>
             <linearGradient id="behindGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ef4444" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="#ef4444" stopOpacity={0.05} />
+              <stop offset="0%" stopColor={CHART_THEME.behind} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={CHART_THEME.behind} stopOpacity={0.05} />
             </linearGradient>
             <linearGradient id="aheadGrad" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
+              <stop offset="0%" stopColor={CHART_THEME.ahead} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={CHART_THEME.ahead} stopOpacity={0.05} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -111,16 +111,16 @@ export function PerformanceDeltaChart({
                   <div className="text-zinc-400 mb-1">
                     Lap {label}
                     {d.playerPit && (
-                      <span className="ml-1 text-cyan-400">PIT</span>
+                      <span className="ml-1 text-active">PIT</span>
                     )}
                     {d.rivalPit && (
-                      <span className="ml-1 text-orange-400">
+                      <span className="ml-1 text-warning">
                         {rivalName} PIT
                       </span>
                     )}
                   </div>
                   <div
-                    className={`font-mono font-medium ${d.delta > 0 ? "text-red-400" : "text-emerald-400"}`}
+                    className={`font-mono font-medium ${d.delta > 0 ? "text-behind" : "text-ahead"}`}
                   >
                     {d.delta > 0 ? "+" : ""}
                     {d.delta.toFixed(3)}s cumulative
@@ -152,12 +152,12 @@ export function PerformanceDeltaChart({
             <ReferenceLine
               key={`pp${lap}`}
               x={lap}
-              stroke="#22d3ee"
+              stroke={CHART_THEME.player}
               strokeDasharray="4 4"
               strokeOpacity={0.4}
               label={{
                 value: "PIT",
-                fill: "#22d3ee",
+                fill: CHART_THEME.player,
                 fontSize: 9,
                 position: "top",
               }}
@@ -167,12 +167,12 @@ export function PerformanceDeltaChart({
             <ReferenceLine
               key={`rp${lap}`}
               x={lap}
-              stroke="#f97316"
+              stroke={CHART_THEME.rival}
               strokeDasharray="4 4"
               strokeOpacity={0.4}
               label={{
                 value: "PIT",
-                fill: "#f97316",
+                fill: CHART_THEME.rival,
                 fontSize: 9,
                 position: "bottom",
               }}
@@ -183,7 +183,7 @@ export function PerformanceDeltaChart({
           <Area
             type="monotone"
             dataKey="behind"
-            stroke="#ef4444"
+            stroke={CHART_THEME.behind}
             strokeWidth={0}
             fill="url(#behindGrad)"
           />
@@ -191,7 +191,7 @@ export function PerformanceDeltaChart({
           <Area
             type="monotone"
             dataKey="ahead"
-            stroke="#22c55e"
+            stroke={CHART_THEME.ahead}
             strokeWidth={0}
             fill="url(#aheadGrad)"
           />

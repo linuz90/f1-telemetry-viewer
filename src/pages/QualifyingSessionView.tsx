@@ -38,6 +38,7 @@ export function QualifyingSessionView({
 
   const laps = focusedDriver?.["session-history"]["lap-history-data"] ?? [];
   const stints = focusedDriver?.["session-history"]["tyre-stints-history-data"] ?? [];
+  const perLapInfo = focusedDriver?.["per-lap-info"] ?? [];
   // Find track name from session list to match history
   const { sessions: allSessions } = useSessionList();
   const sessionMeta = useMemo(
@@ -86,7 +87,7 @@ export function QualifyingSessionView({
       {/* Player lap breakdown */}
       {laps.length > 0 && (
         <Card as="section">
-          <SectorComparison laps={laps} stints={stints} />
+          <SectorComparison laps={laps} stints={stints} perLapInfo={perLapInfo} />
         </Card>
       )}
 

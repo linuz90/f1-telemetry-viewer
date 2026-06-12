@@ -8,6 +8,7 @@ import {
 } from "../utils/stats";
 import { msToLapTime } from "../utils/format";
 import { getCompoundColor } from "../utils/colors";
+import { tableRowClass } from "./ui/table";
 
 interface StintComparisonTableProps {
   player: DriverData;
@@ -92,7 +93,7 @@ export function StintComparisonTable({
               return (
                 <tr
                   key={i}
-                  className="border-t border-zinc-800/50"
+                  className={tableRowClass}
                 >
                   <td className="py-1.5 px-2 font-medium text-zinc-300">
                     {i + 1}
@@ -160,7 +161,7 @@ function Delta({
   const positive = display > 0;
   return (
     <span
-      className={`ml-1.5 text-[10px] ${positive ? "text-red-400" : "text-emerald-400"}`}
+      className={`ml-1.5 text-[10px] ${positive ? "text-behind" : "text-ahead"}`}
     >
       {positive ? "+" : ""}
       {display.toFixed(unit === "%" ? 1 : 3)}

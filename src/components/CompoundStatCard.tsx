@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { getCompoundColor } from "../utils/colors";
+import { dynamicAccentCardStyle } from "./Card";
+import { tableRowClass } from "./ui/table";
 
 interface CompoundStatCardRow {
   label: string;
@@ -24,8 +26,14 @@ interface CompoundStatCardProps {
 export function CompoundStatCard({ compound, subtitle, rows, hero, progress, className, children }: CompoundStatCardProps) {
   const color = getCompoundColor(compound);
 
+  // Shared accent-tile recipe (see Card.tsx) — compound color drives a linear
+  // top-left → bottom-right gradient and a 1px inset accent ring. Mirrors the
+  // static-color accents (podium chips, insight cards, best-lap highlights).
   return (
-    <div className={`rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-3 ${className ?? ""}`}>
+    <div
+      className={`rounded-xl px-3 py-3 ${className ?? ""}`}
+      style={dynamicAccentCardStyle(color)}
+    >
       <div className="flex items-center gap-1.5 mb-1.5">
         <span
           className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
@@ -49,7 +57,7 @@ export function CompoundStatCard({ compound, subtitle, rows, hero, progress, cla
       <div className="text-xs text-zinc-400 space-y-1.5">
         {rows.map((row, i) => (
           <div key={i}>
-            {row.divider && <div className="border-t border-zinc-800 my-2" />}
+            {row.divider && <div className={`${tableRowClass} my-2`} />}
             <div className="flex justify-between">
               <span>{row.label}</span>
               <span className={row.className ?? "text-zinc-300 font-mono"}>

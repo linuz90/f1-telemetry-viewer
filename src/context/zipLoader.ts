@@ -1,100 +1,13 @@
 import JSZip from "jszip";
-import { resolveSessionMeta, toSlug } from "../utils/parseFilename";
 import { deduplicateSessions } from "../utils/deduplicateSessions";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
-import { isQualifyingSessionType } from "../utils/sessionTypes";
+import { buildSessionSummary } from "../utils/sessionSummary";
 
 export type LoadedSessionSummary = SessionSummary & { fileSize: number };
 
 export interface LoadResult {
   sessions: LoadedSessionSummary[];
   sessionData: Map<string, TelemetrySession>;
-}
-
-/** Build a SessionSummary from a parsed telemetry JSON and its filename. */
-function buildSummary(
-  relativePath: string,
-  json: TelemetrySession,
-  fileSize: number,
-): { summary: LoadedSessionSummary; valid: boolean } {
-  const slug = toSlug(relativePath);
-
-  let validLapCount = 0;
-  let lapIndicators: ("valid" | "invalid" | "best")[] | undefined;
-  let bestLapTime: string | undefined;
-  let bestLapTimeMs: number | undefined;
-  let aiDifficulty: number | undefined;
-  let isSpectator = false;
-
-  const sessionInfo = json["session-info"];
-  const parsed = resolveSessionMeta(relativePath, sessionInfo);
-  const isOnline = sessionInfo?.["network-game"] === 1;
-  aiDifficulty = isOnline ? 0 : (sessionInfo?.["ai-difficulty"] ?? 0);
-
-  let focusDriver = json["classification-data"]?.find(
-    (d) => d["is-player"],
-  );
-
-  // Spectator fallback: no player → pick driver with most valid laps
-  if (!focusDriver) {
-    isSpectator = true;
-    const drivers = json["classification-data"] ?? [];
-    let maxLaps = 0;
-    for (const d of drivers) {
-      const count = (d["session-history"]?.["lap-history-data"] ?? [])
-        .filter((l) => l["lap-time-in-ms"] > 0).length;
-      if (count > maxLaps) {
-        maxLaps = count;
-        focusDriver = d;
-      }
-    }
-  }
-
-  if (focusDriver) {
-    const laps = focusDriver["session-history"]?.["lap-history-data"] ?? [];
-    validLapCount = laps.filter((l) => l["lap-time-in-ms"] > 0).length;
-
-    const isQuali = isQualifyingSessionType(parsed.sessionType);
-    if (isQuali) {
-      const bestLapNum =
-        focusDriver["session-history"]?.["best-lap-time-lap-num"] ?? -1;
-      lapIndicators = laps
-        .filter((l) => l["lap-time-in-ms"] > 0)
-        .map((l, i) => {
-          const lapNum = i + 1;
-          if (lapNum === bestLapNum) return "best" as const;
-          return l["lap-valid-bit-flags"] === 15
-            ? ("valid" as const)
-            : ("invalid" as const);
-        });
-
-      if (bestLapNum > 0) {
-        const bestLap = laps[bestLapNum - 1];
-        if (bestLap?.["lap-time-str"]) {
-          bestLapTime = bestLap["lap-time-str"];
-          bestLapTimeMs = bestLap["lap-time-in-ms"];
-        }
-      }
-    }
-  }
-
-  return {
-    summary: {
-      relativePath,
-      slug,
-      ...parsed,
-      gameYear: json["game-year"],
-      packetFormat: json["packet-format"],
-      validLapCount,
-      lapIndicators,
-      bestLapTime,
-      bestLapTimeMs,
-      aiDifficulty,
-      isSpectator,
-      fileSize,
-    },
-    valid: validLapCount > 0,
-  };
 }
 
 function sortByDateDesc(sessions: SessionSummary[]) {
@@ -120,9 +33,9 @@ export async function loadZipFile(file: File): Promise<LoadResult> {
     try {
       const text = await entry.async("text");
       const json = JSON.parse(text) as TelemetrySession;
-      const { summary, valid } = buildSummary(relativePath, json, new Blob([text]).size);
+      const { summary, valid } = buildSessionSummary(relativePath, json, new Blob([text]).size);
       if (valid) {
-        sessions.push(summary);
+        sessions.push(summary as LoadedSessionSummary);
         sessionData.set(summary.slug, json);
       }
     } catch {
@@ -149,9 +62,9 @@ export async function loadJsonFiles(files: File[]): Promise<LoadResult> {
     try {
       const text = await file.text();
       const json = JSON.parse(text) as TelemetrySession;
-      const { summary, valid } = buildSummary(file.name, json, file.size);
+      const { summary, valid } = buildSessionSummary(file.name, json, file.size);
       if (valid) {
-        sessions.push(summary);
+        sessions.push(summary as LoadedSessionSummary);
         sessionData.set(summary.slug, json);
       }
     } catch {

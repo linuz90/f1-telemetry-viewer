@@ -1,11 +1,13 @@
+import { Bell, ChevronRight, FolderUp, Menu, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom";
-import { Bell, FolderUp, Menu, Upload, X } from "lucide-react";
-import { SessionList } from "./SessionList";
-import { ChangelogModal } from "./ChangelogModal";
-import { AppBrand } from "./AppBrand";
-import { useTelemetry } from "../context/TelemetryContext";
+import { Outlet, useLocation } from "react-router-dom";
 import changelog from "virtual:changelog";
+import { useTelemetry } from "../context/TelemetryContext";
+import { AppBrand } from "./AppBrand";
+import { BrandHomeLink } from "./BrandHomeLink";
+import { cardHighlight } from "./Card";
+import { ChangelogModal } from "./ChangelogModal";
+import { SessionList } from "./SessionList";
 
 const MIN_WIDTH = 250;
 const MAX_WIDTH = 480;
@@ -30,7 +32,9 @@ export function Layout() {
   const location = useLocation();
   const latestHash = changelog[0]?.hash ?? "";
   const [hasUnseen, setHasUnseen] = useState(
-    () => latestHash !== "" && localStorage.getItem(CHANGELOG_SEEN_KEY) !== latestHash,
+    () =>
+      latestHash !== "" &&
+      localStorage.getItem(CHANGELOG_SEEN_KEY) !== latestHash,
   );
   const dragging = useRef(false);
 
@@ -83,26 +87,27 @@ export function Layout() {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — faint right-edge inset highlight acts as a soft panel divider
+          against the slightly lighter main canvas, without re-adding a hard border. */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-30 border-r border-zinc-800/60 bg-black overflow-y-auto
+          sidebar-scroll
+          fixed inset-y-0 left-0 z-30 bg-black overflow-y-auto
           transition-transform duration-200 ease-in-out
           md:relative md:z-0 md:translate-x-0 md:shrink-0
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
         style={{ width }}
       >
-        <div className="p-4 border-b border-zinc-800/60">
+        <div className="w-px h-full absolute right-0 top-0 z-99 pointer-events-none bg-[rgba(255,255,255,0.08)]" />
+        <div className="p-4">
           <div className="flex items-center justify-between">
-            <Link to="/" className="text-lg font-bold tracking-tight hover:opacity-80 transition-opacity">
-              <AppBrand />
-            </Link>
+            <BrandHomeLink className="text-[15px] font-bold tracking-tight" />
             <div className="flex items-center gap-1">
               <button
                 onClick={openChangelog}
                 title="What's new"
-                className="relative rounded-lg p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+                className="relative rounded-lg p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/60 transition-colors"
               >
                 <Bell className="h-4 w-4" />
                 {hasUnseen && (
@@ -113,7 +118,7 @@ export function Layout() {
                 <button
                   onClick={() => setShowUploadModal(true)}
                   title="Load different data"
-                  className="rounded-lg p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+                  className="rounded-lg p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/60 transition-colors"
                 >
                   <FolderUp className="h-4 w-4" />
                 </button>
@@ -138,24 +143,35 @@ export function Layout() {
       />
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto bg-black">
+      <main className="flex-1 overflow-y-auto bg-canvas">
         {/* Mobile top bar */}
-        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-zinc-800/60 bg-black/90 backdrop-blur px-4 py-3 md:hidden">
+        <div className="sticky top-0 z-10 flex items-center gap-3 bg-canvas/85 backdrop-blur px-4 py-3 md:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+            className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 transition-colors"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <Link to="/" className="text-base font-bold tracking-tight">
-            <AppBrand />
-          </Link>
+          <BrandHomeLink className="text-[15px] font-bold tracking-tight" />
         </div>
 
         {mode === "demo" && (
-          <div className="border-b border-zinc-800/60 bg-gradient-to-r from-zinc-950 via-zinc-900/50 to-zinc-950 px-6 py-5">
-            <div className="mx-auto flex max-w-5xl items-center justify-between gap-6">
-              <div className="min-w-0">
+          <div className="px-6 pt-6 pb-2">
+            {/*
+              Two-layer background: base zinc gradient stays consistent with
+              the dashboard cards, then a radial red glow biased to the bottom-
+              right corner so the CTA itself feels like the source of the
+              accent. Kept low-opacity so it reads as ambient warmth, not a
+              solid red panel.
+            */}
+            <div
+              className={`relative mx-auto flex max-w-5xl items-center justify-between gap-6 overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-800/60 via-zinc-900/40 to-zinc-900/20 px-6 py-5 ${cardHighlight}`}
+            >
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(220,38,38,0.16),rgba(127,29,29,0.06)_45%,transparent_70%)]"
+              />
+              <div className="relative min-w-0">
                 <h2 className="text-lg font-bold tracking-tight">
                   <AppBrand />
                 </h2>
@@ -174,10 +190,10 @@ export function Layout() {
               </div>
               <button
                 onClick={() => setShowUploadModal(true)}
-                className="flex shrink-0 items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"
+                className="group relative flex shrink-0 items-center gap-1.5 rounded-xl bg-red-700/95 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition-colors shadow-lg shadow-red-950/40"
               >
-                <Upload className="h-3.5 w-3.5" />
                 Get started
+                <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
           </div>
