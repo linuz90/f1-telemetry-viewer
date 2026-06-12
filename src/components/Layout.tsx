@@ -156,7 +156,7 @@ export function Layout() {
         </div>
 
         {mode === "demo" && (
-          <div className="px-6 pt-6 pb-2">
+          <div className="mx-auto max-w-5xl px-6 pt-6 pb-2">
             {/*
               Two-layer background: base zinc gradient stays consistent with
               the dashboard cards, then a radial red glow biased to the bottom-
@@ -165,7 +165,7 @@ export function Layout() {
               solid red panel.
             */}
             <div
-              className={`relative mx-auto flex max-w-5xl items-center justify-between gap-6 overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-800/60 via-zinc-900/40 to-zinc-900/20 px-6 py-5 ${cardHighlight}`}
+              className={`relative flex items-center justify-between gap-6 overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-800/60 via-zinc-900/40 to-zinc-900/20 px-6 py-5 ${cardHighlight}`}
             >
               <div
                 aria-hidden
