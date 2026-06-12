@@ -200,9 +200,9 @@ export function TyreWearChart({
             />
           ))}
 
-          {pitLaps.map((lap) => (
+          {pitLaps.map((lap, i) => (
             <ReferenceLine
-              key={lap}
+              key={`pit-${lap}-${i}`}
               x={lap}
               stroke={CHART_THEME.muted}
               strokeDasharray="4 4"

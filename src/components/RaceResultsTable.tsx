@@ -1,17 +1,19 @@
 import { useState, useMemo } from "react";
-import type { TelemetrySession } from "../types/telemetry";
+import type { RaceControlEvent, TelemetrySession } from "../types/telemetry";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { msToLapTime } from "../utils/format";
 import { getCleanRaceLaps, getBestLapTime, driverTopSpeed, avgErsDeployMj, avgErsHarvestMj, getCompletedStints, RACE_PACE_TOOLTIP } from "../utils/stats";
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { FocusToggle } from "./ui/FocusToggle";
 import { tableRowClass } from "./ui/table";
+import { formatPenaltySummary } from "../utils/raceControl";
 
 interface RaceResultsTableProps {
   session: TelemetrySession;
   focusedDriverIndex: number;
+  raceControlEvents?: RaceControlEvent[];
 }
 
 type SortKey = "pos" | "bestLap" | "racePace" | "gap" | "topSpeed" | "ers" | "ersHarv";
@@ -29,7 +31,11 @@ function SortIcon({ column, sortKey, sortDir, side = "right" }: { column: SortKe
  * Final classification table for race sessions.
  * Uses tyre-stint-history-v2 when available, falls back to classification-data.
  */
-export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTableProps) {
+export function RaceResultsTable({
+  session,
+  focusedDriverIndex,
+  raceControlEvents = [],
+}: RaceResultsTableProps) {
   const [focusedOnly, toggleFocusedOnly] = usePlayerOnly();
   const [sortKey, setSortKey] = useState<SortKey>("pos");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -57,6 +63,79 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
     return map;
   }, [drivers]);
 
+  const penaltiesByDriver = useMemo(() => {
+    const map = new Map<string, RaceControlEvent[]>();
+    for (const event of raceControlEvents) {
+      if (event["message-type"] !== "PENALTY" || !event["driver-info"]?.name) {
+        continue;
+      }
+      const driverName = event["driver-info"].name;
+      const penalties = map.get(driverName) ?? [];
+      penalties.push(event);
+      map.set(driverName, penalties);
+    }
+    return map;
+  }, [raceControlEvents]);
+
+  const filteredStintHistory = useMemo(() => {
+    if (!stintHistory?.length) return [];
+    return focusedOnly
+      ? stintHistory.filter((entry) => entry.name === focusedName)
+      : stintHistory;
+  }, [focusedName, focusedOnly, stintHistory]);
+
+  const sortedStintHistory = useMemo(() => {
+    const arr = [...filteredStintHistory];
+    arr.sort((a, b) => {
+      const statsA = driverStats.get(a.name);
+      const statsB = driverStats.get(b.name);
+      let cmp = 0;
+      switch (sortKey) {
+        case "pos":
+          cmp = (a.position ?? 99) - (b.position ?? 99);
+          break;
+        case "bestLap": {
+          const la = statsA?.bestLap || Infinity;
+          const lb = statsB?.bestLap || Infinity;
+          cmp = la - lb;
+          break;
+        }
+        case "racePace": {
+          const pa = statsA?.racePace || Infinity;
+          const pb = statsB?.racePace || Infinity;
+          cmp = pa - pb;
+          break;
+        }
+        case "topSpeed": {
+          const sa = statsA?.topSpeed || 0;
+          const sb = statsB?.topSpeed || 0;
+          cmp = sb - sa;
+          break;
+        }
+        case "ers": {
+          const ea = statsA?.ers || 0;
+          const eb = statsB?.ers || 0;
+          cmp = eb - ea;
+          break;
+        }
+        case "ersHarv": {
+          const ha = statsA?.ersHarv || 0;
+          const hb = statsB?.ersHarv || 0;
+          cmp = hb - ha;
+          break;
+        }
+        case "gap": {
+          const ga = typeof a["delta-to-leader"] === "number" ? a["delta-to-leader"] : 0;
+          const gb = typeof b["delta-to-leader"] === "number" ? b["delta-to-leader"] : 0;
+          cmp = ga - gb;
+          break;
+        }
+      }
+      return sortDir === "desc" ? -cmp : cmp;
+    });
+    return arr;
+  }, [filteredStintHistory, sortKey, sortDir, driverStats]);
+
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
       if (sortDir === "asc") {
@@ -76,62 +155,6 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
 
   // Use tyre-stint-history-v2 if available (has clean per-driver race results)
   if (stintHistory?.length) {
-    const filtered = focusedOnly
-      ? stintHistory.filter((entry) => entry.name === focusedName)
-      : stintHistory;
-
-    const sorted = useMemo(() => {
-      const arr = [...filtered];
-      arr.sort((a, b) => {
-        const statsA = driverStats.get(a.name);
-        const statsB = driverStats.get(b.name);
-        let cmp = 0;
-        switch (sortKey) {
-          case "pos":
-            cmp = (a.position ?? 99) - (b.position ?? 99);
-            break;
-          case "bestLap": {
-            const la = statsA?.bestLap || Infinity;
-            const lb = statsB?.bestLap || Infinity;
-            cmp = la - lb;
-            break;
-          }
-          case "racePace": {
-            const pa = statsA?.racePace || Infinity;
-            const pb = statsB?.racePace || Infinity;
-            cmp = pa - pb;
-            break;
-          }
-          case "topSpeed": {
-            const sa = statsA?.topSpeed || 0;
-            const sb = statsB?.topSpeed || 0;
-            cmp = sb - sa; // highest first by default
-            break;
-          }
-          case "ers": {
-            const ea = statsA?.ers || 0;
-            const eb = statsB?.ers || 0;
-            cmp = eb - ea; // highest first by default
-            break;
-          }
-          case "ersHarv": {
-            const ha = statsA?.ersHarv || 0;
-            const hb = statsB?.ersHarv || 0;
-            cmp = hb - ha; // highest first by default
-            break;
-          }
-          case "gap": {
-            const ga = typeof a["delta-to-leader"] === "number" ? a["delta-to-leader"] : 0;
-            const gb = typeof b["delta-to-leader"] === "number" ? b["delta-to-leader"] : 0;
-            cmp = ga - gb;
-            break;
-          }
-        }
-        return sortDir === "desc" ? -cmp : cmp;
-      });
-      return arr;
-    }, [filtered, sortKey, sortDir, driverStats]);
-
     // Find best values for highlighting
     const bestLapMs = Math.min(...[...driverStats.values()].map((s) => s.bestLap).filter((v) => v > 0));
     const bestPaceMs = Math.min(...[...driverStats.values()].map((s) => s.racePace).filter((v) => v > 0));
@@ -185,7 +208,7 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
               </tr>
             </thead>
             <tbody>
-              {sorted.map((entry, i) => {
+              {sortedStintHistory.map((entry) => {
                 const isFocused = entry.name === focusedName;
                 const gap = entry["delta-to-leader"];
                 const status = entry["result-status"];
@@ -215,10 +238,11 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
                 const isBestSpeed = topSpeed > 0 && Math.abs(topSpeed - bestSpeedKmh) < 1;
                 const isBestErs = ers > 0 && Math.abs(ers - bestErs) < 0.1;
                 const isBestErsHarv = ersHarv > 0 && Math.abs(ersHarv - bestErsHarv) < 0.1;
+                const penalties = penaltiesByDriver.get(entry.name) ?? [];
 
                 return (
                   <tr
-                    key={i}
+                    key={`${entry.name}-${entry.team}`}
                     className={`${tableRowClass} ${isFocused ? "bg-zinc-800/40 text-white font-medium" : ""}`}
                   >
                     <td className="py-1.5 px-2">{entry.position}</td>
@@ -227,7 +251,10 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
                         className="inline-block w-1 h-3 rounded-sm mr-1.5 align-middle"
                         style={{ backgroundColor: getTeamColor(entry.team) }}
                       />
-                      {entry.name}
+                      <span className="inline-flex items-center gap-1.5">
+                        {entry.name}
+                        <PenaltyBadge penalties={penalties} />
+                      </span>
                     </td>
                     <td className="py-1.5 px-2 text-zinc-400">{getTeamName(entry.team)}</td>
                     <td className={`py-1.5 px-2 text-right font-mono ${status === "DNF" || status === "DSQ" ? "text-behind" : ""}`}>
@@ -293,6 +320,7 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
           <tbody>
             {fallbackSorted.map((d) => {
               const fc = d["final-classification"]!;
+              const penalties = penaltiesByDriver.get(d["driver-name"]) ?? [];
               return (
                 <tr
                   key={d.index}
@@ -304,7 +332,10 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
                       className="inline-block w-1 h-3 rounded-sm mr-1.5 align-middle"
                       style={{ backgroundColor: getTeamColor(d.team) }}
                     />
-                    {d["driver-name"]}
+                    <span className="inline-flex items-center gap-1.5">
+                      {d["driver-name"]}
+                      <PenaltyBadge penalties={penalties} />
+                    </span>
                   </td>
                   <td className="py-1.5 px-2 text-zinc-400">{getTeamName(d.team)}</td>
                   <td className="py-1.5 px-2 text-right font-mono">
@@ -320,5 +351,18 @@ export function RaceResultsTable({ session, focusedDriverIndex }: RaceResultsTab
         </table>
       </div>
     </div>
+  );
+}
+
+function PenaltyBadge({ penalties }: { penalties: RaceControlEvent[] }) {
+  if (penalties.length === 0) return null;
+
+  return (
+    <Tooltip text={penalties.map(formatPenaltySummary).join(" | ")}>
+      <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-bold text-amber-300">
+        <AlertTriangle className="size-2.5" />
+        {penalties.length}
+      </span>
+    </Tooltip>
   );
 }

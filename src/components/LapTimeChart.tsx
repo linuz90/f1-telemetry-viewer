@@ -258,9 +258,9 @@ export function LapTimeChart({
           )}
 
           {/* Pit stop markers */}
-          {pitLaps.map((lap) => (
+          {pitLaps.map((lap, i) => (
             <ReferenceLine
-              key={lap}
+              key={`pit-${lap}-${i}`}
               yAxisId="time"
               x={lap}
               stroke={CHART_THEME.muted}
@@ -320,14 +320,14 @@ export function LapTimeChart({
             dot={(props) => {
               const { cx, cy, index } = props as { cx?: number; cy?: number; index?: number };
               const entry = index != null ? data[index] : undefined;
-              if (!entry || cx == null || cy == null) return <circle key={index} cx={0} cy={0} r={0} />;
+              if (!entry || cx == null || cy == null) return <circle key={`lap-dot-${index}`} cx={0} cy={0} r={0} />;
 
               // SC/VSC dot styling
               if (entry.isSC || entry.isVSC) {
                 const color = entry.isSC ? SC_COLORS.SAFETY_CAR : SC_COLORS.VIRTUAL_SAFETY_CAR;
                 return (
                   <circle
-                    key={index}
+                    key={`lap-dot-${index}`}
                     cx={cx}
                     cy={cy}
                     r={4}
@@ -342,7 +342,7 @@ export function LapTimeChart({
               if (!entry.valid) {
                 // Invalid: larger red circle with X
                 return (
-                  <g key={index}>
+                  <g key={`lap-dot-${index}`}>
                     <circle cx={cx} cy={cy} r={5} fill={CHART_THEME.behind} fillOpacity={0.2} stroke={CHART_THEME.behind} strokeWidth={2} />
                     <line x1={cx - 2.5} y1={cy - 2.5} x2={cx + 2.5} y2={cy + 2.5} stroke={CHART_THEME.behind} strokeWidth={1.5} />
                     <line x1={cx + 2.5} y1={cy - 2.5} x2={cx - 2.5} y2={cy + 2.5} stroke={CHART_THEME.behind} strokeWidth={1.5} />
@@ -353,7 +353,7 @@ export function LapTimeChart({
               const color = isBest ? CHART_THEME.best : CHART_THEME.player;
               return (
                 <circle
-                  key={index}
+                  key={`lap-dot-${index}`}
                   cx={cx}
                   cy={cy}
                   r={isBest ? 5 : 3}
@@ -404,7 +404,7 @@ export function LapTimeChart({
             </tr>
           );
 
-          const renderLapRow = (d: typeof data[number]) => {
+          const renderLapRow = (d: typeof data[number], rowKey: string) => {
             const isBestLap = d.valid && Math.abs(d.timeSec - bestTime) < 0.001;
             const isBestS1 = d.valid && Math.abs(d.s1 - bestS1) < 0.001;
             const isBestS2 = d.valid && Math.abs(d.s2 - bestS2) < 0.001;
@@ -417,7 +417,7 @@ export function LapTimeChart({
                 : "";
             return (
               <tr
-                key={d.lap}
+                key={rowKey}
                 className={`${tableRowClass} ${!d.valid ? "bg-red-500/10" : scBg}`}
               >
                 <td className="py-1 px-2">
@@ -499,7 +499,7 @@ export function LapTimeChart({
                           </div>
                         </td>
                       </tr>,
-                      ...stintLaps.map(renderLapRow),
+                      ...stintLaps.map((lap, li) => renderLapRow(lap, `stint-${si}-lap-${lap.lap}-${li}`)),
                     ];
                   })}
                 </tbody>
@@ -514,7 +514,7 @@ export function LapTimeChart({
                 {headerRow}
               </thead>
               <tbody>
-                {data.map(renderLapRow)}
+                {data.map((lap, i) => renderLapRow(lap, `lap-${lap.lap}-${i}`))}
               </tbody>
             </table>
           );

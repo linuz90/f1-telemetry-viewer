@@ -8,6 +8,11 @@
    * sit on. */
   --color-shell: #000000;
   --color-canvas: hsl(240deg, 14.3%, 3.75%);
+  --color-card-surface: color-mix(
+    in oklab,
+    var(--color-canvas) 30%,
+    theme("--color-zinc-900") 70%
+  );
 
   /* Semantic palette — clear UI states mapped to specific hues. Use these
    * (text-best, bg-ahead/10, ring-behind/15, …) for anything that carries one
@@ -65,4 +70,84 @@ body {
 .recharts-wrapper:focus,
 .recharts-surface:focus {
   outline: none;
+}
+
+/* Scroll-driven masks hide the fade at the edge you're already touching. */
+@property --scroll-mask-top-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --scroll-mask-bottom-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@keyframes scroll-mask-vertical {
+  0% {
+    --scroll-mask-top-fade: 0;
+  }
+  10%,
+  100% {
+    --scroll-mask-top-fade: var(--scroll-mask-fade-distance, 1rem);
+  }
+  0%,
+  90% {
+    --scroll-mask-bottom-fade: var(--scroll-mask-fade-distance, 1rem);
+  }
+  100% {
+    --scroll-mask-bottom-fade: 0;
+  }
+}
+
+@utility scroll-mask-vertical {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: scroll()) {
+      --scroll-mask-fade-distance: 1rem;
+      mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        black var(--scroll-mask-top-fade, 1rem),
+        black calc(100% - var(--scroll-mask-bottom-fade, 1rem)),
+        transparent
+      );
+      animation: scroll-mask-vertical linear;
+      animation-timeline: scroll(self block);
+    }
+  }
+}
+
+@utility scroll-mask-vertical-* {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: scroll()) {
+      --scroll-mask-fade-distance: --value([ *]);
+      mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        black var(--scroll-mask-top-fade, --value([ *])),
+        black calc(100% - var(--scroll-mask-bottom-fade, --value([ *]))),
+        transparent
+      );
+      animation: scroll-mask-vertical linear;
+      animation-timeline: scroll(self block);
+    }
+  }
+}
+
+@utility scroll-mask-down-* {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: scroll()) {
+      --scroll-mask-fade-distance: --value([ *]);
+      mask-image: linear-gradient(
+        to top,
+        transparent,
+        black var(--scroll-mask-bottom-fade, --value([ *])),
+        black
+      );
+      animation: scroll-mask-vertical linear;
+      animation-timeline: scroll(self block);
+    }
+  }
 }

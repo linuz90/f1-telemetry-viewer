@@ -22,10 +22,12 @@ import { CompoundLapComparison } from "../components/CompoundLapComparison";
 import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
 import { PositionChart } from "../components/PositionChart";
 import { RaceResultsTable } from "../components/RaceResultsTable";
+import { RaceControlTimeline } from "../components/RaceControlTimeline";
 import { DamageTimeline } from "../components/DamageTimeline";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
 import { DuplicateNotice } from "../components/DuplicateNotice";
+import { getRaceControlEvents, raceControlEventsToOvertakes } from "../utils/raceControl";
 
 export function RaceSessionView({ session, slug }: { session: TelemetrySession; slug: string }) {
   const drivers = session["classification-data"] ?? [];
@@ -77,6 +79,14 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     ...stints.slice(1).map((s) => s["start-lap"]),
   ]);
   const perLapInfo = focusedDriver?.["per-lap-info"] ?? [];
+  const raceControlEvents = useMemo(
+    () => getRaceControlEvents(session),
+    [session],
+  );
+  const raceControlOvertakes = useMemo(
+    () => raceControlEventsToOvertakes(raceControlEvents),
+    [raceControlEvents],
+  );
 
   // Derive rival data
   const rival = useMemo(
@@ -241,13 +251,28 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
           positionHistory={session["position-history"] ?? []}
           playerName={focusedDriver?.["driver-name"] ?? ""}
           rivalName={rival?.["driver-name"]}
-          overtakes={session.overtakes?.records.filter((ot) => !pitAffectedLaps.has(ot["overtaking-driver-lap"]))}
+          overtakes={(raceControlOvertakes.length > 0 ? raceControlOvertakes : session.overtakes?.records)
+            ?.filter((ot) => !pitAffectedLaps.has(ot["overtaking-driver-lap"]))}
         />
       </Card>
 
+      {/* Race control */}
+      {raceControlEvents.length > 0 && (
+        <Card as="section">
+          <RaceControlTimeline
+            events={raceControlEvents}
+            focusedDriver={focusedDriver}
+          />
+        </Card>
+      )}
+
       {/* Results table */}
       <Card as="section">
-        <RaceResultsTable session={session} focusedDriverIndex={focusedDriverIndex} />
+        <RaceResultsTable
+          session={session}
+          focusedDriverIndex={focusedDriverIndex}
+          raceControlEvents={raceControlEvents}
+        />
       </Card>
 
       <DuplicateNotice count={sessionMeta?.duplicateCount ?? 0} />

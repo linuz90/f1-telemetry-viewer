@@ -128,7 +128,7 @@ export function DriverComparisonPicker({
         const isActive = selectedIndex === d.index;
         return (
           <button
-            key={d.index}
+            key={`${preset.label}-${d.index}`}
             onClick={() => onSelect(isActive ? null : d.index)}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
               isActive

@@ -173,7 +173,7 @@ export function PositionChart({ positionHistory, playerName, rivalName, overtake
             if (position == null) return null;
             return (
               <ReferenceDot
-                key={`ot-${i}`}
+                key={`ot-${ot["overtake-id"] ?? i}`}
                 x={lap}
                 y={position}
                 r={5}

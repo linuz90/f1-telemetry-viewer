@@ -152,6 +152,7 @@ export interface TelemetrySession {
   "tyre-stint-history-v2": TyreStintHistoryV2Entry[];
   records: Records;
   overtakes: { records: OvertakeRecord[] };
+  "race-control"?: RaceControlEvent[];
   debug: DebugInfo;
   "game-year": number;
   "packet-format"?: number;
@@ -241,6 +242,63 @@ export interface DriverData {
   "tyre-set-history": TyreStint[];
   "per-lap-info": PerLapInfo[];
   "car-setup"?: CarSetup | null;
+  "race-control"?: RaceControlEvent[];
+  "warning-penalty-history"?: WarningPenaltyEntry[];
+}
+
+export interface RaceControlDriverInfo {
+  name: string;
+  team: string;
+  "driver-number": number;
+}
+
+export interface RaceControlEvent {
+  id: number;
+  "lap-number": number | null;
+  timestamp: number;
+  "message-type": string;
+  "involved-drivers": number[];
+  "driver-info"?: RaceControlDriverInfo;
+  "driver-1-info"?: RaceControlDriverInfo;
+  "driver-2-info"?: RaceControlDriverInfo;
+  "other-driver-info"?: RaceControlDriverInfo;
+  "overtaker-info"?: RaceControlDriverInfo;
+  "overtaken-info"?: RaceControlDriverInfo;
+  "session-fastest-driver-info"?: RaceControlDriverInfo;
+  "vehicle-index"?: number;
+  "other-vehicle-index"?: number;
+  "driver-index"?: number;
+  "overtaker-index"?: number;
+  "overtaken-index"?: number;
+  "penalty-type"?: string;
+  "infringement-type"?: string;
+  time?: number;
+  "places-gained"?: number;
+  reason?: string;
+  "damaged-part"?: string;
+  "old-value"?: number;
+  "new-value"?: number;
+  speed?: number;
+  "is-personal-fastest"?: boolean;
+  "is-session-fastest"?: boolean;
+  "session-fastest"?: number;
+  "lap-time-ms"?: number;
+  "old-tyre-compound"?: string;
+  "new-tyre-compound"?: string;
+  "old-tyre-index"?: number;
+  "new-tyre-index"?: number;
+  "num-lights"?: number;
+  [key: string]: unknown;
+}
+
+export interface WarningPenaltyEntry {
+  "entry-type": string;
+  "old-value": number;
+  "new-value": number;
+  "lap-number": number;
+  "sector-number"?: string;
+  "distance-from-start"?: number;
+  "lap-progress-percent"?: number;
 }
 
 export interface ParticipantData {
@@ -440,6 +498,9 @@ export interface OvertakeRecord {
   "overtaking-driver-name": string;
   "overtaken-driver-name": string;
   "overtaking-driver-lap": number;
+  "overtake-id"?: number;
+  "overtaking-driver-index"?: number;
+  "overtaken-driver-index"?: number;
 }
 
 export interface DebugInfo {
