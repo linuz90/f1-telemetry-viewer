@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { TrackFlag } from "../TrackFlag";
 import type { SessionSummary } from "../../types/telemetry";
 import { formatShortDate } from "../../utils/format";
+import { sessionFormulaPath } from "../../utils/routes";
+import { getFormulaComparisonKey } from "../../utils/sessionTypes";
 import { isProblemStatus } from "./helpers";
 
 // Race-by-race progression: two bars per online race (grid → finish).
@@ -172,10 +174,14 @@ function ProgressionColumn({ session }: { session: SessionSummary }) {
   const finishLabelClass = isDnf ? "text-behind" : "text-zinc-200";
   const gridLabel = grid ? `P${grid}` : "—";
   const title = `${session.track} · ${formatShortDate(session.date)}\nGrid ${gridLabel} → Finish ${isDnf ? "DNF" : `P${result.position}`}`;
+  const to = sessionFormulaPath(
+    session.slug,
+    getFormulaComparisonKey(session.formula, session.gameYear),
+  );
 
   return (
     <Link
-      to={`/session/${session.slug}`}
+      to={to}
       title={title}
       className="group flex min-w-0 flex-col items-center gap-2.5"
     >

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft } from "lucide-react";
 import { useTelemetry } from "../context/TelemetryContext";
 import { AppBrand } from "./AppBrand";
+import { dashboardPath } from "../utils/routes";
 
 interface BrandHomeLinkProps {
   className?: string;
@@ -12,13 +13,14 @@ export function BrandHomeLink({ className }: BrandHomeLinkProps) {
   const location = useLocation();
   const { mode } = useTelemetry();
   const isDashboard = location.pathname === "/";
+  const homePath = dashboardPath(new URLSearchParams(location.search).get("formula"));
   // In the prod no-data demo, the home page is positioned as a preview rather
   // than the user's own dashboard — so the back-link reads "Demo" to match.
   const homeLabel = mode === "demo" ? "Demo" : "Dashboard";
 
   return (
     <Link
-      to="/"
+      to={homePath}
       className={`relative inline-flex items-center hover:opacity-80 transition-opacity ${className ?? ""}`}
     >
       {/* Invisible spacer keeps the container height stable while children are absolutely positioned for crossfade */}

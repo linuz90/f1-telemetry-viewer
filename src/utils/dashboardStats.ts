@@ -264,6 +264,8 @@ export interface TrackInsight {
   scope: InsightScope;
   headline: string;
   detail: string;
+  /** Single-session highlights use this as their primary destination. */
+  sessionSlug?: string;
   /** Underlying data depth — used to rank insights when more than 9 qualify. */
   sampleSize: number;
 }
@@ -535,6 +537,7 @@ function buildHotStreakInsight(
     scope,
     headline: `${streak}`,
     detail: `consecutive points finishes · last P${pos ?? "?"}`,
+    sessionSlug: mostRecent.slug,
     sampleSize: streak,
   };
 }
@@ -560,6 +563,7 @@ function buildComebackInsight(
     scope,
     headline: `+${winner.gain}`,
     detail: `P${result.gridPosition} → P${result.position} · ${formatShortDate(winner.session.date)}`,
+    sessionSlug: winner.session.slug,
     sampleSize: withGain.length,
   };
 }
@@ -698,6 +702,7 @@ function buildFastestLapKingInsight(
     scope,
     headline: `${flSessions.length}`,
     detail: `races with fastest lap · last at ${mostRecent.track}`,
+    sessionSlug: mostRecent.slug,
     sampleSize: flSessions.length,
   };
 }

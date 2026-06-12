@@ -22,6 +22,7 @@ import { TrackFlag } from "../components/TrackFlag";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { CHART_THEME, TOOLTIP_STYLE, SECTOR_COLORS } from "../utils/colors";
 import { compareFormulaComparisonKeys, getFormulaComparisonAliases, getFormulaComparisonKey, getFormulaLabel, shouldShowFormulaLabel } from "../utils/sessionTypes";
+import { dashboardPath, sessionFormulaPath } from "../utils/routes";
 import { accentCardClass, cardClass, cardClassFeature } from "../components/Card";
 import { Upload, ArrowLeft } from "lucide-react";
 import { CarSetupCard } from "../components/CarSetupCard";
@@ -179,6 +180,11 @@ export function TrackProgressPage() {
 
   // Resolve the original (display) track name from session data
   const displayTrackName = allTrackSessions.length > 0 ? allTrackSessions[0].track : trackId ?? "";
+  const backToDashboardPath = dashboardPath(
+    requestedFormula?.key ??
+      requestedFormulaKey ??
+      (formulaOptions.length > 0 ? activeFormulaKey : null),
+  );
 
   useEffect(() => {
     if (!trackSessions.length) {
@@ -314,7 +320,7 @@ export function TrackProgressPage() {
             </button>
           ) : (
             <Link
-              to="/"
+              to={backToDashboardPath}
               className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
             >
               Back to dashboard
@@ -769,7 +775,7 @@ export function TrackProgressPage() {
               <h3 className="text-sm font-semibold text-zinc-300 mb-1">Your Best Qualifying Setup</h3>
               <p className="text-xs text-zinc-500 mb-4">
                 From{" "}
-                <Link to={`/session/${bestQualiSession.summary.slug}`} className="text-zinc-400 hover:text-zinc-200 transition-colors">
+                <Link to={sessionFormulaPath(bestQualiSession.summary.slug, activeFormulaKey)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
                   {formatSessionType(bestQualiSession.summary.sessionType, bestQualiSession.summary.formula)} · {formatDate(bestQualiSession.summary.date)} · {msToLapTime(bestQualiSession.bestLapMs)}
                 </Link>
               </p>
@@ -949,7 +955,7 @@ export function TrackProgressPage() {
               <h3 className="text-sm font-semibold text-zinc-300 mb-1">Your Best Race Setup</h3>
               <p className="text-xs text-zinc-500 mb-4">
                 From{" "}
-                <Link to={`/session/${bestRaceSession.summary.slug}`} className="text-zinc-400 hover:text-zinc-200 transition-colors">
+                <Link to={sessionFormulaPath(bestRaceSession.summary.slug, activeFormulaKey)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
                   {formatSessionType(bestRaceSession.summary.sessionType, bestRaceSession.summary.formula)} · {formatDate(bestRaceSession.summary.date)} · {msToLapTime(bestRaceSession.bestLapMs)}
                 </Link>
               </p>
@@ -987,7 +993,7 @@ export function TrackProgressPage() {
             return (
               <SessionRow
                 key={d.summary.relativePath}
-                to={`/session/${d.summary.slug}`}
+                to={sessionFormulaPath(d.summary.slug, activeFormulaKey)}
                 leading={
                   <>
                     <span className="text-sm leading-none">

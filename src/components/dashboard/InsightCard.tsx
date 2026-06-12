@@ -29,6 +29,7 @@ import { ACCENT_TOKENS, accentCardClass, type AccentColor } from "../Card";
 import { TrackFlag } from "../TrackFlag";
 import { TrackLayout } from "../TrackLayout";
 import { trackFormulaPath } from "./helpers";
+import { sessionFormulaPath } from "../../utils/routes";
 
 interface InsightStyle {
   title: string;
@@ -109,9 +110,13 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
   const style = INSIGHT_STYLES[insight.kind];
   const tokens = ACCENT_TOKENS[style.accent];
   const Icon = style.icon;
+  const to = insight.sessionSlug
+    ? sessionFormulaPath(insight.sessionSlug, insight.formulaKey)
+    : trackFormulaPath(insight.track, insight.formulaKey);
+
   return (
     <Link
-      to={trackFormulaPath(insight.track, insight.formulaKey)}
+      to={to}
       className={`relative block overflow-hidden rounded-2xl ${accentCardClass(style.accent)} p-3.5 transition-all hover:brightness-125`}
     >
       <TrackLayout

@@ -3,6 +3,7 @@ import { Upload, ArrowLeft } from "lucide-react";
 import { useSession } from "../hooks/useSession";
 import { useTelemetry } from "../context/TelemetryContext";
 import { isRaceSession } from "../utils/stats";
+import { dashboardPath } from "../utils/routes";
 import { RaceSessionView } from "./RaceSessionView";
 import { QualifyingSessionView } from "./QualifyingSessionView";
 
@@ -16,6 +17,9 @@ export function SessionPage() {
 
   const { session, loading, error } = useSession(slug);
   const { mode, sessions, setShowUploadModal } = useTelemetry();
+  const backToDashboardPath = dashboardPath(
+    new URLSearchParams(location.search).get("formula"),
+  );
 
   if (loading) {
     return (
@@ -59,7 +63,7 @@ export function SessionPage() {
                 Upload telemetry
               </button>
               <Link
-                to="/"
+                to={backToDashboardPath}
                 className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
               >
                 Back to dashboard
@@ -101,7 +105,7 @@ export function SessionPage() {
             </button>
           ) : (
             <Link
-              to="/"
+              to={backToDashboardPath}
               className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
             >
               Back to dashboard
