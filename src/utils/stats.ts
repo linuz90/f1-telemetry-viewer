@@ -7,7 +7,7 @@ import type {
   TyreStintBasic,
   TyreWearEntry,
 } from "../types/telemetry";
-import { isLapValid } from "./format";
+import { bestSectorTimeMs, isLapValid, sectorTimeMs } from "./format";
 import { isRaceSession as isRaceTelemetrySession } from "./sessionTypes";
 
 /** Find the player driver in a session */
@@ -399,12 +399,9 @@ export function calculateCumulativeDeltas(
       lap: i + 1,
       delta: cumulative / 1000, // convert to seconds for display
       lapDelta: lapDelta / 1000,
-      s1Delta:
-        (pLap["sector-1-time-in-ms"] - rLap["sector-1-time-in-ms"]) / 1000,
-      s2Delta:
-        (pLap["sector-2-time-in-ms"] - rLap["sector-2-time-in-ms"]) / 1000,
-      s3Delta:
-        (pLap["sector-3-time-in-ms"] - rLap["sector-3-time-in-ms"]) / 1000,
+      s1Delta: (sectorTimeMs(pLap, 1) - sectorTimeMs(rLap, 1)) / 1000,
+      s2Delta: (sectorTimeMs(pLap, 2) - sectorTimeMs(rLap, 2)) / 1000,
+      s3Delta: (sectorTimeMs(pLap, 3) - sectorTimeMs(rLap, 3)) / 1000,
       playerPit: playerPitLaps.includes(i + 1),
       rivalPit: rivalPitLaps.includes(i + 1),
     });
@@ -544,17 +541,17 @@ export function generateInsights(
     const rivalCleanLaps = getCleanRaceLaps(rival);
     if (playerCleanLaps.length > 0 && rivalCleanLaps.length > 0) {
       const sectorKeys = [
-        { key: "sector-1-time-in-ms" as const, label: "S1" },
-        { key: "sector-2-time-in-ms" as const, label: "S2" },
-        { key: "sector-3-time-in-ms" as const, label: "S3" },
-      ];
+        { sector: 1, label: "S1" },
+        { sector: 2, label: "S2" },
+        { sector: 3, label: "S3" },
+      ] as const;
 
       const parts: string[] = [];
       let gains = 0;
       let losses = 0;
-      for (const { key, label } of sectorKeys) {
-        const pAvg = playerCleanLaps.reduce((s, l) => s + l[key], 0) / playerCleanLaps.length;
-        const rAvg = rivalCleanLaps.reduce((s, l) => s + l[key], 0) / rivalCleanLaps.length;
+      for (const { sector, label } of sectorKeys) {
+        const pAvg = playerCleanLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) / playerCleanLaps.length;
+        const rAvg = rivalCleanLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) / rivalCleanLaps.length;
         const d = (pAvg - rAvg) / 1000;
         parts.push(`${label}: ${d <= 0 ? "" : "+"}${d.toFixed(3)}s`);
         if (d < -0.001) gains++;
@@ -762,10 +759,10 @@ export function generateInsights(
     const playerCleanLaps2 = getCleanRaceLaps(player);
     if (playerCleanLaps2.length > 0) {
       const sectorKeys = [
-        { key: "sector-1-time-in-ms" as const, label: "S1" },
-        { key: "sector-2-time-in-ms" as const, label: "S2" },
-        { key: "sector-3-time-in-ms" as const, label: "S3" },
-      ];
+        { sector: 1, label: "S1" },
+        { sector: 2, label: "S2" },
+        { sector: 3, label: "S3" },
+      ] as const;
 
       const sectorRankings: {
         label: string;
@@ -777,13 +774,13 @@ export function generateInsights(
         p2Driver: string;
       }[] = [];
 
-      for (const { key, label } of sectorKeys) {
+      for (const { sector, label } of sectorKeys) {
         const ranking: { driver: DriverData; avg: number }[] = [];
         for (const d of allDrivers) {
           const clean = getCleanRaceLaps(d);
           if (!clean.length) continue;
           const avg =
-            clean.reduce((s, l) => s + l[key], 0) / clean.length;
+            clean.reduce((s, l) => s + sectorTimeMs(l, sector), 0) / clean.length;
           if (avg > 0) ranking.push({ driver: d, avg });
         }
         ranking.sort((a, b) => a.avg - b.avg);
@@ -1178,10 +1175,10 @@ export function generateQualiInsights(
   const playerValid = getValidLaps(player["session-history"]["lap-history-data"]);
   if (playerValid.length > 0) {
     const sectorKeys = [
-      { key: "sector-1-time-in-ms" as const, label: "S1" },
-      { key: "sector-2-time-in-ms" as const, label: "S2" },
-      { key: "sector-3-time-in-ms" as const, label: "S3" },
-    ];
+      { sector: 1, label: "S1" },
+      { sector: 2, label: "S2" },
+      { sector: 3, label: "S3" },
+    ] as const;
 
     const sectorRankings: {
       label: string;
@@ -1193,12 +1190,12 @@ export function generateQualiInsights(
       p2Driver: string;
     }[] = [];
 
-    for (const { key, label } of sectorKeys) {
+    for (const { sector, label } of sectorKeys) {
       const ranking: { driver: DriverData; best: number }[] = [];
       for (const d of allDrivers) {
         const valid = getValidLaps(d["session-history"]["lap-history-data"]);
         if (!valid.length) continue;
-        const best = Math.min(...valid.map((l) => l[key]));
+        const best = bestSectorTimeMs(valid, sector);
         if (best > 0) ranking.push({ driver: d, best });
       }
       ranking.sort((a, b) => a.best - b.best);
@@ -1255,12 +1252,12 @@ export function generateQualiInsights(
     }
 
     // 4. Theoretical best lap
-    const bestS1 = Math.min(...playerValid.map((l) => l["sector-1-time-in-ms"]));
-    const bestS2 = Math.min(...playerValid.map((l) => l["sector-2-time-in-ms"]));
-    const bestS3 = Math.min(...playerValid.map((l) => l["sector-3-time-in-ms"]));
+    const bestS1 = bestSectorTimeMs(playerValid, 1);
+    const bestS2 = bestSectorTimeMs(playerValid, 2);
+    const bestS3 = bestSectorTimeMs(playerValid, 3);
     const theoretical = bestS1 + bestS2 + bestS3;
     const actualBest = getBestLapTime(player["session-history"]["lap-history-data"]);
-    if (actualBest > 0 && theoretical < actualBest) {
+    if (bestS1 > 0 && bestS2 > 0 && bestS3 > 0 && actualBest > 0 && theoretical < actualBest) {
       const gap = actualBest - theoretical;
       if (gap >= 10) {
         insights.push({
@@ -1390,17 +1387,18 @@ export function generateQualiHistoryInsights(
   }
 
   // 2. Sector vs PB sectors — show the sector furthest from PB
-  const currentS1 = Math.min(
-    ...valid.map((l) => l["sector-1-time-in-ms"]).filter((v) => v > 0),
-  );
-  const currentS2 = Math.min(
-    ...valid.map((l) => l["sector-2-time-in-ms"]).filter((v) => v > 0),
-  );
-  const currentS3 = Math.min(
-    ...valid.map((l) => l["sector-3-time-in-ms"]).filter((v) => v > 0),
-  );
+  const currentS1 = bestSectorTimeMs(valid, 1);
+  const currentS2 = bestSectorTimeMs(valid, 2);
+  const currentS3 = bestSectorTimeMs(valid, 3);
 
-  if (pbs.bestS1Ms > 0 && pbs.bestS2Ms > 0 && pbs.bestS3Ms > 0) {
+  if (
+    currentS1 > 0 &&
+    currentS2 > 0 &&
+    currentS3 > 0 &&
+    pbs.bestS1Ms > 0 &&
+    pbs.bestS2Ms > 0 &&
+    pbs.bestS3Ms > 0
+  ) {
     const deltas = [
       { sector: "S1", delta: currentS1 - pbs.bestS1Ms },
       { sector: "S2", delta: currentS2 - pbs.bestS2Ms },

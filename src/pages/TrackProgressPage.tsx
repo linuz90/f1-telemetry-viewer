@@ -17,7 +17,7 @@ import { useSessionList } from "../hooks/useSessionList";
 import { useTelemetry } from "../context/TelemetryContext";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
 import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, isRaceSession, aggregateCompoundLife, aggregateFuelData } from "../utils/stats";
-import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getSessionIcon } from "../utils/format";
+import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getSessionIcon, bestSectorTimeMs } from "../utils/format";
 import { TrackFlag } from "../components/TrackFlag";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { CHART_THEME, TOOLTIP_STYLE, SECTOR_COLORS } from "../utils/colors";
@@ -26,10 +26,14 @@ import { dashboardPath, sessionFormulaPath } from "../utils/routes";
 import { accentCardClass, cardClass, cardClassFeature } from "../components/Card";
 import { Upload, ArrowLeft } from "lucide-react";
 import { CarSetupCard } from "../components/CarSetupCard";
+import { RaceSetupComparison } from "../components/RaceSetupComparison";
 import { SessionRow } from "../components/SessionRow";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { Badge } from "../components/ui/Badge";
+import { buildRaceSetupComparison } from "../utils/setupComparison";
+import type { CompoundLifeStats } from "../utils/stats";
+import type { RaceSetupCandidate, RaceSetupRunInput } from "../utils/setupComparison";
 
 interface LapPoint {
   timeSec: number;
@@ -54,6 +58,19 @@ interface TrackSessionData {
   aiDifficulty: number;
   topSpeed: number;
   attemptCount: number;
+}
+
+interface RaceAnalysisBucket {
+  totalLaps: number;
+  value: string;
+  label: string;
+  raceData: TrackSessionData[];
+  sessions: TelemetrySession[];
+  compoundLifeStats: CompoundLifeStats[];
+  setupCandidates: RaceSetupCandidate[];
+  tyreEvidenceCount: number;
+  setupSampleCount: number;
+  raceCount: number;
 }
 
 /**
@@ -115,6 +132,83 @@ function deduplicateRuns(sessions: TrackSessionData[]): TrackSessionData[] {
   });
 }
 
+function getRaceTotalLaps(session: TelemetrySession): number | null {
+  const totalLaps = session["session-info"]["total-laps"];
+  if (!Number.isFinite(totalLaps) || totalLaps <= 0) return null;
+  return Math.round(totalLaps);
+}
+
+function toRaceSetupRuns(races: TrackSessionData[]): RaceSetupRunInput[] {
+  return races.map((race) => ({
+    summary: race.summary,
+    session: race.session,
+  }));
+}
+
+function buildRaceAnalysisBuckets(races: TrackSessionData[]): RaceAnalysisBucket[] {
+  const byTotalLaps = new Map<number, TrackSessionData[]>();
+
+  for (const race of races) {
+    const totalLaps = getRaceTotalLaps(race.session);
+    if (totalLaps === null) continue;
+
+    const bucket = byTotalLaps.get(totalLaps);
+    if (bucket) {
+      bucket.push(race);
+    } else {
+      byTotalLaps.set(totalLaps, [race]);
+    }
+  }
+
+  return [...byTotalLaps.entries()]
+    .map(([totalLaps, raceData]) => {
+      const sessions = raceData.map((race) => race.session);
+      const compoundLifeStats = aggregateCompoundLife(sessions);
+      const setupCandidates = buildRaceSetupComparison(toRaceSetupRuns(raceData));
+      const tyreEvidenceCount = compoundLifeStats.reduce(
+        (sum, compound) => sum + compound.stintCount,
+        0,
+      );
+      const setupSampleCount = setupCandidates.reduce(
+        (sum, setup) => sum + setup.sampleCount,
+        0,
+      );
+
+      return {
+        totalLaps,
+        value: String(totalLaps),
+        label: `${totalLaps} laps`,
+        raceData,
+        sessions,
+        compoundLifeStats,
+        setupCandidates,
+        tyreEvidenceCount,
+        setupSampleCount,
+        raceCount: raceData.length,
+      } satisfies RaceAnalysisBucket;
+    })
+    .filter(
+      (bucket) =>
+        bucket.tyreEvidenceCount > 0 || bucket.setupSampleCount > 0,
+    )
+    .sort((a, b) => a.totalLaps - b.totalLaps);
+}
+
+function getDefaultRaceAnalysisBucket(
+  buckets: RaceAnalysisBucket[],
+): RaceAnalysisBucket | null {
+  return [...buckets].sort((a, b) => {
+    if (a.tyreEvidenceCount !== b.tyreEvidenceCount) {
+      return b.tyreEvidenceCount - a.tyreEvidenceCount;
+    }
+    if (a.setupSampleCount !== b.setupSampleCount) {
+      return b.setupSampleCount - a.setupSampleCount;
+    }
+    if (a.raceCount !== b.raceCount) return b.raceCount - a.raceCount;
+    return b.totalLaps - a.totalLaps;
+  })[0] ?? null;
+}
+
 export function TrackProgressPage() {
   const { trackId } = useParams<{ trackId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -123,6 +217,7 @@ export function TrackProgressPage() {
   const [data, setData] = useState<TrackSessionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"qualifying" | "race">("race");
+  const requestedRaceLaps = searchParams.get("raceLaps");
 
   // Case-insensitive match: slug is lowercase, track names from data may be capitalized
   const allTrackSessions = useMemo(
@@ -206,15 +301,9 @@ export function TrackProgressPage() {
           const valid = getValidLaps(laps);
 
           // Best sector times from valid laps
-          const bestS1 = valid.length
-            ? Math.min(...valid.map((l) => l["sector-1-time-in-ms"]).filter((v) => v > 0))
-            : 0;
-          const bestS2 = valid.length
-            ? Math.min(...valid.map((l) => l["sector-2-time-in-ms"]).filter((v) => v > 0))
-            : 0;
-          const bestS3 = valid.length
-            ? Math.min(...valid.map((l) => l["sector-3-time-in-ms"]).filter((v) => v > 0))
-            : 0;
+          const bestS1 = bestSectorTimeMs(valid, 1);
+          const bestS2 = bestSectorTimeMs(valid, 2);
+          const bestS3 = bestSectorTimeMs(valid, 3);
 
           const allLaps: LapPoint[] = laps
             .filter((l) => l["lap-time-in-ms"] > 0)
@@ -264,10 +353,15 @@ export function TrackProgressPage() {
     };
   }, [trackSessionKey, getSession]);
 
-  // Compound life + fuel aggregations (race only) — must be before early returns
-  const raceSessions = useMemo(
-    () => data.filter((d) => d.isRace).map((d) => d.session),
+  // Race analysis aggregations must stay before early returns so hook ordering
+  // remains stable while async session details are still loading.
+  const raceDataAll = useMemo(
+    () => data.filter((d) => d.isRace),
     [data],
+  );
+  const raceSessions = useMemo(
+    () => raceDataAll.map((d) => d.session),
+    [raceDataAll],
   );
   const compoundLifeStats = useMemo(
     () => aggregateCompoundLife(raceSessions),
@@ -276,6 +370,51 @@ export function TrackProgressPage() {
   const trackFuelStats = useMemo(
     () => aggregateFuelData(raceSessions),
     [raceSessions],
+  );
+  const allRaceSetupCandidates = useMemo(
+    () => buildRaceSetupComparison(toRaceSetupRuns(raceDataAll)),
+    [raceDataAll],
+  );
+  const raceAnalysisBuckets = useMemo(
+    () => buildRaceAnalysisBuckets(raceDataAll),
+    [raceDataAll],
+  );
+  const defaultRaceAnalysisBucket = useMemo(
+    () => getDefaultRaceAnalysisBucket(raceAnalysisBuckets),
+    [raceAnalysisBuckets],
+  );
+  const selectedRaceAnalysisBucket = useMemo(() => {
+    const requestedBucket = requestedRaceLaps
+      ? raceAnalysisBuckets.find((bucket) => bucket.value === requestedRaceLaps)
+      : undefined;
+    return requestedBucket ?? defaultRaceAnalysisBucket;
+  }, [defaultRaceAnalysisBucket, raceAnalysisBuckets, requestedRaceLaps]);
+  const showRaceLengthSelector = raceAnalysisBuckets.length > 1;
+  const selectedCompoundLifeStats =
+    showRaceLengthSelector && selectedRaceAnalysisBucket
+      ? selectedRaceAnalysisBucket.compoundLifeStats
+      : compoundLifeStats;
+  const selectedRaceSetupCandidates =
+    showRaceLengthSelector && selectedRaceAnalysisBucket
+      ? selectedRaceAnalysisBucket.setupCandidates
+      : allRaceSetupCandidates;
+  const raceLengthOptions = raceAnalysisBuckets.map((bucket) => ({
+    value: bucket.value,
+    label: bucket.label,
+  }));
+  const selectedRaceLengthValue =
+    selectedRaceAnalysisBucket?.value ?? raceLengthOptions[0]?.value ?? "";
+  const selectedRaceLengthLabel =
+    showRaceLengthSelector && selectedRaceAnalysisBucket
+      ? `${selectedRaceAnalysisBucket.totalLaps}-lap`
+      : undefined;
+  const selectedTyreLifeRaceCount =
+    showRaceLengthSelector && selectedRaceAnalysisBucket
+      ? selectedRaceAnalysisBucket.raceCount
+      : raceDataAll.length;
+  const selectedTyreLifeStintCount = selectedCompoundLifeStats.reduce(
+    (sum, compound) => sum + compound.stintCount,
+    0,
   );
 
   if (loading) {
@@ -333,7 +472,7 @@ export function TrackProgressPage() {
 
   // Split into qualifying and race sessions
   const qualiData = data.filter((d) => !d.isRace);
-  const raceData = data.filter((d) => d.isRace);
+  const raceData = raceDataAll;
 
   // Theoretical best: best S1 + best S2 + best S3 across all qualifying sessions
   const allBestS1 = qualiData.filter((d) => d.bestS1 > 0).map((d) => d.bestS1);
@@ -361,24 +500,15 @@ export function TrackProgressPage() {
     ? Math.min(...raceData.filter((d) => d.bestLapMs > 0).map((d) => d.bestLapMs))
     : 0;
 
-  // Find the session behind each all-time best lap (for setup display)
+  // Find the session behind the all-time best qualifying lap (for setup display)
   const bestQualiSession = qualiData.find(
     (d) => d.bestLapMs > 0 && d.bestLapMs === actualBestQualiMs
   ) ?? null;
-  const bestRaceSession = raceData.find(
-    (d) => d.bestLapMs > 0 && d.bestLapMs === bestRaceLapMs
-  ) ?? null;
 
-  // Extract valid setup from each best session
+  // Extract valid setup from the best qualifying session
   const bestQualiSetup = (() => {
     if (!bestQualiSession) return null;
     const player = findPlayer(bestQualiSession.session);
-    const setup = player?.["car-setup"];
-    return setup?.["is-valid"] ? setup : null;
-  })();
-  const bestRaceSetup = (() => {
-    if (!bestRaceSession) return null;
-    const player = findPlayer(bestRaceSession.session);
     const setup = player?.["car-setup"];
     return setup?.["is-valid"] ? setup : null;
   })();
@@ -455,6 +585,11 @@ export function TrackProgressPage() {
 
   const hasBoth = qualiData.length > 0 && raceData.length > 0;
   const onlySessionType = hasBoth ? null : raceData.length > 0 ? "race" : "qualifying";
+  const handleRaceLengthChange = (raceLaps: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("raceLaps", raceLaps);
+    setSearchParams(nextParams);
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -483,6 +618,7 @@ export function TrackProgressPage() {
               onChange={(key) => {
                 const nextParams = new URLSearchParams(searchParams);
                 nextParams.set("formula", key);
+                nextParams.delete("raceLaps");
                 setSearchParams(nextParams);
               }}
             />
@@ -807,14 +943,33 @@ export function TrackProgressPage() {
           </div>
 
           {/* Compound tyre life cards */}
-          {compoundLifeStats.length > 0 && (
+          {selectedCompoundLifeStats.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-zinc-300 mb-2">Compound Tyre Life</h4>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-zinc-300">
+                  Compound Tyre Life
+                </h4>
+                {showRaceLengthSelector && selectedRaceAnalysisBucket && (
+                  <div className="flex max-w-full items-center gap-2">
+                    <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+                      Race length
+                    </span>
+                    <SegmentedControl
+                      ariaLabel="Race length"
+                      options={raceLengthOptions}
+                      value={selectedRaceLengthValue}
+                      onChange={handleRaceLengthChange}
+                      size="sm"
+                      scrollable
+                    />
+                  </div>
+                )}
+              </div>
               <div
                 className="grid gap-2"
-                style={{ gridTemplateColumns: `repeat(${Math.min(compoundLifeStats.length, 4)}, minmax(0, 1fr))` }}
+                style={{ gridTemplateColumns: `repeat(${Math.min(selectedCompoundLifeStats.length, 4)}, minmax(0, 1fr))` }}
               >
-                {compoundLifeStats.map((cs) => (
+                {selectedCompoundLifeStats.map((cs) => (
                   <CompoundStatCard
                     key={cs.compound}
                     compound={cs.compound}
@@ -828,7 +983,7 @@ export function TrackProgressPage() {
                 ))}
               </div>
               <p className="text-xs text-zinc-600 mt-1.5">
-                Pit lap estimated at {75}% worst-wheel wear (puncture risk threshold), based on {compoundLifeStats.reduce((s, c) => s + c.stintCount, 0)} stints across {raceData.length} race{raceData.length !== 1 ? "s" : ""}.
+                Pit lap estimated at {75}% worst-wheel wear (puncture risk threshold), based on {selectedTyreLifeStintCount} stint{selectedTyreLifeStintCount !== 1 ? "s" : ""} across {selectedTyreLifeRaceCount} {selectedRaceLengthLabel ? `${selectedRaceLengthLabel} ` : ""}race{selectedTyreLifeRaceCount !== 1 ? "s" : ""}.
               </p>
             </div>
           )}
@@ -949,18 +1104,13 @@ export function TrackProgressPage() {
             </section>
           )}
 
-          {/* Best race setup */}
-          {bestRaceSetup && bestRaceSession && (
-            <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-1">Your Best Race Setup</h3>
-              <p className="text-xs text-zinc-500 mb-4">
-                From{" "}
-                <Link to={sessionFormulaPath(bestRaceSession.summary.slug, activeFormulaKey)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
-                  {formatSessionType(bestRaceSession.summary.sessionType, bestRaceSession.summary.formula)} · {formatDate(bestRaceSession.summary.date)} · {msToLapTime(bestRaceSession.bestLapMs)}
-                </Link>
-              </p>
-              <CarSetupCard setup={bestRaceSetup} />
-            </section>
+          {/* Race setup comparison */}
+          {selectedRaceSetupCandidates.length > 0 && (
+            <RaceSetupComparison
+              candidates={selectedRaceSetupCandidates}
+              activeFormulaKey={activeFormulaKey}
+              raceLengthLabel={selectedRaceLengthLabel}
+            />
           )}
         </>
       )}

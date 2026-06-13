@@ -70,6 +70,7 @@ Open [http://localhost:5173](http://localhost:5173).
 
 ```bash
 pnpm dev            # Start dev server at http://localhost:5173
+pnpm dev:telemetry <folder>  # Start dev server with a specific telemetry folder
 pnpm dev:prod       # Run the production-like demo/upload flow locally
 pnpm build          # Type-check and build the production app
 pnpm preview        # Preview the production build locally
@@ -79,6 +80,15 @@ pnpm find-session <slug-or-url>  # Resolve a session URL or slug to JSON
 ```
 
 No test runner or linter is configured yet; `pnpm build` is the main validation command.
+
+For debugging shared repro files without pointing at your full telemetry history, put the files in a small folder and launch against that folder:
+
+```bash
+pnpm dev:telemetry "/Users/linuz90/PC Stuff/Pits & Giggles/debug data"
+pnpm dev:telemetry /path/to/debug-data -- --host 127.0.0.1 --port 5174
+```
+
+The folder is served through the normal local `/api/sessions` flow, so session URLs, track pages, and browser refreshes work the same way as your main telemetry directory.
 
 ## Self-Hosting
 

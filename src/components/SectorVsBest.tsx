@@ -1,5 +1,5 @@
 import type { TelemetrySession } from "../types/telemetry";
-import { msToSectorTime, msToLapTime } from "../utils/format";
+import { bestSectorTimeMs, msToSectorTime, msToLapTime, sectorTimeMs } from "../utils/format";
 import { getValidLaps } from "../utils/stats";
 import { getTeamColor } from "../utils/colors";
 import { accentCardClass, neutralCardClass } from "./Card";
@@ -10,9 +10,9 @@ interface SectorVsBestProps {
 }
 
 const SECTOR_KEYS = [
-  { key: "sector-1-time-in-ms", label: "S1" },
-  { key: "sector-2-time-in-ms", label: "S2" },
-  { key: "sector-3-time-in-ms", label: "S3" },
+  { sector: 1, label: "S1" },
+  { sector: 2, label: "S2" },
+  { sector: 3, label: "S3" },
 ] as const;
 
 /**
@@ -57,10 +57,9 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
     focusedBestLap !== null && sessionBestLap > 0 ? focusedBestLap - sessionBestLap : null;
 
   // Compute session-best and focused-driver-best for each sector
-  const sectors = SECTOR_KEYS.map(({ key, label }) => {
-    const focusedBest = focusedValid.length
-      ? Math.min(...focusedValid.map((l) => l[key]))
-      : null;
+  const sectors = SECTOR_KEYS.map(({ sector, label }) => {
+    const focusedBestMs = bestSectorTimeMs(focusedValid, sector);
+    const focusedBest = focusedBestMs > 0 ? focusedBestMs : null;
 
     // Session best across all drivers
     let sessionBest = Infinity;
@@ -70,8 +69,9 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
     for (const d of drivers) {
       const valid = getValidLaps(d["session-history"]["lap-history-data"]);
       for (const lap of valid) {
-        if (lap[key] < sessionBest) {
-          sessionBest = lap[key];
+        const lapSectorTime = sectorTimeMs(lap, sector);
+        if (lapSectorTime > 0 && lapSectorTime < sessionBest) {
+          sessionBest = lapSectorTime;
           sessionBestDriver = d["driver-name"];
           sessionBestTeam = d.team;
         }

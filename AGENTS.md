@@ -10,6 +10,7 @@ F1 Telemetry Viewer — a React app for visualizing telemetry JSON files exporte
 
 ```bash
 pnpm dev            # Start dev server (default: http://localhost:5173)
+pnpm dev:telemetry <folder>  # Start dev server with a specific debug folder
 pnpm dev:prod       # Dev server without local API (uses demo data, like production)
 pnpm build          # Type-check (tsc) + production build
 pnpm preview        # Preview production build
@@ -21,7 +22,13 @@ No test runner or linter is configured.
 
 ## Setup
 
-Copy `.env.example` to `.env` and set `TELEMETRY_DIR` to the directory containing telemetry JSON files. The app recursively scans this directory for `.json` files.
+Copy `.env.example` to `.env` and set `TELEMETRY_DIR` to the directory containing telemetry JSON files. The app recursively scans this directory for `.json` files. For one-off debugging, put repro JSON files in a small folder and use `pnpm dev:telemetry <folder>` to point the dev server there without editing `.env`.
+
+Shared repro sessions for local debugging live in `/Users/linuz90/PC Stuff/Pits & Giggles/debug data`. Start the app against only those files with:
+
+```bash
+pnpm dev:telemetry "/Users/linuz90/PC Stuff/Pits & Giggles/debug data"
+```
 
 ## Architecture
 
@@ -63,7 +70,7 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 
 When the user references a session by URL, or when you're testing in the browser and land on a session page (e.g. `http://localhost:5173/session/race-baku-manual-2026-02-21-16-39-26`), you can read the raw telemetry JSON to understand the data. The URL slug maps to a file on disk under `TELEMETRY_DIR` (set in `.env`).
 
-**This only works in local dev mode (`pnpm dev`)**, where sessions are served from the `TELEMETRY_DIR` directory. It won't work for uploaded sessions (JSON/zip via drag-and-drop) or when running `dev:prod` / production, since those sessions live in-memory in the browser.
+**This only works in local dev mode (`pnpm dev`)**, where sessions are served from the `TELEMETRY_DIR` directory. For shared repro files, `pnpm dev:telemetry <folder>` starts the same local API against a supplied folder. It won't work for uploaded sessions (JSON/zip via drag-and-drop) or when running `dev:prod` / production, since those sessions live in-memory in the browser.
 
 **How the slug-to-file mapping works:**
 - Filenames follow: `Race_Baku_Manual_2026_02_21_16_39_26.json` (with date subdirs like `2026_02_21/race-info/`)

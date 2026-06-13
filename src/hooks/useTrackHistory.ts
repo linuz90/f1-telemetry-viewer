@@ -8,6 +8,7 @@ import {
   getBestLapTime,
   isRaceSession,
 } from "../utils/stats";
+import { bestSectorTimeMs } from "../utils/format";
 import { getFormulaComparisonKey } from "../utils/sessionTypes";
 
 export interface TrackPBs {
@@ -125,21 +126,9 @@ export function useTrackHistory(
             }
 
             if (valid.length > 0) {
-              const s1 = Math.min(
-                ...valid
-                  .map((l) => l["sector-1-time-in-ms"])
-                  .filter((v) => v > 0),
-              );
-              const s2 = Math.min(
-                ...valid
-                  .map((l) => l["sector-2-time-in-ms"])
-                  .filter((v) => v > 0),
-              );
-              const s3 = Math.min(
-                ...valid
-                  .map((l) => l["sector-3-time-in-ms"])
-                  .filter((v) => v > 0),
-              );
+              const s1 = bestSectorTimeMs(valid, 1);
+              const s2 = bestSectorTimeMs(valid, 2);
+              const s3 = bestSectorTimeMs(valid, 3);
 
               if (s1 > 0 && (bestS1Ms === 0 || s1 < bestS1Ms)) bestS1Ms = s1;
               if (s2 > 0 && (bestS2Ms === 0 || s2 < bestS2Ms)) bestS2Ms = s2;

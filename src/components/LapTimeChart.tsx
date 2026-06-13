@@ -11,7 +11,7 @@ import {
   ComposedChart,
 } from "recharts";
 import type { LapHistoryEntry, PerLapInfo, TyreStint } from "../types/telemetry";
-import { msToLapTime, isLapValid } from "../utils/format";
+import { msToLapTime, msToSectorTime, isLapValid, sectorTimeMs } from "../utils/format";
 import { ersDeployMjForLap, ersHarvestMjForLap, getWorstWheelWear } from "../utils/stats";
 import { tableRowClass } from "./ui/table";
 import { CHART_THEME, TOOLTIP_STYLE, COMPOUND_COLORS, SC_COLORS, SC_FALLBACK } from "../utils/colors";
@@ -86,9 +86,9 @@ export function LapTimeChart({
         timeStr: l["lap-time-str"],
         timeSec: l["lap-time-in-ms"] / 1000,
         valid: isLapValid(l["lap-valid-bit-flags"]),
-        s1: l["sector-1-time-in-ms"] / 1000,
-        s2: l["sector-2-time-in-ms"] / 1000,
-        s3: l["sector-3-time-in-ms"] / 1000,
+        s1: sectorTimeMs(l, 1) / 1000,
+        s2: sectorTimeMs(l, 2) / 1000,
+        s3: sectorTimeMs(l, 3) / 1000,
         topSpeed: info?.["top-speed-kmph"] ?? undefined,
         rivalTimeSec: rivalMap.get(lapNum) ?? undefined,
         scStatus,
@@ -441,9 +441,9 @@ export function LapTimeChart({
                 <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-behind/70 line-through" : isBestLap ? "text-best font-semibold" : ""}`}>
                   {d.timeStr}
                 </td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS1 ? "text-best" : ""}`}>{d.s1.toFixed(3)}</td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS2 ? "text-best" : ""}`}>{d.s2.toFixed(3)}</td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS3 ? "text-best" : ""}`}>{d.s3.toFixed(3)}</td>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS1 ? "text-best" : ""}`}>{msToSectorTime(d.s1 * 1000)}</td>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS2 ? "text-best" : ""}`}>{msToSectorTime(d.s2 * 1000)}</td>
+                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS3 ? "text-best" : ""}`}>{msToSectorTime(d.s3 * 1000)}</td>
                 {hasTopSpeed && (
                   <td className={`text-right py-1 px-2 font-mono ${d.valid && d.topSpeed != null && d.topSpeed === bestTopSpeed ? "text-best font-semibold" : ""}`}>
                     {d.topSpeed != null ? `${d.topSpeed}` : "–"}

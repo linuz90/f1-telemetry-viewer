@@ -1,6 +1,6 @@
 import type { TelemetrySession, DriverData } from "../types/telemetry";
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
-import { msToLapTime, msToSectorTime } from "../utils/format";
+import { bestSectorTimeMs, msToLapTime, msToSectorTime, sectorTimeMs } from "../utils/format";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { getValidLaps } from "../utils/stats";
 import { FocusToggle } from "./ui/FocusToggle";
@@ -59,13 +59,13 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
     ? Math.min(...allBestLaps.map((l) => l["lap-time-in-ms"]))
     : null;
   const bestS1 = allBestLaps.length
-    ? Math.min(...allBestLaps.map((l) => l["sector-1-time-in-ms"]))
+    ? bestSectorTimeMs(allBestLaps, 1) || null
     : null;
   const bestS2 = allBestLaps.length
-    ? Math.min(...allBestLaps.map((l) => l["sector-2-time-in-ms"]))
+    ? bestSectorTimeMs(allBestLaps, 2) || null
     : null;
   const bestS3 = allBestLaps.length
-    ? Math.min(...allBestLaps.map((l) => l["sector-3-time-in-ms"]))
+    ? bestSectorTimeMs(allBestLaps, 3) || null
     : null;
 
   return (
@@ -93,6 +93,9 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
           <tbody>
             {rows.map((row, i) => {
               const isFocused = row.driver.index === focusedDriverIndex;
+              const rowS1 = row.bestLap ? sectorTimeMs(row.bestLap, 1) : 0;
+              const rowS2 = row.bestLap ? sectorTimeMs(row.bestLap, 2) : 0;
+              const rowS3 = row.bestLap ? sectorTimeMs(row.bestLap, 3) : 0;
               const gap =
                 i === 0
                   ? "–"
@@ -121,19 +124,19 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
                       ? msToLapTime(row.bestLap["lap-time-in-ms"])
                       : "–"}
                   </td>
-                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS1 !== null && row.bestLap["sector-1-time-in-ms"] === bestS1 ? "text-best font-bold" : "text-zinc-400"}`}>
+                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS1 !== null && rowS1 === bestS1 ? "text-best font-bold" : "text-zinc-400"}`}>
                     {row.bestLap
-                      ? msToSectorTime(row.bestLap["sector-1-time-in-ms"])
+                      ? msToSectorTime(rowS1)
                       : "–"}
                   </td>
-                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS2 !== null && row.bestLap["sector-2-time-in-ms"] === bestS2 ? "text-best font-bold" : "text-zinc-400"}`}>
+                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS2 !== null && rowS2 === bestS2 ? "text-best font-bold" : "text-zinc-400"}`}>
                     {row.bestLap
-                      ? msToSectorTime(row.bestLap["sector-2-time-in-ms"])
+                      ? msToSectorTime(rowS2)
                       : "–"}
                   </td>
-                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS3 !== null && row.bestLap["sector-3-time-in-ms"] === bestS3 ? "text-best font-bold" : "text-zinc-400"}`}>
+                  <td className={`py-1.5 px-2 text-right font-mono ${row.bestLap && bestS3 !== null && rowS3 === bestS3 ? "text-best font-bold" : "text-zinc-400"}`}>
                     {row.bestLap
-                      ? msToSectorTime(row.bestLap["sector-3-time-in-ms"])
+                      ? msToSectorTime(rowS3)
                       : "–"}
                   </td>
                   <td className={`py-1.5 px-2 text-right font-mono ${row.allInvalid ? "text-behind" : ""}`}>{gap}</td>

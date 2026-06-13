@@ -331,10 +331,13 @@ export interface LapHistoryEntry {
   "lap-time-in-ms": number;
   "lap-time-str": string;
   "sector-1-time-in-ms": number;
+  "sector-1-time-minutes"?: number;
   "sector-1-time-str": string;
   "sector-2-time-in-ms": number;
+  "sector-2-time-minutes"?: number;
   "sector-2-time-str": string;
   "sector-3-time-in-ms": number;
+  "sector-3-time-minutes"?: number;
   "sector-3-time-str": string;
   "lap-valid-bit-flags": number;
 }

@@ -1,5 +1,5 @@
 import type { LapHistoryEntry, PerLapInfo, TyreStintBasic } from "../types/telemetry";
-import { isLapValid, msToLapTime } from "../utils/format";
+import { isLapValid, msToLapTime, msToSectorTime, sectorTimeMs } from "../utils/format";
 import { getCompoundColor, PERF_COLORS } from "../utils/colors";
 import { ersDeployMjForLap, ersHarvestMjForLap } from "../utils/stats";
 import { accentCardClass, neutralCardClass } from "./Card";
@@ -46,9 +46,9 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
       const ers = lapErs.get(lapNum);
       return {
         lap: lapNum,
-        s1: l["sector-1-time-in-ms"] / 1000,
-        s2: l["sector-2-time-in-ms"] / 1000,
-        s3: l["sector-3-time-in-ms"] / 1000,
+        s1: sectorTimeMs(l, 1) / 1000,
+        s2: sectorTimeMs(l, 2) / 1000,
+        s3: sectorTimeMs(l, 3) / 1000,
         total: l["lap-time-in-ms"] / 1000,
         totalStr: l["lap-time-str"],
         valid: isLapValid(l["lap-valid-bit-flags"]),
@@ -224,7 +224,7 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
                           isBestSector ? "text-white font-bold" : "text-white/80"
                         }`}
                       >
-                        {sectorKey}: {time.toFixed(3)}
+                        {sectorKey}: {msToSectorTime(time * 1000)}
                       </span>
                     </div>
                   );
