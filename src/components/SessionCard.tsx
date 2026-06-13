@@ -1,6 +1,6 @@
 import { Eye, Globe, Timer, Target, Flag, Gauge, Save } from "lucide-react";
 import { TrackFlag } from "./TrackFlag";
-import { getFormulaLabel, isRaceSessionType, shouldShowFormulaLabel } from "../utils/sessionTypes";
+import { isRaceSessionType } from "../utils/sessionTypes";
 import { HStack } from "./ui/Stack";
 
 interface SessionCardProps {
@@ -12,8 +12,6 @@ interface SessionCardProps {
   isTrackBest?: boolean;
   aiDifficulty?: number;
   isSpectator?: boolean;
-  formula?: string;
-  gameYear?: number;
   /** P&G periodic safety-net snapshot — surfaced when not deduped away. */
   isAutoSave?: boolean;
 }
@@ -31,14 +29,13 @@ const INDICATOR_COLORS = {
   best: "bg-purple-400",
 };
 
-export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTime, isTrackBest, aiDifficulty, isSpectator, formula, gameYear, isAutoSave }: SessionCardProps) {
+export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTime, isTrackBest, aiDifficulty, isSpectator, isAutoSave }: SessionCardProps) {
   const typeConfig =
     TYPE_CONFIG[sessionType] ??
     (isRaceSessionType(sessionType)
       ? TYPE_CONFIG.Race
       : { color: "text-zinc-500", icon: Flag });
   const TypeIcon = typeConfig.icon;
-  const showFormula = shouldShowFormulaLabel(formula, gameYear);
 
   return (
     <div className="min-w-0">
@@ -93,9 +90,6 @@ export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTi
               <Globe className="size-3" />
               Online
             </HStack>
-          )}
-          {showFormula && (
-            <span className="text-[10px] font-semibold text-zinc-500">{getFormulaLabel(formula, gameYear)}</span>
           )}
         </HStack>
         <HStack className="gap-1">

@@ -180,7 +180,8 @@ export function Layout() {
                 ariaLabel="Formula scope"
                 options={formulaOptions.map((option) => ({
                   value: option.key,
-                  label: `${option.label} · ${option.sessionCount}`,
+                  label: option.label,
+                  meta: option.sessionCount,
                 }))}
                 value={activeFormulaKey}
                 onChange={handleFormulaScopeChange}

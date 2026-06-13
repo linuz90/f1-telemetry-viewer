@@ -104,6 +104,17 @@ export interface RivalEntry {
   meanLapMs?: number;
   /** Std-deviation of valid lap times (ms). */
   stddevLapMs?: number;
+  /**
+   * Race-level pace delta using clean laps on compounds both drivers used.
+   * Negative means the rival was faster than the player. This is preferred for
+   * dashboard pace benchmarks because it is fairer than comparing isolated
+   * best laps across different tyres.
+   */
+  compoundMatchedPaceDeltaMs?: number;
+  /** Evidence count for compoundMatchedPaceDeltaMs: sum of shared clean-lap samples. */
+  compoundMatchedPaceLapCount?: number;
+  /** Visual compounds that contributed to compoundMatchedPaceDeltaMs. */
+  compoundMatchedPaceCompounds?: string[];
   /** Times this driver overtook anyone on track (overtakes.records). */
   overtakes: number;
   /** Times this driver overtook the player. */

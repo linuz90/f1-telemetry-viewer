@@ -84,6 +84,18 @@ export function getDriverStints(driver: DriverData): TyreStint[] {
   return synthesizeStints(basics, driver["session-history"]["num-laps"]);
 }
 
+/** Build a lap-number → visual compound lookup from the driver's stint history. */
+export function getLapCompoundMap(driver: DriverData): Map<number, string> {
+  const map = new Map<number, string>();
+  for (const stint of getDriverStints(driver)) {
+    const compound = stint["tyre-set-data"]["visual-tyre-compound"];
+    for (let lap = stint["start-lap"]; lap <= stint["end-lap"]; lap++) {
+      map.set(lap, compound);
+    }
+  }
+  return map;
+}
+
 /** Drop the last stint if it's a single incomplete lap (e.g. DNF retirement) */
 export function getCompletedStints(stints: TyreStint[]): TyreStint[] {
   if (stints.length <= 1) return stints;
@@ -99,6 +111,20 @@ export function getValidLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
   );
 }
 
+function median(values: number[]): number | undefined {
+  if (values.length === 0) return undefined;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1]! + sorted[mid]!) / 2
+    : sorted[mid];
+}
+
+/** Median lap time in ms. Returns 0 for empty inputs to match existing pace helpers. */
+export function medianLapTimeMs(laps: LapHistoryEntry[]): number {
+  return median(getValidLaps(laps).map((l) => l["lap-time-in-ms"])) ?? 0;
+}
+
 /**
  * Filter outlier laps from a subset using median-based filtering.
  * Any lap > 1.2× the median is excluded. Used for stint-level analysis
@@ -109,9 +135,9 @@ export function filterOutlierLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
   const valid = getValidLaps(laps);
   if (valid.length < 3) return valid;
   const times = valid.map((l) => l["lap-time-in-ms"]);
-  const sorted = [...times].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)];
-  const threshold = median * 1.2;
+  const baseline = median(times);
+  if (baseline == null) return valid;
+  const threshold = baseline * 1.2;
   return valid.filter((l) => l["lap-time-in-ms"] <= threshold);
 }
 
@@ -121,7 +147,7 @@ export function filterOutlierLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
  * and the first lap of the next stint is the pit-out lap.
  */
 function getPitLapNumbers(d: DriverData): Set<number> {
-  const stints = d["tyre-set-history"] ?? [];
+  const stints = getDriverStints(d);
   const pitLaps = new Set<number>();
   for (let i = 0; i < stints.length - 1; i++) {
     const endLap = stints[i]["end-lap"];
@@ -129,6 +155,13 @@ function getPitLapNumbers(d: DriverData): Set<number> {
     pitLaps.add(endLap + 1); // pit-out lap (slow exit from pits)
   }
   return pitLaps;
+}
+
+export interface CleanRaceLapSample {
+  lapNumber: number;
+  lap: LapHistoryEntry;
+  timeMs: number;
+  compound?: string;
 }
 
 /**
@@ -157,12 +190,13 @@ function getPitLapNumbers(d: DriverData): Set<number> {
  *  - Rankings were noticeably different (and less accurate) compared to
  *    explicit SC/pit filtering on sessions with safety car periods.
  */
-export function getCleanRaceLaps(d: DriverData): LapHistoryEntry[] {
+export function getCleanRaceLapSamples(d: DriverData): CleanRaceLapSample[] {
   const laps = d["session-history"]["lap-history-data"];
   const perLapInfo = d["per-lap-info"] ?? [];
   const pitLaps = getPitLapNumbers(d);
+  const compoundByLap = getLapCompoundMap(d);
 
-  const clean: LapHistoryEntry[] = [];
+  const clean: CleanRaceLapSample[] = [];
   for (let i = 1; i < laps.length; i++) {
     const lap = laps[i];
     const lapNum = i + 1; // lap-history-data is 0-indexed, lap numbers are 1-indexed
@@ -179,17 +213,25 @@ export function getCleanRaceLaps(d: DriverData): LapHistoryEntry[] {
     // Exclude pit in/out laps
     if (pitLaps.has(lapNum)) continue;
 
-    clean.push(lap);
+    clean.push({
+      lapNumber: lapNum,
+      lap,
+      timeMs: lap["lap-time-in-ms"],
+      compound: compoundByLap.get(lapNum),
+    });
   }
 
   if (clean.length < 3) return clean;
 
   // Final safety net: 1.2× median catches unlabeled incidents (spins, off-tracks)
-  const times = clean.map((l) => l["lap-time-in-ms"]);
-  const sorted = [...times].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)];
-  const threshold = median * 1.2;
-  return clean.filter((l) => l["lap-time-in-ms"] <= threshold);
+  const baseline = median(clean.map((sample) => sample.timeMs));
+  if (baseline == null) return clean;
+  const threshold = baseline * 1.2;
+  return clean.filter((sample) => sample.timeMs <= threshold);
+}
+
+export function getCleanRaceLaps(d: DriverData): LapHistoryEntry[] {
+  return getCleanRaceLapSamples(d).map((sample) => sample.lap);
 }
 
 /** Get the best lap time in ms from a set of laps */
@@ -309,25 +351,51 @@ export function stintWearRate(stint: TyreStint): number {
   return stint["stint-length"] > 0 ? lastWear / stint["stint-length"] : 0;
 }
 
-/** Find the best driver on a given compound within an overlapping lap range */
+/** Find the fastest same-compound driver within an overlapping lap range. */
 export function getBestDriverOnCompound(
   drivers: DriverData[],
   compound: string,
   lapStart: number,
   lapEnd: number,
-): { driver: DriverData; stint: TyreStint; wearRate: number } | undefined {
+): {
+  driver: DriverData;
+  stint: TyreStint;
+  wearRate: number;
+  paceMs: number;
+  lapStart: number;
+  lapEnd: number;
+} | undefined {
   let best:
-    | { driver: DriverData; stint: TyreStint; wearRate: number }
+    | {
+        driver: DriverData;
+        stint: TyreStint;
+        wearRate: number;
+        paceMs: number;
+        lapStart: number;
+        lapEnd: number;
+      }
     | undefined;
 
   for (const driver of drivers) {
-    for (const stint of driver["tyre-set-history"]) {
+    const laps = driver["session-history"]["lap-history-data"];
+    for (const stint of getDriverStints(driver)) {
       if (stint["tyre-set-data"]["visual-tyre-compound"] !== compound) continue;
-      // Check overlap
       if (stint["end-lap"] < lapStart || stint["start-lap"] > lapEnd) continue;
+      const overlapStart = Math.max(stint["start-lap"], lapStart);
+      const overlapEnd = Math.min(stint["end-lap"], lapEnd);
+      if (overlapEnd - overlapStart + 1 < 3) continue;
+      const paceMs = medianPaceInRange(laps, overlapStart, overlapEnd);
+      if (paceMs <= 0) continue;
       const rate = stintWearRate(stint);
-      if (rate > 0 && (!best || rate < best.wearRate)) {
-        best = { driver, stint, wearRate: rate };
+      if (!best || paceMs < best.paceMs) {
+        best = {
+          driver,
+          stint,
+          wearRate: rate,
+          paceMs,
+          lapStart: overlapStart,
+          lapEnd: overlapEnd,
+        };
       }
     }
   }
@@ -344,6 +412,15 @@ export function avgPaceInRange(
   const clean = filterOutlierLaps(laps.slice(startLap - 1, endLap));
   if (clean.length === 0) return 0;
   return clean.reduce((sum, l) => sum + l["lap-time-in-ms"], 0) / clean.length;
+}
+
+/** Calculate median pace (ms) for a driver's laps in a range, excluding outliers. */
+export function medianPaceInRange(
+  laps: LapHistoryEntry[],
+  startLap: number,
+  endLap: number,
+): number {
+  return medianLapTimeMs(filterOutlierLaps(laps.slice(startLap - 1, endLap)));
 }
 
 /** Calculate pace drop: avg of last N laps minus avg of first N laps (ms) */

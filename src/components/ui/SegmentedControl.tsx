@@ -1,6 +1,10 @@
+import type { ReactNode } from "react";
+
 export interface SegmentedOption<T extends string = string> {
   value: T;
   label: string;
+  /** Secondary text, such as a count, rendered quieter than the main label. */
+  meta?: ReactNode;
 }
 
 interface Props<T extends string> {
@@ -47,12 +51,26 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
+            aria-label={
+              opt.meta != null ? `${opt.label} ${opt.meta}` : opt.label
+            }
             onClick={() => onChange(opt.value)}
             className={`rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600 ${styles.button} ${
               fullWidth ? "flex-1" : "shrink-0"
             } ${active ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
           >
-            {opt.label}
+            <span className="inline-flex min-w-0 items-baseline justify-center gap-1.5 whitespace-nowrap">
+              <span className="truncate">{opt.label}</span>
+              {opt.meta != null && (
+                <span
+                  className={`font-mono text-[10px] font-medium leading-none ${
+                    active ? "text-zinc-400/75" : "text-zinc-600"
+                  }`}
+                >
+                  {opt.meta}
+                </span>
+              )}
+            </span>
           </button>
         );
       })}

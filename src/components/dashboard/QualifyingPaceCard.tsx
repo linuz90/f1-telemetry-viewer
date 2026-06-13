@@ -18,13 +18,12 @@ export interface QualifyingPaceData {
   track: string;
   formulaKey: string;
   formulaLabel: string;
-  showFormula: boolean;
   points: { day: string; bestLap: number }[];
   pbMs: number;
 }
 
 export function QualifyingPaceCard({ data }: { data: QualifyingPaceData }) {
-  const { track, formulaKey, formulaLabel, showFormula, points, pbMs } = data;
+  const { track, formulaKey, points, pbMs } = data;
   return (
     <Link
       to={trackFormulaPath(track, formulaKey)}
@@ -34,9 +33,6 @@ export function QualifyingPaceCard({ data }: { data: QualifyingPaceData }) {
         <HStack className="gap-1.5">
           <TrackFlag track={track} />
           <span className="truncate text-sm font-medium">{track}</span>
-          {showFormula && (
-            <span className="text-[11px] text-zinc-500">{formulaLabel}</span>
-          )}
           <span className="ml-1 text-[11px] text-zinc-500">
             {points.length} days
           </span>

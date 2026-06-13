@@ -26,7 +26,7 @@ export function SessionRow({ to, leading, meta, trailing }: SessionRowProps) {
       <div className="ml-auto hidden min-w-0 flex-1 truncate text-right text-xs text-zinc-500 sm:block">
         {meta}
       </div>
-      <HStack className="shrink-0 gap-3">{trailing}</HStack>
+      <HStack className="ml-auto shrink-0 gap-3 sm:ml-0">{trailing}</HStack>
     </>
   );
   if (to == null) {

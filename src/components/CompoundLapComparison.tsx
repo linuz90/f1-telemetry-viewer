@@ -1,5 +1,5 @@
 import type { LapHistoryEntry, TyreStint } from "../types/telemetry";
-import { filterOutlierLaps, getBestLapTime } from "../utils/stats";
+import { filterOutlierLaps, getBestLapTime, medianLapTimeMs } from "../utils/stats";
 import { msToLapTime } from "../utils/format";
 import { getCompoundColor } from "../utils/colors";
 import { tableRowClass } from "./ui/table";
@@ -14,8 +14,8 @@ interface CompoundLapComparisonProps {
 
 interface CompoundStats {
   compound: string;
-  playerAvg: number;
-  rivalAvg: number;
+  playerMedian: number;
+  rivalMedian: number;
   playerBest: number;
   rivalBest: number;
   playerLapCount: number;
@@ -63,14 +63,10 @@ export function CompoundLapComparison({
   const stats: CompoundStats[] = compounds.map((compound) => {
     const pLaps = playerByCompound.get(compound)!;
     const rLaps = rivalByCompound.get(compound)!;
-    const pAvg =
-      pLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) / pLaps.length;
-    const rAvg =
-      rLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) / rLaps.length;
     return {
       compound,
-      playerAvg: pAvg,
-      rivalAvg: rAvg,
+      playerMedian: medianLapTimeMs(pLaps),
+      rivalMedian: medianLapTimeMs(rLaps),
       playerBest: getBestLapTime(pLaps),
       rivalBest: getBestLapTime(rLaps),
       playerLapCount: pLaps.length,
@@ -89,8 +85,8 @@ export function CompoundLapComparison({
           <thead className="text-zinc-500">
             <tr>
               <th className="text-left py-1.5 px-2">Compound</th>
-              <th className="text-right py-1.5 px-2">Your Avg</th>
-              <th className="text-right py-1.5 px-2">Rival Avg</th>
+              <th className="text-right py-1.5 px-2">Your Median</th>
+              <th className="text-right py-1.5 px-2">Rival Median</th>
               <th className="text-right py-1.5 px-2">Delta</th>
               <th className="text-right py-1.5 px-2">Your Best</th>
               <th className="text-right py-1.5 px-2">Rival Best</th>
@@ -99,7 +95,7 @@ export function CompoundLapComparison({
           </thead>
           <tbody>
             {stats.map((s) => {
-              const delta = (s.playerAvg - s.rivalAvg) / 1000;
+              const delta = (s.playerMedian - s.rivalMedian) / 1000;
               const positive = delta > 0;
               return (
                 <tr key={s.compound} className={tableRowClass}>
@@ -115,10 +111,10 @@ export function CompoundLapComparison({
                     </span>
                   </td>
                   <td className="text-right py-1.5 px-2 font-mono text-zinc-300">
-                    {msToLapTime(s.playerAvg)}
+                    {msToLapTime(s.playerMedian)}
                   </td>
                   <td className="text-right py-1.5 px-2 font-mono text-zinc-300">
-                    {msToLapTime(s.rivalAvg)}
+                    {msToLapTime(s.rivalMedian)}
                   </td>
                   <td
                     className={`text-right py-1.5 px-2 font-mono font-bold ${

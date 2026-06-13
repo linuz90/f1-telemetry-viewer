@@ -236,8 +236,6 @@ export function SessionList() {
                       isTrackBest={!!s.bestLapTimeMs && s.bestLapTimeMs === bestTimeByTrack[`${s.track}::${getSessionFormulaScopeKey(s)}`]}
                       aiDifficulty={s.aiDifficulty}
                       isSpectator={s.isSpectator}
-                      formula={s.formula}
-                      gameYear={s.gameYear}
                       isAutoSave={s.isAutoSave}
                     />
                   );

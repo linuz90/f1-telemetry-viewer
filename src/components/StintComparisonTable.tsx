@@ -2,7 +2,7 @@ import type { DriverData } from "../types/telemetry";
 import {
   stintWearRate,
   getBestDriverOnCompound,
-  avgPaceInRange,
+  medianPaceInRange,
   paceDrop,
   getDriverStints,
 } from "../utils/stats";
@@ -42,7 +42,7 @@ export function StintComparisonTable({
               <th className="text-left py-1.5 px-2">Stint</th>
               <th className="text-left py-1.5 px-2">Compound</th>
               <th className="text-right py-1.5 px-2">Laps</th>
-              <th className="text-right py-1.5 px-2">Avg Pace</th>
+              <th className="text-right py-1.5 px-2">Median Pace</th>
               <th className="text-right py-1.5 px-2">Wear/Lap</th>
               <th className="text-right py-1.5 px-2">Pace Drop</th>
               <th className="text-left py-1.5 px-2">vs Best</th>
@@ -53,17 +53,6 @@ export function StintComparisonTable({
               const compound =
                 stint["tyre-set-data"]["visual-tyre-compound"];
               const playerRate = stintWearRate(stint);
-              const playerPace = avgPaceInRange(
-                playerLaps,
-                stint["start-lap"],
-                stint["end-lap"],
-              );
-              const playerDrop = paceDrop(
-                playerLaps,
-                stint["start-lap"],
-                stint["end-lap"],
-              );
-
               const best = getBestDriverOnCompound(
                 others,
                 compound,
@@ -71,24 +60,36 @@ export function StintComparisonTable({
                 stint["end-lap"],
               );
 
-              const bestPace = best
-                ? avgPaceInRange(
-                    best.driver["session-history"]["lap-history-data"],
-                    best.stint["start-lap"],
-                    best.stint["end-lap"],
-                  )
-                : 0;
+              const compareStartLap = best?.lapStart ?? stint["start-lap"];
+              const compareEndLap = best?.lapEnd ?? stint["end-lap"];
+              const playerPace = medianPaceInRange(
+                playerLaps,
+                compareStartLap,
+                compareEndLap,
+              );
+              const playerDrop = paceDrop(
+                playerLaps,
+                compareStartLap,
+                compareEndLap,
+              );
+
+              const bestPace = best?.paceMs ?? 0;
               const bestDrop = best
                 ? paceDrop(
                     best.driver["session-history"]["lap-history-data"],
-                    best.stint["start-lap"],
-                    best.stint["end-lap"],
+                    best.lapStart,
+                    best.lapEnd,
                   )
                 : 0;
 
-              const wearDelta = best ? playerRate - best.wearRate : 0;
-              const paceDelta = bestPace > 0 ? playerPace - bestPace : 0;
-              const dropDelta = bestDrop !== 0 ? playerDrop - bestDrop : 0;
+              const wearDelta =
+                best && playerRate > 0 && best.wearRate > 0
+                  ? playerRate - best.wearRate
+                  : 0;
+              const paceDelta =
+                playerPace > 0 && bestPace > 0 ? playerPace - bestPace : 0;
+              const dropDelta =
+                playerDrop !== 0 && bestDrop !== 0 ? playerDrop - bestDrop : 0;
 
               return (
                 <tr
@@ -114,7 +115,7 @@ export function StintComparisonTable({
                     <span className="text-zinc-300">
                       {playerPace > 0 ? msToLapTime(playerPace) : "–"}
                     </span>
-                    {bestPace > 0 && (
+                    {paceDelta !== 0 && (
                       <Delta value={paceDelta} unit="s" factor={1000} />
                     )}
                   </td>
@@ -122,7 +123,7 @@ export function StintComparisonTable({
                     <span className="text-zinc-300">
                       {playerRate > 0 ? `${playerRate.toFixed(1)}%` : "–"}
                     </span>
-                    {best && <Delta value={wearDelta} unit="%" />}
+                    {wearDelta !== 0 && <Delta value={wearDelta} unit="%" />}
                   </td>
                   <td className="text-right py-1.5 px-2 font-mono">
                     <span className="text-zinc-300">
@@ -130,12 +131,14 @@ export function StintComparisonTable({
                         ? `${playerDrop > 0 ? "+" : ""}${(playerDrop / 1000).toFixed(3)}s`
                         : "–"}
                     </span>
-                    {bestDrop !== 0 && (
+                    {dropDelta !== 0 && (
                       <Delta value={dropDelta} unit="s" factor={1000} />
                     )}
                   </td>
                   <td className="text-left py-1.5 px-2 text-zinc-500 text-[10px]">
-                    {best ? best.driver["driver-name"] : "–"}
+                    {best
+                      ? `${best.driver["driver-name"]} L${best.lapStart}-${best.lapEnd}`
+                      : "–"}
                   </td>
                 </tr>
               );

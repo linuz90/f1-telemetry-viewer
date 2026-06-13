@@ -63,7 +63,7 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 
 **ERS handling:** Pits n' Giggles F1 26 saved sessions can deploy more than the 4 MJ battery capacity per lap because the 2026 ruleset has no fixed deploy limit. Display ERS deployment as energy (`MJ/lap`), preferring `per-lap-info[].ers-stats["ers-deployed-j"]` and falling back to `car-status-data["ers-deployed-this-lap"]` for older exports. Keep battery-store values as percentages only when explicitly showing remaining store.
 
-**Rivals roster:** Online race summaries carry a slim per-driver roster (`SessionSummary.rivals`) with each opponent's normalized name, team, lap stats, overtake counts, average per-lap position gap to the player, and a fastest-lap flag. Identity key is the normalized `driver-name` (the only field stable across sessions). The dashboard's Rivals & Teammates section aggregates this across the active formula scope via `src/utils/rivalStats.ts` — see that module for thresholds. Quali and offline-AI sessions skip the roster to keep the summary slim.
+**Rivals roster:** Online race summaries carry a slim per-driver roster (`SessionSummary.rivals`) with each opponent's normalized name, team, lap stats, same-compound clean-median pace delta when available, overtake counts, average per-lap position gap to the player, and a fastest-lap flag. Identity key is the normalized `driver-name` (the only field stable across sessions). The dashboard's Rivals & Teammates section aggregates this across the active formula scope via `src/utils/rivalStats.ts` — see that module for thresholds. Quali and offline-AI sessions skip the roster to keep the summary slim.
 
 **Styling:** Dark theme (slate-950 background). All styling via Tailwind utility classes.
 

@@ -6,10 +6,6 @@ import {
   formatDate,
   formatSessionType,
 } from "../../utils/format";
-import {
-  getFormulaLabel,
-  shouldShowFormulaLabel,
-} from "../../utils/sessionTypes";
 import { sessionSummaryPath } from "../../utils/routes";
 import { GridGainGlyph } from "./GridGainGlyph";
 import {
@@ -34,7 +30,6 @@ export function ResultRow({ session }: { session: SessionSummary }) {
     0;
   const status = result?.status;
   const problem = isProblemStatus(status);
-  const showFormula = shouldShowFormulaLabel(session.formula, session.gameYear);
   const Icon = podiumIcon(result?.position);
   const to = sessionSummaryPath(session);
 
@@ -47,11 +42,6 @@ export function ResultRow({ session }: { session: SessionSummary }) {
           <span className="truncate text-sm font-medium text-zinc-100">
             {session.track}
           </span>
-          {showFormula && (
-            <span className="shrink-0 rounded-sm bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
-              {getFormulaLabel(session.formula, session.gameYear)}
-            </span>
-          )}
           {problem && <Badge tone="red">{resultStatusLabel(status)}</Badge>}
         </>
       }

@@ -20,7 +20,7 @@ const STRENGTH_META: Record<
   { label: string; tone: BadgeTone }
 > = {
   "fastest-lap": { label: "Fastest lap", tone: "sky" },
-  "best-pace": { label: "Best pace", tone: "green" },
+  "best-pace": { label: "Best median pace", tone: "green" },
   "best-stint": { label: "Best stint", tone: "amber" },
   "lowest-deg": { label: "Lowest deg", tone: "green" },
 };
@@ -156,7 +156,7 @@ export function RaceSetupComparison({
           <div className="grid grid-cols-[minmax(260px,1.6fr)_repeat(5,minmax(88px,0.7fr))] gap-3 px-3 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
             <div>Setup</div>
             <div>Best lap</div>
-            <div>Clean pace</div>
+            <div>Median pace</div>
             <div>Best stint</div>
             <div>Wear</div>
             <div>Races</div>
@@ -203,7 +203,7 @@ export function RaceSetupComparison({
                     className="text-purple-300"
                   />
                   <MetricCell
-                    value={formatLapMetric(candidate.avgCleanPaceMs)}
+                    value={formatLapMetric(candidate.medianCleanPaceMs)}
                     detail={
                       candidate.cleanLapCount > 0
                         ? `${candidate.cleanLapCount} clean laps`

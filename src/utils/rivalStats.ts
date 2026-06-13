@@ -62,6 +62,14 @@ interface RivalAggregate {
    * median still favors recent form.
    */
   bestLapDeltas: { deltaMs: number; weight: number }[];
+  /**
+   * Per-race samples of same-compound clean median pace deltas. Preferred over
+   * best-lap deltas for pace cards because it compares representative race pace
+   * on tyres both drivers actually used.
+   */
+  compoundPaceDeltas: { deltaMs: number; weight: number }[];
+  compoundPaceRaceSamples: number;
+  compoundPaceLapSamples: number;
   /** Sum of rival lap stddev ms across races where they had ≥5 valid laps. */
   stddevSumMs: number;
   stddevSamples: number;
@@ -245,6 +253,9 @@ function newAggregate(rival: { key: string; name: string; team?: string }, fallb
     teammateRaces: 0,
     weightedTeammateRaces: 0,
     bestLapDeltas: [],
+    compoundPaceDeltas: [],
+    compoundPaceRaceSamples: 0,
+    compoundPaceLapSamples: 0,
     stddevSumMs: 0,
     stddevSamples: 0,
     weightedStddevSumMs: 0,
@@ -310,6 +321,15 @@ function aggregateRivals(sessions: SessionSummary[]): Map<string, RivalAggregate
           deltaMs: rival.bestLapMs - playerBest,
           weight,
         });
+      }
+      if (rival.compoundMatchedPaceDeltaMs != null) {
+        existing.compoundPaceDeltas.push({
+          deltaMs: rival.compoundMatchedPaceDeltaMs,
+          weight,
+        });
+        existing.compoundPaceRaceSamples += 1;
+        existing.compoundPaceLapSamples +=
+          rival.compoundMatchedPaceLapCount ?? 0;
       }
       if (
         rival.stddevLapMs != null &&
@@ -394,6 +414,47 @@ function bestLapMedianMs(aggregate: RivalAggregate): number | undefined {
   );
 }
 
+interface PaceMedian {
+  deltaMs: number;
+  raceSamples: number;
+  lapSamples?: number;
+  basis: "same-compound pace" | "best-lap fallback";
+}
+
+function compoundPaceMedianMs(aggregate: RivalAggregate): number | undefined {
+  return weightedMedian(
+    aggregate.compoundPaceDeltas.map((s) => ({
+      value: s.deltaMs,
+      weight: s.weight,
+    })),
+  );
+}
+
+function preferredPaceMedian(aggregate: RivalAggregate): PaceMedian | undefined {
+  const compoundMedian = compoundPaceMedianMs(aggregate);
+  if (
+    compoundMedian != null &&
+    aggregate.compoundPaceRaceSamples >= MIN_PACE_RACES
+  ) {
+    return {
+      deltaMs: compoundMedian,
+      raceSamples: aggregate.compoundPaceRaceSamples,
+      lapSamples: aggregate.compoundPaceLapSamples,
+      basis: "same-compound pace",
+    };
+  }
+
+  const bestLapMedian = bestLapMedianMs(aggregate);
+  if (bestLapMedian == null || aggregate.bestLapDeltas.length < MIN_PACE_RACES) {
+    return undefined;
+  }
+  return {
+    deltaMs: bestLapMedian,
+    raceSamples: aggregate.bestLapDeltas.length,
+    basis: "best-lap fallback",
+  };
+}
+
 function formatDeltaSeconds(ms: number): string {
   const sign = ms > 0 ? "+" : ms < 0 ? "−" : "";
   const seconds = Math.abs(ms) / 1000;
@@ -425,10 +486,10 @@ function buildClosestTeammateCards(aggregates: RivalAggregate[]): RivalCard[] {
     return b.teammateRaces - a.teammateRaces;
   });
   return top.map((winner) => {
-    const medianDeltaMs = bestLapMedianMs(winner);
+    const paceMedian = preferredPaceMedian(winner);
     const headline =
-      medianDeltaMs != null
-        ? formatDeltaSeconds(medianDeltaMs)
+      paceMedian != null
+        ? formatDeltaSeconds(paceMedian.deltaMs)
         : `${winner.teammateRaces}×`;
     const detailParts: string[] = [`${winner.teammateRaces} races`];
     if (winner.h2hWinsForPlayer + winner.h2hWinsForRival > 0) {
@@ -436,7 +497,7 @@ function buildClosestTeammateCards(aggregates: RivalAggregate[]): RivalCard[] {
         `H2H ${winner.h2hWinsForPlayer}-${winner.h2hWinsForRival}`,
       );
     }
-    const relation = medianDeltaMs != null ? relationToYou(medianDeltaMs) : undefined;
+    const relation = paceMedian != null ? relationToYou(paceMedian.deltaMs) : undefined;
     if (relation) detailParts.push(relation);
     return {
       kind: "closest-teammate",
@@ -467,13 +528,14 @@ function buildFrequentRivalCards(aggregates: RivalAggregate[]): RivalCard[] {
   });
   return top.map((winner) => {
     const opponentRaces = winner.races - winner.teammateRaces;
-    const medianDeltaMs = bestLapMedianMs(winner);
+    const paceMedian = preferredPaceMedian(winner);
     // Use the magnitude + a direction word in the footer ("0.052s faster
-     // than you") so the slim format reads in plain English — no sign
-     // convention to mentally translate.
+    // than you") so the slim format reads in plain English — no sign
+    // convention to mentally translate.
+    const relation = paceMedian != null ? relationToYou(paceMedian.deltaMs) : undefined;
     const gapPhrase =
-      medianDeltaMs != null
-        ? `${(Math.abs(medianDeltaMs) / 1000).toFixed(3)}s ${relationToYou(medianDeltaMs)}`
+      paceMedian != null && relation
+        ? `${(Math.abs(paceMedian.deltaMs) / 1000).toFixed(3)}s ${relation}`
         : undefined;
     const detail = [
       `${winner.races} races`,
@@ -496,28 +558,38 @@ function buildFrequentRivalCards(aggregates: RivalAggregate[]): RivalCard[] {
 function buildPaceBenchmarkCards(aggregates: RivalAggregate[]): RivalCard[] {
   // Annotate each candidate with its weighted-median delta once so we don't
   // recompute it inside the filter + sort + map (median is O(n log n) per call).
-  type Annotated = RivalAggregate & { medianDeltaMs: number };
+  type Annotated = RivalAggregate & { paceMedian: PaceMedian };
   const annotated = aggregates.flatMap<Annotated>((r) => {
-    if (r.bestLapDeltas.length < MIN_PACE_RACES) return [];
     if (r.races - r.teammateRaces < 1) return [];
     if (r.weightedRaces < MIN_RECENCY_SCORE) return [];
-    const medianDeltaMs = bestLapMedianMs(r);
-    if (medianDeltaMs == null || medianDeltaMs >= 0) return [];
-    return [{ ...r, medianDeltaMs }];
+    const paceMedian = preferredPaceMedian(r);
+    if (paceMedian == null || paceMedian.deltaMs >= 0) return [];
+    return [{ ...r, paceMedian }];
   });
   const top = takeTop(annotated, MAX_PER_KIND["pace-benchmark"], (a, b) => {
     const ph = placeholderRank(a) - placeholderRank(b);
     if (ph !== 0) return ph;
-    return a.medianDeltaMs - b.medianDeltaMs;
+    return a.paceMedian.deltaMs - b.paceMedian.deltaMs;
   });
-  return top.map((winner) => ({
-    kind: "pace-benchmark",
-    driverName: winner.name,
-    team: winner.latestTeam ?? winner.team,
-    headline: formatDeltaSeconds(winner.medianDeltaMs),
-    detail: `${winner.bestLapDeltas.length} races · faster than you`,
-    sampleSize: winner.bestLapDeltas.length,
-  }));
+  return top.map((winner) => {
+    const evidence =
+      winner.paceMedian.basis === "same-compound pace" &&
+      winner.paceMedian.lapSamples
+        ? `${winner.paceMedian.raceSamples} races · ${winner.paceMedian.lapSamples} laps · same tyres`
+        : `${winner.paceMedian.raceSamples} races`;
+    const basis =
+      winner.paceMedian.basis === "same-compound pace"
+        ? ""
+        : ` · ${winner.paceMedian.basis}`;
+    return {
+      kind: "pace-benchmark",
+      driverName: winner.name,
+      team: winner.latestTeam ?? winner.team,
+      headline: formatDeltaSeconds(winner.paceMedian.deltaMs),
+      detail: `${evidence}${basis}`,
+      sampleSize: winner.paceMedian.raceSamples,
+    };
+  });
 }
 
 function buildMostConsistentRivalCards(

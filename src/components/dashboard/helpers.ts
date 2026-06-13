@@ -8,7 +8,6 @@ import type { SessionSummary } from "../../types/telemetry";
 import {
   getFormulaComparisonKey,
   getFormulaLabel,
-  shouldShowFormulaLabel,
 } from "../../utils/sessionTypes";
 import { trackPath } from "../../utils/routes";
 
@@ -24,7 +23,6 @@ export interface TrackGroup {
   track: string;
   formulaKey: string;
   formulaLabel: string;
-  showFormula: boolean;
   stats: SessionStats[];
 }
 
@@ -163,10 +161,6 @@ export function buildTrackGroups(
         track: session.summary.track,
         formulaKey,
         formulaLabel: getFormulaLabel(
-          session.summary.formula,
-          session.summary.gameYear,
-        ),
-        showFormula: shouldShowFormulaLabel(
           session.summary.formula,
           session.summary.gameYear,
         ),

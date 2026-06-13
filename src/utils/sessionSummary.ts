@@ -1,6 +1,7 @@
 import type {
   DriverData,
   FinalClassification,
+  LapHistoryEntry,
   ParticipantData,
   PlayerRaceResult,
   PlayerStintSummary,
@@ -11,6 +12,7 @@ import type {
 } from "../types/telemetry";
 import { isQualifyingSessionType, isRaceSessionType } from "./sessionTypes";
 import { isAutoSaveFilename, parseFilename, resolveSessionMeta, toSlug } from "./parseFilename";
+import { getCleanRaceLapSamples, medianLapTimeMs } from "./stats";
 
 export interface BuiltSessionSummary {
   summary: SessionSummary & { fileSize: number };
@@ -146,6 +148,61 @@ function computeLapStats(driver: DriverData): {
   };
 }
 
+function cleanLapsByCompound(driver: DriverData): Map<string, LapHistoryEntry[]> {
+  const byCompound = new Map<string, LapHistoryEntry[]>();
+  for (const sample of getCleanRaceLapSamples(driver)) {
+    if (!sample.compound) continue;
+    const laps = byCompound.get(sample.compound) ?? [];
+    laps.push(sample.lap);
+    byCompound.set(sample.compound, laps);
+  }
+  return byCompound;
+}
+
+function compoundMatchedPaceDelta(
+  player: DriverData,
+  rival: DriverData,
+): Pick<
+  RivalEntry,
+  | "compoundMatchedPaceDeltaMs"
+  | "compoundMatchedPaceLapCount"
+  | "compoundMatchedPaceCompounds"
+> {
+  const playerByCompound = cleanLapsByCompound(player);
+  const rivalByCompound = cleanLapsByCompound(rival);
+  const compounds = [...playerByCompound.keys()].filter((compound) =>
+    rivalByCompound.has(compound),
+  );
+
+  let weightedDelta = 0;
+  let totalWeight = 0;
+  const contributingCompounds: string[] = [];
+
+  for (const compound of compounds) {
+    const playerLaps = playerByCompound.get(compound) ?? [];
+    const rivalLaps = rivalByCompound.get(compound) ?? [];
+    // One matching lap would still behave like a best-lap comparison. Requiring
+    // a small sample on both drivers keeps the dashboard pace card honest.
+    const sharedLapEvidence = Math.min(playerLaps.length, rivalLaps.length);
+    if (sharedLapEvidence < 3) continue;
+
+    const playerMedian = medianLapTimeMs(playerLaps);
+    const rivalMedian = medianLapTimeMs(rivalLaps);
+    if (playerMedian <= 0 || rivalMedian <= 0) continue;
+
+    weightedDelta += (rivalMedian - playerMedian) * sharedLapEvidence;
+    totalWeight += sharedLapEvidence;
+    contributingCompounds.push(compound);
+  }
+
+  if (totalWeight === 0) return {};
+  return {
+    compoundMatchedPaceDeltaMs: Math.round(weightedDelta / totalWeight),
+    compoundMatchedPaceLapCount: totalWeight,
+    compoundMatchedPaceCompounds: contributingCompounds,
+  };
+}
+
 function buildPositionMap(
   history: { "lap-number": number; position: number }[] | undefined,
 ): Map<number, number> {
@@ -261,6 +318,7 @@ function buildRivalsRoster(
       ? getBestLapMs(classification)
       : undefined;
     const bestLapMs = lapStats.bestLapMs ?? bestFromClassification;
+    const compoundPace = compoundMatchedPaceDelta(player, driver);
 
     roster.push({
       key,
@@ -275,6 +333,7 @@ function buildRivalsRoster(
       validLapCount: lapStats.validLapCount,
       meanLapMs: lapStats.meanLapMs,
       stddevLapMs: lapStats.stddevLapMs,
+      ...compoundPace,
       overtakes: overtakesByDriver.get(key) ?? 0,
       overtakesOnPlayer: overtakesOnPlayer.get(key) ?? 0,
       overtakesByPlayer: overtakesByPlayer.get(key) ?? 0,

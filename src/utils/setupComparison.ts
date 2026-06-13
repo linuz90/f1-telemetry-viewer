@@ -6,13 +6,13 @@ import type {
 } from "../types/telemetry";
 import {
   avgWearRate,
-  filterOutlierLaps,
   findPlayer,
   getBestLapTime,
-  getCleanRaceLaps,
+  getCleanRaceLapSamples,
   getCompletedStints,
   getDriverStints,
   isRaceSession,
+  medianPaceInRange,
 } from "./stats";
 
 type SetupFingerprintKey = Exclude<keyof CarSetup, "fuel-load" | "is-valid">;
@@ -66,7 +66,7 @@ export interface RaceSetupCandidate {
   sampleCount: number;
   cleanLapCount: number;
   bestLapMs: number | null;
-  avgCleanPaceMs: number | null;
+  medianCleanPaceMs: number | null;
   bestStintPaceMs: number | null;
   bestStintLabel: string | null;
   avgWearRatePerLap: number | null;
@@ -93,6 +93,8 @@ interface BestStintPace {
   paceMs: number;
   label: string;
 }
+
+const MIN_CLEAN_LAPS_FOR_SETUP_PACE = 3;
 
 function isUsableSetup(setup: CarSetup | null | undefined): setup is CarSetup {
   if (!setup?.["is-valid"]) return false;
@@ -146,14 +148,20 @@ function average(values: number[]): number | null {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function averageCleanPace(player: DriverData): { paceMs: number | null; lapCount: number } {
-  const cleanLaps = getCleanRaceLaps(player);
-  if (cleanLaps.length === 0) return { paceMs: null, lapCount: 0 };
+function medianValue(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1]! + sorted[mid]!) / 2
+    : sorted[mid]!;
+}
+
+function cleanPaceSamples(player: DriverData): { lapTimesMs: number[]; lapCount: number } {
+  const cleanLaps = getCleanRaceLapSamples(player);
 
   return {
-    paceMs:
-      cleanLaps.reduce((sum, lap) => sum + lap["lap-time-in-ms"], 0) /
-      cleanLaps.length,
+    lapTimesMs: cleanLaps.map((lap) => lap.timeMs),
     lapCount: cleanLaps.length,
   };
 }
@@ -173,12 +181,8 @@ function getBestStintPace(player: DriverData): BestStintPace | null {
 
     if (endLap - startLap + 1 < 3) return;
 
-    const cleanStintLaps = filterOutlierLaps(laps.slice(startLap - 1, endLap));
-    if (cleanStintLaps.length < 3) return;
-
-    const paceMs =
-      cleanStintLaps.reduce((sum, lap) => sum + lap["lap-time-in-ms"], 0) /
-      cleanStintLaps.length;
+    const paceMs = medianPaceInRange(laps, startLap, endLap);
+    if (paceMs <= 0) return;
     const compound = stint["tyre-set-data"]["visual-tyre-compound"];
     const label = `${compound} L${startLap}-${endLap}`;
 
@@ -211,14 +215,14 @@ function hasWinningValue(
 
 function withStrengths(candidates: RaceSetupCandidate[]): RaceSetupCandidate[] {
   const fastestLap = minValue(candidates, (candidate) => candidate.bestLapMs);
-  const bestPace = minValue(candidates, (candidate) => candidate.avgCleanPaceMs);
+  const bestPace = minValue(candidates, (candidate) => candidate.medianCleanPaceMs);
   const bestStint = minValue(candidates, (candidate) => candidate.bestStintPaceMs);
   const lowestDeg = minValue(candidates, (candidate) => candidate.avgWearRatePerLap);
 
   return candidates.map((candidate) => {
     const strengths: RaceSetupStrength[] = [];
     if (hasWinningValue(candidate.bestLapMs, fastestLap)) strengths.push("fastest-lap");
-    if (hasWinningValue(candidate.avgCleanPaceMs, bestPace)) strengths.push("best-pace");
+    if (hasWinningValue(candidate.medianCleanPaceMs, bestPace)) strengths.push("best-pace");
     if (hasWinningValue(candidate.bestStintPaceMs, bestStint)) strengths.push("best-stint");
     if (hasWinningValue(candidate.avgWearRatePerLap, lowestDeg)) strengths.push("lowest-deg");
     return { ...candidate, strengths };
@@ -249,7 +253,7 @@ export function buildRaceSetupComparison(
       summary: run.summary,
       bestLapMs,
     };
-    const cleanPace = averageCleanPace(player);
+    const cleanPace = cleanPaceSamples(player);
     const bestStint = getBestStintPace(player);
     const wearRate = avgWearRate(player);
 
@@ -283,9 +287,7 @@ export function buildRaceSetupComparison(
       accumulator.bestLapSource = source;
     }
 
-    if (cleanPace.paceMs !== null) {
-      accumulator.cleanPaceSamples.push(cleanPace.paceMs);
-    }
+    accumulator.cleanPaceSamples.push(...cleanPace.lapTimesMs);
 
     if (
       bestStint &&
@@ -309,7 +311,13 @@ export function buildRaceSetupComparison(
     sampleCount: accumulator.sampleCount,
     cleanLapCount: accumulator.cleanLapCount,
     bestLapMs: accumulator.bestLapMs,
-    avgCleanPaceMs: average(accumulator.cleanPaceSamples),
+    // A one- or two-lap run can be representative of a hotlap, not race pace.
+    // Keep the lap count visible, but only rank setup pace once there is at
+    // least a short stint's worth of clean evidence.
+    medianCleanPaceMs:
+      accumulator.cleanPaceSamples.length >= MIN_CLEAN_LAPS_FOR_SETUP_PACE
+        ? medianValue(accumulator.cleanPaceSamples)
+        : null,
     bestStintPaceMs: accumulator.bestStintPaceMs,
     bestStintLabel: accumulator.bestStintLabel,
     avgWearRatePerLap: average(accumulator.wearSamples),
@@ -321,7 +329,7 @@ export function buildRaceSetupComparison(
     .sort((a, b) => {
       const lapDiff = sortableMetric(a.bestLapMs) - sortableMetric(b.bestLapMs);
       if (lapDiff !== 0) return lapDiff;
-      const paceDiff = sortableMetric(a.avgCleanPaceMs) - sortableMetric(b.avgCleanPaceMs);
+      const paceDiff = sortableMetric(a.medianCleanPaceMs) - sortableMetric(b.medianCleanPaceMs);
       if (paceDiff !== 0) return paceDiff;
       const wearDiff = sortableMetric(a.avgWearRatePerLap) - sortableMetric(b.avgWearRatePerLap);
       if (wearDiff !== 0) return wearDiff;
