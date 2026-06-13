@@ -1,9 +1,11 @@
 import type { SessionSummary } from "../types/telemetry";
 import {
   compareFormulaComparisonKeys,
+  getFormulaComparisonAliases,
   getFormulaComparisonKey,
   getFormulaLabel,
   isRaceSessionType,
+  shouldShowFormulaLabel,
 } from "./sessionTypes";
 
 export interface FormulaScopeOption {
@@ -11,6 +13,7 @@ export interface FormulaScopeOption {
   label: string;
   sessionCount: number;
   latestTime: number;
+  showLabel: boolean;
 }
 
 export type ResultDataMode =
@@ -66,12 +69,16 @@ export function getFormulaScopeOptions(sessions: SessionSummary[]): FormulaScope
     if (existing) {
       existing.sessionCount += 1;
       existing.latestTime = Math.max(existing.latestTime, latestTime);
+      existing.showLabel =
+        existing.showLabel ||
+        shouldShowFormulaLabel(session.formula, session.gameYear);
     } else {
       options.set(key, {
         key,
         label: getFormulaLabel(session.formula, session.gameYear),
         sessionCount: 1,
         latestTime,
+        showLabel: shouldShowFormulaLabel(session.formula, session.gameYear),
       });
     }
   }
@@ -86,6 +93,33 @@ export function getFormulaScopeOptions(sessions: SessionSummary[]): FormulaScope
 
 export function getSessionFormulaScopeKey(session: SessionSummary): string {
   return getFormulaComparisonKey(session.formula, session.gameYear);
+}
+
+export function resolveFormulaScopeKey(
+  sessions: SessionSummary[],
+  requestedKey: string | null | undefined,
+): string | undefined {
+  const options = getFormulaScopeOptions(sessions);
+  if (options.length === 0) return undefined;
+
+  if (requestedKey) {
+    const optionKeys = new Set(options.map((option) => option.key));
+    if (optionKeys.has(requestedKey)) return requestedKey;
+
+    for (const session of sessions) {
+      const key = getSessionFormulaScopeKey(session);
+      if (
+        optionKeys.has(key) &&
+        getFormulaComparisonAliases(session.formula, session.gameYear).includes(
+          requestedKey,
+        )
+      ) {
+        return key;
+      }
+    }
+  }
+
+  return options[0]?.key;
 }
 
 export function getDefaultFormulaScopeKey(sessions: SessionSummary[]): string | undefined {

@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -13,6 +14,11 @@ import {
   type LoadedSessionSummary,
 } from "./zipLoader";
 import { deduplicateSessions } from "../utils/deduplicateSessions";
+import {
+  getFormulaScopeOptions,
+  resolveFormulaScopeKey,
+  type FormulaScopeOption,
+} from "../utils/dashboardStats";
 
 type Mode = "detecting" | "api" | "demo" | "upload";
 
@@ -21,6 +27,11 @@ interface TelemetryContextValue {
   sessions: SessionSummary[];
   sessionsLoading: boolean;
   sessionsError: string | null;
+  formulaOptions: FormulaScopeOption[];
+  activeFormulaKey: string | undefined;
+  activeFormula: FormulaScopeOption | undefined;
+  setActiveFormulaKey: (key: string | null | undefined) => void;
+  resolveFormulaKey: (key: string | null | undefined) => string | undefined;
   getSession: (slug: string) => Promise<TelemetrySession>;
   loadFiles: (files: File[]) => Promise<void>;
   showUploadModal: boolean;
@@ -43,6 +54,9 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [filesLoading, setFilesLoading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [requestedFormulaKey, setRequestedFormulaKey] = useState<string | null>(
+    null,
+  );
 
   // In-memory store for upload mode
   const [sessionStore] = useState(
@@ -52,6 +66,30 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   // API-mode session cache (mirrors the old api/client.ts cache)
   const [apiCache] = useState(
     () => new Map<string, Promise<TelemetrySession>>(),
+  );
+
+  const formulaOptions = useMemo(
+    () => getFormulaScopeOptions(sessions),
+    [sessions],
+  );
+  const activeFormulaKey = useMemo(
+    () => resolveFormulaScopeKey(sessions, requestedFormulaKey),
+    [sessions, requestedFormulaKey],
+  );
+  const activeFormula = useMemo(
+    () => formulaOptions.find((option) => option.key === activeFormulaKey),
+    [activeFormulaKey, formulaOptions],
+  );
+  const setActiveFormulaKey = useCallback(
+    (key: string | null | undefined) => {
+      setRequestedFormulaKey(key ?? null);
+    },
+    [],
+  );
+  const resolveFormulaKey = useCallback(
+    (key: string | null | undefined) =>
+      resolveFormulaScopeKey(sessions, key),
+    [sessions],
   );
 
   // Detect mode on mount
@@ -190,6 +228,11 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         sessions,
         sessionsLoading,
         sessionsError,
+        formulaOptions,
+        activeFormulaKey,
+        activeFormula,
+        setActiveFormulaKey,
+        resolveFormulaKey,
         getSession,
         loadFiles,
         showUploadModal,

@@ -29,7 +29,7 @@ import { ACCENT_TOKENS, accentCardClass, type AccentColor } from "../Card";
 import { TrackFlag } from "../TrackFlag";
 import { TrackLayout } from "../TrackLayout";
 import { trackFormulaPath } from "./helpers";
-import { sessionFormulaPath } from "../../utils/routes";
+import { sessionPath } from "../../utils/routes";
 
 interface InsightStyle {
   title: string;
@@ -111,7 +111,7 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
   const tokens = ACCENT_TOKENS[style.accent];
   const Icon = style.icon;
   const to = insight.sessionSlug
-    ? sessionFormulaPath(insight.sessionSlug, insight.formulaKey)
+    ? sessionPath(insight.sessionSlug)
     : trackFormulaPath(insight.track, insight.formulaKey);
 
   return (

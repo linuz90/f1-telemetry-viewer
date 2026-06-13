@@ -21,8 +21,8 @@ import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate,
 import { TrackFlag } from "../components/TrackFlag";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { CHART_THEME, TOOLTIP_STYLE, SECTOR_COLORS } from "../utils/colors";
-import { compareFormulaComparisonKeys, getFormulaComparisonAliases, getFormulaComparisonKey, getFormulaLabel, shouldShowFormulaLabel } from "../utils/sessionTypes";
-import { dashboardPath, sessionFormulaPath } from "../utils/routes";
+import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
+import { dashboardPath, sessionPath } from "../utils/routes";
 import { accentCardClass, cardClass, cardClassFeature } from "../components/Card";
 import { Upload, ArrowLeft } from "lucide-react";
 import { CarSetupCard } from "../components/CarSetupCard";
@@ -213,7 +213,13 @@ export function TrackProgressPage() {
   const { trackId } = useParams<{ trackId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { sessions } = useSessionList();
-  const { getSession, mode, setShowUploadModal } = useTelemetry();
+  const {
+    getSession,
+    mode,
+    setShowUploadModal,
+    activeFormulaKey,
+    activeFormula,
+  } = useTelemetry();
   const [data, setData] = useState<TrackSessionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"qualifying" | "race">("race");
@@ -224,62 +230,15 @@ export function TrackProgressPage() {
     () => sessions.filter((s) => s.track.toLowerCase() === (trackId ?? "")),
     [sessions, trackId],
   );
-  const formulaOptions = useMemo(() => {
-    const byKey = new Map<string, { key: string; label: string; aliases: Set<string>; count: number; showLabel: boolean; latestMs: number }>();
-    for (const session of allTrackSessions) {
-      const key = getFormulaComparisonKey(session.formula, session.gameYear);
-      const sessionMs = new Date(session.date).getTime();
-      const option = byKey.get(key);
-      if (option) {
-        option.count += 1;
-        option.latestMs = Math.max(option.latestMs, sessionMs);
-        for (const alias of getFormulaComparisonAliases(session.formula, session.gameYear)) {
-          option.aliases.add(alias);
-        }
-      } else {
-        byKey.set(key, {
-          key,
-          label: getFormulaLabel(session.formula, session.gameYear),
-          aliases: new Set(getFormulaComparisonAliases(session.formula, session.gameYear)),
-          count: 1,
-          showLabel: shouldShowFormulaLabel(session.formula, session.gameYear),
-          latestMs: sessionMs,
-        });
-      }
-    }
-    return [...byKey.values()].map((option) => ({
-      ...option,
-      aliases: [...option.aliases],
-    })).sort((a, b) => {
-      const formulaOrder = compareFormulaComparisonKeys(a.key, b.key);
-      if (formulaOrder !== 0) return formulaOrder;
-      if (a.latestMs !== b.latestMs) return b.latestMs - a.latestMs;
-      return a.label.localeCompare(b.label);
-    });
-  }, [allTrackSessions]);
-  const defaultFormulaKey = formulaOptions[0]?.key ?? "f1";
-  const requestedFormulaKey = searchParams.get("formula");
-  const requestedFormula = requestedFormulaKey
-    ? formulaOptions.find((formula) => formula.aliases.includes(requestedFormulaKey))
-    : undefined;
-  const activeFormulaKey = requestedFormula
-    ? requestedFormula.key
-    : defaultFormulaKey;
 
   const trackSessions = allTrackSessions.filter(
-    (s) => getFormulaComparisonKey(s.formula, s.gameYear) === activeFormulaKey,
+    (s) => !activeFormulaKey || getSessionFormulaScopeKey(s) === activeFormulaKey,
   );
   const trackSessionKey = trackSessions.map((s) => s.slug).join("|");
-  const activeFormula = formulaOptions.find((f) => f.key === activeFormulaKey);
-  const showFormulaSwitcher = formulaOptions.length > 1;
 
   // Resolve the original (display) track name from session data
   const displayTrackName = allTrackSessions.length > 0 ? allTrackSessions[0].track : trackId ?? "";
-  const backToDashboardPath = dashboardPath(
-    requestedFormula?.key ??
-      requestedFormulaKey ??
-      (formulaOptions.length > 0 ? activeFormulaKey : null),
-  );
+  const backToDashboardPath = dashboardPath(activeFormulaKey);
 
   useEffect(() => {
     if (!trackSessions.length) {
@@ -427,6 +386,9 @@ export function TrackProgressPage() {
 
   if (!data.length) {
     const isUploadWithNoData = mode === "upload" && sessions.length === 0;
+    const hasOnlyOtherFormulaScopes =
+      allTrackSessions.length > 0 && trackSessions.length === 0;
+    const formulaLabel = activeFormula?.label ?? "selected formula";
 
     return (
       <div className="flex items-center justify-center h-full">
@@ -442,11 +404,15 @@ export function TrackProgressPage() {
             <h3 className="text-base font-medium text-zinc-200">
               {isUploadWithNoData
                 ? "Track data not available"
-                : "No sessions found"}
+                : hasOnlyOtherFormulaScopes
+                  ? `No ${formulaLabel} sessions found`
+                  : "No sessions found"}
             </h3>
             <p className="mt-1 text-sm text-zinc-500">
               {isUploadWithNoData
                 ? "Uploaded telemetry is stored in memory and lost when the browser is closed. Re-upload your .zip to continue."
+                : hasOnlyOtherFormulaScopes
+                  ? `${displayTrackName} has telemetry in another formula scope. Switch the game scope in the sidebar to view it.`
                 : `No sessions found for ${displayTrackName}.`}
             </p>
           </div>
@@ -610,28 +576,6 @@ export function TrackProgressPage() {
         </div>
 
         <div className="flex flex-col items-end gap-2 shrink-0">
-          {showFormulaSwitcher && activeFormulaKey && (
-            <SegmentedControl
-              ariaLabel="Formula"
-              options={formulaOptions.map((f) => ({ value: f.key, label: f.label }))}
-              value={activeFormulaKey}
-              onChange={(key) => {
-                const nextParams = new URLSearchParams(searchParams);
-                nextParams.set("formula", key);
-                nextParams.delete("raceLaps");
-                setSearchParams(nextParams);
-              }}
-            />
-          )}
-          {!showFormulaSwitcher && activeFormula && (
-            <SegmentedControl
-              ariaLabel="Formula"
-              options={[{ value: activeFormula.key, label: activeFormula.label }]}
-              value={activeFormula.key}
-              onChange={() => {}}
-            />
-          )}
-
           {/* Tab switcher: interactive with both data types, static when only one exists. */}
           {hasBoth && (
             <SegmentedControl<"qualifying" | "race">
@@ -911,7 +855,7 @@ export function TrackProgressPage() {
               <h3 className="text-sm font-semibold text-zinc-300 mb-1">Your Best Qualifying Setup</h3>
               <p className="text-xs text-zinc-500 mb-4">
                 From{" "}
-                <Link to={sessionFormulaPath(bestQualiSession.summary.slug, activeFormulaKey)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
+                <Link to={sessionPath(bestQualiSession.summary.slug)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
                   {formatSessionType(bestQualiSession.summary.sessionType, bestQualiSession.summary.formula)} · {formatDate(bestQualiSession.summary.date)} · {msToLapTime(bestQualiSession.bestLapMs)}
                 </Link>
               </p>
@@ -1108,7 +1052,6 @@ export function TrackProgressPage() {
           {selectedRaceSetupCandidates.length > 0 && (
             <RaceSetupComparison
               candidates={selectedRaceSetupCandidates}
-              activeFormulaKey={activeFormulaKey}
               raceLengthLabel={selectedRaceLengthLabel}
             />
           )}
@@ -1143,7 +1086,7 @@ export function TrackProgressPage() {
             return (
               <SessionRow
                 key={d.summary.relativePath}
-                to={sessionFormulaPath(d.summary.slug, activeFormulaKey)}
+                to={sessionPath(d.summary.slug)}
                 leading={
                   <>
                     <span className="text-sm leading-none">

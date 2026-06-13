@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Bot, Flag, SlidersHorizontal, Trophy, type LucideIcon } from "lucide-react";
+import { Bot, Flag, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { SegmentedControl } from "./ui/SegmentedControl";
 
 export type SessionTypeFilter = "all" | "race" | "quali";
@@ -9,48 +9,31 @@ export type SessionModeFilter = "all" | "online" | "ai";
 export interface SessionListFilters {
   type: SessionTypeFilter;
   mode: SessionModeFilter;
-  formula: string | null;
 }
 
 export const DEFAULT_FILTERS: SessionListFilters = {
   type: "all",
   mode: "all",
-  formula: null,
 };
-
-export interface FormulaOption {
-  key: string;
-  label: string;
-}
 
 interface Props {
   value: SessionListFilters;
   onChange: (next: SessionListFilters) => void;
-  /** Formula options to show; section is hidden when fewer than 2. */
-  formulaOptions: FormulaOption[];
-  /** Resolved active formula key (after fallback to first option). */
-  activeFormulaKey: string | null;
 }
 
-/** Counts how many filter dimensions differ from defaults. Formula counts only when offered. */
-function countActive(value: SessionListFilters, formulaOptions: FormulaOption[]): number {
+function countActive(value: SessionListFilters): number {
   let n = 0;
   if (value.type !== DEFAULT_FILTERS.type) n += 1;
   if (value.mode !== DEFAULT_FILTERS.mode) n += 1;
-  // Only count formula when it's user-selectable AND differs from the first (default) option.
-  if (formulaOptions.length > 1 && value.formula && value.formula !== formulaOptions[0]?.key) {
-    n += 1;
-  }
   return n;
 }
 
-export function SessionListFilterMenu({ value, onChange, formulaOptions, activeFormulaKey }: Props) {
+export function SessionListFilterMenu({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
 
-  const activeCount = countActive(value, formulaOptions);
-  const showFormulaSection = formulaOptions.length > 1;
+  const activeCount = countActive(value);
 
   // Close on outside click and Escape
   useEffect(() => {
@@ -131,18 +114,6 @@ export function SessionListFilterMenu({ value, onChange, formulaOptions, activeF
             />
           </Section>
 
-          {showFormulaSection && (
-            <Section label="Formula" icon={Trophy}>
-              <SegmentedControl
-                size="sm"
-                fullWidth
-                options={formulaOptions.map((f) => ({ value: f.key, label: f.label }))}
-                value={activeFormulaKey ?? formulaOptions[0]?.key ?? ""}
-                onChange={(next) => onChange({ ...value, formula: next })}
-              />
-            </Section>
-          )}
-
           {!isDefault && (
             <div className="flex items-center justify-between px-3 py-2">
               <span className="text-[11px] text-zinc-500">
@@ -182,4 +153,3 @@ function Section({
     </div>
   );
 }
-

@@ -1,4 +1,5 @@
-import { Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { Layout } from "./components/Layout";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -39,6 +40,38 @@ function AppRoutes() {
   );
 }
 
+function FormulaScopeUrlSync() {
+  const location = useLocation();
+  const {
+    activeFormulaKey,
+    formulaOptions,
+    resolveFormulaKey,
+    setActiveFormulaKey,
+  } = useTelemetry();
+
+  useEffect(() => {
+    if (formulaOptions.length === 0) return;
+    if (location.pathname !== "/" && !location.pathname.startsWith("/track/")) {
+      return;
+    }
+
+    const requestedFormula = new URLSearchParams(location.search).get("formula");
+    const resolvedFormula = resolveFormulaKey(requestedFormula);
+    if (resolvedFormula && resolvedFormula !== activeFormulaKey) {
+      setActiveFormulaKey(resolvedFormula);
+    }
+  }, [
+    activeFormulaKey,
+    formulaOptions.length,
+    location.pathname,
+    location.search,
+    resolveFormulaKey,
+    setActiveFormulaKey,
+  ]);
+
+  return null;
+}
+
 const analyticsEnabled = import.meta.env.VITE_DISABLE_ANALYTICS !== "true";
 const appVersion = (window as Window & { __PNG_VERSION__?: string }).__PNG_VERSION__;
 if (appVersion) {
@@ -48,6 +81,7 @@ if (appVersion) {
 export function App() {
   return (
     <TelemetryProvider>
+      <FormulaScopeUrlSync />
       <AppRoutes />
       {analyticsEnabled && <Analytics />}
     </TelemetryProvider>

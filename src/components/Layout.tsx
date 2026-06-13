@@ -1,13 +1,15 @@
 import { Bell, ChevronRight, FolderUp, Menu, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import changelog from "virtual:changelog";
 import { useTelemetry } from "../context/TelemetryContext";
+import { dashboardPath } from "../utils/routes";
 import { AppBrand } from "./AppBrand";
 import { BrandHomeLink } from "./BrandHomeLink";
 import { cardHighlight } from "./Card";
 import { ChangelogModal } from "./ChangelogModal";
 import { SessionList } from "./SessionList";
+import { SegmentedControl } from "./ui/SegmentedControl";
 
 const MIN_WIDTH = 250;
 const MAX_WIDTH = 480;
@@ -25,11 +27,18 @@ function getInitialWidth(): number {
 }
 
 export function Layout() {
-  const { mode, setShowUploadModal } = useTelemetry();
+  const {
+    mode,
+    setShowUploadModal,
+    formulaOptions,
+    activeFormulaKey,
+    setActiveFormulaKey,
+  } = useTelemetry();
   const [width, setWidth] = useState(getInitialWidth);
   const [showChangelog, setShowChangelog] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const latestHash = changelog[0]?.hash ?? "";
   const [hasUnseen, setHasUnseen] = useState(
     () =>
@@ -76,6 +85,26 @@ export function Layout() {
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
   }, []);
+
+  const handleFormulaScopeChange = useCallback(
+    (nextKey: string) => {
+      setActiveFormulaKey(nextKey);
+
+      if (location.pathname.startsWith("/session/")) {
+        navigate(dashboardPath(nextKey));
+        return;
+      }
+
+      if (location.pathname === "/" || location.pathname.startsWith("/track/")) {
+        const nextParams = new URLSearchParams(location.search);
+        nextParams.set("formula", nextKey);
+        nextParams.delete("raceLaps");
+        const nextSearch = nextParams.toString();
+        navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`);
+      }
+    },
+    [location.pathname, location.search, navigate, setActiveFormulaKey],
+  );
 
   return (
     <div className="flex h-screen overflow-hidden relative">
@@ -131,6 +160,22 @@ export function Layout() {
               </button>
             </div>
           </div>
+          {formulaOptions.length > 1 && activeFormulaKey && (
+            <div className="mt-4">
+              <SegmentedControl
+                ariaLabel="Formula scope"
+                options={formulaOptions.map((option) => ({
+                  value: option.key,
+                  label: option.label,
+                }))}
+                value={activeFormulaKey}
+                onChange={handleFormulaScopeChange}
+                size="sm"
+                fullWidth
+                scrollable
+              />
+            </div>
+          )}
         </div>
         <SessionList />
       </aside>

@@ -5,14 +5,13 @@ import type {
   RaceSetupStrength,
 } from "../utils/setupComparison";
 import { msToLapTime, formatDate, formatSessionType } from "../utils/format";
-import { sessionFormulaPath } from "../utils/routes";
+import { sessionPath } from "../utils/routes";
 import { cardClass } from "./Card";
 import { CarSetupCard } from "./CarSetupCard";
 import { Badge, type BadgeTone } from "./ui/Badge";
 
 interface RaceSetupComparisonProps {
   candidates: RaceSetupCandidate[];
-  activeFormulaKey: string;
   raceLengthLabel?: string;
 }
 
@@ -40,16 +39,14 @@ function pluralizeRace(count: number): string {
 
 function SourceLink({
   candidate,
-  activeFormulaKey,
 }: {
   candidate: RaceSetupCandidate;
-  activeFormulaKey: string;
 }) {
   const { summary, bestLapMs } = candidate.source;
 
   return (
     <Link
-      to={sessionFormulaPath(summary.slug, activeFormulaKey)}
+      to={sessionPath(summary.slug)}
       className="text-zinc-400 hover:text-zinc-200 transition-colors"
     >
       {formatSessionType(summary.sessionType, summary.formula)} ·{" "}
@@ -92,7 +89,6 @@ function getDefaultCandidateId(candidates: RaceSetupCandidate[]): string {
 
 export function RaceSetupComparison({
   candidates,
-  activeFormulaKey,
   raceLengthLabel,
 }: RaceSetupComparisonProps) {
   const defaultCandidateId = useMemo(
@@ -130,10 +126,7 @@ export function RaceSetupComparison({
         </h3>
         <p className="text-xs text-zinc-500 mb-4">
           From{" "}
-          <SourceLink
-            candidate={candidate}
-            activeFormulaKey={activeFormulaKey}
-          />
+          <SourceLink candidate={candidate} />
         </p>
         <CarSetupCard setup={candidate.setup} />
       </section>
@@ -241,10 +234,7 @@ export function RaceSetupComparison({
       <div className="mt-5 border-t border-white/[0.06] pt-5">
         <p className="text-xs text-zinc-500 mb-4">
           Detail from{" "}
-          <SourceLink
-            candidate={selectedCandidate}
-            activeFormulaKey={activeFormulaKey}
-          />
+          <SourceLink candidate={selectedCandidate} />
         </p>
         <CarSetupCard setup={selectedCandidate.setup} />
       </div>

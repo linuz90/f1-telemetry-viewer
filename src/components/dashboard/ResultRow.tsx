@@ -7,11 +7,10 @@ import {
   formatSessionType,
 } from "../../utils/format";
 import {
-  getFormulaComparisonKey,
   getFormulaLabel,
   shouldShowFormulaLabel,
 } from "../../utils/sessionTypes";
-import { sessionFormulaPath } from "../../utils/routes";
+import { sessionPath } from "../../utils/routes";
 import { GridGainGlyph } from "./GridGainGlyph";
 import {
   gridGainTone,
@@ -37,14 +36,11 @@ export function ResultRow({ session }: { session: SessionSummary }) {
   const problem = isProblemStatus(status);
   const showFormula = shouldShowFormulaLabel(session.formula, session.gameYear);
   const Icon = podiumIcon(result?.position);
-  const sessionPath = sessionFormulaPath(
-    session.slug,
-    getFormulaComparisonKey(session.formula, session.gameYear),
-  );
+  const to = sessionPath(session.slug);
 
   return (
     <SessionRow
-      to={session.isSynthetic ? null : sessionPath}
+      to={session.isSynthetic ? null : to}
       leading={
         <>
           <TrackFlag track={session.track} />

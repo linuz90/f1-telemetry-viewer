@@ -1,9 +1,11 @@
+import { useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { Upload, ArrowLeft } from "lucide-react";
 import { useSession } from "../hooks/useSession";
 import { useTelemetry } from "../context/TelemetryContext";
 import { isRaceSession } from "../utils/stats";
 import { dashboardPath } from "../utils/routes";
+import { getFormulaComparisonKey } from "../utils/sessionTypes";
 import { RaceSessionView } from "./RaceSessionView";
 import { QualifyingSessionView } from "./QualifyingSessionView";
 
@@ -16,10 +18,25 @@ export function SessionPage() {
   const slug = location.pathname.replace("/session/", "");
 
   const { session, loading, error } = useSession(slug);
-  const { mode, sessions, setShowUploadModal } = useTelemetry();
-  const backToDashboardPath = dashboardPath(
-    new URLSearchParams(location.search).get("formula"),
-  );
+  const {
+    mode,
+    sessions,
+    setShowUploadModal,
+    activeFormulaKey,
+    setActiveFormulaKey,
+  } = useTelemetry();
+  const backToDashboardPath = dashboardPath(activeFormulaKey);
+
+  useEffect(() => {
+    if (!session) return;
+    const sessionFormulaKey = getFormulaComparisonKey(
+      session["session-info"].formula,
+      session["game-year"],
+    );
+    if (sessionFormulaKey !== activeFormulaKey) {
+      setActiveFormulaKey(sessionFormulaKey);
+    }
+  }, [activeFormulaKey, session, setActiveFormulaKey]);
 
   if (loading) {
     return (

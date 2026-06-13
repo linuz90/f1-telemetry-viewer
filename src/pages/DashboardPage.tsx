@@ -1,8 +1,6 @@
 import { ChevronDown, ChevronUp, Timer } from "lucide-react";
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { cardHighlight } from "../components/Card";
-import { FormulaScopeTabs } from "../components/dashboard/FormulaScopeTabs";
 import { InsightCard } from "../components/dashboard/InsightCard";
 import { QualifyingPaceCard } from "../components/dashboard/QualifyingPaceCard";
 import { RaceResultsHero } from "../components/dashboard/RaceResultsHero";
@@ -20,8 +18,6 @@ import { useSessionList } from "../hooks/useSessionList";
 import {
   buildTrackInsights,
   getDashboardResultStats,
-  getDefaultFormulaScopeKey,
-  getFormulaScopeOptions,
   getSessionFormulaScopeKey,
 } from "../utils/dashboardStats";
 import { sortTracksByCalendar } from "../utils/format";
@@ -32,8 +28,7 @@ const RECENT_RESULTS_COLLAPSED = 3;
 
 export function DashboardPage() {
   const { sessions, loading } = useSessionList();
-  const { mode } = useTelemetry();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { mode, activeFormulaKey, activeFormula } = useTelemetry();
   const [showAllResults, setShowAllResults] = useState(false);
   const isDemoMode = mode === "demo";
 
@@ -51,17 +46,6 @@ export function DashboardPage() {
   // rivals, tracks) so the prod no-data preview looks like a real dashboard.
   // List/card surfaces either render them as static demo rows or rely on the
   // SessionPage's friendly "demo preview" placeholder when a chart links to one.
-  const formulaOptions = getFormulaScopeOptions(validSessions);
-  const requestedFormulaKey = searchParams.get("formula");
-  const defaultFormulaKey = getDefaultFormulaScopeKey(validSessions);
-  const activeFormulaKey = formulaOptions.some(
-    (option) => option.key === requestedFormulaKey,
-  )
-    ? (requestedFormulaKey ?? undefined)
-    : defaultFormulaKey;
-  const activeFormula = formulaOptions.find(
-    (option) => option.key === activeFormulaKey,
-  );
   const dashboardStats = getDashboardResultStats(
     validSessions,
     activeFormulaKey,
@@ -119,26 +103,15 @@ export function DashboardPage() {
     ? `${formulaLabelText} · ${scopedSessions.length} ${scopedSessions.length === 1 ? "session" : "sessions"} across ${uniqueTracks.length} ${uniqueTracks.length === 1 ? "track" : "tracks"}`
     : `${formulaLabelText} form across your saved sessions`;
 
-  function selectFormula(nextKey: string) {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("formula", nextKey);
-    setSearchParams(nextParams);
-  }
-
   return (
     <div className="mx-auto max-w-5xl space-y-8 p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div>
         <div className="min-w-0">
           <h2 className="mb-1 text-xl font-bold">
             {isDemoMode ? "Demo" : "Dashboard"}
           </h2>
           <p className="text-sm text-zinc-500">{subtitle}</p>
         </div>
-        <FormulaScopeTabs
-          options={formulaOptions}
-          activeKey={activeFormulaKey}
-          onSelect={selectFormula}
-        />
       </div>
 
       {!hasScopedData ? (

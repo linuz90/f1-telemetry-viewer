@@ -14,10 +14,10 @@ Supports recent F1 (and F2) telemetry, including the newly released **2026 Seaso
 ## What It Does
 
 - 🏁 **Results dashboard** - See your real race form at a glance: average finish, podiums, wins, front-row starts, top-five rate, DNFs, grid gain, recent results, best and toughest tracks, comeback drives, lap-one gains, fastest-lap highlights, and tyre-management patterns.
-- 🧭 **Formula scopes** - Keep F1 26, F1 25, F2 25, and older data separate. The dashboard and sidebar default to the latest game generation while still letting you switch back to older sessions.
+- 🧭 **Formula scopes** - Keep F1 26, F1 25, F2 25, and older data separate with one app-wide selector. The app defaults to the latest game generation while still letting you switch back to older sessions.
 - 🤝 **Rivals & teammates** - Aggregate online race rosters into teammate pace, frequent rivals, head-to-heads, fastest-lap threats, pole sitters, overtakers, and other repeat patterns.
 - 📊 **Session detail** - Open any race or qualifying session for lap-by-lap charts, sector tables, stint timelines, tyre wear, damage, ERS, fuel, position history, and driver-vs-driver deltas.
-- 🗺️ **Track progress** - Drill into a circuit to compare game generations, review best laps, qualifying progression, race pace, setup history, tyre life, fuel usage, and every saved session for that track.
+- 🗺️ **Track progress** - Drill into a circuit within the active game scope to review best laps, qualifying progression, race pace, setup history, tyre life, fuel usage, and every saved session for that track.
 - 🔒 **Private data loading** - Use the local API during development, self-host against your telemetry folder, or drag in `.json` files / a `.zip` in the browser. Hosted uploads stay in memory and never leave your device.
 
 The dashboard prefers representative online races when there is enough human-grid data. If that is not available for a formula scope, it gracefully falls back to whatever race results or session history exists, so you only see an empty state when there is truly no data to show.

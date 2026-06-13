@@ -11,9 +11,9 @@ interface BrandHomeLinkProps {
 
 export function BrandHomeLink({ className }: BrandHomeLinkProps) {
   const location = useLocation();
-  const { mode } = useTelemetry();
+  const { mode, activeFormulaKey } = useTelemetry();
   const isDashboard = location.pathname === "/";
-  const homePath = dashboardPath(new URLSearchParams(location.search).get("formula"));
+  const homePath = dashboardPath(activeFormulaKey);
   // In the prod no-data demo, the home page is positioned as a preview rather
   // than the user's own dashboard — so the back-link reads "Demo" to match.
   const homeLabel = mode === "demo" ? "Demo" : "Dashboard";

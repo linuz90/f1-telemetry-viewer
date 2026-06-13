@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { useTelemetry } from "../context/TelemetryContext";
 import { useSessionList } from "../hooks/useSessionList";
 import type { SessionSummary } from "../types/telemetry";
 import { formatDate, formatTime, formatSessionType, toTrackSlug, sortTracksByCalendar } from "../utils/format";
 import { isQualifyingSessionType, isRaceSessionType } from "../utils/sessionTypes";
-import { getFormulaScopeOptions, getSessionFormulaScopeKey } from "../utils/dashboardStats";
+import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
 import { TrackFlag } from "./TrackFlag";
 import { SessionCard } from "./SessionCard";
 import {
@@ -28,7 +29,7 @@ const PAGE_SIZE = 50;
 const FILTERS_STORAGE_KEY = "session-list-filters";
 
 function representativeFormulaKey(sessions: SessionSummary[]): string | undefined {
-  return getFormulaScopeOptions(sessions)[0]?.key;
+  return sessions[0] ? getSessionFormulaScopeKey(sessions[0]) : undefined;
 }
 
 function readPersistedFilters(): SessionListFilters {
@@ -40,7 +41,6 @@ function readPersistedFilters(): SessionListFilters {
     return {
       type: parsed.type === "race" || parsed.type === "quali" ? parsed.type : "all",
       mode: parsed.mode === "online" || parsed.mode === "ai" ? parsed.mode : "all",
-      formula: typeof parsed.formula === "string" ? parsed.formula : null,
     };
   } catch {
     return DEFAULT_FILTERS;
@@ -49,6 +49,7 @@ function readPersistedFilters(): SessionListFilters {
 
 export function SessionList() {
   const { sessions, loading, error } = useSessionList();
+  const { activeFormulaKey } = useTelemetry();
   const [tab, setTab] = useState<"sessions" | "tracks">("sessions");
   const [filters, setFilters] = useState<SessionListFilters>(readPersistedFilters);
   const [page, setPage] = useState(0);
@@ -85,8 +86,8 @@ export function SessionList() {
     );
   }
 
-  // First pass: type + mode. We derive formula options from this set so the formula chips reflect
-  // what's actually available under the current type/mode selection, not the formula filter itself.
+  // First pass: type + mode. Formula scope is app-wide and applied below so the
+  // sidebar always matches the dashboard/track/session context.
   // Synthetic (demo-only) entries DO appear here so the sidebar reads like a real session list;
   // clicking one lands on the SessionPage's friendly "Demo session — upload to explore detail"
   // placeholder rather than a 404.
@@ -98,16 +99,8 @@ export function SessionList() {
     return true;
   });
 
-  const trackFormulaOptions = getFormulaScopeOptions(typeModeFiltered);
-  // Drop a persisted formula key that no longer matches any available scope so the UI silently
-  // falls back to the first option instead of showing nothing selected.
-  const activeTrackFormulaKey = trackFormulaOptions.some((option) => option.key === filters.formula)
-    ? filters.formula
-    : trackFormulaOptions[0]?.key ?? null;
-
-  // Second pass: apply formula. Both tabs filter by formula now that it lives in the shared menu.
-  const filteredSessions = activeTrackFormulaKey
-    ? typeModeFiltered.filter((s) => getSessionFormulaScopeKey(s) === activeTrackFormulaKey)
+  const filteredSessions = activeFormulaKey
+    ? typeModeFiltered.filter((s) => getSessionFormulaScopeKey(s) === activeFormulaKey)
     : typeModeFiltered;
 
   const pageCount = Math.ceil(filteredSessions.length / PAGE_SIZE);
@@ -117,7 +110,7 @@ export function SessionList() {
   const grouped = groupByDate(pagedSessions);
   const tracks = sortTracksByCalendar(
     [...new Set(filteredSessions.map((s) => s.track))],
-    activeTrackFormulaKey,
+    activeFormulaKey,
   );
 
   // Compute best lap time per track (lowest ms wins)
@@ -163,8 +156,6 @@ export function SessionList() {
             <SessionListFilterMenu
               value={filters}
               onChange={updateFilters}
-              formulaOptions={trackFormulaOptions.map((f) => ({ key: f.key, label: f.label }))}
-              activeFormulaKey={activeTrackFormulaKey ?? null}
             />
           </div>
         </div>
@@ -278,7 +269,7 @@ export function SessionList() {
           tracks.map((track) => {
             const trackSessions = filteredSessions.filter((s) => s.track === track);
             const count = trackSessions.length;
-            const formulaKey = activeTrackFormulaKey ?? representativeFormulaKey(trackSessions);
+            const formulaKey = activeFormulaKey ?? representativeFormulaKey(trackSessions);
             const bestTime = trackSessions
               .filter((s) => getSessionFormulaScopeKey(s) === formulaKey && s.bestLapTimeMs)
               .sort((a, b) => (a.bestLapTimeMs ?? Infinity) - (b.bestLapTimeMs ?? Infinity))[0]?.bestLapTime;
