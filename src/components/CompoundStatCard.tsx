@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { getCompoundColor } from "../utils/colors";
 import { dynamicAccentCardStyle } from "./Card";
+import { HStack } from "./ui/Stack";
 import { tableRowClass } from "./ui/table";
 
 interface CompoundStatCardRow {
@@ -34,7 +35,7 @@ export function CompoundStatCard({ compound, subtitle, rows, hero, progress, cla
       className={`rounded-xl px-3 py-3 ${className ?? ""}`}
       style={dynamicAccentCardStyle(color)}
     >
-      <div className="flex items-center gap-1.5 mb-1.5">
+      <HStack className="mb-1.5 gap-1.5">
         <span
           className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
           style={{ backgroundColor: color }}
@@ -45,7 +46,7 @@ export function CompoundStatCard({ compound, subtitle, rows, hero, progress, cla
         {subtitle && (
           <span className="text-[10px] text-zinc-500 ml-auto">{subtitle}</span>
         )}
-      </div>
+      </HStack>
       {hero && (
         <div className="text-center py-2 mb-1.5">
           <div className="font-mono text-2xl font-semibold text-zinc-100">
@@ -58,12 +59,12 @@ export function CompoundStatCard({ compound, subtitle, rows, hero, progress, cla
         {rows.map((row, i) => (
           <div key={i}>
             {row.divider && <div className={`${tableRowClass} my-2`} />}
-            <div className="flex justify-between">
+            <HStack justify="between">
               <span>{row.label}</span>
               <span className={row.className ?? "text-zinc-300 font-mono"}>
                 {row.value}
               </span>
-            </div>
+            </HStack>
           </div>
         ))}
         {progress && (

@@ -10,7 +10,7 @@ import {
   getFormulaLabel,
   shouldShowFormulaLabel,
 } from "../../utils/sessionTypes";
-import { toTrackSlug } from "../../utils/format";
+import { trackPath } from "../../utils/routes";
 
 export interface SessionStats {
   summary: SessionSummary;
@@ -29,7 +29,7 @@ export interface TrackGroup {
 }
 
 export function trackFormulaPath(track: string, formulaKey: string): string {
-  return `/track/${toTrackSlug(track)}?formula=${encodeURIComponent(formulaKey)}`;
+  return trackPath(formulaKey, track);
 }
 
 export function positionLabel(position: number | undefined): string {

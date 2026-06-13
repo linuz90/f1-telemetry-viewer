@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { cardHighlight } from "./Card";
+import { HStack } from "./ui/Stack";
 
 /**
  * Single visual primitive for "a row in a session list". Used by the
@@ -21,29 +22,30 @@ interface SessionRowProps {
 export function SessionRow({ to, leading, meta, trailing }: SessionRowProps) {
   const inner = (
     <>
-      <div className="flex min-w-0 items-center gap-2">{leading}</div>
+      <HStack>{leading}</HStack>
       <div className="ml-auto hidden min-w-0 flex-1 truncate text-right text-xs text-zinc-500 sm:block">
         {meta}
       </div>
-      <div className="flex shrink-0 items-center gap-3">{trailing}</div>
+      <HStack className="shrink-0 gap-3">{trailing}</HStack>
     </>
   );
   if (to == null) {
     return (
-      <div
+      <HStack
         title="Demo data — upload your telemetry to explore detail"
-        className={`flex items-center gap-3 rounded-xl bg-zinc-900/40 px-3 py-2 opacity-70 ${cardHighlight}`}
+        className={`gap-3 rounded-xl bg-zinc-900/40 px-3 py-2 opacity-70 ${cardHighlight}`}
       >
         {inner}
-      </div>
+      </HStack>
     );
   }
   return (
-    <Link
+    <HStack
+      as={Link}
       to={to}
-      className={`flex items-center gap-3 rounded-xl bg-zinc-900/60 px-3 py-2 transition-colors hover:bg-zinc-800/60 ${cardHighlight}`}
+      className={`gap-3 rounded-xl bg-zinc-900/60 px-3 py-2 transition-colors hover:bg-zinc-800/60 ${cardHighlight}`}
     >
       {inner}
-    </Link>
+    </HStack>
   );
 }

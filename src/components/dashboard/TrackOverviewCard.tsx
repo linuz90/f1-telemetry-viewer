@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 import type { SessionSummary } from "../../types/telemetry";
-import { formatShortDate, toTrackSlug } from "../../utils/format";
+import { formatShortDate } from "../../utils/format";
 import { cardClassCompact } from "../Card";
 import { TrackFlag } from "../TrackFlag";
 import { TrackLayout } from "../TrackLayout";
+import { HStack, VStack } from "../ui/Stack";
 import { trackFormulaPath } from "./helpers";
 
 export function TrackOverviewCard({
@@ -25,13 +26,13 @@ export function TrackOverviewCard({
   const isSyntheticOnly = sessions.every((session) => session.isSynthetic);
 
   const inner = (
-    <div className="flex items-center gap-3">
-      <div className="min-w-0 flex-1 flex flex-col gap-1">
-        <div className="flex items-center gap-1.5 text-base font-semibold">
+    <HStack className="gap-3">
+      <VStack className="flex-1 gap-1">
+        <HStack className="gap-1.5 text-base font-semibold">
           <TrackFlag track={track} />
           {track}
-        </div>
-        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">
+        </HStack>
+        <HStack wrap className="mt-1 gap-x-4 gap-y-1 text-xs text-zinc-400">
           <span>
             {sessions.length} {sessions.length === 1 ? "session" : "sessions"}
           </span>
@@ -43,13 +44,13 @@ export function TrackOverviewCard({
               Last {formatShortDate(new Date(lastDriven).toISOString())}
             </span>
           )}
-        </div>
-      </div>
+        </HStack>
+      </VStack>
       <TrackLayout
         track={track}
         className="size-14 shrink-0 text-zinc-500/40 transition-colors group-hover:text-purple-400/60 [&>svg]:size-full"
       />
-    </div>
+    </HStack>
   );
 
   if (isSyntheticOnly) {
@@ -63,13 +64,13 @@ export function TrackOverviewCard({
     );
   }
 
+  if (!activeFormulaKey) {
+    return <div className={`${cardClassCompact} opacity-70`}>{inner}</div>;
+  }
+
   return (
     <Link
-      to={
-        activeFormulaKey
-          ? trackFormulaPath(track, activeFormulaKey)
-          : `/track/${toTrackSlug(track)}`
-      }
+      to={trackFormulaPath(track, activeFormulaKey)}
       className={`${cardClassCompact} group transition-colors hover:bg-zinc-800/50`}
     >
       {inner}

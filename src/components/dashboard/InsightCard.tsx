@@ -28,6 +28,7 @@ import type {
 import { ACCENT_TOKENS, accentCardClass, type AccentColor } from "../Card";
 import { TrackFlag } from "../TrackFlag";
 import { TrackLayout } from "../TrackLayout";
+import { HStack } from "../ui/Stack";
 import { trackFormulaPath } from "./helpers";
 import { sessionPath } from "../../utils/routes";
 
@@ -111,7 +112,7 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
   const tokens = ACCENT_TOKENS[style.accent];
   const Icon = style.icon;
   const to = insight.sessionSlug
-    ? sessionPath(insight.sessionSlug)
+    ? sessionPath(insight.formulaKey, insight.sessionSlug)
     : trackFormulaPath(insight.track, insight.formulaKey);
 
   return (
@@ -123,7 +124,7 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
         track={insight.track}
         className={`pointer-events-none absolute right-6 top-1/2 size-34 -translate-y-1/2 ${tokens.iconText} opacity-6 [&>svg]:size-full [&_path]:![stroke-width:7]`}
       />
-      <div className="relative flex items-center gap-2">
+      <HStack className="relative gap-2">
         <Icon className={`size-3.5 ${tokens.iconText}`} />
         <span
           className={`text-[11px] font-mono font-semibold uppercase tracking-wider ${tokens.iconText}`}
@@ -135,13 +136,13 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
             {SCOPE_LABEL[insight.scope]}
           </span>
         )}
-      </div>
-      <div className="relative mt-2.5 flex items-center justify-between gap-3">
+      </HStack>
+      <HStack justify="between" className="relative mt-2.5 gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 truncate text-base font-semibold">
+          <HStack className="gap-1.5 truncate text-base font-semibold">
             <TrackFlag track={insight.track} />
             <span className="truncate">{insight.track}</span>
-          </div>
+          </HStack>
           <div className="mt-1 truncate text-xs text-zinc-500">
             {insight.detail}
           </div>
@@ -151,7 +152,7 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
         >
           {insight.headline}
         </div>
-      </div>
+      </HStack>
     </Link>
   );
 }

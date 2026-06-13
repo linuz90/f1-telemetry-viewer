@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { TrackFlag } from "../TrackFlag";
 import type { SessionSummary } from "../../types/telemetry";
 import { formatShortDate } from "../../utils/format";
-import { sessionPath } from "../../utils/routes";
+import { sessionSummaryPath } from "../../utils/routes";
+import { TrackFlag } from "../TrackFlag";
 import { isProblemStatus } from "./helpers";
 
 // Race-by-race progression: two bars per online race (grid → finish).
@@ -66,7 +66,7 @@ export function RaceResultsProgression({
     <div className="mt-6 border-t border-zinc-800/60 pt-5">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+          <div className="text-[11px] font-mono font-semibold uppercase tracking-wider text-zinc-500">
             Race-by-race
           </div>
           <div className="mt-0.5 text-xs text-zinc-500">
@@ -173,7 +173,7 @@ function ProgressionColumn({ session }: { session: SessionSummary }) {
   const finishLabelClass = isDnf ? "text-behind" : "text-zinc-200";
   const gridLabel = grid ? `P${grid}` : "—";
   const title = `${session.track} · ${formatShortDate(session.date)}\nGrid ${gridLabel} → Finish ${isDnf ? "DNF" : `P${result.position}`}`;
-  const to = sessionPath(session.slug);
+  const to = sessionSummaryPath(session);
 
   return (
     <Link

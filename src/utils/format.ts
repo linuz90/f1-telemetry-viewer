@@ -115,9 +115,19 @@ export function formatSessionType(type: string, formula?: string): string {
   }
 }
 
-/** Convert track name to a lowercase URL slug */
+/** Convert track names like "Abu Dhabi" to stable path slugs like "abu-dhabi". */
 export function toTrackSlug(track: string): string {
-  return track.toLowerCase();
+  return track
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function isTrackSlugMatch(track: string, slug: string | undefined): boolean {
+  return toTrackSlug(track) === (slug ?? "").toLowerCase();
 }
 
 /** Map F1 track names (from telemetry filenames) to ISO 3166-1 alpha-2 country codes */

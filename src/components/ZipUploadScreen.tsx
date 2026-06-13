@@ -20,6 +20,7 @@ import {
 } from "../utils/links";
 import { AppBrand } from "./AppBrand";
 import { Modal } from "./ui/Modal";
+import { HStack, VStack } from "./ui/Stack";
 
 export function ZipUploadScreen({
   dismissable = false,
@@ -84,38 +85,39 @@ export function ZipUploadScreen({
           telemetry.
         </p>
         <div className="mx-auto mt-5 mb-2 grid grid-cols-2 gap-x-8 gap-y-3 text-left text-sm">
-          <div className="flex items-center gap-2 text-zinc-400">
+          <HStack className="text-zinc-400">
             <Grid3x3 className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
             Sector-by-sector breakdown
-          </div>
-          <div className="flex items-center gap-2 text-zinc-400">
+          </HStack>
+          <HStack className="text-zinc-400">
             <ChartLine className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
             Driver-vs-driver comparison
-          </div>
-          <div className="flex items-center gap-2 text-zinc-400">
+          </HStack>
+          <HStack className="text-zinc-400">
             <Layers className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
             Stint strategy &amp; tyre wear
-          </div>
-          <div className="flex items-center gap-2 text-zinc-400">
+          </HStack>
+          <HStack className="text-zinc-400">
             <TrendingUp className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
             Progress tracking over time
-          </div>
-          <div className="flex items-center gap-2 text-zinc-400">
+          </HStack>
+          <HStack className="text-zinc-400">
             <Timer className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
             Pace &amp; consistency metrics
-          </div>
-          <div className="flex items-center gap-2 text-zinc-400">
+          </HStack>
+          <HStack className="text-zinc-400">
             <Flag className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
             Race &amp; qualifying analysis
-          </div>
+          </HStack>
         </div>
       </div>
 
       {/* Upload zone */}
       <div className="w-full px-8">
-        <div
+        <VStack
           onClick={() => inputRef.current?.click()}
-          className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-zinc-700 hover:border-zinc-500 hover:bg-zinc-900/30 px-6 py-8 text-center transition-colors"
+          align="center"
+          className="cursor-pointer gap-3 rounded-xl border-2 border-dashed border-zinc-700 px-6 py-8 text-center transition-colors hover:border-zinc-500 hover:bg-zinc-900/30"
         >
           {filesLoading ? (
             <>
@@ -131,9 +133,9 @@ export function ZipUploadScreen({
             </>
           ) : (
             <>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900">
+              <HStack justify="center" className="h-10 w-10 rounded-full bg-zinc-900">
                 <Upload className="h-4 w-4 text-zinc-400" />
-              </div>
+              </HStack>
               <div>
                 <p className="text-sm font-medium text-zinc-200">
                   Drop or select telemetry files
@@ -153,17 +155,17 @@ export function ZipUploadScreen({
             className="hidden"
             onChange={onFileSelect}
           />
-        </div>
+        </VStack>
       </div>
 
       {/* Info footer */}
       <div className="w-full px-10 pt-6 pb-8 text-center space-y-4">
         <div className="h-px bg-zinc-900" />
-        <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-500">
+        <HStack as="p" justify="center" className="gap-1.5 text-xs text-zinc-500">
           <ShieldCheck className="h-3.5 w-3.5 text-ahead" />
           100% client-side — your telemetry never leaves your browser
-        </p>
-        <div className="flex items-center justify-center gap-2 text-xs text-zinc-500">
+        </HStack>
+        <HStack justify="center" className="text-xs text-zinc-500">
           <span>Vibecoded by</span>
           <a
             href={AUTHOR_SITE_URL}
@@ -188,7 +190,7 @@ export function ZipUploadScreen({
             <Github className="h-3 w-3" />
             <span>View source on GitHub</span>
           </a>
-        </div>
+        </HStack>
       </div>
     </Modal>
   );

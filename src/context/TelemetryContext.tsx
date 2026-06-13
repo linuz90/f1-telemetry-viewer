@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useLocation } from "react-router-dom";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
 import {
   loadZipFile,
@@ -19,6 +20,10 @@ import {
   resolveFormulaScopeKey,
   type FormulaScopeOption,
 } from "../utils/dashboardStats";
+import {
+  getFormulaScopeCandidateFromPath,
+  isRootPath,
+} from "../utils/routes";
 
 type Mode = "detecting" | "api" | "demo" | "upload";
 
@@ -30,8 +35,6 @@ interface TelemetryContextValue {
   formulaOptions: FormulaScopeOption[];
   activeFormulaKey: string | undefined;
   activeFormula: FormulaScopeOption | undefined;
-  setActiveFormulaKey: (key: string | null | undefined) => void;
-  resolveFormulaKey: (key: string | null | undefined) => string | undefined;
   getSession: (slug: string) => Promise<TelemetrySession>;
   loadFiles: (files: File[]) => Promise<void>;
   showUploadModal: boolean;
@@ -48,16 +51,13 @@ export function useTelemetry() {
 }
 
 export function TelemetryProvider({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const [mode, setMode] = useState<Mode>("detecting");
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [filesLoading, setFilesLoading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [requestedFormulaKey, setRequestedFormulaKey] = useState<string | null>(
-    null,
-  );
-
   // In-memory store for upload mode
   const [sessionStore] = useState(
     () => new Map<string, TelemetrySession>(),
@@ -72,26 +72,27 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
     () => getFormulaScopeOptions(sessions),
     [sessions],
   );
+  const isRouteRoot = isRootPath(location.pathname);
+  const routeFormulaKey = getFormulaScopeCandidateFromPath(location.pathname);
+  const routeFormulaKeyExists = formulaOptions.some(
+    (option) => option.key === routeFormulaKey,
+  );
+  // Root is the only path that defaults to the newest available scope. Every
+  // other URL must carry an exact first-segment scope, otherwise stale legacy
+  // links or typos would quietly display data for the wrong game generation.
   const activeFormulaKey = useMemo(
-    () => resolveFormulaScopeKey(sessions, requestedFormulaKey),
-    [sessions, requestedFormulaKey],
+    () =>
+      isRouteRoot
+        ? resolveFormulaScopeKey(sessions, null)
+        : routeFormulaKeyExists
+          ? routeFormulaKey ?? undefined
+          : undefined,
+    [isRouteRoot, routeFormulaKey, routeFormulaKeyExists, sessions],
   );
   const activeFormula = useMemo(
     () => formulaOptions.find((option) => option.key === activeFormulaKey),
     [activeFormulaKey, formulaOptions],
   );
-  const setActiveFormulaKey = useCallback(
-    (key: string | null | undefined) => {
-      setRequestedFormulaKey(key ?? null);
-    },
-    [],
-  );
-  const resolveFormulaKey = useCallback(
-    (key: string | null | undefined) =>
-      resolveFormulaScopeKey(sessions, key),
-    [sessions],
-  );
-
   // Detect mode on mount
   useEffect(() => {
     const tryDemo = () =>
@@ -231,8 +232,6 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         formulaOptions,
         activeFormulaKey,
         activeFormula,
-        setActiveFormulaKey,
-        resolveFormulaKey,
         getSession,
         loadFiles,
         showUploadModal,

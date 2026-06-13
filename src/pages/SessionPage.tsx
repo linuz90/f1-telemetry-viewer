@@ -1,21 +1,21 @@
-import { useEffect } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { Upload, ArrowLeft } from "lucide-react";
 import { useSession } from "../hooks/useSession";
 import { useTelemetry } from "../context/TelemetryContext";
 import { isRaceSession } from "../utils/stats";
-import { dashboardPath } from "../utils/routes";
+import { dashboardPath, sessionPath } from "../utils/routes";
 import { getFormulaComparisonKey } from "../utils/sessionTypes";
 import { RaceSessionView } from "./RaceSessionView";
 import { QualifyingSessionView } from "./QualifyingSessionView";
+import { HStack, VStack } from "../components/ui/Stack";
 
 /**
  * Wrapper that loads session data from the URL path
  * and delegates to the correct view based on session type.
  */
 export function SessionPage() {
-  const location = useLocation();
-  const slug = location.pathname.replace("/session/", "");
+  const params = useParams<{ "*": string }>();
+  const slug = params["*"] ?? "";
 
   const { session, loading, error } = useSession(slug);
   const {
@@ -23,20 +23,8 @@ export function SessionPage() {
     sessions,
     setShowUploadModal,
     activeFormulaKey,
-    setActiveFormulaKey,
   } = useTelemetry();
   const backToDashboardPath = dashboardPath(activeFormulaKey);
-
-  useEffect(() => {
-    if (!session) return;
-    const sessionFormulaKey = getFormulaComparisonKey(
-      session["session-info"].formula,
-      session["game-year"],
-    );
-    if (sessionFormulaKey !== activeFormulaKey) {
-      setActiveFormulaKey(sessionFormulaKey);
-    }
-  }, [activeFormulaKey, session, setActiveFormulaKey]);
 
   if (loading) {
     return (
@@ -58,10 +46,10 @@ export function SessionPage() {
     if (isDemoPreview) {
       return (
         <div className="flex items-center justify-center h-full px-6">
-          <div className="flex flex-col items-center gap-4 text-center max-w-md">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900">
+          <VStack align="center" className="max-w-md text-center">
+            <HStack justify="center" className="h-12 w-12 rounded-full bg-zinc-900">
               <Upload className="h-5 w-5 text-zinc-500" />
-            </div>
+            </HStack>
             <div>
               <h3 className="text-base font-medium text-zinc-200">
                 Demo session — detail not available
@@ -72,7 +60,7 @@ export function SessionPage() {
                 stints, sector breakdowns, and race-by-race comparisons.
               </p>
             </div>
-            <div className="flex gap-2">
+            <HStack className="gap-2">
               <button
                 onClick={() => setShowUploadModal(true)}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"
@@ -85,22 +73,22 @@ export function SessionPage() {
               >
                 Back to dashboard
               </Link>
-            </div>
-          </div>
+            </HStack>
+          </VStack>
         </div>
       );
     }
 
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900">
+        <VStack align="center" className="max-w-sm text-center">
+          <HStack justify="center" className="h-12 w-12 rounded-full bg-zinc-900">
             {isUploadWithNoData ? (
               <Upload className="h-5 w-5 text-zinc-500" />
             ) : (
               <ArrowLeft className="h-5 w-5 text-zinc-500" />
             )}
-          </div>
+          </HStack>
           <div>
             <h3 className="text-base font-medium text-zinc-200">
               {isUploadWithNoData
@@ -128,9 +116,17 @@ export function SessionPage() {
               Back to dashboard
             </Link>
           )}
-        </div>
+        </VStack>
       </div>
     );
+  }
+
+  const sessionFormulaKey = getFormulaComparisonKey(
+    session["session-info"].formula,
+    session["game-year"],
+  );
+  if (sessionFormulaKey !== activeFormulaKey) {
+    return <Navigate to={sessionPath(sessionFormulaKey, slug)} replace />;
   }
 
   return isRaceSession(session) ? (

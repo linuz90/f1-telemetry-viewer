@@ -4,7 +4,7 @@
 #
 # Usage:
 #   ./scripts/find-session.sh race-baku-manual-2026-02-21-16-39-26
-#   ./scripts/find-session.sh http://localhost:5173/session/race-baku-manual-2026-02-21-16-39-26
+#   ./scripts/find-session.sh http://localhost:5173/f1-25/sessions/race-baku-manual-2026-02-21-16-39-26
 #
 # Reads TELEMETRY_DIR from .env in the project root.
 # Prints the absolute path to the matching JSON file (if found).
@@ -41,13 +41,14 @@ INPUT="${1:-}"
 if [[ -z "$INPUT" ]]; then
   echo "Usage: $0 <slug-or-url>" >&2
   echo "  e.g. $0 race-baku-manual-2026-02-21-16-39-26" >&2
-  echo "  e.g. $0 http://localhost:5173/session/race-baku-manual-2026-02-21-16-39-26" >&2
+  echo "  e.g. $0 http://localhost:5173/f1-25/sessions/race-baku-manual-2026-02-21-16-39-26" >&2
   exit 1
 fi
 
-# Strip URL prefix if present (handle any host/port)
-SLUG="${INPUT##*/session/}"
-# If still has protocol/host (no /session/ in URL), use as-is
+# Strip URL prefix if present (handle any host/port). Scoped app URLs use
+# /:formulaKey/sessions/:slug; if the input is already a slug, the final
+# segment fallback leaves it unchanged.
+SLUG="${INPUT##*/sessions/}"
 SLUG="${SLUG##*/}"
 
 # Convert slug to filename pattern: replace hyphens with underscores

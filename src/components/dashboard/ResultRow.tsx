@@ -10,7 +10,7 @@ import {
   getFormulaLabel,
   shouldShowFormulaLabel,
 } from "../../utils/sessionTypes";
-import { sessionPath } from "../../utils/routes";
+import { sessionSummaryPath } from "../../utils/routes";
 import { GridGainGlyph } from "./GridGainGlyph";
 import {
   gridGainTone,
@@ -36,7 +36,7 @@ export function ResultRow({ session }: { session: SessionSummary }) {
   const problem = isProblemStatus(status);
   const showFormula = shouldShowFormulaLabel(session.formula, session.gameYear);
   const Icon = podiumIcon(result?.position);
-  const to = sessionPath(session.slug);
+  const to = sessionSummaryPath(session);
 
   return (
     <SessionRow

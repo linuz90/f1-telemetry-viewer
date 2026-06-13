@@ -5,7 +5,7 @@ import type {
   RaceSetupStrength,
 } from "../utils/setupComparison";
 import { msToLapTime, formatDate, formatSessionType } from "../utils/format";
-import { sessionPath } from "../utils/routes";
+import { sessionSummaryPath } from "../utils/routes";
 import { cardClass } from "./Card";
 import { CarSetupCard } from "./CarSetupCard";
 import { Badge, type BadgeTone } from "./ui/Badge";
@@ -46,7 +46,7 @@ function SourceLink({
 
   return (
     <Link
-      to={sessionPath(summary.slug)}
+      to={sessionSummaryPath(summary)}
       className="text-zinc-400 hover:text-zinc-200 transition-colors"
     >
       {formatSessionType(summary.sessionType, summary.formula)} ·{" "}

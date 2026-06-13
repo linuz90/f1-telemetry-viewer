@@ -3,9 +3,10 @@ import { NavLink } from "react-router-dom";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useSessionList } from "../hooks/useSessionList";
 import type { SessionSummary } from "../types/telemetry";
-import { formatDate, formatTime, formatSessionType, toTrackSlug, sortTracksByCalendar } from "../utils/format";
+import { formatDate, formatTime, formatSessionType, sortTracksByCalendar } from "../utils/format";
 import { isQualifyingSessionType, isRaceSessionType } from "../utils/sessionTypes";
 import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
+import { sessionSummaryPath, trackPath } from "../utils/routes";
 import { TrackFlag } from "./TrackFlag";
 import { SessionCard } from "./SessionCard";
 import {
@@ -13,6 +14,7 @@ import {
   DEFAULT_FILTERS,
   type SessionListFilters,
 } from "./SessionListFilterMenu";
+import { HStack } from "./ui/Stack";
 
 /** Groups sessions by date for display */
 function groupByDate(sessions: SessionSummary[]) {
@@ -49,7 +51,7 @@ function readPersistedFilters(): SessionListFilters {
 
 export function SessionList() {
   const { sessions, loading, error } = useSessionList();
-  const { activeFormulaKey } = useTelemetry();
+  const { activeFormulaKey, formulaOptions } = useTelemetry();
   const [tab, setTab] = useState<"sessions" | "tracks">("sessions");
   const [filters, setFilters] = useState<SessionListFilters>(readPersistedFilters);
   const [page, setPage] = useState(0);
@@ -82,6 +84,14 @@ export function SessionList() {
     return (
       <div className="p-4 text-sm text-zinc-500">
         No telemetry files found.
+      </div>
+    );
+  }
+
+  if (!activeFormulaKey && formulaOptions.length > 0) {
+    return (
+      <div className="p-4 text-sm text-zinc-500">
+        Choose a game scope to view sessions.
       </div>
     );
   }
@@ -129,7 +139,7 @@ export function SessionList() {
     <nav className="flex flex-col">
       {/* Sticky header: tabs + filter */}
       <div className="sticky top-0 z-10 bg-black/85 backdrop-blur">
-        <div className="flex items-center px-2 pt-2">
+        <HStack className="px-2 pt-2">
           <div className="flex flex-1">
             <button
               onClick={() => setTab("sessions")}
@@ -158,10 +168,10 @@ export function SessionList() {
               onChange={updateFilters}
             />
           </div>
-        </div>
+        </HStack>
 
         {tab === "sessions" && pageCount > 1 && (
-          <div className="flex items-center justify-between px-2 py-1 mt-1">
+          <HStack justify="between" className="mt-1 px-2 py-1">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={safePage === 0}
@@ -179,7 +189,7 @@ export function SessionList() {
             >
               →
             </button>
-          </div>
+          </HStack>
         )}
       </div>
 
@@ -248,7 +258,7 @@ export function SessionList() {
                   return (
                     <NavLink
                       key={s.relativePath}
-                      to={`/session/${s.slug}`}
+                      to={sessionSummaryPath(s)}
                       className={({ isActive }) =>
                         `block rounded-xl px-2 py-2 transition-colors ${
                           isActive
@@ -289,22 +299,19 @@ export function SessionList() {
             );
             if (isSyntheticOnly) {
               return (
-                <div
+                <HStack
                   key={track}
                   title="Demo data — upload your telemetry to explore this track"
-                  className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-zinc-400"
+                  className="rounded-xl px-2 py-1.5 text-sm text-zinc-400"
                 >
                   {trackContent}
-                </div>
+                </HStack>
               );
             }
-            const trackPath = formulaKey
-              ? `/track/${toTrackSlug(track)}?formula=${encodeURIComponent(formulaKey)}`
-              : `/track/${toTrackSlug(track)}`;
             return (
               <NavLink
                 key={track}
-                to={trackPath}
+                to={formulaKey ? trackPath(formulaKey, track) : "#"}
                 className={({ isActive }) =>
                   `flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors ${
                     isActive

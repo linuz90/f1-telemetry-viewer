@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Upload } from "lucide-react";
 import { useTelemetry } from "../context/TelemetryContext";
+import { HStack, VStack } from "./ui/Stack";
 
 export function GlobalDropZone() {
   const { loadFiles, filesLoading, setShowUploadModal } = useTelemetry();
@@ -92,7 +93,7 @@ export function GlobalDropZone() {
       {/* Drop overlay */}
       {(visible || filesLoading) && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity">
-          <div className="flex flex-col items-center gap-4">
+          <VStack align="center">
             {filesLoading ? (
               <>
                 <div className="h-12 w-12 animate-spin rounded-full border-4 border-zinc-600 border-t-red-500" />
@@ -102,9 +103,9 @@ export function GlobalDropZone() {
               </>
             ) : (
               <>
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-red-500/60 bg-red-500/10">
+                <HStack justify="center" className="h-16 w-16 rounded-2xl border-2 border-dashed border-red-500/60 bg-red-500/10">
                   <Upload className="h-7 w-7 text-behind" />
-                </div>
+                </HStack>
                 <div className="text-center">
                   <p className="text-lg font-medium text-zinc-200">
                     Drop telemetry files
@@ -115,7 +116,7 @@ export function GlobalDropZone() {
                 </div>
               </>
             )}
-          </div>
+          </VStack>
         </div>
       )}
     </>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Bot, Flag, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { SegmentedControl } from "./ui/SegmentedControl";
+import { HStack } from "./ui/Stack";
 
 export type SessionTypeFilter = "all" | "race" | "quali";
 export type SessionModeFilter = "all" | "online" | "ai";
@@ -115,7 +116,7 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
           </Section>
 
           {!isDefault && (
-            <div className="flex items-center justify-between px-3 py-2">
+            <HStack justify="between" className="px-3 py-2">
               <span className="text-[11px] text-zinc-500">
                 {activeCount} {activeCount === 1 ? "filter" : "filters"} active
               </span>
@@ -126,7 +127,7 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
               >
                 Reset
               </button>
-            </div>
+            </HStack>
           )}
         </div>
       )}
@@ -145,10 +146,10 @@ function Section({
 }) {
   return (
     <div className="px-3 py-2.5">
-      <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <HStack className="mb-1.5 gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
         <Icon className="h-3 w-3" />
         {label}
-      </div>
+      </HStack>
       {children}
     </div>
   );

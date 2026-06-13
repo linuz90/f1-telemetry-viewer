@@ -11,6 +11,7 @@ import { cardClassCompact } from "../Card";
 import { TrackFlag } from "../TrackFlag";
 import { CHART_THEME } from "../../utils/colors";
 import { msToLapTime } from "../../utils/format";
+import { HStack } from "../ui/Stack";
 import { trackFormulaPath } from "./helpers";
 
 export interface QualifyingPaceData {
@@ -29,8 +30,8 @@ export function QualifyingPaceCard({ data }: { data: QualifyingPaceData }) {
       to={trackFormulaPath(track, formulaKey)}
       className={`${cardClassCompact} !p-3 transition-colors hover:bg-zinc-800/50`}
     >
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-1.5">
+      <HStack justify="between" className="mb-2 gap-3">
+        <HStack className="gap-1.5">
           <TrackFlag track={track} />
           <span className="truncate text-sm font-medium">{track}</span>
           {showFormula && (
@@ -39,11 +40,11 @@ export function QualifyingPaceCard({ data }: { data: QualifyingPaceData }) {
           <span className="ml-1 text-[11px] text-zinc-500">
             {points.length} days
           </span>
-        </div>
+        </HStack>
         <span className="shrink-0 text-sm font-mono text-purple-400">
           {msToLapTime(pbMs)}
         </span>
-      </div>
+      </HStack>
       <ResponsiveContainer width="100%" height={96}>
         <LineChart
           data={points}

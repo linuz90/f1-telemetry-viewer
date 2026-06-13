@@ -17,12 +17,12 @@ import { useSessionList } from "../hooks/useSessionList";
 import { useTelemetry } from "../context/TelemetryContext";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
 import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, isRaceSession, aggregateCompoundLife, aggregateFuelData } from "../utils/stats";
-import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getSessionIcon, bestSectorTimeMs } from "../utils/format";
+import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getSessionIcon, bestSectorTimeMs, isTrackSlugMatch } from "../utils/format";
 import { TrackFlag } from "../components/TrackFlag";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { CHART_THEME, TOOLTIP_STYLE, SECTOR_COLORS } from "../utils/colors";
 import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
-import { dashboardPath, sessionPath } from "../utils/routes";
+import { dashboardPath, sessionSummaryPath, trackPath } from "../utils/routes";
 import { accentCardClass, cardClass, cardClassFeature } from "../components/Card";
 import { Upload, ArrowLeft } from "lucide-react";
 import { CarSetupCard } from "../components/CarSetupCard";
@@ -31,6 +31,7 @@ import { SessionRow } from "../components/SessionRow";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { Badge } from "../components/ui/Badge";
+import { HStack, VStack } from "../components/ui/Stack";
 import { buildRaceSetupComparison } from "../utils/setupComparison";
 import type { CompoundLifeStats } from "../utils/stats";
 import type { RaceSetupCandidate, RaceSetupRunInput } from "../utils/setupComparison";
@@ -219,15 +220,18 @@ export function TrackProgressPage() {
     setShowUploadModal,
     activeFormulaKey,
     activeFormula,
+    formulaOptions,
   } = useTelemetry();
   const [data, setData] = useState<TrackSessionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"qualifying" | "race">("race");
   const requestedRaceLaps = searchParams.get("raceLaps");
 
-  // Case-insensitive match: slug is lowercase, track names from data may be capitalized
+  // Route slugs are stable hyphenated ids (`abu-dhabi`), while telemetry keeps
+  // display names (`Abu Dhabi`). Match through the shared slug helper so future
+  // route-model changes only need to update one normalization function.
   const allTrackSessions = useMemo(
-    () => sessions.filter((s) => s.track.toLowerCase() === (trackId ?? "")),
+    () => sessions.filter((s) => isTrackSlugMatch(s.track, trackId)),
     [sessions, trackId],
   );
 
@@ -389,30 +393,41 @@ export function TrackProgressPage() {
     const hasOnlyOtherFormulaScopes =
       allTrackSessions.length > 0 && trackSessions.length === 0;
     const formulaLabel = activeFormula?.label ?? "selected formula";
+    const otherTrackScopes = formulaOptions
+      .map((option) => ({
+        ...option,
+        trackSessionCount: allTrackSessions.filter(
+          (session) => getSessionFormulaScopeKey(session) === option.key,
+        ).length,
+      }))
+      .filter(
+        (option) =>
+          option.key !== activeFormulaKey && option.trackSessionCount > 0,
+      );
 
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900">
+        <VStack align="center" className="max-w-md text-center">
+          <HStack justify="center" className="h-12 w-12 rounded-full bg-zinc-900">
             {isUploadWithNoData ? (
               <Upload className="h-5 w-5 text-zinc-500" />
             ) : (
               <ArrowLeft className="h-5 w-5 text-zinc-500" />
             )}
-          </div>
+          </HStack>
           <div>
             <h3 className="text-base font-medium text-zinc-200">
               {isUploadWithNoData
                 ? "Track data not available"
                 : hasOnlyOtherFormulaScopes
-                  ? `No ${formulaLabel} sessions found`
+                  ? `No ${formulaLabel} data for ${displayTrackName}`
                   : "No sessions found"}
             </h3>
             <p className="mt-1 text-sm text-zinc-500">
               {isUploadWithNoData
                 ? "Uploaded telemetry is stored in memory and lost when the browser is closed. Re-upload your .zip to continue."
                 : hasOnlyOtherFormulaScopes
-                  ? `${displayTrackName} has telemetry in another formula scope. Switch the game scope in the sidebar to view it.`
+                  ? `${displayTrackName} exists in another game scope. Scoped track pages stay strict so tyre life, PBs, setups, and history never mix incompatible data.`
                 : `No sessions found for ${displayTrackName}.`}
             </p>
           </div>
@@ -423,6 +438,24 @@ export function TrackProgressPage() {
             >
               Upload telemetry
             </button>
+          ) : hasOnlyOtherFormulaScopes ? (
+            <HStack wrap justify="center" className="gap-2">
+              {otherTrackScopes.map((option) => (
+                <Link
+                  key={option.key}
+                  to={trackPath(option.key, displayTrackName)}
+                  className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
+                >
+                  View {option.label} ({option.trackSessionCount})
+                </Link>
+              ))}
+              <Link
+                to={backToDashboardPath}
+                className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+              >
+                Back to dashboard
+              </Link>
+            </HStack>
           ) : (
             <Link
               to={backToDashboardPath}
@@ -431,7 +464,7 @@ export function TrackProgressPage() {
               Back to dashboard
             </Link>
           )}
-        </div>
+        </VStack>
       </div>
     );
   }
@@ -575,7 +608,7 @@ export function TrackProgressPage() {
           </p>
         </div>
 
-        <div className="flex flex-col items-end gap-2 shrink-0">
+        <VStack align="end" className="shrink-0 gap-2">
           {/* Tab switcher: interactive with both data types, static when only one exists. */}
           {hasBoth && (
             <SegmentedControl<"qualifying" | "race">
@@ -596,7 +629,7 @@ export function TrackProgressPage() {
               onChange={() => {}}
             />
           )}
-        </div>
+        </VStack>
       </div>
 
       {/* ── Qualifying Section ── */}
@@ -855,7 +888,7 @@ export function TrackProgressPage() {
               <h3 className="text-sm font-semibold text-zinc-300 mb-1">Your Best Qualifying Setup</h3>
               <p className="text-xs text-zinc-500 mb-4">
                 From{" "}
-                <Link to={sessionPath(bestQualiSession.summary.slug)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
+                <Link to={sessionSummaryPath(bestQualiSession.summary)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
                   {formatSessionType(bestQualiSession.summary.sessionType, bestQualiSession.summary.formula)} · {formatDate(bestQualiSession.summary.date)} · {msToLapTime(bestQualiSession.bestLapMs)}
                 </Link>
               </p>
@@ -1086,7 +1119,7 @@ export function TrackProgressPage() {
             return (
               <SessionRow
                 key={d.summary.relativePath}
-                to={sessionPath(d.summary.slug)}
+                to={sessionSummaryPath(d.summary)}
                 leading={
                   <>
                     <span className="text-sm leading-none">

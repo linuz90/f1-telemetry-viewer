@@ -3,7 +3,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import changelog from "virtual:changelog";
 import { useTelemetry } from "../context/TelemetryContext";
-import { dashboardPath } from "../utils/routes";
+import {
+  dashboardPath,
+  replaceFormulaScopeInPath,
+  SESSIONS_ROUTE_SEGMENT,
+} from "../utils/routes";
 import { AppBrand } from "./AppBrand";
 import { BrandHomeLink } from "./BrandHomeLink";
 import { cardHighlight } from "./Card";
@@ -32,7 +36,6 @@ export function Layout() {
     setShowUploadModal,
     formulaOptions,
     activeFormulaKey,
-    setActiveFormulaKey,
   } = useTelemetry();
   const [width, setWidth] = useState(getInitialWidth);
   const [showChangelog, setShowChangelog] = useState(false);
@@ -88,22 +91,33 @@ export function Layout() {
 
   const handleFormulaScopeChange = useCallback(
     (nextKey: string) => {
-      setActiveFormulaKey(nextKey);
+      if (nextKey === activeFormulaKey) return;
 
-      if (location.pathname.startsWith("/session/")) {
+      const [, section] = location.pathname.split("/").filter(Boolean);
+
+      // Sessions are atomic telemetry records, not cross-scope resources. When
+      // the user changes game scope from a session detail page, send them to
+      // the selected dashboard instead of inventing a missing session URL.
+      if (section === SESSIONS_ROUTE_SEGMENT) {
         navigate(dashboardPath(nextKey));
         return;
       }
 
-      if (location.pathname === "/" || location.pathname.startsWith("/track/")) {
+      if (activeFormulaKey) {
         const nextParams = new URLSearchParams(location.search);
-        nextParams.set("formula", nextKey);
         nextParams.delete("raceLaps");
         const nextSearch = nextParams.toString();
-        navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`);
+        navigate(
+          `${replaceFormulaScopeInPath(location.pathname, nextKey)}${
+            nextSearch ? `?${nextSearch}` : ""
+          }`,
+        );
+        return;
       }
+
+      navigate(dashboardPath(nextKey));
     },
-    [location.pathname, location.search, navigate, setActiveFormulaKey],
+    [activeFormulaKey, location.pathname, location.search, navigate],
   );
 
   return (
@@ -166,7 +180,7 @@ export function Layout() {
                 ariaLabel="Formula scope"
                 options={formulaOptions.map((option) => ({
                   value: option.key,
-                  label: option.label,
+                  label: `${option.label} · ${option.sessionCount}`,
                 }))}
                 value={activeFormulaKey}
                 onChange={handleFormulaScopeChange}

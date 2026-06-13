@@ -1,4 +1,5 @@
 import type { CarSetup } from "../types/telemetry";
+import { HStack, VStack } from "./ui/Stack";
 
 interface CarSetupCardProps {
   setup: CarSetup;
@@ -74,13 +75,13 @@ function SetupRow({
   value: number;
 }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <HStack className="gap-2 text-xs">
       <span className="text-zinc-500 w-20 shrink-0 truncate">{label}</span>
       <RangeBar setupKey={setupKey} value={value} />
       <span className="font-mono text-zinc-300 w-14 text-right shrink-0">
         {formatValue(setupKey, value)}
       </span>
-    </div>
+    </HStack>
   );
 }
 
@@ -112,7 +113,7 @@ function TyrePressureCell({
 }) {
   const pct = getRangePercent(setupKey, value);
   return (
-    <div className="flex flex-col items-center gap-1 py-2.5 px-3 rounded-lg bg-zinc-800/40">
+    <VStack align="center" className="gap-1 rounded-lg bg-zinc-800/40 px-3 py-2.5">
       <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
         {label}
       </span>
@@ -125,7 +126,7 @@ function TyrePressureCell({
           style={{ width: `${pct}%` }}
         />
       </div>
-    </div>
+    </VStack>
   );
 }
 

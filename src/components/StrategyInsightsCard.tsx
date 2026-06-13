@@ -2,6 +2,7 @@ import { Battery, Crosshair, Circle, Fuel, Gauge, Wrench, Zap, Trophy, type Luci
 import type { StrategyInsight } from "../utils/stats";
 import { cardClass } from "./Card";
 import { Tooltip } from "./Tooltip";
+import { HStack } from "./ui/Stack";
 
 interface StrategyInsightsCardProps {
   insights: StrategyInsight[];
@@ -51,9 +52,9 @@ export function StrategyInsightsCard({ insights }: StrategyInsightsCardProps) {
           );
 
           return (
-            <div
+            <HStack
               key={i}
-              className="flex items-center gap-4 py-2.5 first:pt-0 last:pb-0"
+              className="gap-4 py-2.5 first:pt-0 last:pb-0"
             >
               <Icon className="w-4 h-4 text-zinc-600 shrink-0" />
               {insight.tooltip ? (
@@ -67,7 +68,7 @@ export function StrategyInsightsCard({ insights }: StrategyInsightsCardProps) {
               <span className="text-xs text-zinc-500">
                 {insight.detail}
               </span>
-            </div>
+            </HStack>
           );
         })}
       </div>

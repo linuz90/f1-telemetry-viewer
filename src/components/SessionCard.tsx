@@ -1,6 +1,7 @@
 import { Eye, Globe, Timer, Target, Flag, Gauge, Save } from "lucide-react";
 import { TrackFlag } from "./TrackFlag";
 import { getFormulaLabel, isRaceSessionType, shouldShowFormulaLabel } from "../utils/sessionTypes";
+import { HStack } from "./ui/Stack";
 
 interface SessionCardProps {
   sessionType: string;
@@ -41,64 +42,80 @@ export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTi
 
   return (
     <div className="min-w-0">
-      <div className="flex items-center justify-between gap-1.5">
-        <span className="text-sm font-medium truncate flex items-center gap-1.5"><TrackFlag track={track} />{track}</span>
-        <div className="shrink-0 flex items-center gap-1.5">
+      <HStack justify="between" className="gap-1.5">
+        <HStack as="span" className="gap-1.5 truncate text-sm font-medium">
+          <TrackFlag track={track} />
+          {track}
+        </HStack>
+        <HStack className="shrink-0 gap-1.5">
           {isSpectator && (
-            <span className="flex items-center gap-0.5 text-[10px] font-medium text-zinc-500">
+            <HStack
+              as="span"
+              className="gap-0.5 text-[10px] font-medium text-zinc-500"
+            >
               <Eye className="size-3" />
               Spectator
-            </span>
+            </HStack>
           )}
           {isAutoSave && (
             // Surviving auto-saves are ones the dedup pipeline couldn't
             // collapse against a regular save — surfacing the badge makes
             // it obvious why this row exists even when a sibling save
             // doesn't.
-            <span
-              className="flex items-center gap-0.5 text-[10px] font-medium text-amber-500/70"
+            <HStack
+              as="span"
+              className="gap-0.5 text-[10px] font-medium text-amber-500/70"
               title="Pits n' Giggles periodic auto-save"
             >
               <Save className="size-3" />
               Auto-save
-            </span>
+            </HStack>
           )}
-          <span className={`flex items-center gap-0.5 text-[10px] font-medium uppercase leading-none ${typeConfig.color}`}>
+          <HStack
+            as="span"
+            className={`gap-0.5 text-[10px] font-medium uppercase leading-none ${typeConfig.color}`}
+          >
             <TypeIcon className="size-3" />
             {sessionType}
-          </span>
-        </div>
-      </div>
-      <div className="flex items-center justify-between gap-1 mt-0.5">
-        <div className="flex items-center gap-1">
+          </HStack>
+        </HStack>
+      </HStack>
+      <HStack justify="between" className="mt-0.5 gap-1">
+        <HStack className="gap-1">
           <span className="text-xs text-zinc-500">{time}</span>
           {aiDifficulty != null && aiDifficulty > 0 ? (
             <span className="text-[10px] font-medium text-zinc-600">AI {aiDifficulty}</span>
           ) : (
-            <span className="flex items-center gap-0.5 text-[10px] font-medium text-sky-500/70"><Globe className="size-3" />Online</span>
+            <HStack
+              as="span"
+              className="gap-0.5 text-[10px] font-medium text-sky-500/70"
+            >
+              <Globe className="size-3" />
+              Online
+            </HStack>
           )}
           {showFormula && (
             <span className="text-[10px] font-semibold text-zinc-500">{getFormulaLabel(formula, gameYear)}</span>
           )}
-        </div>
-        <div className="flex items-center gap-1">
+        </HStack>
+        <HStack className="gap-1">
           {lapIndicators && lapIndicators.length > 0 && (
-            <span className="flex items-center gap-0.5">
+            <HStack as="span" className="gap-0.5">
               {lapIndicators.map((indicator, i) => (
                 <span
                   key={i}
                   className={`inline-block size-1.5 rounded-full ${INDICATOR_COLORS[indicator]}`}
                 />
               ))}
-            </span>
+            </HStack>
           )}
           {bestLapTime && (
             <span className={`text-xs font-mono font-medium ${isTrackBest ? "text-purple-400" : "text-zinc-500"}`}>
               {bestLapTime}
             </span>
           )}
-        </div>
-      </div>
+        </HStack>
+      </HStack>
     </div>
   );
 }
