@@ -71,6 +71,7 @@ Open [http://localhost:5173](http://localhost:5173).
 ```bash
 pnpm dev            # Start dev server at http://localhost:5173
 pnpm dev:telemetry <folder>  # Start dev server with a specific telemetry folder
+pnpm dev:debug      # Start dev server with DEBUG_TELEMETRY_DIR from .env
 pnpm dev:prod       # Run the production-like demo/upload flow locally
 pnpm build          # Type-check and build the production app
 pnpm preview        # Preview the production build locally
@@ -89,6 +90,20 @@ pnpm dev:telemetry /path/to/debug-data -- --host 127.0.0.1 --port 5174
 ```
 
 The folder is served through the normal local `/api/sessions` flow, so scoped session URLs, track pages, and browser refreshes work the same way as your main telemetry directory.
+
+If you have a larger generated/debug telemetry corpus, keep its path out of git
+and put it in your local `.env`:
+
+```bash
+DEBUG_TELEMETRY_DIR=/path/to/generated/debug-telemetry
+pnpm dev:debug
+```
+
+For contributors working with the Pits n' Giggles repo, this can point at the
+folder produced after running its integration telemetry downloader/generator
+(for example `poetry run python tests/integration_test/runner.py` in that
+repo). This is optional local QA data, not something the open-source app
+requires or commits.
 
 ## Self-Hosting
 

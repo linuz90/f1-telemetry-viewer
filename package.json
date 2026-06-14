@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "vite",
     "dev:telemetry": "tsx scripts/dev-with-telemetry.ts",
+    "dev:debug": "tsx scripts/dev-debug-telemetry.ts",
     "dev:prod": "vite --mode devprod",
     "build": "tsc && vite build",
     "preview": "vite preview",

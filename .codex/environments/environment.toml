@@ -5,9 +5,14 @@ name = "f1-telemetry-viewer"
 script = "for f in .env; do [ -f \"$CODEX_SOURCE_TREE_PATH/$f\" ] && ln -sf \"$CODEX_SOURCE_TREE_PATH/$f\" \"$f\"; done; pnpm install"
 
 [[actions]]
-name = "Run"
+name = "Run Telemetry"
 icon = "run"
 command = "pnpm dev"
+
+[[actions]]
+name = "Run Debug Telemetry"
+icon = "run"
+command = "pnpm dev:debug"
 
 [[actions]]
 name = "Run Demo"

@@ -11,6 +11,7 @@ F1 Telemetry Viewer — a React app for visualizing telemetry JSON files exporte
 ```bash
 pnpm dev            # Start dev server (default: http://localhost:5173)
 pnpm dev:telemetry <folder>  # Start dev server with a specific debug folder
+pnpm dev:debug      # Start dev server with DEBUG_TELEMETRY_DIR from .env
 pnpm dev:prod       # Dev server without local API (uses demo data, like production)
 pnpm build          # Type-check (tsc) + production build
 pnpm preview        # Preview production build
@@ -29,6 +30,8 @@ Shared repro sessions for local debugging live in `/Users/linuz90/PC Stuff/Pits 
 ```bash
 pnpm dev:telemetry "/Users/linuz90/PC Stuff/Pits & Giggles/debug data"
 ```
+
+For broader local QA, first check whether `DEBUG_TELEMETRY_DIR` is set in the uncommitted `.env`. When present, `pnpm dev:debug` is a good default for smoke testing against generated/repro data instead of the user's full personal telemetry folder. Do not blindly use it when the conversation points at specific sessions, screenshots, or localhost URLs, because those may come from the normal `TELEMETRY_DIR` server or a one-off `pnpm dev:telemetry <folder>` run. Let the user's current context decide which telemetry source to launch; use `pnpm find-session <slug-or-url>` against the active source when a link is involved. In Fabrizio's setup `DEBUG_TELEMETRY_DIR` may point at telemetry generated from the Pits n' Giggles integration runner (`poetry run python tests/integration_test/runner.py` in that repo). Treat it as optional local data: never commit real telemetry files or machine-specific paths.
 
 ## Architecture
 

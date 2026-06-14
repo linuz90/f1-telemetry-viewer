@@ -51,12 +51,10 @@ function LapMetric({
   label?: string;
 }) {
   const hasBestLap = Boolean(session.bestLapTime);
-  const value = session.bestLapTime ?? String(session.validLapCount);
-  const metricLabel =
-    label ??
-    (hasBestLap
-      ? null
-      : `${session.validLapCount === 1 ? "valid lap" : "valid laps"}`);
+  const value = hasBestLap
+    ? session.bestLapTime
+    : `${session.validLapCount} ${session.validLapCount === 1 ? "lap" : "laps"}`;
+  const metricLabel = hasBestLap ? label ?? null : null;
 
   const chipLayout = metricLabel
     ? "min-w-[5.75rem] flex-col items-end px-2.5 text-right"
@@ -87,12 +85,7 @@ function RaceMetric({
 }) {
   const result = session.playerRaceResult;
   if (!result) {
-    return (
-      <LapMetric
-        session={session}
-        label={`${session.validLapCount} ${session.validLapCount === 1 ? "lap" : "laps"}`}
-      />
-    );
+    return <LapMetric session={session} />;
   }
 
   const gridGain = result.gridPosition
