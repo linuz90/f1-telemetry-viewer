@@ -122,6 +122,31 @@ export function resolveFormulaScopeKey(
   return options[0]?.key;
 }
 
+export function resolveFormulaScopeAlias(
+  sessions: SessionSummary[],
+  requestedKey: string | null | undefined,
+): string | undefined {
+  if (!requestedKey) return undefined;
+
+  const options = getFormulaScopeOptions(sessions);
+  const optionKeys = new Set(options.map((option) => option.key));
+  if (optionKeys.has(requestedKey)) return requestedKey;
+
+  for (const session of sessions) {
+    const key = getSessionFormulaScopeKey(session);
+    if (
+      optionKeys.has(key) &&
+      getFormulaComparisonAliases(session.formula, session.gameYear).includes(
+        requestedKey,
+      )
+    ) {
+      return key;
+    }
+  }
+
+  return undefined;
+}
+
 export function getDefaultFormulaScopeKey(sessions: SessionSummary[]): string | undefined {
   return getFormulaScopeOptions(sessions)[0]?.key;
 }

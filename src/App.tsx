@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, Navigate, Routes, Route, useParams } from "react-router-dom";
+import { Link, Navigate, Routes, Route, useLocation, useParams } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { Layout } from "./components/Layout";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -9,7 +9,7 @@ import { TelemetryProvider, useTelemetry } from "./context/TelemetryContext";
 import { ZipUploadScreen } from "./components/ZipUploadScreen";
 import { GlobalDropZone } from "./components/GlobalDropZone";
 import { PNG_VERSION_TITLE_PREFIX } from "./config/branding";
-import { dashboardPath } from "./utils/routes";
+import { dashboardPath, replaceFormulaScopeInPath } from "./utils/routes";
 
 function AppRoutes() {
   const { mode, sessions, sessionsLoading, showUploadModal } = useTelemetry();
@@ -72,8 +72,18 @@ function DefaultScopeRedirect() {
 
 function ScopedFormulaRoute({ children }: { children: ReactNode }) {
   const { formulaKey } = useParams<{ formulaKey: string }>();
+  const location = useLocation();
   const { activeFormulaKey, formulaOptions } = useTelemetry();
   const matchedFormula = formulaOptions.find((option) => option.key === formulaKey);
+
+  if (formulaKey && activeFormulaKey && formulaKey !== activeFormulaKey) {
+    return (
+      <Navigate
+        to={`${replaceFormulaScopeInPath(location.pathname, activeFormulaKey)}${location.search}`}
+        replace
+      />
+    );
+  }
 
   if (!formulaKey || formulaKey !== activeFormulaKey) {
     return (

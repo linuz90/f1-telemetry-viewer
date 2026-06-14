@@ -1,21 +1,27 @@
 import type { SessionInfo, TelemetrySession } from "../types/telemetry";
 
 const PRIMARY_FORMULA_KEY = "f1";
-const DEFAULT_F1_COMPARISON_KEY = "f1-modern";
+const F1_25_COMPARISON_KEY = "f1-25";
 const F1_26_COMPARISON_KEY = "f1-26";
+const LEGACY_F1_MODERN_ALIAS = "f1-modern";
 
 function getFormulaGenerationRank(formulaKey: string): number {
   return Number(formulaKey.match(/-(\d{2})$/)?.[1] ?? 0);
 }
 
 function getFormulaFamilyRank(formulaKey: string): number {
-  if (formulaKey === PRIMARY_FORMULA_KEY || formulaKey === DEFAULT_F1_COMPARISON_KEY || formulaKey.startsWith("f1-")) return 0;
+  if (formulaKey === PRIMARY_FORMULA_KEY || formulaKey === LEGACY_F1_MODERN_ALIAS || formulaKey.startsWith("f1-")) return 0;
   if (formulaKey === "f2" || formulaKey.startsWith("f2-")) return 1;
   return 2;
 }
 
 function normalizeFormula(formula: SessionInfo["formula"] | undefined): string {
   return formula?.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ") ?? "";
+}
+
+function isF1ModernFormula(formula: SessionInfo["formula"] | undefined): boolean {
+  const normalized = normalizeFormula(formula);
+  return normalized === "f1 modern" || normalized === "formula 1 modern";
 }
 
 function formatGameYearSuffix(gameYear: number | undefined): string | undefined {
@@ -26,6 +32,10 @@ function formatGameYearSuffix(gameYear: number | undefined): string | undefined 
 function getF1SeasonSuffix(formula: SessionInfo["formula"] | undefined, gameYear: number | undefined): string | undefined {
   const normalized = normalizeFormula(formula);
   if (normalized.includes("season pack")) return "26";
+  // Pits n' Giggles has a durable `F1 Modern` enum for old-regs saves. Keep the
+  // URL/display model canonical as F1 25 even when older integrations do not
+  // include `game-year` on their lightweight session summaries.
+  if (isF1ModernFormula(formula)) return "25";
 
   const explicitYear = normalized.match(/(?:^|\s)(?:f1|formula 1)\s+(?:20)?(\d{2})(?:\s|$)/)?.[1];
   if (explicitYear) return explicitYear;
@@ -77,14 +87,14 @@ export function getFormulaComparisonKey(formula: SessionInfo["formula"] | undefi
   }
   if (seasonSuffix) return `f1-${seasonSuffix}`;
 
-  return DEFAULT_F1_COMPARISON_KEY;
+  return F1_25_COMPARISON_KEY;
 }
 
 export function getFormulaComparisonAliases(formula: SessionInfo["formula"] | undefined, gameYear?: number): string[] {
   const key = getFormulaComparisonKey(formula, gameYear);
   const aliases = [key];
 
-  if (key === "f1-25") aliases.push(DEFAULT_F1_COMPARISON_KEY);
+  if (key === F1_25_COMPARISON_KEY) aliases.push(LEGACY_F1_MODERN_ALIAS);
   if (key === "f2-25") aliases.push("f2");
 
   return aliases;
@@ -104,7 +114,7 @@ export function getFormulaLabel(formula: SessionInfo["formula"] | undefined, gam
   const formulaKey = getFormulaKey(formula);
   if (formulaKey === PRIMARY_FORMULA_KEY) {
     const seasonSuffix = getF1SeasonSuffix(formula, gameYear);
-    return seasonSuffix ? `F1 ${seasonSuffix}` : "F1";
+    return `F1 ${seasonSuffix ?? "25"}`;
   }
 
   const yearSuffix = formatGameYearSuffix(gameYear);
@@ -122,5 +132,5 @@ export function isNonF1Formula(formula: SessionInfo["formula"] | undefined): boo
 }
 
 export function shouldShowFormulaLabel(formula: SessionInfo["formula"] | undefined, gameYear?: number): boolean {
-  return getFormulaComparisonKey(formula, gameYear) !== DEFAULT_F1_COMPARISON_KEY;
+  return getFormulaComparisonKey(formula, gameYear) !== LEGACY_F1_MODERN_ALIAS;
 }

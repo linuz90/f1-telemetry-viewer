@@ -17,6 +17,7 @@ import {
 import { deduplicateSessions } from "../utils/deduplicateSessions";
 import {
   getFormulaScopeOptions,
+  resolveFormulaScopeAlias,
   resolveFormulaScopeKey,
   type FormulaScopeOption,
 } from "../utils/dashboardStats";
@@ -74,20 +75,21 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   );
   const isRouteRoot = isRootPath(location.pathname);
   const routeFormulaKey = getFormulaScopeCandidateFromPath(location.pathname);
-  const routeFormulaKeyExists = formulaOptions.some(
-    (option) => option.key === routeFormulaKey,
+  const routeFormulaKeyResolved = resolveFormulaScopeAlias(
+    sessions,
+    routeFormulaKey,
   );
   // Root is the only path that defaults to the newest available scope. Every
   // other URL must carry an exact first-segment scope, otherwise stale legacy
   // links or typos would quietly display data for the wrong game generation.
+  // Known legacy scope aliases, such as `f1-modern`, resolve to their canonical
+  // key so the route wrapper can replace the URL with `/f1-25/...`.
   const activeFormulaKey = useMemo(
     () =>
       isRouteRoot
         ? resolveFormulaScopeKey(sessions, null)
-        : routeFormulaKeyExists
-          ? routeFormulaKey ?? undefined
-          : undefined,
-    [isRouteRoot, routeFormulaKey, routeFormulaKeyExists, sessions],
+        : routeFormulaKeyResolved,
+    [isRouteRoot, routeFormulaKeyResolved, sessions],
   );
   const activeFormula = useMemo(
     () => formulaOptions.find((option) => option.key === activeFormulaKey),
