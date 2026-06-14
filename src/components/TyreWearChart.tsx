@@ -120,7 +120,15 @@ export function TyreWearChart({
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-2">Tyre Wear</h3>
+      <h3 className="text-sm font-semibold text-zinc-300 mb-2">
+        Tyre Wear{" "}
+        <span
+          className="font-normal text-zinc-500"
+          title="Tyre wear uses max/worst-wheel wear: the highest-worn tyre at each lap."
+        >
+          max wheel
+        </span>
+      </h3>
       <ResponsiveContainer width="100%" height={280}>
         <LineChart
           data={data}
@@ -167,7 +175,7 @@ export function TyreWearChart({
             {...TOOLTIP_STYLE}
             formatter={(value: number | undefined, name: string | undefined) => [
               `${value ?? 0}%`,
-              name ?? "",
+              name ?? "Max wear",
             ]}
             labelFormatter={(lap) => {
               const entry = data.find((d) => d.lap === lap);
@@ -218,7 +226,7 @@ export function TyreWearChart({
           <Line
             type="monotone"
             dataKey="wear"
-            name="Worst Wheel"
+            name="Max wear"
             stroke="url(#wearGradient)"
             strokeWidth={2}
             dot={false}

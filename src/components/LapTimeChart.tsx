@@ -253,7 +253,13 @@ export function LapTimeChart({
               stroke={CHART_THEME.best}
               strokeDasharray="4 4"
               strokeOpacity={0.5}
-              label={{ value: `Best: ${msToLapTime(bestTime * 1000)}`, fill: CHART_THEME.best, fontSize: 10, position: "right" }}
+              label={{
+                value: `Best: ${msToLapTime(bestTime * 1000)}`,
+                fill: CHART_THEME.best,
+                fontSize: 10,
+                position: "insideRight",
+                offset: 8,
+              }}
             />
           )}
 
@@ -372,7 +378,7 @@ export function LapTimeChart({
       <div className="mt-3 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
         {(() => {
           const hasWear = stints?.some((s) => s["tyre-wear-history"]?.length > 0) ?? false;
-          // Build wear lookup: lap number → average wear %
+          // Build wear lookup: lap number → max/worst-wheel wear %
           // Each stint's wear history starts with the pit-lap at 0% (fresh tyres),
           // which would overwrite the previous stint's final wear. Keep the higher
           // value so pit laps show the outgoing tyre wear, not the incoming 0%.
@@ -398,7 +404,14 @@ export function LapTimeChart({
               <th className="text-right py-1 px-2">S2</th>
               <th className="text-right py-1 px-2">S3</th>
               {hasTopSpeed && <th className="text-right py-1 px-2">Speed</th>}
-              {hasWear && <th className="text-right py-1 px-2">Wear</th>}
+              {hasWear && (
+                <th
+                  className="text-right py-1 px-2"
+                  title="Max tyre wear: highest-worn tyre at the end of the lap."
+                >
+                  Max wear
+                </th>
+              )}
               {hasErs && <th className="text-right py-1 px-2">ERS Dep</th>}
               {hasErsHarv && <th className="text-right py-1 px-2">ERS Harv</th>}
             </tr>
@@ -450,7 +463,10 @@ export function LapTimeChart({
                   </td>
                 )}
                 {hasWear && (
-                  <td className={`text-right py-1 px-2 font-mono ${wear != null && wear >= 75 ? "text-behind" : wear != null && wear >= 50 ? "text-warning" : "text-zinc-400"}`}>
+                  <td
+                    className={`text-right py-1 px-2 font-mono ${wear != null && wear >= 75 ? "text-behind" : wear != null && wear >= 50 ? "text-warning" : "text-zinc-400"}`}
+                    title={wear != null ? "Max tyre wear: highest-worn tyre at the end of this lap." : undefined}
+                  >
                     {wear != null ? `${wear.toFixed(0)}%` : "–"}
                   </td>
                 )}
