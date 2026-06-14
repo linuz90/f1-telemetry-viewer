@@ -8,6 +8,9 @@ import type { SessionSummary } from "../../types/telemetry";
 import {
   getFormulaComparisonKey,
   getFormulaLabel,
+  isQualifyingSessionType,
+  isRaceSessionType,
+  isTimeTrialSessionType,
 } from "../../utils/sessionTypes";
 import { trackPath } from "../../utils/routes";
 
@@ -24,6 +27,26 @@ export interface TrackGroup {
   formulaKey: string;
   formulaLabel: string;
   stats: SessionStats[];
+}
+
+export interface TrackLapRecord {
+  session: SessionSummary;
+  time: string;
+  timeMs: number;
+}
+
+export interface TrackRaceRecord {
+  session: SessionSummary;
+  position: number;
+  status?: string;
+  gridGain?: number;
+}
+
+export interface TrackRecords {
+  race?: TrackRaceRecord;
+  onlineQualifying?: TrackLapRecord;
+  offlineQualifying?: TrackLapRecord;
+  timeTrial?: TrackLapRecord;
 }
 
 export function trackFormulaPath(track: string, formulaKey: string): string {
@@ -74,8 +97,127 @@ export function isProblemStatus(status: string | undefined): boolean {
   );
 }
 
+function sessionTimestamp(session: SessionSummary): number {
+  const time = new Date(session.date).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function bestLapRecord(session: SessionSummary): TrackLapRecord | undefined {
+  if (!session.bestLapTime || !session.bestLapTimeMs || session.bestLapTimeMs <= 0) {
+    return undefined;
+  }
+
+  return {
+    session,
+    time: session.bestLapTime,
+    timeMs: session.bestLapTimeMs,
+  };
+}
+
+function pickBestLapRecord(sessions: SessionSummary[]): TrackLapRecord | undefined {
+  return sessions
+    .map(bestLapRecord)
+    .filter((record): record is TrackLapRecord => Boolean(record))
+    .sort((a, b) => {
+      const lapDiff = a.timeMs - b.timeMs;
+      if (lapDiff !== 0) return lapDiff;
+      return sessionTimestamp(b.session) - sessionTimestamp(a.session);
+    })[0];
+}
+
+function raceRecord(session: SessionSummary): TrackRaceRecord | undefined {
+  const result = session.playerRaceResult;
+  if (!result || result.position <= 0) return undefined;
+
+  return {
+    session,
+    position: result.position,
+    status: result.status,
+    gridGain: result.gridPosition ? result.gridPosition - result.position : undefined,
+  };
+}
+
+function actualOnlineDriverCount(session: SessionSummary): number {
+  return session.activeHumanDriverCount ?? session.onlineDriverCount ?? 0;
+}
+
+function isActualOnlineRace(record: TrackRaceRecord): boolean {
+  return record.session.isOnline === true && actualOnlineDriverCount(record.session) > 3;
+}
+
+function compareRaceRecords(a: TrackRaceRecord, b: TrackRaceRecord): number {
+  // A classified finish is a better "best result" than a DNF/DSQ at the
+  // same track. If every result is a problem status, the best classified
+  // position still gives the user the most truthful compact summary.
+  const cleanDiff =
+    Number(isProblemStatus(a.status)) - Number(isProblemStatus(b.status));
+  if (cleanDiff !== 0) return cleanDiff;
+
+  const positionDiff = a.position - b.position;
+  if (positionDiff !== 0) return positionDiff;
+
+  if (a.gridGain != null || b.gridGain != null) {
+    const gridDiff =
+      (b.gridGain ?? Number.NEGATIVE_INFINITY) -
+      (a.gridGain ?? Number.NEGATIVE_INFINITY);
+    if (gridDiff !== 0) return gridDiff;
+  }
+
+  return sessionTimestamp(b.session) - sessionTimestamp(a.session);
+}
+
+function bestRaceWithinTier(records: TrackRaceRecord[]): TrackRaceRecord | undefined {
+  return [...records].sort(compareRaceRecords)[0];
+}
+
+function pickBestRaceRecord(sessions: SessionSummary[]): TrackRaceRecord | undefined {
+  const records = sessions
+    .map(raceRecord)
+    .filter((record): record is TrackRaceRecord => Boolean(record));
+
+  const actualOnline = records.filter(isActualOnlineRace);
+  const otherOnline = records.filter(
+    (record) => record.session.isOnline === true && !isActualOnlineRace(record),
+  );
+  const offline = records.filter((record) => record.session.isOnline !== true);
+
+  // Online race results are the most useful track-card signal because they
+  // reflect real competitive context. Prefer lobbies with 4+ actual humans,
+  // then weaker online evidence, and only then fall back to AI/offline races.
+  return (
+    bestRaceWithinTier(actualOnline) ??
+    bestRaceWithinTier(otherOnline) ??
+    bestRaceWithinTier(offline)
+  );
+}
+
+export function buildTrackRecords(sessions: SessionSummary[]): TrackRecords {
+  return {
+    race: pickBestRaceRecord(
+      sessions.filter((session) => isRaceSessionType(session.sessionType)),
+    ),
+    onlineQualifying: pickBestLapRecord(
+      sessions.filter(
+        (session) =>
+          isQualifyingSessionType(session.sessionType) &&
+          session.isOnline === true,
+      ),
+    ),
+    offlineQualifying: pickBestLapRecord(
+      sessions.filter(
+        (session) =>
+          isQualifyingSessionType(session.sessionType) &&
+          session.isOnline !== true,
+      ),
+    ),
+    timeTrial: pickBestLapRecord(
+      sessions.filter((session) => isTimeTrialSessionType(session.sessionType)),
+    ),
+  };
+}
+
 // Shared podium convention: gold/Trophy for P1, silver/Medal for P2, bronze/Medal
-// for P3. Used by the hero podium chips, the Recent Results row badge, and the
+// for P3. Used by the hero podium chips, the Recent Activity row badge, and the
 // hero "Best" microstat tone — keep these in sync if tweaking. Tiles share the
 // app-wide accent recipe from Card.tsx so podium chips look identical in shape
 // to insight cards / stint cards / best-lap highlights.
@@ -116,7 +258,9 @@ export function buildQualifyingPaceData(
   > = {};
   for (const [key, group] of Object.entries(trackGroups)) {
     const qualiSessions = group.stats.filter(
-      (session) => !session.isRace && session.bestLapMs > 0,
+      (session) =>
+        isQualifyingSessionType(session.summary.sessionType) &&
+        session.bestLapMs > 0,
     );
     const byDay: Record<string, number> = {};
     for (const session of qualiSessions) {

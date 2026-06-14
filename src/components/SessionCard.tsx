@@ -11,16 +11,19 @@ interface SessionCardProps {
   bestLapTime?: string;
   isTrackBest?: boolean;
   aiDifficulty?: number;
+  isOnline?: boolean;
   isSpectator?: boolean;
   /** P&G periodic safety-net snapshot — surfaced when not deduped away. */
   isAutoSave?: boolean;
+  /** When true, the date header already shows the AI/Online context — omit it from the row. */
+  hideMode?: boolean;
 }
 
 const TYPE_CONFIG: Record<string, { color: string; icon: typeof Flag }> = {
-  Race: { color: "text-red-400/60", icon: Flag },
-  "Short Quali": { color: "text-yellow-500/60", icon: Timer },
-  "One-Shot Quali": { color: "text-purple-400/60", icon: Target },
-  "Time Trial": { color: "text-cyan-400/60", icon: Gauge },
+  Race: { color: "text-red-400/70", icon: Flag },
+  "Short Quali": { color: "text-yellow-500/70", icon: Timer },
+  "One-Shot Quali": { color: "text-purple-400/70", icon: Target },
+  "Time Trial": { color: "text-cyan-400/70", icon: Gauge },
 };
 
 const INDICATOR_COLORS = {
@@ -29,7 +32,19 @@ const INDICATOR_COLORS = {
   best: "bg-purple-400",
 };
 
-export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTime, isTrackBest, aiDifficulty, isSpectator, isAutoSave }: SessionCardProps) {
+export function SessionCard({
+  sessionType,
+  track,
+  time,
+  lapIndicators,
+  bestLapTime,
+  isTrackBest,
+  aiDifficulty,
+  isOnline,
+  isSpectator,
+  isAutoSave,
+  hideMode,
+}: SessionCardProps) {
   const typeConfig =
     TYPE_CONFIG[sessionType] ??
     (isRaceSessionType(sessionType)
@@ -40,9 +55,9 @@ export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTi
   return (
     <div className="min-w-0">
       <HStack justify="between" className="gap-1.5">
-        <HStack as="span" className="gap-1.5 truncate text-sm font-medium">
+        <HStack as="span" className="min-w-0 gap-1.5 truncate text-sm font-medium">
           <TrackFlag track={track} />
-          {track}
+          <span className="truncate">{track}</span>
         </HStack>
         <HStack className="shrink-0 gap-1.5">
           {isSpectator && (
@@ -80,9 +95,12 @@ export function SessionCard({ sessionType, track, time, lapIndicators, bestLapTi
       <HStack justify="between" className="mt-0.5 gap-1">
         <HStack className="gap-1">
           <span className="text-xs text-zinc-500">{time}</span>
-          {aiDifficulty != null && aiDifficulty > 0 ? (
-            <span className="text-[10px] font-medium text-zinc-600">AI {aiDifficulty}</span>
-          ) : (
+          {!hideMode && aiDifficulty != null && aiDifficulty > 0 && (
+            <span className="text-[10px] font-medium text-zinc-600">
+              AI {aiDifficulty}
+            </span>
+          )}
+          {!hideMode && isOnline === true && (
             <HStack
               as="span"
               className="gap-0.5 text-[10px] font-medium text-sky-500/70"

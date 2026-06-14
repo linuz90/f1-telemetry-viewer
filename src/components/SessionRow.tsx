@@ -5,7 +5,7 @@ import { HStack } from "./ui/Stack";
 
 /**
  * Single visual primitive for "a row in a session list". Used by the
- * dashboard's Recent Results and by the track page's Session History so they
+ * dashboard's Recent Activity and by the track page's Session History so they
  * share chrome, hover behavior, and right-edge alignment. Callers compose:
  *   leading   — identity (track flag + name, or session-type icon + label)
  *   meta      — dim dot-separated context (sm+ only)

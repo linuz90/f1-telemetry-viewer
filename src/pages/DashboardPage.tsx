@@ -1,20 +1,22 @@
 import { ChevronDown, ChevronUp, Timer } from "lucide-react";
 import { useState } from "react";
 import { cardHighlight } from "../components/Card";
+import { ActivityRow } from "../components/dashboard/ActivityRow";
 import { InsightCard } from "../components/dashboard/InsightCard";
 import { QualifyingPaceCard } from "../components/dashboard/QualifyingPaceCard";
 import { RaceResultsHero } from "../components/dashboard/RaceResultsHero";
-import { ResultRow } from "../components/dashboard/ResultRow";
 import { RivalCard } from "../components/dashboard/RivalCard";
 import { SectionHeader } from "../components/dashboard/SectionHeader";
 import { TrackOverviewCard } from "../components/dashboard/TrackOverviewCard";
 import {
   type SessionStats,
   buildQualifyingPaceData,
+  buildTrackRecords,
   buildTrackGroups,
 } from "../components/dashboard/helpers";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useSessionList } from "../hooks/useSessionList";
+import { buildDashboardActivity } from "../utils/dashboardActivity";
 import {
   buildTrackInsights,
   getDashboardResultStats,
@@ -24,12 +26,12 @@ import { sortTracksByCalendar } from "../utils/format";
 import { buildRivalStats } from "../utils/rivalStats";
 import { isRaceSessionType } from "../utils/sessionTypes";
 
-const RECENT_RESULTS_COLLAPSED = 3;
+const RECENT_ACTIVITY_COLLAPSED = 3;
 
 export function DashboardPage() {
   const { sessions, loading } = useSessionList();
   const { mode, activeFormulaKey, activeFormula } = useTelemetry();
-  const [showAllResults, setShowAllResults] = useState(false);
+  const [showAllActivity, setShowAllActivity] = useState(false);
   const isDemoMode = mode === "demo";
 
   if (loading) {
@@ -59,6 +61,7 @@ export function DashboardPage() {
   }));
 
   const trackGroups = buildTrackGroups(scopedSessionStats);
+  const recentActivity = buildDashboardActivity(scopedSessions);
   const sparklineGroups = Object.values(buildQualifyingPaceData(trackGroups))
     .sort((a, b) => {
       const [trackA] = sortTracksByCalendar(
@@ -92,12 +95,11 @@ export function DashboardPage() {
   // Aggregate stats (avg finish, DNF rate, podium counts) are noisy or misleading
   // with one or two races, and downright depressing when every race is a DNF
   // (P21 best, 0/0/0 podium, 100% DNF). Hide until there's a meaningful sample
-  // AND at least one clean finish; Recent Results still surfaces whatever races
-  // exist.
+  // AND at least one clean finish; Recent Activity still surfaces the raw work.
   const showHero =
     dashboardStats.starts >= 3 &&
     dashboardStats.cleanFinishSessions.length >= 1;
-  const hasRecentResults = dashboardStats.recentResults.length > 0;
+  const hasRecentActivity = recentActivity.length > 0;
   const formulaLabelText = activeFormula?.label ?? "Telemetry";
   const subtitle = hasScopedData
     ? `${formulaLabelText} · ${scopedSessions.length} ${scopedSessions.length === 1 ? "session" : "sessions"} across ${uniqueTracks.length} ${uniqueTracks.length === 1 ? "track" : "tracks"}`
@@ -133,39 +135,39 @@ export function DashboardPage() {
             />
           )}
 
-          {hasRecentResults && (
+          {hasRecentActivity && (
             <section>
               <SectionHeader
-                title="Recent Results"
-                hint={dashboardStats.modeLabel}
+                title="Recent Activity"
+                hint="Best representative sessions from recent driving"
               />
               <div className="space-y-1.5">
-                {(showAllResults
-                  ? dashboardStats.recentResults
-                  : dashboardStats.recentResults.slice(
+                {(showAllActivity
+                  ? recentActivity
+                  : recentActivity.slice(
                       0,
-                      RECENT_RESULTS_COLLAPSED,
+                      RECENT_ACTIVITY_COLLAPSED,
                     )
-                ).map((session) => (
-                  <ResultRow key={session.relativePath} session={session} />
+                ).map((activity) => (
+                  <ActivityRow key={activity.key} activity={activity} />
                 ))}
               </div>
-              {dashboardStats.recentResults.length >
-                RECENT_RESULTS_COLLAPSED && (
+              {recentActivity.length >
+                RECENT_ACTIVITY_COLLAPSED && (
                 <button
                   type="button"
-                  onClick={() => setShowAllResults((value) => !value)}
+                  onClick={() => setShowAllActivity((value) => !value)}
                   className="mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600"
                 >
-                  {showAllResults ? (
+                  {showAllActivity ? (
                     <>
                       Show less <ChevronUp className="size-3" />
                     </>
                   ) : (
                     <>
                       Show{" "}
-                      {dashboardStats.recentResults.length -
-                        RECENT_RESULTS_COLLAPSED}{" "}
+                      {recentActivity.length -
+                        RECENT_ACTIVITY_COLLAPSED}{" "}
                       more <ChevronDown className="size-3" />
                     </>
                   )}
@@ -220,7 +222,7 @@ export function DashboardPage() {
             </section>
           )}
 
-          {uniqueTracks.length > 1 && (
+          {uniqueTracks.length > 0 && (
             <section>
               <SectionHeader title="Tracks" />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -228,24 +230,13 @@ export function DashboardPage() {
                   const trackSessions = scopedSessions.filter(
                     (session) => session.track === track,
                   );
-                  const bestTime = trackSessions
-                    .filter(
-                      (session) =>
-                        session.bestLapTimeMs &&
-                        getSessionFormulaScopeKey(session) === activeFormulaKey,
-                    )
-                    .sort(
-                      (a, b) =>
-                        (a.bestLapTimeMs ?? Infinity) -
-                        (b.bestLapTimeMs ?? Infinity),
-                    )[0]?.bestLapTime;
                   return (
                     <TrackOverviewCard
                       key={track}
                       track={track}
                       sessions={trackSessions}
                       activeFormulaKey={activeFormulaKey}
-                      bestTime={bestTime}
+                      records={buildTrackRecords(trackSessions)}
                     />
                   );
                 })}

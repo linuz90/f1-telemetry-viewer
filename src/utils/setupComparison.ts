@@ -5,7 +5,6 @@ import type {
   TelemetrySession,
 } from "../types/telemetry";
 import {
-  avgWearRate,
   findPlayer,
   getBestLapTime,
   getCleanRaceLapSamples,
@@ -13,6 +12,7 @@ import {
   getDriverStints,
   isRaceSession,
   medianPaceInRange,
+  stintWearRate,
 } from "./stats";
 
 type SetupFingerprintKey = Exclude<keyof CarSetup, "fuel-load" | "is-valid">;
@@ -42,11 +42,17 @@ const SETUP_FINGERPRINT_KEYS: readonly SetupFingerprintKey[] = [
   "ballast",
 ];
 
-export type RaceSetupStrength =
+export type RaceSetupStrengthKind =
+  | "most-promising"
   | "fastest-lap"
   | "best-pace"
   | "best-stint"
   | "lowest-deg";
+
+export interface RaceSetupStrength {
+  kind: RaceSetupStrengthKind;
+  compound?: string;
+}
 
 export interface RaceSetupRunInput {
   summary: SessionSummary;
@@ -56,6 +62,21 @@ export interface RaceSetupRunInput {
 export interface RaceSetupRunSource {
   summary: SessionSummary;
   bestLapMs: number | null;
+}
+
+export interface RaceSetupCompoundMetric {
+  compound: string;
+  value: number;
+  sampleCount: number;
+  label?: string;
+}
+
+export interface RaceSetupComparableMetric {
+  compound: string;
+  value: number;
+  delta: number;
+  sampleCount: number;
+  label?: string;
 }
 
 export interface RaceSetupCandidate {
@@ -70,6 +91,16 @@ export interface RaceSetupCandidate {
   bestStintPaceMs: number | null;
   bestStintLabel: string | null;
   avgWearRatePerLap: number | null;
+  medianCleanPaceByCompound: RaceSetupCompoundMetric[];
+  bestStintPaceByCompound: RaceSetupCompoundMetric[];
+  wearRateByCompound: RaceSetupCompoundMetric[];
+  comparablePace: RaceSetupComparableMetric | null;
+  comparableStint: RaceSetupComparableMetric | null;
+  comparableWear: RaceSetupComparableMetric | null;
+  fairScore: number | null;
+  fairScoreWeight: number;
+  fairMetricCount: number;
+  rankScore: number;
   source: RaceSetupRunSource;
   strengths: RaceSetupStrength[];
 }
@@ -83,18 +114,54 @@ interface RaceSetupAccumulator {
   bestLapMs: number | null;
   bestLapSource: RaceSetupRunSource | null;
   cleanPaceSamples: number[];
+  cleanPaceSamplesByCompound: Map<string, number[]>;
   bestStintPaceMs: number | null;
   bestStintLabel: string | null;
+  bestStintPaceByCompound: Map<string, BestStintPace>;
   wearSamples: number[];
+  wearSamplesByCompound: Map<string, number[]>;
   fallbackSource: RaceSetupRunSource;
 }
 
 interface BestStintPace {
   paceMs: number;
   label: string;
+  compound: string;
 }
 
 const MIN_CLEAN_LAPS_FOR_SETUP_PACE = 3;
+const MIN_FAIR_COMPARISON_SETUPS = 2;
+
+type ComparableMetricField =
+  | "comparablePace"
+  | "comparableStint"
+  | "comparableWear";
+
+type CompoundMetricField =
+  | "medianCleanPaceByCompound"
+  | "bestStintPaceByCompound"
+  | "wearRateByCompound";
+
+const FAIR_SCORE_WEIGHTS: Record<ComparableMetricField, number> = {
+  comparablePace: 2,
+  comparableStint: 1,
+  comparableWear: 1.5,
+};
+
+const RANK_STRENGTH_POINTS: Record<RaceSetupStrengthKind, number> = {
+  "most-promising": 0,
+  "fastest-lap": 2,
+  "best-pace": 4,
+  "best-stint": 3,
+  "lowest-deg": 0.5,
+};
+
+const RANK_DELTA_PENALTIES = {
+  bestLapPerSecond: 0.75,
+  pacePerSecond: 2,
+  stintPerSecond: 1.25,
+  wearPerPercent: 0.35,
+} as const;
 
 function isUsableSetup(setup: CarSetup | null | undefined): setup is CarSetup {
   if (!setup?.["is-valid"]) return false;
@@ -157,19 +224,32 @@ function medianValue(values: number[]): number | null {
     : sorted[mid]!;
 }
 
-function cleanPaceSamples(player: DriverData): { lapTimesMs: number[]; lapCount: number } {
+function cleanPaceSamples(player: DriverData): {
+  lapTimesMs: number[];
+  lapCount: number;
+  byCompound: Map<string, number[]>;
+} {
   const cleanLaps = getCleanRaceLapSamples(player);
+  const byCompound = new Map<string, number[]>();
+
+  cleanLaps.forEach((sample) => {
+    if (!sample.compound) return;
+    const lapTimes = byCompound.get(sample.compound) ?? [];
+    lapTimes.push(sample.timeMs);
+    byCompound.set(sample.compound, lapTimes);
+  });
 
   return {
     lapTimesMs: cleanLaps.map((lap) => lap.timeMs),
     lapCount: cleanLaps.length,
+    byCompound,
   };
 }
 
-function getBestStintPace(player: DriverData): BestStintPace | null {
+function getBestStintPaces(player: DriverData): BestStintPace[] {
   const laps = player["session-history"]["lap-history-data"];
   const stints = getCompletedStints(getDriverStints(player));
-  let best: BestStintPace | null = null;
+  const bestByCompound = new Map<string, BestStintPace>();
 
   stints.forEach((stint, index) => {
     const rawStartLap = stint["start-lap"];
@@ -185,13 +265,33 @@ function getBestStintPace(player: DriverData): BestStintPace | null {
     if (paceMs <= 0) return;
     const compound = stint["tyre-set-data"]["visual-tyre-compound"];
     const label = `${compound} L${startLap}-${endLap}`;
+    const best = bestByCompound.get(compound);
 
     if (!best || paceMs < best.paceMs) {
-      best = { paceMs, label };
+      bestByCompound.set(compound, { paceMs, label, compound });
     }
   });
 
-  return best;
+  return [...bestByCompound.values()];
+}
+
+function getBestStintPace(player: DriverData): BestStintPace | null {
+  return getBestStintPaces(player).sort((a, b) => a.paceMs - b.paceMs)[0] ?? null;
+}
+
+function wearSamplesByCompound(player: DriverData): Map<string, number[]> {
+  const byCompound = new Map<string, number[]>();
+
+  for (const stint of getCompletedStints(getDriverStints(player))) {
+    const wearRate = stintWearRate(stint);
+    if (wearRate <= 0) continue;
+    const compound = stint["tyre-set-data"]["visual-tyre-compound"];
+    const samples = byCompound.get(compound) ?? [];
+    samples.push(wearRate);
+    byCompound.set(compound, samples);
+  }
+
+  return byCompound;
 }
 
 function minValue(
@@ -213,20 +313,285 @@ function hasWinningValue(
   return Math.abs(value - winningValue) < 0.001;
 }
 
-function withStrengths(candidates: RaceSetupCandidate[]): RaceSetupCandidate[] {
-  const fastestLap = minValue(candidates, (candidate) => candidate.bestLapMs);
-  const bestPace = minValue(candidates, (candidate) => candidate.medianCleanPaceMs);
-  const bestStint = minValue(candidates, (candidate) => candidate.bestStintPaceMs);
-  const lowestDeg = minValue(candidates, (candidate) => candidate.avgWearRatePerLap);
+function compoundMetricsFromSamples(
+  samplesByCompound: Map<string, number[]>,
+  minSamples: number,
+): RaceSetupCompoundMetric[] {
+  return [...samplesByCompound.entries()]
+    .map(([compound, samples]) => ({
+      compound,
+      value: medianValue(samples),
+      sampleCount: samples.length,
+    }))
+    .filter(
+      (metric): metric is RaceSetupCompoundMetric =>
+        metric.value !== null && metric.sampleCount >= minSamples,
+    )
+    .sort((a, b) => a.compound.localeCompare(b.compound));
+}
 
-  return candidates.map((candidate) => {
-    const strengths: RaceSetupStrength[] = [];
-    if (hasWinningValue(candidate.bestLapMs, fastestLap)) strengths.push("fastest-lap");
-    if (hasWinningValue(candidate.medianCleanPaceMs, bestPace)) strengths.push("best-pace");
-    if (hasWinningValue(candidate.bestStintPaceMs, bestStint)) strengths.push("best-stint");
-    if (hasWinningValue(candidate.avgWearRatePerLap, lowestDeg)) strengths.push("lowest-deg");
-    return { ...candidate, strengths };
+function bestStintMetricsFromMap(
+  bestByCompound: Map<string, BestStintPace>,
+): RaceSetupCompoundMetric[] {
+  return [...bestByCompound.values()]
+    .map((stint) => ({
+      compound: stint.compound,
+      value: stint.paceMs,
+      sampleCount: 1,
+      label: stint.label,
+    }))
+    .sort((a, b) => a.compound.localeCompare(b.compound));
+}
+
+function addMapSamples(
+  target: Map<string, number[]>,
+  source: Map<string, number[]>,
+): void {
+  source.forEach((values, compound) => {
+    const samples = target.get(compound) ?? [];
+    samples.push(...values);
+    target.set(compound, samples);
   });
+}
+
+function addBestStints(
+  target: Map<string, BestStintPace>,
+  stints: BestStintPace[],
+): void {
+  stints.forEach((stint) => {
+    const current = target.get(stint.compound);
+    if (!current || stint.paceMs < current.paceMs) {
+      target.set(stint.compound, stint);
+    }
+  });
+}
+
+function strengthKey(strength: RaceSetupStrength): string {
+  return `${strength.kind}:${strength.compound ?? ""}`;
+}
+
+function pushStrength(
+  strengths: RaceSetupStrength[],
+  strength: RaceSetupStrength,
+): void {
+  if (strengths.some((existing) => strengthKey(existing) === strengthKey(strength))) {
+    return;
+  }
+
+  strengths.push(strength);
+}
+
+function hasFairWin(candidate: RaceSetupCandidate, kind: RaceSetupStrengthKind): boolean {
+  return candidate.strengths.some((strength) => strength.kind === kind);
+}
+
+function strengthCount(
+  candidate: RaceSetupCandidate,
+  kind: RaceSetupStrengthKind,
+): number {
+  return candidate.strengths.filter((strength) => strength.kind === kind).length;
+}
+
+function chooseComparableMetric(
+  current: RaceSetupComparableMetric | null,
+  next: RaceSetupComparableMetric,
+): RaceSetupComparableMetric {
+  if (!current) return next;
+  if (next.delta !== current.delta) return next.delta < current.delta ? next : current;
+  if (next.sampleCount !== current.sampleCount) {
+    return next.sampleCount > current.sampleCount ? next : current;
+  }
+  return next.value < current.value ? next : current;
+}
+
+function applyFairCompoundComparison(
+  candidates: RaceSetupCandidate[],
+  metricField: CompoundMetricField,
+  comparableField: ComparableMetricField,
+  strengthKind: RaceSetupStrengthKind,
+): RaceSetupCandidate[] {
+  const nextCandidates = candidates.map((candidate) => ({
+    ...candidate,
+    strengths: [...candidate.strengths],
+  }));
+  const candidateById = new Map(nextCandidates.map((candidate) => [candidate.id, candidate]));
+  const entriesByCompound = new Map<
+    string,
+    { candidate: RaceSetupCandidate; metric: RaceSetupCompoundMetric }[]
+  >();
+
+  for (const candidate of nextCandidates) {
+    for (const metric of candidate[metricField]) {
+      const entries = entriesByCompound.get(metric.compound) ?? [];
+      entries.push({ candidate, metric });
+      entriesByCompound.set(metric.compound, entries);
+    }
+  }
+
+  entriesByCompound.forEach((entries) => {
+    const candidateCount = new Set(entries.map((entry) => entry.candidate.id)).size;
+    if (candidateCount < MIN_FAIR_COMPARISON_SETUPS) return;
+
+    const winningValue = Math.min(...entries.map((entry) => entry.metric.value));
+
+    entries.forEach(({ candidate, metric }) => {
+      const target = candidateById.get(candidate.id);
+      if (!target) return;
+      const comparable: RaceSetupComparableMetric = {
+        compound: metric.compound,
+        value: metric.value,
+        delta: metric.value - winningValue,
+        sampleCount: metric.sampleCount,
+        label: metric.label,
+      };
+
+      target[comparableField] = chooseComparableMetric(
+        target[comparableField],
+        comparable,
+      );
+
+      if (hasWinningValue(metric.value, winningValue)) {
+        pushStrength(target.strengths, {
+          kind: strengthKind,
+          compound: metric.compound,
+        });
+      }
+    });
+  });
+
+  return nextCandidates;
+}
+
+function withComparisonMetadata(candidates: RaceSetupCandidate[]): RaceSetupCandidate[] {
+  const fastestLap = minValue(candidates, (candidate) => candidate.bestLapMs);
+  let nextCandidates: RaceSetupCandidate[] = candidates.map((candidate) => ({
+    ...candidate,
+    strengths: hasWinningValue(candidate.bestLapMs, fastestLap)
+      ? ([{ kind: "fastest-lap" }] satisfies RaceSetupStrength[])
+      : [],
+  }));
+
+  nextCandidates = applyFairCompoundComparison(
+    nextCandidates,
+    "medianCleanPaceByCompound",
+    "comparablePace",
+    "best-pace",
+  );
+  nextCandidates = applyFairCompoundComparison(
+    nextCandidates,
+    "bestStintPaceByCompound",
+    "comparableStint",
+    "best-stint",
+  );
+  nextCandidates = applyFairCompoundComparison(
+    nextCandidates,
+    "wearRateByCompound",
+    "comparableWear",
+    "lowest-deg",
+  );
+
+  nextCandidates = nextCandidates.map((candidate) => {
+    let score = 0;
+    let weight = 0;
+    let metricCount = 0;
+
+    ([
+      "comparablePace",
+      "comparableStint",
+      "comparableWear",
+    ] as const).forEach((field) => {
+      const metric = candidate[field];
+      if (!metric) return;
+      const metricWeight = FAIR_SCORE_WEIGHTS[field];
+      // Lower is better for all three fair setup dimensions. This keeps the
+      // score relative to an actually comparable same-compound benchmark
+      // instead of mixing Soft pace with Hard degradation and overclaiming.
+      score += Math.min(1, (metric.value - metric.delta) / metric.value) * metricWeight;
+      weight += metricWeight;
+      metricCount += 1;
+    });
+
+    return {
+      ...candidate,
+      fairScore: weight > 0 ? Math.round((score / weight) * 100) : null,
+      fairScoreWeight: weight,
+      fairMetricCount: metricCount,
+    };
+  });
+
+  nextCandidates = nextCandidates.map((candidate) => {
+    let rankScore = 0;
+
+    ([
+      "fastest-lap",
+      "best-pace",
+      "best-stint",
+      "lowest-deg",
+    ] as const).forEach((kind) => {
+      rankScore += strengthCount(candidate, kind) * RANK_STRENGTH_POINTS[kind];
+    });
+
+    // Ranking is intentionally speed-first. Tyre degradation is useful, but a
+    // low-deg setup should not appear above a setup that is clearly faster on
+    // same-compound pace/stint evidence. These penalties are in driver-sized
+    // units (seconds and %/lap), avoiding the old ratio score where tyre wear
+    // dwarfed half-second pace gaps because lap times are ~80 seconds long.
+    if (candidate.bestLapMs !== null && fastestLap !== null) {
+      rankScore -=
+        ((candidate.bestLapMs - fastestLap) / 1000) *
+        RANK_DELTA_PENALTIES.bestLapPerSecond;
+    }
+    if (candidate.comparablePace) {
+      rankScore -=
+        (candidate.comparablePace.delta / 1000) *
+        RANK_DELTA_PENALTIES.pacePerSecond;
+    }
+    if (candidate.comparableStint) {
+      rankScore -=
+        (candidate.comparableStint.delta / 1000) *
+        RANK_DELTA_PENALTIES.stintPerSecond;
+    }
+    if (candidate.comparableWear) {
+      rankScore -=
+        candidate.comparableWear.delta *
+        RANK_DELTA_PENALTIES.wearPerPercent;
+    }
+
+    return { ...candidate, rankScore };
+  });
+
+  const rankedCandidates = nextCandidates.filter(
+    (candidate) =>
+      candidate.rankScore > 0 &&
+      (hasFairWin(candidate, "fastest-lap") ||
+        hasFairWin(candidate, "best-pace") ||
+        hasFairWin(candidate, "best-stint")),
+  );
+  const bestRankScore = Math.max(
+    ...rankedCandidates.map((candidate) => candidate.rankScore),
+    0,
+  );
+  const bestRankedCandidates = rankedCandidates.filter(
+    (candidate) => Math.abs(candidate.rankScore - bestRankScore) < 0.001,
+  );
+  const mostPromising = bestRankedCandidates.find(
+    (candidate) =>
+      hasFairWin(candidate, "fastest-lap") ||
+      hasFairWin(candidate, "best-pace") ||
+      hasFairWin(candidate, "best-stint"),
+  );
+
+  if (mostPromising && bestRankedCandidates.length === 1) {
+    nextCandidates = nextCandidates.map((candidate) => ({
+      ...candidate,
+      strengths:
+        candidate.id === mostPromising.id
+          ? [{ kind: "most-promising" as const }, ...candidate.strengths]
+          : candidate.strengths,
+    }));
+  }
+
+  return nextCandidates;
 }
 
 function sortableMetric(value: number | null): number {
@@ -255,7 +620,9 @@ export function buildRaceSetupComparison(
     };
     const cleanPace = cleanPaceSamples(player);
     const bestStint = getBestStintPace(player);
-    const wearRate = avgWearRate(player);
+    const bestStintsByCompound = getBestStintPaces(player);
+    const compoundWearSamples = wearSamplesByCompound(player);
+    const wearRates = [...compoundWearSamples.values()].flat();
 
     let accumulator = bySetup.get(id);
     if (!accumulator) {
@@ -268,9 +635,12 @@ export function buildRaceSetupComparison(
         bestLapMs: null,
         bestLapSource: null,
         cleanPaceSamples: [],
+        cleanPaceSamplesByCompound: new Map(),
         bestStintPaceMs: null,
         bestStintLabel: null,
+        bestStintPaceByCompound: new Map(),
         wearSamples: [],
+        wearSamplesByCompound: new Map(),
         fallbackSource: source,
       };
       bySetup.set(id, accumulator);
@@ -288,6 +658,9 @@ export function buildRaceSetupComparison(
     }
 
     accumulator.cleanPaceSamples.push(...cleanPace.lapTimesMs);
+    addMapSamples(accumulator.cleanPaceSamplesByCompound, cleanPace.byCompound);
+    addBestStints(accumulator.bestStintPaceByCompound, bestStintsByCompound);
+    addMapSamples(accumulator.wearSamplesByCompound, compoundWearSamples);
 
     if (
       bestStint &&
@@ -298,8 +671,8 @@ export function buildRaceSetupComparison(
       accumulator.bestStintLabel = bestStint.label;
     }
 
-    if (wearRate > 0) {
-      accumulator.wearSamples.push(wearRate);
+    if (wearRates.length > 0) {
+      accumulator.wearSamples.push(...wearRates);
     }
   }
 
@@ -321,12 +694,34 @@ export function buildRaceSetupComparison(
     bestStintPaceMs: accumulator.bestStintPaceMs,
     bestStintLabel: accumulator.bestStintLabel,
     avgWearRatePerLap: average(accumulator.wearSamples),
+    medianCleanPaceByCompound: compoundMetricsFromSamples(
+      accumulator.cleanPaceSamplesByCompound,
+      MIN_CLEAN_LAPS_FOR_SETUP_PACE,
+    ),
+    bestStintPaceByCompound: bestStintMetricsFromMap(
+      accumulator.bestStintPaceByCompound,
+    ),
+    wearRateByCompound: compoundMetricsFromSamples(
+      accumulator.wearSamplesByCompound,
+      1,
+    ),
+    comparablePace: null,
+    comparableStint: null,
+    comparableWear: null,
+    fairScore: null,
+    fairScoreWeight: 0,
+    fairMetricCount: 0,
+    rankScore: 0,
     source: accumulator.bestLapSource ?? accumulator.fallbackSource,
     strengths: [],
   }));
 
-  return withStrengths(candidates)
+  return withComparisonMetadata(candidates)
     .sort((a, b) => {
+      const rankDiff = b.rankScore - a.rankScore;
+      if (rankDiff !== 0) return rankDiff;
+      const scoreDiff = (b.fairScore ?? -1) - (a.fairScore ?? -1);
+      if (scoreDiff !== 0) return scoreDiff;
       const lapDiff = sortableMetric(a.bestLapMs) - sortableMetric(b.bestLapMs);
       if (lapDiff !== 0) return lapDiff;
       const paceDiff = sortableMetric(a.medianCleanPaceMs) - sortableMetric(b.medianCleanPaceMs);

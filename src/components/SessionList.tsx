@@ -3,7 +3,12 @@ import { NavLink } from "react-router-dom";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useSessionList } from "../hooks/useSessionList";
 import type { SessionSummary } from "../types/telemetry";
-import { formatDate, formatTime, formatSessionType, sortTracksByCalendar } from "../utils/format";
+import {
+  formatRelativeDate,
+  formatSessionType,
+  formatTime,
+  sortTracksByCalendar,
+} from "../utils/format";
 import { isQualifyingSessionType, isRaceSessionType } from "../utils/sessionTypes";
 import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
 import { sessionSummaryPath, trackPath } from "../utils/routes";
@@ -25,6 +30,28 @@ function groupByDate(sessions: SessionSummary[]) {
     groups[dateKey].push(s);
   }
   return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
+}
+
+/** Per-row mode label — null when the session has no applicable mode (e.g. offline Time Trial). */
+function sessionModeLabel(s: SessionSummary): string | null {
+  if (s.isOnline === true) return "Online";
+  if (s.aiDifficulty != null && s.aiDifficulty > 0) return `AI ${s.aiDifficulty}`;
+  return null;
+}
+
+/**
+ * Group-level mode label hoisted into the date header so matching rows can omit it.
+ * Considers only sessions that *have* a mode — a Time Trial without AI doesn't break
+ * the uniformity of a group full of AI 110 races. Rows whose own mode differs from
+ * the label (e.g. an Online TT in an AI-110 group) still show their tag.
+ */
+function groupModeLabel(sessions: SessionSummary[]): string | null {
+  const labels = new Set<string>();
+  for (const s of sessions) {
+    const label = sessionModeLabel(s);
+    if (label != null) labels.add(label);
+  }
+  return labels.size === 1 ? labels.values().next().value ?? null : null;
 }
 
 const PAGE_SIZE = 50;
@@ -219,10 +246,15 @@ export function SessionList() {
           </div>
         )}
         {tab === "sessions" &&
-          grouped.map(([dateKey, dateSessions]) => (
+          grouped.map(([dateKey, dateSessions]) => {
+            const modeLabel = groupModeLabel(dateSessions);
+            return (
             <div key={dateKey}>
               <h3 className="px-2 mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                {formatDate(dateKey + "T00:00:00")}
+                {formatRelativeDate(dateKey + "T00:00:00")}
+                {modeLabel && (
+                  <span className="ml-1.5 text-zinc-600">· {modeLabel}</span>
+                )}
               </h3>
               <div className="space-y-0.5">
                 {dateSessions.map((s) => {
@@ -233,10 +265,20 @@ export function SessionList() {
                       time={formatTime(s.date)}
                       lapIndicators={s.lapIndicators}
                       bestLapTime={s.bestLapTime}
-                      isTrackBest={!!s.bestLapTimeMs && s.bestLapTimeMs === bestTimeByTrack[`${s.track}::${getSessionFormulaScopeKey(s)}`]}
+                      isTrackBest={
+                        !!s.bestLapTimeMs &&
+                        s.bestLapTimeMs ===
+                          bestTimeByTrack[
+                            `${s.track}::${getSessionFormulaScopeKey(s)}`
+                          ]
+                      }
                       aiDifficulty={s.aiDifficulty}
+                      isOnline={s.isOnline}
                       isSpectator={s.isSpectator}
                       isAutoSave={s.isAutoSave}
+                      hideMode={
+                        modeLabel != null && sessionModeLabel(s) === modeLabel
+                      }
                     />
                   );
                   // Synthetic (demo) entries have no detail JSON, so they
@@ -271,7 +313,8 @@ export function SessionList() {
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
 
         {tab === "tracks" &&
           tracks.map((track) => {

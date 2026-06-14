@@ -41,6 +41,10 @@ export function isQualifyingSessionType(type: string | undefined): boolean {
   return type?.includes("Qualifying") ?? false;
 }
 
+export function isTimeTrialSessionType(type: string | undefined): boolean {
+  return /time\s*trial/i.test(type ?? "");
+}
+
 export function isRaceSession(session: TelemetrySession): boolean {
   return isRaceSessionType(session["session-info"]["session-type"]);
 }

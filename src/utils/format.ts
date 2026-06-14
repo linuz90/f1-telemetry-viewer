@@ -69,6 +69,26 @@ export function formatDate(dateStr: string): string {
   });
 }
 
+/**
+ * Friendly grouping label: "Today" / "Yesterday" for the last two days,
+ * otherwise weekday + day + month, and the year only when it differs from now.
+ * Compared against `now` (defaults to current time) so the result is stable per render.
+ */
+export function formatRelativeDate(dateStr: string, now: Date = new Date()): string {
+  const d = new Date(dateStr);
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const diffDays = Math.round((startOf(now) - startOf(d)) / dayMs);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return d.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
+  });
+}
+
 /** Format time portion of a date string */
 export function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
