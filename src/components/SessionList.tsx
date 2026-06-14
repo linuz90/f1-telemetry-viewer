@@ -153,6 +153,7 @@ export function SessionList() {
   // Compute best lap time per track (lowest ms wins)
   const bestTimeByTrack: Record<string, number> = {};
   for (const s of filteredSessions) {
+    if (s.isSpectator) continue;
     if (s.bestLapTimeMs && s.bestLapTimeMs > 0) {
       const key = `${s.track}::${getSessionFormulaScopeKey(s)}`;
       const prev = bestTimeByTrack[key];
@@ -322,7 +323,7 @@ export function SessionList() {
             const count = trackSessions.length;
             const formulaKey = activeFormulaKey ?? representativeFormulaKey(trackSessions);
             const bestTime = trackSessions
-              .filter((s) => getSessionFormulaScopeKey(s) === formulaKey && s.bestLapTimeMs)
+              .filter((s) => getSessionFormulaScopeKey(s) === formulaKey && s.isSpectator !== true && s.bestLapTimeMs)
               .sort((a, b) => (a.bestLapTimeMs ?? Infinity) - (b.bestLapTimeMs ?? Infinity))[0]?.bestLapTime;
             // A track whose every session is synthetic has no usable detail
             // page (the TrackPage filters those out, so navigation lands on

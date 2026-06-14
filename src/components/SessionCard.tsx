@@ -60,15 +60,6 @@ export function SessionCard({
           <span className="truncate">{track}</span>
         </HStack>
         <HStack className="shrink-0 gap-1.5">
-          {isSpectator && (
-            <HStack
-              as="span"
-              className="gap-0.5 text-[10px] font-medium text-zinc-500"
-            >
-              <Eye className="size-3" />
-              Spectator
-            </HStack>
-          )}
           {isAutoSave && (
             // Surviving auto-saves are ones the dedup pipeline couldn't
             // collapse against a regular save — surfacing the badge makes
@@ -111,6 +102,15 @@ export function SessionCard({
           )}
         </HStack>
         <HStack className="gap-1">
+          {isSpectator && (
+            <HStack
+              as="span"
+              className="gap-0.5 text-[10px] font-medium text-zinc-500"
+            >
+              <Eye className="size-3" />
+              Spectator
+            </HStack>
+          )}
           {lapIndicators && lapIndicators.length > 0 && (
             <HStack as="span" className="gap-0.5">
               {lapIndicators.map((indicator, i) => (

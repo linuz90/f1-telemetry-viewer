@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import type { TelemetrySession } from "../types/telemetry";
+import type { DriverData, TelemetrySession } from "../types/telemetry";
 import {
   findFocusedDriver,
   calculateCumulativeDeltas,
@@ -28,10 +28,80 @@ import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
 import { DuplicateNotice } from "../components/DuplicateNotice";
 import { getRaceControlEvents, raceControlEventsToOvertakes } from "../utils/raceControl";
+import { getTeamColor, getTeamName } from "../utils/colors";
+import { Badge } from "../components/ui/Badge";
+
+function timedRaceDrivers(drivers: DriverData[]): DriverData[] {
+  return [...drivers]
+    .filter((driver) =>
+      driver["session-history"]["lap-history-data"].some(
+        (lap) => lap["lap-time-in-ms"] > 0,
+      ),
+    )
+    .sort((a, b) => {
+      const positionDiff =
+        (a["final-classification"]?.position ?? 999) -
+        (b["final-classification"]?.position ?? 999);
+      if (positionDiff !== 0) return positionDiff;
+      return a.index - b.index;
+    });
+}
+
+function SpectatorDriverPicker({
+  drivers,
+  focusedDriverIndex,
+  onFocusedDriverChange,
+}: {
+  drivers: DriverData[];
+  focusedDriverIndex: number;
+  onFocusedDriverChange: (index: number) => void;
+}) {
+  if (drivers.length === 0) return null;
+
+  const focusedDriver = drivers.find((driver) => driver.index === focusedDriverIndex);
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        Driver
+      </span>
+      <span className="relative inline-flex items-center">
+        <span
+          className="mr-1.5 inline-block size-1.5 rounded-full"
+          style={{
+            backgroundColor: focusedDriver
+              ? getTeamColor(focusedDriver.team)
+              : undefined,
+          }}
+        />
+        <select
+          value={focusedDriverIndex}
+          onChange={(event) => onFocusedDriverChange(Number(event.target.value))}
+          className="rounded-md border border-zinc-700/50 bg-zinc-900/60 px-2 py-1.5 text-xs text-zinc-300 outline-none transition-colors hover:border-zinc-600 focus:ring-1 focus:ring-purple-500/40"
+        >
+          {drivers.map((driver) => {
+            const position = driver["final-classification"]?.position;
+            return (
+              <option key={driver.index} value={driver.index}>
+                {position ? `P${position} - ` : ""}
+                {driver["driver-name"]} - {getTeamName(driver.team)}
+              </option>
+            );
+          })}
+        </select>
+      </span>
+      <Badge tone="zinc">Spectator save</Badge>
+    </div>
+  );
+}
 
 export function RaceSessionView({ session, slug }: { session: TelemetrySession; slug: string }) {
   const drivers = session["classification-data"] ?? [];
-  const defaultFocused = findFocusedDriver(session);
+  const isSpectator = drivers.length > 0 && !drivers.some((driver) => driver["is-player"]);
+  const selectableDrivers = useMemo(() => timedRaceDrivers(drivers), [drivers]);
+  const defaultFocused = isSpectator
+    ? selectableDrivers[0]
+    : findFocusedDriver(session);
 
   const [focusedDriverIndex, setFocusedDriverIndex] = useState<number>(
     defaultFocused?.index ?? 0,
@@ -42,9 +112,16 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
 
   // Reset when session data actually changes (handles cached fast-resolve)
   useEffect(() => {
-    setFocusedDriverIndex(findFocusedDriver(session)?.index ?? 0);
+    setFocusedDriverIndex(
+      (isSpectator ? selectableDrivers[0] : findFocusedDriver(session))?.index ?? 0,
+    );
     setSelectedRivalIndex(null);
-  }, [session]);
+  }, [session, isSpectator, selectableDrivers]);
+
+  const handleFocusedDriverChange = (index: number) => {
+    setFocusedDriverIndex(index);
+    if (isSpectator) setSelectedRivalIndex(null);
+  };
 
   useEffect(() => {
     if (selectedRivalIndex === focusedDriverIndex) {
@@ -91,10 +168,10 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   // Derive rival data
   const rival = useMemo(
     () =>
-      selectedRivalIndex !== null
+      !isSpectator && selectedRivalIndex !== null
         ? drivers.find((d) => d.index === selectedRivalIndex)
         : undefined,
-    [selectedRivalIndex, drivers],
+    [isSpectator, selectedRivalIndex, drivers],
   );
 
   const rivalStints = getCompletedStints(
@@ -161,17 +238,25 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
       <SessionHeader
         session={session}
         focusedDriverIndex={focusedDriverIndex}
-        onFocusedDriverChange={setFocusedDriverIndex}
+        onFocusedDriverChange={handleFocusedDriverChange}
         slug={slug}
+        showDriverSelector={!isSpectator}
       />
 
-      {/* Driver comparison picker */}
-      <DriverComparisonPicker
-        session={session}
-        selectedIndex={selectedRivalIndex}
-        onSelect={setSelectedRivalIndex}
-        focusedDriverIndex={focusedDriverIndex}
-      />
+      {isSpectator ? (
+        <SpectatorDriverPicker
+          drivers={selectableDrivers}
+          focusedDriverIndex={focusedDriverIndex}
+          onFocusedDriverChange={handleFocusedDriverChange}
+        />
+      ) : (
+        <DriverComparisonPicker
+          session={session}
+          selectedIndex={selectedRivalIndex}
+          onSelect={setSelectedRivalIndex}
+          focusedDriverIndex={focusedDriverIndex}
+        />
+      )}
 
       {/* Strategy insights */}
       <StrategyInsightsCard insights={insights} />

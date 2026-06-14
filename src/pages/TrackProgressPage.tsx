@@ -265,14 +265,16 @@ export function TrackProgressPage() {
   const trackSessions = allTrackSessions.filter(
     (s) => !activeFormulaKey || getSessionFormulaScopeKey(s) === activeFormulaKey,
   );
-  const trackSessionKey = trackSessions.map((s) => s.slug).join("|");
+  const playerTrackSessions = trackSessions.filter((s) => s.isSpectator !== true);
+  const spectatorTrackSessions = trackSessions.filter((s) => s.isSpectator === true);
+  const playerTrackSessionKey = playerTrackSessions.map((s) => s.slug).join("|");
 
   // Resolve the original (display) track name from session data
   const displayTrackName = allTrackSessions.length > 0 ? allTrackSessions[0].track : trackId ?? "";
   const backToDashboardPath = dashboardPath(activeFormulaKey);
 
   useEffect(() => {
-    if (!trackSessions.length) {
+    if (!playerTrackSessions.length) {
       setData([]);
       setLoading(false);
       return;
@@ -281,7 +283,7 @@ export function TrackProgressPage() {
     setLoading(true);
     let cancelled = false;
     Promise.all(
-      trackSessions.map(async (s) => {
+      playerTrackSessions.map(async (s) => {
         try {
           const sessionData = await getSession(s.slug);
           const player = findPlayer(sessionData);
@@ -343,7 +345,7 @@ export function TrackProgressPage() {
     return () => {
       cancelled = true;
     };
-  }, [trackSessionKey, getSession]);
+  }, [playerTrackSessionKey, getSession]);
 
   // Race analysis aggregations must stay before early returns so hook ordering
   // remains stable while async session details are still loading.
@@ -408,6 +410,42 @@ export function TrackProgressPage() {
     (sum, compound) => sum + compound.stintCount,
     0,
   );
+  const spectatorHistory = [...spectatorTrackSessions].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
+  const renderSpectatorSessionRow = (summary: SessionSummary) => {
+    const metaParts = [
+      `${formatDate(summary.date)} · ${formatTime(summary.date)}`,
+      summary.weather,
+      summary.isOnline ? "Online" : summary.aiDifficulty ? `AI ${summary.aiDifficulty}` : undefined,
+      summary.classifiedDriverCount ? `${summary.classifiedDriverCount} drivers` : undefined,
+    ].filter(Boolean);
+    const trailingValue = summary.bestLapTime ?? `${summary.validLapCount} laps`;
+
+    return (
+      <SessionRow
+        key={summary.relativePath}
+        to={summary.isSynthetic ? null : sessionSummaryPath(summary)}
+        leading={
+          <>
+            <span className="text-sm leading-none">
+              {getSessionIcon(summary.sessionType)}
+            </span>
+            <span className="truncate text-sm font-medium text-zinc-100">
+              {formatSessionType(summary.sessionType, summary.formula)}
+            </span>
+            <Badge tone="zinc">Spectator</Badge>
+          </>
+        }
+        meta={metaParts.join(" · ")}
+        trailing={
+          <div className="inline-flex h-9 items-center justify-center rounded-lg bg-zinc-900/70 px-2.5 font-mono text-sm font-bold tabular-nums text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+            {trailingValue}
+          </div>
+        }
+      />
+    );
+  };
 
   if (loading) {
     return (
@@ -421,6 +459,10 @@ export function TrackProgressPage() {
     const isUploadWithNoData = mode === "upload" && sessions.length === 0;
     const hasOnlyOtherFormulaScopes =
       allTrackSessions.length > 0 && trackSessions.length === 0;
+    const hasOnlySpectatorSessions =
+      trackSessions.length > 0 &&
+      playerTrackSessions.length === 0 &&
+      spectatorTrackSessions.length > 0;
     const formulaLabel = activeFormula?.label ?? "selected formula";
     const otherTrackScopes = formulaOptions
       .map((option) => ({
@@ -433,6 +475,52 @@ export function TrackProgressPage() {
         (option) =>
           option.key !== activeFormulaKey && option.trackSessionCount > 0,
       );
+
+    if (hasOnlySpectatorSessions) {
+      const oldest = spectatorHistory[spectatorHistory.length - 1];
+      const newest = spectatorHistory[0];
+      const spectatorDateRange =
+        oldest && newest
+          ? oldest.relativePath === newest.relativePath
+            ? formatDate(newest.date)
+            : `${formatDate(oldest.date)} — ${formatDate(newest.date)}`
+          : "";
+
+      return (
+        <div className="p-6 max-w-5xl mx-auto space-y-6">
+          <div>
+            <h2 className="text-xl font-bold mb-1">
+              <TrackFlag track={displayTrackName} className="mr-2" />
+              {displayTrackName}
+            </h2>
+            <p className="text-sm text-zinc-500">
+              {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
+              {spectatorTrackSessions.length} spectator session{spectatorTrackSessions.length !== 1 ? "s" : ""}
+              {spectatorDateRange ? ` · ${spectatorDateRange}` : ""}
+            </p>
+          </div>
+
+          <section className={cardClass}>
+            <Badge tone="zinc">Spectator</Badge>
+            <h3 className="mt-3 text-base font-semibold text-zinc-100">
+              Spectator sessions only
+            </h3>
+            <p className="mt-1 max-w-2xl text-sm text-zinc-500">
+              These saves do not mark any driver as the player, so they are kept out of PBs, tyre life, fuel, setup, and race-result calculations. You can still open each session to inspect the focused driver from the recording.
+            </p>
+          </section>
+
+          <div>
+            <div className="mb-3">
+              <SectionHeader>Session History</SectionHeader>
+            </div>
+            <div className="space-y-1.5">
+              {spectatorHistory.map(renderSpectatorSessionRow)}
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="flex items-center justify-center h-full">
@@ -1538,6 +1626,14 @@ export function TrackProgressPage() {
               />
             );
           })}
+          {spectatorHistory.length > 0 && (
+            <>
+              <div className="px-3 pb-1 pt-4 text-xs text-zinc-600">
+                Spectator saves are shown for inspection only and do not affect player PBs, setup picks, tyre life, fuel, or race-result calculations.
+              </div>
+              {spectatorHistory.map(renderSpectatorSessionRow)}
+            </>
+          )}
         </div>
       </div>
     </div>

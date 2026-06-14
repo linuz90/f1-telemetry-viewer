@@ -29,9 +29,16 @@ interface SessionHeaderProps {
   focusedDriverIndex: number;
   onFocusedDriverChange: (index: number) => void;
   slug?: string;
+  showDriverSelector?: boolean;
 }
 
-export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChange, slug }: SessionHeaderProps) {
+export function SessionHeader({
+  session,
+  focusedDriverIndex,
+  onFocusedDriverChange,
+  slug,
+  showDriverSelector = true,
+}: SessionHeaderProps) {
   const info = session["session-info"];
   const drivers = session["classification-data"] ?? [];
   const focusedDriver = drivers.find((d) => d.index === focusedDriverIndex);
@@ -107,36 +114,37 @@ export function SessionHeader({ session, focusedDriverIndex, onFocusedDriverChan
 
         {/* Meta pills */}
         <HStack wrap className="gap-2 text-xs text-zinc-400">
-          {/* Driver selector */}
-          <span className="relative inline-flex items-center">
-            <span
-              className="inline-block w-1.5 h-1.5 rounded-full mr-1"
-              style={{
-                backgroundColor: focusedDriver
-                  ? getTeamColor(focusedDriver.team)
-                  : undefined,
-              }}
-            />
-            <select
-              value={focusedDriverIndex}
-              onChange={(e) => onFocusedDriverChange(Number(e.target.value))}
-              className="appearance-none bg-zinc-900 text-zinc-200 text-xs font-medium rounded-full pl-2 pr-6 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-purple-500/40 cursor-pointer"
-            >
-              {selectableDrivers.map((d) => {
-                const pos = d["final-classification"]?.position;
-                const suffix = d["is-player"] ? " (You)" : "";
-                const prefix = pos ? `P${pos} ` : "";
-                return (
-                  <option key={d.index} value={d.index}>
-                    {prefix}
-                    {d["driver-name"]} — {getTeamName(d.team)}
-                    {suffix}
-                  </option>
-                );
-              })}
-            </select>
-            <ChevronDown className="absolute right-1.5 size-3 pointer-events-none text-zinc-500" />
-          </span>
+          {showDriverSelector && (
+            <span className="relative inline-flex items-center">
+              <span
+                className="inline-block w-1.5 h-1.5 rounded-full mr-1"
+                style={{
+                  backgroundColor: focusedDriver
+                    ? getTeamColor(focusedDriver.team)
+                    : undefined,
+                }}
+              />
+              <select
+                value={focusedDriverIndex}
+                onChange={(e) => onFocusedDriverChange(Number(e.target.value))}
+                className="appearance-none bg-zinc-900 text-zinc-200 text-xs font-medium rounded-full pl-2 pr-6 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-purple-500/40 cursor-pointer"
+              >
+                {selectableDrivers.map((d) => {
+                  const pos = d["final-classification"]?.position;
+                  const suffix = d["is-player"] ? " (You)" : "";
+                  const prefix = pos ? `P${pos} ` : "";
+                  return (
+                    <option key={d.index} value={d.index}>
+                      {prefix}
+                      {d["driver-name"]} — {getTeamName(d.team)}
+                      {suffix}
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className="absolute right-1.5 size-3 pointer-events-none text-zinc-500" />
+            </span>
+          )}
 
           {focusedDriver?.["final-classification"] && (
             <Pill icon={Trophy} accent>

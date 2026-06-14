@@ -192,26 +192,31 @@ function pickBestRaceRecord(sessions: SessionSummary[]): TrackRaceRecord | undef
 }
 
 export function buildTrackRecords(sessions: SessionSummary[]): TrackRecords {
+  // Spectator saves are useful history entries, but their fallback focused
+  // driver is not the user. Keep them out of compact PB/result records so
+  // dashboard and track cards don't present someone else's lap as "your" best.
+  const playerSessions = sessions.filter((session) => session.isSpectator !== true);
+
   return {
     race: pickBestRaceRecord(
-      sessions.filter((session) => isRaceSessionType(session.sessionType)),
+      playerSessions.filter((session) => isRaceSessionType(session.sessionType)),
     ),
     onlineQualifying: pickBestLapRecord(
-      sessions.filter(
+      playerSessions.filter(
         (session) =>
           isQualifyingSessionType(session.sessionType) &&
           session.isOnline === true,
       ),
     ),
     offlineQualifying: pickBestLapRecord(
-      sessions.filter(
+      playerSessions.filter(
         (session) =>
           isQualifyingSessionType(session.sessionType) &&
           session.isOnline !== true,
       ),
     ),
     timeTrial: pickBestLapRecord(
-      sessions.filter((session) => isTimeTrialSessionType(session.sessionType)),
+      playerSessions.filter((session) => isTimeTrialSessionType(session.sessionType)),
     ),
   };
 }
