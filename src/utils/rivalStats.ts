@@ -794,6 +794,164 @@ const RIVAL_CARD_ORDER: RivalCardKind[] = [
   "most-consistent-rival",
 ];
 
+/**
+ * Single-track sibling of {@link buildRivalStats}: the fastest online rival
+ * the player has faced at this specific track in the active formula scope.
+ *
+ * Sample sizes are tiny at a single track, so the function ranks by an
+ * unweighted mean pace gap (compound-matched clean laps where available,
+ * best-lap fallback otherwise) and exposes the evidence count on the result
+ * so the UI can render it honestly. Recency weighting from
+ * {@link buildRivalStats} is deliberately dropped — at single-track scope
+ * "who's fastest" beats "who's hot lately".
+ *
+ * Filters mirror the dashboard's rivals scope: online race sessions only,
+ * AI-fill lobby slots dropped (real F1/F2 surnames the game inserts for empty
+ * seats), constructor-slot placeholders dropped, and rivals with fewer than
+ * {@link MIN_TRACK_RIVAL_LAPS_PER_RACE} valid laps in a race are ignored so a
+ * one-lap retirement can't masquerade as race pace.
+ */
+export interface TrackRivalBenchmark {
+  driverName: string;
+  team?: string;
+  /** Pace delta vs player (ms). Negative = rival was faster than the player. */
+  paceDeltaMs: number;
+  /** Which sample stream produced `paceDeltaMs`. */
+  basis: "same-compound pace" | "best-lap fallback";
+  /** Online races at this track shared with the rival. */
+  raceCount: number;
+  /**
+   * Total clean laps that contributed to the same-compound pace mean.
+   * Undefined for the best-lap fallback (one sample per race).
+   */
+  lapSamples?: number;
+}
+
+/**
+ * Each rival must have run at least this many valid laps in a race for that
+ * race to count toward the track benchmark. Three laps is enough to wash out
+ * a single-lap fluke (in/out lap, slipstream tow) while still admitting short
+ * races and lapped finishers — the harder thresholds belong on
+ * `compoundMatchedPaceDeltaMs` which already gates on shared clean laps.
+ */
+const MIN_TRACK_RIVAL_LAPS_PER_RACE = 3;
+
+export function buildTrackRivalBenchmark(
+  sessions: SessionSummary[],
+  formulaKey: string | undefined,
+  scopeKeyFor: (session: SessionSummary) => string,
+  trackMatcher: (session: SessionSummary) => boolean,
+): TrackRivalBenchmark | null {
+  const scoped = getOnlineRaceSessions(sessions, formulaKey, scopeKeyFor).filter(
+    trackMatcher,
+  );
+  if (scoped.length === 0) return null;
+
+  interface Bench {
+    name: string;
+    team?: string;
+    races: number;
+    aiRaces: number;
+    compoundDeltaSum: number;
+    compoundLapSum: number;
+    compoundRaceSamples: number;
+    bestLapDeltaSum: number;
+    bestLapRaceSamples: number;
+    latestTeam?: string;
+  }
+  const map = new Map<string, Bench>();
+
+  for (const session of scoped) {
+    const playerBest = getPlayerBestLapMs(session);
+    for (const rival of session.rivals ?? []) {
+      if (rival.validLapCount < MIN_TRACK_RIVAL_LAPS_PER_RACE) continue;
+      const existing =
+        map.get(rival.key) ??
+        ({
+          name: rival.name,
+          team: rival.team,
+          races: 0,
+          aiRaces: 0,
+          compoundDeltaSum: 0,
+          compoundLapSum: 0,
+          compoundRaceSamples: 0,
+          bestLapDeltaSum: 0,
+          bestLapRaceSamples: 0,
+        } satisfies Bench);
+      existing.races += 1;
+      if (rival.isAi === true) existing.aiRaces += 1;
+      if (rival.compoundMatchedPaceDeltaMs != null) {
+        existing.compoundDeltaSum += rival.compoundMatchedPaceDeltaMs;
+        existing.compoundLapSum += rival.compoundMatchedPaceLapCount ?? 0;
+        existing.compoundRaceSamples += 1;
+      }
+      if (rival.bestLapMs != null && playerBest != null) {
+        existing.bestLapDeltaSum += rival.bestLapMs - playerBest;
+        existing.bestLapRaceSamples += 1;
+      }
+      // Team can change between sessions; prefer the most recent value but
+      // don't bother with a per-session timestamp here — just keep updating.
+      if (rival.team) existing.latestTeam = rival.team;
+      map.set(rival.key, existing);
+    }
+  }
+
+  interface Candidate {
+    name: string;
+    team?: string;
+    deltaMs: number;
+    basis: "same-compound pace" | "best-lap fallback";
+    raceCount: number;
+    lapSamples?: number;
+  }
+  const candidates: Candidate[] = [];
+  for (const bench of map.values()) {
+    // Drop AI-majority entries and constructor-slot placeholders — same
+    // reasoning as `buildRivalStats`, just without the high-water threshold
+    // because single-track samples are too small for it to be meaningful.
+    if (bench.races > 0 && bench.aiRaces * 2 >= bench.races) continue;
+    if (isConstructorPlaceholder(bench.name)) continue;
+
+    let deltaMs: number;
+    let basis: "same-compound pace" | "best-lap fallback";
+    let lapSamples: number | undefined;
+    if (bench.compoundRaceSamples > 0) {
+      deltaMs = bench.compoundDeltaSum / bench.compoundRaceSamples;
+      basis = "same-compound pace";
+      lapSamples = bench.compoundLapSum;
+    } else if (bench.bestLapRaceSamples > 0) {
+      deltaMs = bench.bestLapDeltaSum / bench.bestLapRaceSamples;
+      basis = "best-lap fallback";
+    } else {
+      continue;
+    }
+    candidates.push({
+      name: bench.name,
+      team: bench.latestTeam ?? bench.team,
+      deltaMs,
+      basis,
+      raceCount: bench.races,
+      lapSamples,
+    });
+  }
+  if (candidates.length === 0) return null;
+
+  // Fastest = most negative delta. Tie-break by larger race count.
+  candidates.sort((a, b) => {
+    if (a.deltaMs !== b.deltaMs) return a.deltaMs - b.deltaMs;
+    return b.raceCount - a.raceCount;
+  });
+  const winner = candidates[0];
+  return {
+    driverName: winner.name,
+    team: winner.team,
+    paceDeltaMs: winner.deltaMs,
+    basis: winner.basis,
+    raceCount: winner.raceCount,
+    lapSamples: winner.lapSamples,
+  };
+}
+
 export function buildRivalStats(
   sessions: SessionSummary[],
   formulaKey: string | undefined,

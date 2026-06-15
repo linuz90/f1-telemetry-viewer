@@ -1,4 +1,5 @@
 import type {
+  CarDamage,
   TelemetrySession,
   DriverData,
   LapHistoryEntry,
@@ -165,6 +166,57 @@ export interface CleanRaceLapSample {
 }
 
 /**
+ * Per-component damage thresholds (in % of full destruction) above which a lap
+ * is considered "damaged" and dropped from race-pace samples.
+ *
+ * Damage is read from `per-lap-info[].car-damage-data`, which is the damage
+ * state at the END of that lap. So a lap that BEGINS clean but ends with a
+ * smashed front wing is excluded (the slow time came from the incident, not
+ * driver pace), and the lap after — driven with the same damage if not
+ * pitted — is also excluded (its slow pace reflects the broken car, not the
+ * driver). A pit-stop repair clears the flag for subsequent laps.
+ *
+ * Thresholds are intentionally conservative — a couple of percent of front
+ * wing damage barely shows up in lap time, so excluding those would throw
+ * away good evidence. Floor / diffuser / sidepod have lower bars because
+ * they affect aero across the whole lap. Engine / gearbox sit higher because
+ * they degrade gradually over a race and routinely sit at 5–10% on a normal
+ * stint without meaningfully slowing the car.
+ */
+const LAP_DAMAGE_THRESHOLDS = {
+  frontWing: 15,
+  rearWing: 15,
+  floor: 5,
+  diffuser: 5,
+  sidepod: 5,
+  engine: 25,
+  gearbox: 25,
+} as const;
+
+function isLapDamaged(damage: CarDamage | undefined): boolean {
+  if (!damage) return false;
+  if (damage["front-left-wing-damage"] > LAP_DAMAGE_THRESHOLDS.frontWing)
+    return true;
+  if (damage["front-right-wing-damage"] > LAP_DAMAGE_THRESHOLDS.frontWing)
+    return true;
+  if (damage["rear-wing-damage"] > LAP_DAMAGE_THRESHOLDS.rearWing) return true;
+  if (damage["floor-damage"] > LAP_DAMAGE_THRESHOLDS.floor) return true;
+  if (damage["diffuser-damage"] > LAP_DAMAGE_THRESHOLDS.diffuser) return true;
+  if (damage["sidepod-damage"] > LAP_DAMAGE_THRESHOLDS.sidepod) return true;
+  if (
+    damage["engine-damage"] != null &&
+    damage["engine-damage"] > LAP_DAMAGE_THRESHOLDS.engine
+  )
+    return true;
+  if (
+    damage["gear-box-damage"] != null &&
+    damage["gear-box-damage"] > LAP_DAMAGE_THRESHOLDS.gearbox
+  )
+    return true;
+  return false;
+}
+
+/**
  * Get "clean" race laps for computing race pace.
  *
  * Filtering strategy (chosen after comparing approaches on real data with
@@ -177,7 +229,13 @@ export interface CleanRaceLapSample {
  *  3. Exclude pit in/out laps — identified from tyre stint boundaries.
  *     The pit-in lap (diving into pits) and pit-out lap (rejoining) both
  *     have artificially slow times that aren't representative of race pace.
- *  4. Apply 1.2× median safety net — catches unlabeled incidents (spins,
+ *  4. Exclude laps run with significant damage — per-lap damage state from
+ *     `per-lap-info[].car-damage-data`. A lap with a broken front wing or
+ *     ripped floor is not representative pace; including it would inflate
+ *     pace deltas vs. healthier rivals (especially relevant for the
+ *     same-compound rival benchmark on the Track page and the dashboard
+ *     Rivals & Teammates cards).
+ *  5. Apply 1.2× median safety net — catches unlabeled incidents (spins,
  *     off-tracks, rejoins) that the game still marks as green-flag. These
  *     have no telemetry flag, so statistical filtering is the only option
  *     (confirmed with ashwin_nat from Pits n' Giggles, 2026-02).
@@ -187,6 +245,8 @@ export interface CleanRaceLapSample {
  *    to the median to sneak through (e.g. 1:13.6 on a 1:12.8 median).
  *  - It included pit-in laps at long tracks where the pit entry time loss
  *    was under 20% of the median (e.g. Spa pit-in at 1:15 vs 1:12 median).
+ *  - It included laps with light damage where pace dropped just enough to
+ *    skew rival pace deltas without tripping the 20% safety net.
  *  - Rankings were noticeably different (and less accurate) compared to
  *    explicit SC/pit filtering on sessions with safety car periods.
  */
@@ -212,6 +272,11 @@ export function getCleanRaceLapSamples(d: DriverData): CleanRaceLapSample[] {
 
     // Exclude pit in/out laps
     if (pitLaps.has(lapNum)) continue;
+
+    // Exclude laps where the car ended the lap with meaningful damage. This
+    // catches the incident lap itself AND any subsequent laps driven with
+    // the same damage (until a pit repair clears it).
+    if (isLapDamaged(pli?.["car-damage-data"])) continue;
 
     clean.push({
       lapNumber: lapNum,
@@ -1707,4 +1772,654 @@ export function aggregateFuelData(
     avgExcessAtFinishLaps: avg(excessAtFinish),
     raceCount: perRace.length,
   };
+}
+
+// ─── Track-level Race "Key Insights" recommendation ──────────────────────────
+
+export interface TrackBestRaceLap {
+  /** Best clean race lap time in ms */
+  bestLapMs: number;
+  /** Visual compound the lap was set on, if known */
+  compound: string | null;
+  /** Sum-of-best-sectors theoretical best from clean race laps */
+  theoreticalBestMs: number;
+  /** Gap to theoretical best (bestLapMs - theoreticalBestMs); 0 if either side missing */
+  gapToTheoreticalMs: number;
+}
+
+export interface TrackStrategySuggestion {
+  /** Visual compound sequence, e.g. ["Medium", "Hard"] */
+  compounds: string[];
+  /** Stint lengths the recommendation is anchored on (laps). Same length as compounds */
+  stintLaps: number[];
+  /** Pit-window per stop, indexed by the pit (stops between compounds[i] and compounds[i+1]).
+   *  Empty for a no-stop strategy. */
+  pitWindows: { earliest: number; latest: number; target: number }[];
+  /** Number of races in the bucket that ran this exact sequence */
+  raceCount: number;
+  /** Number of those races that were near-full-distance */
+  fullDistanceRaceCount: number;
+  /** True when at least one near-full-distance multi-stint race backs this sequence */
+  isEvidenceBacked: boolean;
+}
+
+export interface TrackFuelTarget {
+  /** Recommended delta over zero-laps-remaining at lights out (in laps) */
+  recommendedDeltaLaps: number;
+  /** Average green-flag burn rate, kg/lap */
+  burnRateKgPerLap: number;
+  /** Average projected excess at finish (laps). Positive = over-fueling. */
+  excessAtFinishLaps: number;
+  /** Number of races in the sample */
+  raceCount: number;
+}
+
+export interface TrackSinceLastRaceDelta {
+  /** Best clean lap delta vs. previous race here (ms). Negative = improvement. 0 if either side missing */
+  bestLapDeltaMs: number;
+  /** Avg wear-rate delta (%/lap). Negative = gentler than before. 0 if either side missing */
+  wearRateDelta: number;
+}
+
+export interface TrackRaceRecommendation {
+  /** Number of races in the selected bucket */
+  raceCount: number;
+  /** Number of races in the bucket that finished near full distance (>= totalLaps - 1) */
+  fullDistanceRaceCount: number;
+  /** Whether we have at least one near-full-distance multi-stint race in the bucket */
+  hasEvidence: boolean;
+  bestRaceLap: TrackBestRaceLap | null;
+  /** Best race lap vs best quali lap (ms). Negative = race lap was faster. 0 if either side missing */
+  raceVsQualiDeltaMs: number;
+  /** Average ERS deployed per lap across the bucket's races (MJ). 0 if no data */
+  avgErsDeployMj: number;
+  recommended: TrackStrategySuggestion | null;
+  alternative: TrackStrategySuggestion | null;
+  fuelTarget: TrackFuelTarget | null;
+  sinceLastRace: TrackSinceLastRaceDelta | null;
+}
+
+/** A race counts as "near full distance" when the player completed >= totalLaps - 1 laps */
+function isNearFullDistanceRace(session: TelemetrySession, player: DriverData): boolean {
+  const totalLaps = session["session-info"]["total-laps"];
+  if (!Number.isFinite(totalLaps) || totalLaps <= 0) return false;
+  const lapsCompleted = player["session-history"]["num-laps"] ?? 0;
+  return lapsCompleted >= totalLaps - 1;
+}
+
+interface BucketRaceEntry {
+  session: TelemetrySession;
+  player: DriverData;
+  totalLaps: number;
+  isFullDistance: boolean;
+}
+
+function buildBucketEntries(sessions: TelemetrySession[]): BucketRaceEntry[] {
+  const entries: BucketRaceEntry[] = [];
+  for (const session of sessions) {
+    if (!isRaceSession(session)) continue;
+    const player = findPlayer(session);
+    if (!player) continue;
+    const totalLaps = session["session-info"]["total-laps"];
+    if (!Number.isFinite(totalLaps) || totalLaps <= 0) continue;
+    entries.push({
+      session,
+      player,
+      totalLaps: Math.round(totalLaps),
+      isFullDistance: isNearFullDistanceRace(session, player),
+    });
+  }
+  return entries;
+}
+
+/** Build the pit window for the transition between two stints, anchored on the
+ *  target end-lap. Window widens by ±1 lap to communicate uncertainty; clamped
+ *  to [1, totalLaps - 1]. */
+function buildPitWindow(stintEndLap: number, totalLaps: number) {
+  const target = stintEndLap;
+  const earliest = Math.max(1, target - 1);
+  const latest = Math.min(totalLaps - 1, target + 1);
+  return { earliest, latest, target };
+}
+
+// ─── Wear-derived strategy synthesis ─────────────────────────────────────────
+//
+// The recommendation is intentionally NOT a "replay the sequence we observed
+// most often" lookup — with thin samples (one or two races at a track) that
+// approach surfaces whatever was actually run, including DNFs and weird
+// experiments. Instead, we build a generic F1 one-stopper from compound pace +
+// wear data:
+//
+//   1. Rank dry compounds by softness (softer = faster on fresh rubber).
+//   2. Compute each compound's safe stint length at WEAR_PIT_THRESHOLD_PERCENT.
+//   3. Walk compound PAIRS from softest to hardest (S+M → S+H → M+H …) and
+//      pick the first pair whose fast→slow ordering covers the race distance.
+//      Recommended = that pairing; Alternative = its mirror ("go long" for the
+//      undercut) when also feasible. We don't lock ourselves to the top-2
+//      compounds because high-wear tracks (e.g. Catalunya) often need the
+//      Hard tyre in the mix even though it's the slowest.
+//   4. Two-stop sandwich (fast-durable-fast) only when NO one-stop pair fits.
+//
+// Pit windows are centered on the projected pit lap with ±1 lap of slack.
+
+/** Wear percentage at which we want the tyre to come off — F1 strategists
+ *  typically pit before crossing this since fall-off accelerates beyond. */
+const WEAR_PIT_THRESHOLD_PERCENT = 75;
+
+/** Dry compound softness priority — lower number = softer = faster on fresh
+ *  rubber. Soft/Medium/Hard are the relative labels Pits n' Giggles surfaces
+ *  for the three compounds allocated to a given track; C1–C5 are the raw
+ *  ASN compound IDs that show up on older exports (C5 = softest, C1 = hardest). */
+const DRY_COMPOUND_PRIORITY: Record<string, number> = {
+  Soft: 0,
+  Medium: 1,
+  Hard: 2,
+  C5: 0,
+  C4: 0.5,
+  C3: 1,
+  C2: 1.5,
+  C1: 2,
+};
+
+function isDryCompound(compound: string): boolean {
+  return compound in DRY_COMPOUND_PRIORITY;
+}
+
+/** Max laps a stint of this compound can safely cover without crossing the
+ *  wear threshold, given the observed average wear rate (%/lap). */
+function safeStintMaxLaps(wearRatePerLap: number): number {
+  if (wearRatePerLap <= 0) return Number.POSITIVE_INFINITY;
+  return Math.max(1, Math.floor(WEAR_PIT_THRESHOLD_PERCENT / wearRatePerLap));
+}
+
+/** Sort dry compound stats by relative softness (Soft → Medium → Hard).
+ *  Observed best-lap order isn't trustworthy here because fuel load and
+ *  driver effort confound it — a player's best Hard lap can easily beat
+ *  their best Medium lap simply because the Hard stint ran on lower fuel.
+ *  The compound names are themselves relative-pace labels for the track,
+ *  so the priority ordering matches F1 fresh-lap pace assumptions directly. */
+function rankDryCompoundsByPace(
+  compoundLifeStats: CompoundLifeStats[],
+): CompoundLifeStats[] {
+  const dry = compoundLifeStats.filter(
+    (c) => isDryCompound(c.compound) && c.stintCount > 0 && c.avgWearRatePerLap > 0,
+  );
+  return dry.sort((a, b) => {
+    const aPri = DRY_COMPOUND_PRIORITY[a.compound] ?? Number.POSITIVE_INFINITY;
+    const bPri = DRY_COMPOUND_PRIORITY[b.compound] ?? Number.POSITIVE_INFINITY;
+    if (aPri !== bPri) return aPri - bPri;
+    // Tie-break by stint sample size — more evidence wins.
+    return b.stintCount - a.stintCount;
+  });
+}
+
+interface SynthesizedStrategyShape {
+  compounds: string[];
+  stintLaps: number[];
+}
+
+/** One-stop strategy with `first` compound on stint 1, `second` on stint 2.
+ *  Splits the race proportionally to each compound's safe stint life so
+ *  both stints hit roughly the same fraction of their wear limit at the
+ *  pit window. That produces a realistic F1 one-stopper (pit roughly mid-
+ *  race) rather than running one compound right to the puncture edge and
+ *  hot-swapping for a single lap. Returns null when no valid split fits. */
+function buildOneStopShape(
+  first: CompoundLifeStats,
+  second: CompoundLifeStats,
+  totalLaps: number,
+): SynthesizedStrategyShape | null {
+  const firstMax = safeStintMaxLaps(first.avgWearRatePerLap);
+  const secondMax = safeStintMaxLaps(second.avgWearRatePerLap);
+  // Need at least one lap on each side, so the feasible window for the pit
+  // lap is [1, totalLaps - 1] and stint2 must fit within secondMax.
+  const minStint1 = Math.max(1, totalLaps - secondMax);
+  const maxStint1 = Math.min(firstMax, totalLaps - 1);
+  if (minStint1 > maxStint1) return null;
+  // Proportional ideal pit lap — same fraction-of-life on both compounds.
+  const proportional = Math.round(
+    (totalLaps * firstMax) / (firstMax + secondMax),
+  );
+  const stint1 = Math.min(maxStint1, Math.max(minStint1, proportional));
+  const stint2 = totalLaps - stint1;
+  if (stint1 < 1 || stint2 < 1) return null;
+  return {
+    compounds: [first.compound, second.compound],
+    stintLaps: [stint1, stint2],
+  };
+}
+
+/** Two-stop sandwich: fastest – durable – fastest. Used only when one-stop
+ *  can't make the distance under the wear threshold. Splits roughly into
+ *  thirds with the durable compound in the middle (carries the longest
+ *  stint). Returns null when even the sandwich can't fit. */
+function buildTwoStopShape(
+  fastest: CompoundLifeStats,
+  durable: CompoundLifeStats,
+  totalLaps: number,
+): SynthesizedStrategyShape | null {
+  const fastMax = safeStintMaxLaps(fastest.avgWearRatePerLap);
+  const durableMax = safeStintMaxLaps(durable.avgWearRatePerLap);
+  const base = Math.floor(totalLaps / 3);
+  const remainder = totalLaps - base * 3;
+  // Concentrate any leftover laps on the middle (durable) stint.
+  const stintLaps = [base, base + remainder, base];
+  if (stintLaps.some((l) => l < 1)) return null;
+  if (stintLaps[0] > fastMax) return null;
+  if (stintLaps[1] > durableMax) return null;
+  if (stintLaps[2] > fastMax) return null;
+  return {
+    compounds: [fastest.compound, durable.compound, fastest.compound],
+    stintLaps,
+  };
+}
+
+function suggestionFromShape(
+  shape: SynthesizedStrategyShape,
+  totalLaps: number,
+  raceCount: number,
+  fullDistanceRaceCount: number,
+): TrackStrategySuggestion {
+  const pitWindows: { earliest: number; latest: number; target: number }[] = [];
+  let cumulative = 0;
+  for (let i = 0; i < shape.compounds.length - 1; i++) {
+    cumulative += shape.stintLaps[i];
+    pitWindows.push(buildPitWindow(cumulative, totalLaps));
+  }
+  return {
+    compounds: shape.compounds,
+    stintLaps: shape.stintLaps,
+    pitWindows,
+    raceCount,
+    fullDistanceRaceCount,
+    isEvidenceBacked: true,
+  };
+}
+
+function synthesizeStrategies(
+  compoundLifeStats: CompoundLifeStats[],
+  totalLaps: number,
+  raceCount: number,
+  fullDistanceRaceCount: number,
+): {
+  recommended: TrackStrategySuggestion | null;
+  alternative: TrackStrategySuggestion | null;
+} {
+  const ranked = rankDryCompoundsByPace(compoundLifeStats);
+  if (ranked.length < 2) return { recommended: null, alternative: null };
+
+  // Walk compound pairs in softness order: (0,1) → (0,2) → (1,2) … so the
+  // softest feasible pairing wins. This keeps Soft+Medium as the recommendation
+  // when it covers the distance, but on high-wear tracks (where soft wear
+  // outruns its safe stint) we fall through to harder pairings — e.g.
+  // Medium+Hard at Catalunya — instead of bailing to "no recommendation".
+  for (let i = 0; i < ranked.length - 1; i++) {
+    for (let j = i + 1; j < ranked.length; j++) {
+      const softer = ranked[i];
+      const harder = ranked[j];
+      const fastFirst = buildOneStopShape(softer, harder, totalLaps);
+      const slowFirst = buildOneStopShape(harder, softer, totalLaps);
+      if (fastFirst) {
+        return {
+          recommended: suggestionFromShape(
+            fastFirst,
+            totalLaps,
+            raceCount,
+            fullDistanceRaceCount,
+          ),
+          alternative: slowFirst
+            ? suggestionFromShape(
+                slowFirst,
+                totalLaps,
+                raceCount,
+                fullDistanceRaceCount,
+              )
+            : null,
+        };
+      }
+      if (slowFirst) {
+        return {
+          recommended: suggestionFromShape(
+            slowFirst,
+            totalLaps,
+            raceCount,
+            fullDistanceRaceCount,
+          ),
+          alternative: null,
+        };
+      }
+    }
+  }
+
+  // One-stop infeasible across every dry pair — only then consider a two-stop
+  // sandwich, anchored on the two fastest compounds (the standard F1 shape).
+  const twoStop = buildTwoStopShape(ranked[0], ranked[1], totalLaps);
+  if (twoStop) {
+    return {
+      recommended: suggestionFromShape(
+        twoStop,
+        totalLaps,
+        raceCount,
+        fullDistanceRaceCount,
+      ),
+      alternative: null,
+    };
+  }
+  return { recommended: null, alternative: null };
+}
+
+/** Sum-of-best-sectors across the player's clean race laps in the bucket. */
+function theoreticalBestFromCleanLaps(entries: BucketRaceEntry[]): number {
+  let bestS1 = 0;
+  let bestS2 = 0;
+  let bestS3 = 0;
+  for (const entry of entries) {
+    const clean = getCleanRaceLaps(entry.player);
+    if (clean.length === 0) continue;
+    const s1 = bestSectorTimeMs(clean, 1);
+    const s2 = bestSectorTimeMs(clean, 2);
+    const s3 = bestSectorTimeMs(clean, 3);
+    if (s1 > 0 && (bestS1 === 0 || s1 < bestS1)) bestS1 = s1;
+    if (s2 > 0 && (bestS2 === 0 || s2 < bestS2)) bestS2 = s2;
+    if (s3 > 0 && (bestS3 === 0 || s3 < bestS3)) bestS3 = s3;
+  }
+  return bestS1 > 0 && bestS2 > 0 && bestS3 > 0 ? bestS1 + bestS2 + bestS3 : 0;
+}
+
+interface BestCleanRaceLap {
+  timeMs: number;
+  compound: string | null;
+}
+
+function bestCleanRaceLapWithCompound(entries: BucketRaceEntry[]): BestCleanRaceLap | null {
+  let best: BestCleanRaceLap | null = null;
+  for (const entry of entries) {
+    const samples = getCleanRaceLapSamples(entry.player);
+    for (const sample of samples) {
+      if (sample.timeMs <= 0) continue;
+      if (!best || sample.timeMs < best.timeMs) {
+        best = { timeMs: sample.timeMs, compound: sample.compound ?? null };
+      }
+    }
+  }
+  return best;
+}
+
+/** Build the Race tab "Key Insights" recommendation for the selected race-length bucket.
+ *
+ *  Inputs are already-bucketed so the recommendation always tracks the
+ *  SegmentedControl above the tyre-life cards. Practice/qualifying sessions are
+ *  excluded by the race filter inside this function (defense in depth).
+ *
+ *  Returns null only when the bucket has zero race entries. The evidence gate
+ *  for strategy/alternative is exposed on the result (`hasEvidence`,
+ *  `recommended`, `alternative`) so the UI can render the always-on chips
+ *  (best lap, fuel, ERS) even when strategy data is too thin. */
+export function buildTrackRaceRecommendation(
+  bucketRaceSessions: TelemetrySession[],
+  bucketCompoundLifeStats: CompoundLifeStats[],
+  bucketFuelStats: TrackFuelStats | null,
+  options: { bestQualiLapMs?: number } = {},
+): TrackRaceRecommendation | null {
+  const entries = buildBucketEntries(bucketRaceSessions);
+  if (entries.length === 0) return null;
+
+  const totalLaps = entries[0].totalLaps;
+  const fullDistanceEntries = entries.filter((e) => e.isFullDistance);
+
+  // ── Best clean race lap + compound + theoretical-best gap ───────────────
+  const bestLap = bestCleanRaceLapWithCompound(entries);
+  const theoreticalBestMs = theoreticalBestFromCleanLaps(entries);
+  const bestRaceLap: TrackBestRaceLap | null = bestLap
+    ? {
+        bestLapMs: bestLap.timeMs,
+        compound: bestLap.compound,
+        theoreticalBestMs,
+        gapToTheoreticalMs:
+          theoreticalBestMs > 0 && bestLap.timeMs > 0
+            ? bestLap.timeMs - theoreticalBestMs
+            : 0,
+      }
+    : null;
+
+  // ── Race vs Quali delta (negative = race lap was faster) ────────────────
+  const bestQuali = options.bestQualiLapMs ?? 0;
+  const raceVsQualiDeltaMs =
+    bestRaceLap && bestRaceLap.bestLapMs > 0 && bestQuali > 0
+      ? bestRaceLap.bestLapMs - bestQuali
+      : 0;
+
+  // ── Avg ERS deployed (MJ/lap) across the bucket ─────────────────────────
+  const ersValues = entries
+    .map((e) => avgErsDeployMj(e.player))
+    .filter((v) => v > 0);
+  const avgErsMj =
+    ersValues.length > 0
+      ? ersValues.reduce((a, b) => a + b, 0) / ersValues.length
+      : 0;
+
+  // ── Recommended + alternative strategy ──────────────────────────────────
+  // Synthesized from compound pace + wear stats (see synthesizeStrategies).
+  // This deliberately ignores the *specific* sequences run in past races —
+  // with one or two races in the bucket the most-frequent sequence is just
+  // "whatever happened that one time," which produces nonsense recommendations
+  // (e.g. a 4-lap stint pulled from an early-ended race in a 17-lap event).
+  const { recommended, alternative } = synthesizeStrategies(
+    bucketCompoundLifeStats,
+    totalLaps,
+    entries.length,
+    fullDistanceEntries.length,
+  );
+  const hasEvidence = recommended != null;
+
+  // ── Fuel target (single line) ────────────────────────────────────────────
+  const fuelTarget: TrackFuelTarget | null = bucketFuelStats
+    ? {
+        recommendedDeltaLaps: bucketFuelStats.avgRecommendedFuelLaps,
+        burnRateKgPerLap: bucketFuelStats.avgBurnRateKgPerLap,
+        excessAtFinishLaps: bucketFuelStats.avgExcessAtFinishLaps,
+        raceCount: bucketFuelStats.raceCount,
+      }
+    : null;
+
+  // ── Since last race here ────────────────────────────────────────────────
+  let sinceLastRace: TrackSinceLastRaceDelta | null = null;
+  if (entries.length >= 2) {
+    // entries follow input order (sessions are already date-sorted from the page).
+    const latest = entries[entries.length - 1];
+    const previous = entries[entries.length - 2];
+    const latestBest = getBestLapTime(getCleanRaceLaps(latest.player));
+    const prevBest = getBestLapTime(getCleanRaceLaps(previous.player));
+    const latestWear = avgWearRate(latest.player);
+    const prevWear = avgWearRate(previous.player);
+    sinceLastRace = {
+      bestLapDeltaMs:
+        latestBest > 0 && prevBest > 0 ? latestBest - prevBest : 0,
+      wearRateDelta:
+        latestWear > 0 && prevWear > 0 ? latestWear - prevWear : 0,
+    };
+  }
+
+  return {
+    raceCount: entries.length,
+    fullDistanceRaceCount: fullDistanceEntries.length,
+    hasEvidence,
+    bestRaceLap,
+    raceVsQualiDeltaMs,
+    avgErsDeployMj: avgErsMj,
+    recommended,
+    alternative,
+    fuelTarget,
+    sinceLastRace,
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Pace Evolution — race-on-race representative pace per compound at one track.
+//
+// Why "best window" pace (not median, not best lap):
+//   • A median across a whole stint is biased against long stints — tyre
+//     degradation in the tail drags the number down, so a 5-lap stint looks
+//     faster than a 25-lap stint even when the long stint's best window is
+//     actually quicker. Unfair race-to-race comparison.
+//   • A single best lap is too sensitive to slipstream and one-off flyers.
+//   • Averaging the FASTEST N clean laps on that compound treats short and
+//     long stints fairly (both contribute their best N-lap window) and
+//     filters single-lap noise.
+//
+// N = REPRESENTATIVE_PACE_WINDOW. 3 is the standard F1-strategy choice for a
+// "best representative pace" window: small enough that a 5-lap stint still
+// contributes meaningfully, large enough to defang single-flyer slipstream.
+//
+// Pit/SC/incident laps are already filtered by `getCleanRaceLapSamples`.
+// `minLapsPerCompound` gates noisy single-lap samples (default 3).
+// ────────────────────────────────────────────────────────────────────────────
+
+const REPRESENTATIVE_PACE_WINDOW = 3;
+
+/**
+ * Race context. Distinguishes "clean air" runs from "full grid" runs because
+ * the underlying physics differs (dirty air, defensive lines, overtake
+ * attempts) and pace numbers aren't directly comparable across them.
+ *
+ * The split is on EFFECTIVE TRAFFIC, not online/offline: a 2-car online
+ * sparring session and a 20-car AI race where the player led the whole way
+ * both behave as clean air, while a 20-car AI race fought mid-pack behaves
+ * as traffic.
+ *
+ * Driver count is the first signal; if the player led ≥ LEADER_SHARE_OVERRIDE
+ * of their clean laps, the kind is upgraded to "clean-air" regardless of
+ * field size (e.g. low-AI grand prix where the user practices in P1).
+ */
+export type RaceContextKind = "clean-air" | "small-field" | "full-grid";
+
+export interface RaceContext {
+  /** Bucket used by the chart filter. */
+  kind: RaceContextKind;
+  /** Total driver count in the classification list (player + opponents). */
+  driverCount: number;
+  /** True when `network-game === 1`. */
+  isOnline: boolean;
+  /** Share of player's clean laps spent in P1 (0..1). 0 when no position data. */
+  leaderShare: number;
+}
+
+const LEADER_SHARE_OVERRIDE = 0.7;
+
+/**
+ * Classify a session's context using only the session-level signals (field
+ * size + online flag). Returns leaderShare=0 since per-lap positions aren't
+ * inspected here. For the lap-aware variant used by the Pace Evolution chart,
+ * see the inline computation in `buildPaceEvolution`.
+ */
+export function classifyRaceContext(session: TelemetrySession): RaceContext {
+  const driverCount = session["classification-data"]?.length ?? 0;
+  const isOnline = session["session-info"]?.["network-game"] === 1;
+  // Thresholds: ≤3 = clean air (player + 1-2 sparring partners); ≥10 = full
+  // grid (the AI/online setup actually creates traffic); the in-between band
+  // is real but rare in this app's data.
+  const kind: RaceContextKind =
+    driverCount <= 3 ? "clean-air" : driverCount >= 10 ? "full-grid" : "small-field";
+  return { kind, driverCount, isOnline, leaderShare: 0 };
+}
+
+export interface PaceEvolutionPoint {
+  /** 1-based session index in chronological order. */
+  idx: number;
+  /** Tooltip label, e.g. "Race · 14:32". */
+  label: string;
+  /** Pre-formatted date, e.g. "Sat, 13 Jun 2026". */
+  date: string;
+  /** Session context (clean air / traffic / online vs offline). */
+  context: RaceContext;
+  /**
+   * Compound → average of the fastest N clean laps on that compound (ms),
+   * where N = REPRESENTATIVE_PACE_WINDOW (3). Only compounds with at least
+   * `minLapsPerCompound` clean laps are present.
+   */
+  paces: Record<string, number>;
+  /** Compound → total clean-lap count for that compound this session. */
+  counts: Record<string, number>;
+}
+
+export function buildPaceEvolution(
+  inputs: { session: TelemetrySession; date: string | Date }[],
+  minLapsPerCompound = 3,
+): PaceEvolutionPoint[] {
+  return inputs
+    .map(({ session, date: rawDate }, i): PaceEvolutionPoint | null => {
+      const player = findPlayer(session);
+      if (!player) return null;
+      const samples = getCleanRaceLapSamples(player);
+      const groups = new Map<string, number[]>();
+      for (const s of samples) {
+        if (!s.compound) continue;
+        const arr = groups.get(s.compound) ?? [];
+        arr.push(s.timeMs);
+        groups.set(s.compound, arr);
+      }
+      const paces: Record<string, number> = {};
+      const counts: Record<string, number> = {};
+      for (const [compound, times] of groups) {
+        if (times.length < minLapsPerCompound) continue;
+        // Mean of the fastest N — see header comment for rationale.
+        const sorted = [...times].sort((a, b) => a - b);
+        const window = sorted.slice(0, REPRESENTATIVE_PACE_WINDOW);
+        const sum = window.reduce((a, b) => a + b, 0);
+        paces[compound] = sum / window.length;
+        counts[compound] = times.length;
+      }
+      // Skip sessions that yielded no qualifying compound — keeps the X axis
+      // honest about how many sessions actually contribute a data point.
+      if (Object.keys(paces).length === 0) return null;
+      const date = rawDate instanceof Date ? rawDate : new Date(rawDate);
+
+      // Compute leader share over the player's clean laps. A 20-car AI race
+      // where the user led the whole way is effectively clean air — same as a
+      // 2-car sparring session. We override `kind` to "clean-air" when the
+      // leader share crosses the threshold so the chart filter groups these
+      // sessions correctly.
+      const perLapInfo = player["per-lap-info"] ?? [];
+      const positionByLap = new Map<number, number>();
+      for (const pli of perLapInfo) {
+        const pos = pli["track-position"];
+        if (typeof pos === "number" && pos > 0) {
+          positionByLap.set(pli["lap-number"], pos);
+        }
+      }
+      let leaderLaps = 0;
+      let positionedLaps = 0;
+      for (const s of samples) {
+        const pos = positionByLap.get(s.lapNumber);
+        if (pos == null) continue;
+        positionedLaps++;
+        if (pos === 1) leaderLaps++;
+      }
+      const leaderShare =
+        positionedLaps > 0 ? leaderLaps / positionedLaps : 0;
+
+      const baseContext = classifyRaceContext(session);
+      const context: RaceContext = {
+        ...baseContext,
+        leaderShare,
+        kind:
+          leaderShare >= LEADER_SHARE_OVERRIDE && baseContext.kind !== "clean-air"
+            ? "clean-air"
+            : baseContext.kind,
+      };
+      return {
+        idx: i + 1,
+        context,
+        label: `Race · ${date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
+        date: date.toLocaleDateString("en-GB", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }),
+        paces,
+        counts,
+      };
+    })
+    .filter((p): p is PaceEvolutionPoint => p !== null);
 }

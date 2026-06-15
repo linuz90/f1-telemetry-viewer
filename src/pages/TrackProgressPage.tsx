@@ -16,23 +16,27 @@ import {
 import { useSessionList } from "../hooks/useSessionList";
 import { useTelemetry } from "../context/TelemetryContext";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
-import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, isRaceSession, aggregateCompoundLife, aggregateFuelData } from "../utils/stats";
+import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, isRaceSession, aggregateCompoundLife, aggregateFuelData, buildTrackRaceRecommendation, buildPaceEvolution } from "../utils/stats";
 import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getSessionIcon, bestSectorTimeMs, isTrackSlugMatch } from "../utils/format";
 import { TrackFlag } from "../components/TrackFlag";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { CHART_THEME, TOOLTIP_STYLE, SECTOR_COLORS } from "../utils/colors";
 import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
 import { dashboardPath, sessionSummaryPath, trackPath } from "../utils/routes";
-import { accentCardClass, cardClass, cardClassFeature } from "../components/Card";
-import { Upload, ArrowLeft, Gauge } from "lucide-react";
+import { accentCardClass, cardClass } from "../components/Card";
+import { Upload, ArrowLeft, Gauge, Hash, Target, Timer, TimerReset } from "lucide-react";
+import { InsightTile } from "../components/ui/InsightTile";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { RaceSetupComparison } from "../components/RaceSetupComparison";
+import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
+import { PaceEvolutionChart } from "../components/track/PaceEvolutionChart";
 import { SessionRow } from "../components/SessionRow";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { Badge } from "../components/ui/Badge";
 import { HStack, VStack } from "../components/ui/Stack";
 import { buildRaceSetupComparison } from "../utils/setupComparison";
+import { buildTrackRivalBenchmark } from "../utils/rivalStats";
 import type { CompoundLifeStats } from "../utils/stats";
 import type { RaceSetupCandidate, RaceSetupRunInput } from "../utils/setupComparison";
 
@@ -361,10 +365,6 @@ export function TrackProgressPage() {
     () => aggregateCompoundLife(raceSessions),
     [raceSessions],
   );
-  const trackFuelStats = useMemo(
-    () => aggregateFuelData(raceSessions),
-    [raceSessions],
-  );
   const allRaceSetupCandidates = useMemo(
     () => buildRaceSetupComparison(toRaceSetupRuns(raceDataAll)),
     [raceDataAll],
@@ -388,6 +388,31 @@ export function TrackProgressPage() {
     showRaceLengthSelector && selectedRaceAnalysisBucket
       ? selectedRaceAnalysisBucket.compoundLifeStats
       : compoundLifeStats;
+  // Race sessions in the selected length bucket, used by the Key Insights
+  // recommendation and the bucket-scoped fuel stats. Falls back to all race
+  // sessions when there's only a single race-length bucket (no selector).
+  const selectedRaceSessions =
+    showRaceLengthSelector && selectedRaceAnalysisBucket
+      ? selectedRaceAnalysisBucket.sessions
+      : raceSessions;
+  const selectedTrackFuelStats = useMemo(
+    () => aggregateFuelData(selectedRaceSessions),
+    [selectedRaceSessions],
+  );
+  // Fastest online rival at this track — computed off raw session summaries
+  // (not the race-length bucket) because pace comparisons stay valid across
+  // short and long races, and at single-track scope we want all the evidence
+  // we can get.
+  const trackRivalBenchmark = useMemo(
+    () =>
+      buildTrackRivalBenchmark(
+        sessions,
+        activeFormulaKey,
+        getSessionFormulaScopeKey,
+        (s) => isTrackSlugMatch(s.track, trackId),
+      ),
+    [sessions, activeFormulaKey, trackId],
+  );
   const selectedRaceSetupCandidates =
     showRaceLengthSelector && selectedRaceAnalysisBucket
       ? selectedRaceAnalysisBucket.setupCandidates
@@ -736,22 +761,16 @@ export function TrackProgressPage() {
       label: `${formatSessionType(d.summary.sessionType, d.summary.formula)} · ${formatTime(d.summary.date)}`,
     }));
 
-  // Race chart data
-  const raceWearTrend = raceData
-    .filter((d) => d.wearRate > 0)
-    .map((d, i) => ({
-      idx: i + 1,
-      rate: +d.wearRate.toFixed(1),
-      label: `Race · ${formatTime(d.summary.date)}`,
-    }));
-
-  const raceSpeedTrend = raceData
-    .filter((d) => d.topSpeed > 0)
-    .map((d, i) => ({
-      idx: i + 1,
-      speed: d.topSpeed,
-      label: `Race · ${formatTime(d.summary.date)}`,
-    }));
+  // Race-on-race median clean lap per compound — feeds the Pace Evolution
+  // chart. Uses bucket-scoped sessions so a 5-lap repro doesn't get plotted
+  // against a 30-lap stint median in the same line. The set identity match
+  // is by TelemetrySession reference, which is stable across renders here.
+  const selectedRaceSessionSet = new Set(selectedRaceSessions);
+  const paceEvolutionData = buildPaceEvolution(
+    raceData
+      .filter((d) => selectedRaceSessionSet.has(d.session))
+      .map((d) => ({ session: d.session, date: d.summary.date })),
+  );
 
   const tooltipStyle = TOOLTIP_STYLE;
 
@@ -765,11 +784,6 @@ export function TrackProgressPage() {
     { label: "S2", color: SECTOR_COLORS.S2, bestMs: theoreticalTimeTrialS2, latestMs: latestTimeTrial?.bestS2 ?? 0 },
     { label: "S3", color: SECTOR_COLORS.S3, bestMs: theoreticalTimeTrialS3, latestMs: latestTimeTrial?.bestS3 ?? 0 },
   ];
-
-  // Date range for subtitle
-  const firstDate = formatDate(data[0].summary.date);
-  const lastDate = formatDate(data[data.length - 1].summary.date);
-  const dateRange = data.length > 1 ? `${firstDate} — ${lastDate}` : firstDate;
 
   // Session history sorted newest first
   const sessionHistory = [...data].reverse();
@@ -803,10 +817,20 @@ export function TrackProgressPage() {
           </h2>
           <p className="text-sm text-zinc-500">
             {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
-            {data.length} session{data.length !== 1 ? "s" : ""}{(() => {
-              const totalAttempts = data.reduce((sum, d) => sum + d.attemptCount, 0);
-              return totalAttempts > data.length ? ` (${totalAttempts} total attempts)` : "";
-            })()} · {dateRange}
+            {data.length} session{data.length !== 1 ? "s" : ""}
+            {bestTimeTrialSession && bestTimeTrialMs > 0 && (
+              <>
+                {" · "}
+                <Link
+                  to={sessionSummaryPath(bestTimeTrialSession.summary)}
+                  className="inline-flex items-center gap-1 text-zinc-400 transition-colors hover:text-cyan-200"
+                >
+                  <Gauge className="size-3 text-cyan-300" />
+                  <span className="text-cyan-300/80">Best TT</span>
+                  <span className="font-mono text-zinc-300">{msToLapTime(bestTimeTrialMs)}</span>
+                </Link>
+              </>
+            )}
           </p>
         </div>
 
@@ -831,24 +855,6 @@ export function TrackProgressPage() {
         </VStack>
       </div>
 
-      {bestTimeTrialSession && (
-        <Link
-          to={sessionSummaryPath(bestTimeTrialSession.summary)}
-          className="inline-flex max-w-full items-center gap-2 rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-2 text-sm text-zinc-300 transition-colors hover:border-cyan-300/30 hover:bg-cyan-400/[0.1]"
-        >
-          <Gauge className="size-4 shrink-0 text-cyan-300" />
-          <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-cyan-300/80">
-            Best TT
-          </span>
-          <span className="font-mono font-semibold text-cyan-100">
-            {msToLapTime(bestTimeTrialMs)}
-          </span>
-          <span className="min-w-0 truncate text-xs text-zinc-500">
-            {formatDate(bestTimeTrialSession.summary.date)} · {timeTrialData.length} attempt{timeTrialData.length !== 1 ? "s" : ""}
-          </span>
-        </Link>
-      )}
-
       {/* ── Qualifying Section ── */}
       {qualiData.length > 0 && selectedTab === "qualifying" && (
         <>
@@ -856,30 +862,26 @@ export function TrackProgressPage() {
 
           {/* Stat cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className={cardClassFeature}>
-              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Best Lap</div>
-              <div className="font-mono text-xl font-semibold bg-gradient-to-r from-cyan-300 to-cyan-500 bg-clip-text text-transparent">
+            <InsightTile title="Best Lap" icon={Timer} accent="purple">
+              <div className="font-mono text-xl font-semibold text-purple-300">
                 {actualBestQualiMs > 0 ? msToLapTime(actualBestQualiMs) : "–"}
               </div>
-            </div>
-            <div className={cardClass}>
-              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Theoretical Best</div>
+            </InsightTile>
+            <InsightTile title="Theoretical Best" icon={Target} accent="emerald">
               <div className="font-mono text-xl text-ahead">
                 {theoreticalBestMs > 0 ? msToLapTime(theoreticalBestMs) : "–"}
               </div>
-            </div>
-            <div className={cardClass}>
-              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Gap to Theoretical</div>
+            </InsightTile>
+            <InsightTile title="Gap to Theoretical" icon={TimerReset} accent="amber">
               <div className="font-mono text-xl text-warning">
                 {gapMs > 0 ? `+${(gapMs / 1000).toFixed(3)}s` : "–"}
               </div>
-            </div>
-            <div className={cardClass}>
-              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Sessions</div>
+            </InsightTile>
+            <InsightTile title="Sessions" icon={Hash}>
               <div className="text-xl text-zinc-100 tabular-nums">
                 {qualiData.length}
               </div>
-            </div>
+            </InsightTile>
           </div>
 
           {/* Best lap over time */}
@@ -1121,30 +1123,26 @@ export function TrackProgressPage() {
           <SectionHeader>Time Trial Pace</SectionHeader>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className={cardClassFeature}>
-              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Best TT Lap</div>
-              <div className="font-mono text-xl font-semibold bg-gradient-to-r from-cyan-300 to-cyan-500 bg-clip-text text-transparent">
+            <InsightTile title="Best TT Lap" icon={Timer} accent="purple">
+              <div className="font-mono text-xl font-semibold text-purple-300">
                 {bestTimeTrialMs > 0 ? msToLapTime(bestTimeTrialMs) : "–"}
               </div>
-            </div>
-            <div className={cardClass}>
-              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Theoretical Best</div>
+            </InsightTile>
+            <InsightTile title="Theoretical Best" icon={Target} accent="emerald">
               <div className="font-mono text-xl text-ahead">
                 {theoreticalTimeTrialMs > 0 ? msToLapTime(theoreticalTimeTrialMs) : "–"}
               </div>
-            </div>
-            <div className={cardClass}>
-              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Gap to Theoretical</div>
+            </InsightTile>
+            <InsightTile title="Gap to Theoretical" icon={TimerReset} accent="amber">
               <div className="font-mono text-xl text-warning">
                 {timeTrialGapMs > 0 ? `+${(timeTrialGapMs / 1000).toFixed(3)}s` : "–"}
               </div>
-            </div>
-            <div className={cardClass}>
-              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Attempts</div>
+            </InsightTile>
+            <InsightTile title="Attempts" icon={Hash}>
               <div className="text-xl text-zinc-100 tabular-nums">
                 {timeTrialData.length}
               </div>
-            </div>
+            </InsightTile>
           </div>
 
           {timeTrialLapTrend.length > 1 && (
@@ -1377,23 +1375,25 @@ export function TrackProgressPage() {
       {/* ── Race Section ── */}
       {raceData.length > 0 && selectedTab === "race" && (
         <>
-          <SectionHeader>Race Performance</SectionHeader>
-
-          {/* Race stat cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className={cardClassFeature}>
-              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Best Race Lap</div>
-              <div className="font-mono text-xl font-semibold bg-gradient-to-r from-cyan-300 to-cyan-500 bg-clip-text text-transparent">
-                {bestRaceLapMs > 0 ? msToLapTime(bestRaceLapMs) : "–"}
-              </div>
-            </div>
-            <div className={cardClass}>
-              <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1.5">Races</div>
-              <div className="text-xl text-zinc-100 tabular-nums">
-                {raceData.length}
-              </div>
-            </div>
-          </div>
+          {/* Key Insights — synthesizes the rest of the tab into "what should
+              I actually do here?". Reacts to the same race-length selector that
+              drives the Compound Tyre Life cards below. */}
+          {(() => {
+            const recommendation = buildTrackRaceRecommendation(
+              selectedRaceSessions,
+              selectedCompoundLifeStats,
+              selectedTrackFuelStats,
+              { bestQualiLapMs: actualBestQualiMs },
+            );
+            if (!recommendation) return null;
+            return (
+              <TrackKeyInsights
+                recommendation={recommendation}
+                raceLengthLabel={selectedRaceLengthLabel}
+                rivalBenchmark={trackRivalBenchmark}
+              />
+            );
+          })()}
 
           {/* Compound tyre life cards */}
           {selectedCompoundLifeStats.length > 0 && (
@@ -1441,120 +1441,9 @@ export function TrackProgressPage() {
             </div>
           )}
 
-          {/* Fuel summary */}
-          {trackFuelStats && (
-            <div>
-              <h4 className="text-sm font-semibold text-zinc-300 mb-2">Fuel Management</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div className={cardClass}>
-                  <div className="text-xs text-zinc-500 mb-1">Avg Initial Fuel</div>
-                  <div className={`font-mono text-lg ${
-                    trackFuelStats.avgInitialFuelLaps >= 0
-                      ? "text-ahead"
-                      : Math.abs(trackFuelStats.avgInitialFuelLaps) <= 1
-                        ? "text-warning"
-                        : "text-behind"
-                  }`}>
-                    {trackFuelStats.avgInitialFuelLaps >= 0 ? "+" : ""}{trackFuelStats.avgInitialFuelLaps.toFixed(1)} laps
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-0.5">
-                    {Math.round(trackFuelStats.avgStartingFuelKg)} kg avg
-                  </div>
-                </div>
-                <div className={cardClass}>
-                  <div className="text-xs text-zinc-500 mb-1">Rec. Initial Fuel</div>
-                  <div className={`font-mono text-lg ${
-                    Math.abs(trackFuelStats.avgRecommendedFuelLaps) <= 0.3
-                      ? "text-ahead"
-                      : trackFuelStats.avgRecommendedFuelLaps < -1
-                        ? "text-behind"
-                        : "text-cyan-400"
-                  }`}>
-                    {trackFuelStats.avgRecommendedFuelLaps >= 0 ? "+" : ""}{trackFuelStats.avgRecommendedFuelLaps.toFixed(1)} laps
-                  </div>
-                </div>
-                <div className={cardClass}>
-                  <div className="text-xs text-zinc-500 mb-1">Avg Burn Rate</div>
-                  <div className="font-mono text-lg text-warning">
-                    {trackFuelStats.avgBurnRateKgPerLap.toFixed(2)} kg/lap
-                  </div>
-                </div>
-                <div className={cardClass}>
-                  <div className="text-xs text-zinc-500 mb-1">Avg Excess at Finish</div>
-                  <div className={`font-mono text-lg ${
-                    trackFuelStats.avgExcessAtFinishLaps > 1
-                      ? "text-warning"
-                      : trackFuelStats.avgExcessAtFinishLaps < 0
-                        ? "text-behind"
-                        : "text-ahead"
-                  }`}>
-                    {trackFuelStats.avgExcessAtFinishLaps.toFixed(1)} laps
-                  </div>
-                </div>
-                <div className={cardClass}>
-                  <div className="text-xs text-zinc-500 mb-1">Races</div>
-                  <div className="text-lg text-zinc-200">
-                    {trackFuelStats.raceCount}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Tyre management trend (race only) */}
-          {raceWearTrend.length > 1 && (
-            <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                Tyre Management
-                <span className="font-normal text-zinc-500 ml-2">
-                  Lower = gentler on tyres
-                </span>
-              </h3>
-              <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={raceWearTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
-                  <XAxis dataKey="idx" stroke={CHART_THEME.axis} fontSize={11} />
-                  <YAxis stroke={CHART_THEME.axis} fontSize={11} tickFormatter={(v) => `${v}%`} />
-                  <Tooltip
-                    {...tooltipStyle}
-                    formatter={(value: number | undefined) => [`${value ?? "–"}%/lap`, "Wear Rate"]}
-                    labelFormatter={(v) => {
-                      const entry = raceWearTrend.find((d) => d.idx === v);
-                      return entry?.label ?? `Race ${v}`;
-                    }}
-                  />
-                  <Line type="monotone" dataKey="rate" stroke="#f59e0b" strokeWidth={2} dot={{ fill: "#f59e0b", r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </section>
-          )}
-
-          {/* Top speed trend (race only) */}
-          {raceSpeedTrend.length > 1 && (
-            <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                Top Speed Trend
-                <span className="font-normal text-zinc-500 ml-2">
-                  km/h per race
-                </span>
-              </h3>
-              <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={raceSpeedTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
-                  <XAxis dataKey="idx" stroke={CHART_THEME.axis} fontSize={11} />
-                  <YAxis stroke={CHART_THEME.axis} fontSize={11} tickFormatter={(v) => `${v}`} domain={["auto", "auto"]} />
-                  <Tooltip
-                    {...tooltipStyle}
-                    formatter={(value: number | undefined) => [`${value ?? "–"} km/h`, "Top Speed"]}
-                    labelFormatter={(v) => {
-                      const entry = raceSpeedTrend.find((d) => d.idx === v);
-                      return entry?.label ?? `Race ${v}`;
-                    }}
-                  />
-                  <Line type="monotone" dataKey="speed" stroke="#22c55e" strokeWidth={2} dot={{ fill: "#22c55e", r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </section>
+          {/* Pace evolution (race-on-race median clean lap per compound) */}
+          {paceEvolutionData.length > 1 && (
+            <PaceEvolutionChart data={paceEvolutionData} />
           )}
 
           {/* Race setup comparison */}
