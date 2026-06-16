@@ -103,6 +103,10 @@ function pickRepresentative(
   return [...sessions].sort((a, b) => sessionTime(b) - sessionTime(a))[0]!;
 }
 
+function hasDashboardActivity(session: SessionSummary): boolean {
+  return session.validLapCount > 0 || session.playerRaceResult != null;
+}
+
 /**
  * The sidebar is a literal file/session history. The dashboard is an editorial
  * recap, so repeated consecutive attempts are collapsed into the best
@@ -117,7 +121,7 @@ export function buildDashboardActivity(
   maxGroups = 10,
 ): DashboardActivityGroup[] {
   const sorted = sessions
-    .filter((session) => session.validLapCount > 0)
+    .filter(hasDashboardActivity)
     .sort((a, b) => sessionTime(b) - sessionTime(a));
 
   const groups: Array<{

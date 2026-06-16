@@ -50,9 +50,14 @@ export function DashboardPage() {
     );
   }
 
-  const validSessions = sessions.filter((session) => session.validLapCount > 0);
+  // Dashboard result stats should count classified race outcomes even when the
+  // player retired before logging a timed lap. Lap/pace sections below still
+  // self-filter to sessions with actual lap data before charting.
+  const dashboardSessions = sessions.filter(
+    (session) => session.validLapCount > 0 || session.playerRaceResult != null,
+  );
   const isFiltered = !areSessionFiltersDefault(filters);
-  const visibleSessions = validSessions.filter((session) =>
+  const visibleSessions = dashboardSessions.filter((session) =>
     matchesSessionFilters(session, filters),
   );
   // Synthetic entries are demo-only summary stubs with no backing detail JSON.
@@ -105,10 +110,10 @@ export function DashboardPage() {
   );
   const hasScopedData = scopedSessions.length > 0;
   const unfilteredScopedSessionCount = activeFormulaKey
-    ? validSessions.filter(
+    ? dashboardSessions.filter(
         (session) => getSessionFormulaScopeKey(session) === activeFormulaKey,
       ).length
-    : validSessions.length;
+    : dashboardSessions.length;
   const hasUnfilteredScopedData = unfilteredScopedSessionCount > 0;
   // Aggregate stats (avg finish, DNF rate, podium counts) are noisy or misleading
   // with one or two races, and downright depressing when every race is a DNF
