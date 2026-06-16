@@ -7,6 +7,8 @@ export interface SessionSummary {
   formula?: string;
   gameYear?: number;
   packetFormat?: number;
+  /** Stable Pits n' Giggles session identity when present in debug metadata. */
+  sessionUid?: string;
   date: string;
   validLapCount: number;
   lapIndicators?: ("valid" | "invalid" | "best")[];

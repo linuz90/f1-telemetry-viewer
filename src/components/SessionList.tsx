@@ -11,19 +11,19 @@ import {
 } from "../utils/format";
 import {
   isQualifyingSessionType,
-  isRaceSessionType,
   isTimeTrialSessionType,
 } from "../utils/sessionTypes";
 import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
 import { sessionSummaryPath, trackPath } from "../utils/routes";
+import {
+  DEFAULT_FILTERS,
+  matchesSessionFilters,
+  useSessionFilters,
+} from "../hooks/useSessionFilters";
 import { cn } from "../utils/cn";
 import { TrackFlag } from "./TrackFlag";
 import { SessionCard } from "./SessionCard";
-import {
-  SessionListFilterMenu,
-  DEFAULT_FILTERS,
-  type SessionListFilters,
-} from "./SessionListFilterMenu";
+import { SessionListFilterMenu } from "./SessionListFilterMenu";
 import { HStack } from "./ui/Stack";
 import { Tabs } from "./ui/Tabs";
 
@@ -77,7 +77,6 @@ function groupModeLabel(sessions: SessionSummary[]): string | null {
 }
 
 const PAGE_SIZE = 50;
-const FILTERS_STORAGE_KEY = "session-list-filters";
 const TAB_STORAGE_KEY = "session-list-tab";
 
 type SidebarTab = "sessions" | "tracks";
@@ -96,37 +95,15 @@ function representativeFormulaKey(sessions: SessionSummary[]): string | undefine
   return sessions[0] ? getSessionFormulaScopeKey(sessions[0]) : undefined;
 }
 
-function readPersistedFilters(): SessionListFilters {
-  if (typeof window === "undefined") return DEFAULT_FILTERS;
-  try {
-    const raw = window.sessionStorage.getItem(FILTERS_STORAGE_KEY);
-    if (!raw) return DEFAULT_FILTERS;
-    const parsed = JSON.parse(raw) as Partial<SessionListFilters>;
-    return {
-      type: parsed.type === "race" || parsed.type === "quali" ? parsed.type : "all",
-      mode: parsed.mode === "online" || parsed.mode === "ai" ? parsed.mode : "all",
-    };
-  } catch {
-    return DEFAULT_FILTERS;
-  }
-}
-
 export function SessionList() {
   const { sessions, loading, error } = useSessionList();
   const { activeFormulaKey, formulaOptions } = useTelemetry();
   const [tab, setTab] = useState<SidebarTab>(readPersistedTab);
-  const [filters, setFilters] = useState<SessionListFilters>(readPersistedFilters);
+  const [filters, setFilters] = useSessionFilters();
   const [page, setPage] = useState(0);
 
-  // Persist filters + active tab across reloads within the same tab session.
-  useEffect(() => {
-    try {
-      window.sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters));
-    } catch {
-      // Ignore storage failures (e.g. private mode quota limits).
-    }
-  }, [filters]);
-
+  // Persist the active tab across reloads within the same tab session. Filters
+  // use a shared browser store so the dashboard and sidebar react together.
   useEffect(() => {
     try {
       window.sessionStorage.setItem(TAB_STORAGE_KEY, tab);
@@ -135,7 +112,11 @@ export function SessionList() {
     }
   }, [tab]);
 
-  const updateFilters = (next: SessionListFilters) => {
+  useEffect(() => {
+    setPage(0);
+  }, [filters.type, filters.mode]);
+
+  const updateFilters = (next: typeof filters) => {
     setFilters(next);
     setPage(0);
   };
@@ -171,13 +152,7 @@ export function SessionList() {
   // Synthetic (demo-only) entries DO appear here so the sidebar reads like a real session list;
   // clicking one lands on the SessionPage's friendly "Demo session — upload to explore detail"
   // placeholder rather than a 404.
-  const typeModeFiltered = sessions.filter((s) => {
-    if (filters.type === "race" && !isRaceSessionType(s.sessionType)) return false;
-    if (filters.type === "quali" && !isQualifyingSessionType(s.sessionType)) return false;
-    if (filters.mode === "online" && s.isOnline !== true) return false;
-    if (filters.mode === "ai" && (s.isOnline === true || (s.aiDifficulty ?? 0) <= 0)) return false;
-    return true;
-  });
+  const typeModeFiltered = sessions.filter((s) => matchesSessionFilters(s, filters));
 
   const filteredSessions = activeFormulaKey
     ? typeModeFiltered.filter((s) => getSessionFormulaScopeKey(s) === activeFormulaKey)

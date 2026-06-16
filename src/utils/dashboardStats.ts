@@ -168,8 +168,7 @@ function isRaceWithResult(session: SessionSummary): boolean {
   return (
     isRaceSessionType(session.sessionType) &&
     session.isSpectator !== true &&
-    session.playerRaceResult != null &&
-    session.playerRaceResult.playerLaps > 0
+    session.playerRaceResult != null
   );
 }
 

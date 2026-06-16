@@ -1,22 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Bot, Flag, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import {
+  DEFAULT_FILTERS,
+  type SessionListFilters,
+  type SessionModeFilter,
+  type SessionTypeFilter,
+} from "../hooks/useSessionFilters";
 import { cn } from "../utils/cn";
 import { SegmentedControl } from "./ui/SegmentedControl";
 import { HStack } from "./ui/Stack";
-
-export type SessionTypeFilter = "all" | "race" | "quali";
-export type SessionModeFilter = "all" | "online" | "ai";
-
-export interface SessionListFilters {
-  type: SessionTypeFilter;
-  mode: SessionModeFilter;
-}
-
-export const DEFAULT_FILTERS: SessionListFilters = {
-  type: "all",
-  mode: "all",
-};
 
 interface Props {
   value: SessionListFilters;

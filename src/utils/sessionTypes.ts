@@ -19,6 +19,10 @@ function normalizeFormula(formula: SessionInfo["formula"] | undefined): string {
   return formula?.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ") ?? "";
 }
 
+function normalizeSessionType(type: string | undefined): string {
+  return type?.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ") ?? "";
+}
+
 function isF1ModernFormula(formula: SessionInfo["formula"] | undefined): boolean {
   const normalized = normalizeFormula(formula);
   return normalized === "f1 modern" || normalized === "formula 1 modern";
@@ -47,8 +51,14 @@ export function isRaceSessionType(type: string | undefined): boolean {
   return type?.startsWith("Race") ?? false;
 }
 
+export function isSprintShootoutSessionType(type: string | undefined): boolean {
+  const normalized = normalizeSessionType(type);
+  return /^(short\s+)?(?:sprint|session)\s+shootout$/.test(normalized);
+}
+
 export function isQualifyingSessionType(type: string | undefined): boolean {
-  return type?.includes("Qualifying") ?? false;
+  const normalized = normalizeSessionType(type);
+  return normalized.includes("qualifying") || /\bquali\b/.test(normalized) || isSprintShootoutSessionType(type);
 }
 
 export function isTimeTrialSessionType(type: string | undefined): boolean {

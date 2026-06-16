@@ -130,6 +130,10 @@ export function formatSessionType(type: string, formula?: string): string {
       return "One-Shot Quali";
     case "Short Qualifying":
       return "Short Quali";
+    case "Short Sprint Shootout":
+      return "Sprint Shootout";
+    case "Short Session Shootout":
+      return "Session Shootout";
     default:
       return type;
   }
@@ -353,6 +357,10 @@ export function getSessionIcon(type: string): string {
   switch (type) {
     case "Short Qualifying":
     case "Short Quali":
+    case "Short Sprint Shootout":
+    case "Sprint Shootout":
+    case "Short Session Shootout":
+    case "Session Shootout":
       return "\u23F1\uFE0F"; // ⏱️
     case "One Shot Qualifying":
     case "One-Shot Quali":
