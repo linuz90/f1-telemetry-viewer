@@ -88,6 +88,14 @@ body {
   outline: none;
 }
 
+/* Tame the loud browser default focus ring to match the subtle zinc style
+ * used by SegmentedControl. Components that need a custom focus treatment
+ * still opt in with `focus:outline-none` + their own ring. */
+:focus-visible {
+  outline: 1px solid theme("--color-zinc-600");
+  outline-offset: 1px;
+}
+
 /* Scroll-driven masks hide the fade at the edge you're already touching. */
 @property --scroll-mask-top-fade {
   syntax: "<length>";
