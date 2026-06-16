@@ -9,6 +9,7 @@ import {
   REPO_URL,
   pullRequestUrl,
 } from "../utils/links";
+import { cn } from "../utils/cn";
 
 const TYPE_CONFIG: Record<
   string,
@@ -85,9 +86,12 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
                   <li key={entry.hash} className="flex items-start gap-2.5">
                     {config && (
                       <span
-                        className={`shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded ${config.bg}`}
+                        className={cn(
+                          "shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded",
+                          config.bg,
+                        )}
                       >
-                        <config.icon className={`h-3 w-3 ${config.fg}`} />
+                        <config.icon className={cn("h-3 w-3", config.fg)} />
                       </span>
                     )}
                     <span className="text-sm text-zinc-300 leading-snug">

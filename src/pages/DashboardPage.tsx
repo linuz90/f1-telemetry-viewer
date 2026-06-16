@@ -16,6 +16,7 @@ import {
 } from "../components/dashboard/helpers";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useSessionList } from "../hooks/useSessionList";
+import { cn } from "../utils/cn";
 import { buildDashboardActivity } from "../utils/dashboardActivity";
 import {
   buildTrackInsights,
@@ -117,7 +118,7 @@ export function DashboardPage() {
       </div>
 
       {!hasScopedData ? (
-        <section className={`rounded-2xl bg-zinc-900/40 px-5 py-8 text-center ${cardHighlight}`}>
+        <section className={cn("rounded-2xl bg-zinc-900/40 px-5 py-8 text-center", cardHighlight)}>
           <h3 className="text-sm font-semibold text-zinc-300">
             No sessions in this scope
           </h3>

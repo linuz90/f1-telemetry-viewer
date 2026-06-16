@@ -14,6 +14,7 @@ import { cardHighlight } from "./Card";
 import { ChangelogModal } from "./ChangelogModal";
 import { SessionList } from "./SessionList";
 import { SegmentedControl } from "./ui/SegmentedControl";
+import { cn } from "../utils/cn";
 
 const MIN_WIDTH = 250;
 const MAX_WIDTH = 480;
@@ -133,13 +134,10 @@ export function Layout() {
       {/* Sidebar — faint right-edge inset highlight acts as a soft panel divider
           against the slightly lighter main canvas, without re-adding a hard border. */}
       <aside
-        className={`
-          sidebar-scroll
-          fixed inset-y-0 left-0 z-30 bg-black overflow-y-auto
-          transition-transform duration-200 ease-in-out
-          md:relative md:z-0 md:translate-x-0 md:shrink-0
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-        `}
+        className={cn(
+          "sidebar-scroll fixed inset-y-0 left-0 z-30 bg-black overflow-y-auto transition-transform duration-200 ease-in-out md:relative md:z-0 md:translate-x-0 md:shrink-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+        )}
         style={{ width }}
       >
         <div className="w-px h-full absolute right-0 top-0 z-99 pointer-events-none bg-[rgba(255,255,255,0.08)]" />
@@ -225,7 +223,10 @@ export function Layout() {
               solid red panel.
             */}
             <div
-              className={`relative flex items-center justify-between gap-6 overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-800/60 via-zinc-900/40 to-zinc-900/20 px-6 py-5 ${cardHighlight}`}
+              className={cn(
+                "relative flex items-center justify-between gap-6 overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-800/60 via-zinc-900/40 to-zinc-900/20 px-6 py-5",
+                cardHighlight,
+              )}
             >
               <div
                 aria-hidden

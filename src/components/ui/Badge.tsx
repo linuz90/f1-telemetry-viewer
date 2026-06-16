@@ -1,3 +1,5 @@
+import { cn } from "../../utils/cn";
+
 export type BadgeTone = "red" | "amber" | "yellow" | "green" | "sky" | "rose" | "purple" | "zinc";
 export type BadgeSize = "sm" | "xs";
 export type BadgeShape = "pill" | "square";
@@ -47,11 +49,15 @@ export function Badge({
   className?: string;
   children: React.ReactNode;
 }) {
-  const toneClass = tone ? ` ${TONE[tone]}` : "";
-  const extra = className ? ` ${className}` : "";
   return (
     <span
-      className={`inline-flex shrink-0 items-center ${SHAPE[shape]} ${SIZE[size]}${toneClass}${extra}`}
+      className={cn(
+        "inline-flex shrink-0 items-center",
+        SHAPE[shape],
+        SIZE[size],
+        tone && TONE[tone],
+        className,
+      )}
     >
       {children}
     </span>

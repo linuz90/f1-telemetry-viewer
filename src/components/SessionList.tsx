@@ -16,6 +16,7 @@ import {
 } from "../utils/sessionTypes";
 import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
 import { sessionSummaryPath, trackPath } from "../utils/routes";
+import { cn } from "../utils/cn";
 import { TrackFlag } from "./TrackFlag";
 import { SessionCard } from "./SessionCard";
 import {
@@ -253,7 +254,7 @@ export function SessionList() {
         )}
       </div>
 
-      <div className={`p-2 ${tab === "sessions" ? "space-y-4" : "space-y-0.5"}`}>
+      <div className={cn("p-2", tab === "sessions" ? "space-y-4" : "space-y-0.5")}>
         {tab === "sessions" && filteredSessions.length === 0 && (
           <div className="px-2 py-4 text-sm text-zinc-500">
             No sessions match these filters.{" "}
@@ -337,11 +338,12 @@ export function SessionList() {
                       key={s.relativePath}
                       to={sessionSummaryPath(s)}
                       className={({ isActive }) =>
-                        `block rounded-xl px-2 py-2 transition-colors ${
+                        cn(
+                          "block rounded-xl px-2 py-2 transition-colors",
                           isActive
                             ? "bg-zinc-800/70 text-white"
-                            : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200"
-                        }`
+                            : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200",
+                        )
                       }
                     >
                       {card}
@@ -391,11 +393,12 @@ export function SessionList() {
                 key={track}
                 to={formulaKey ? trackPath(formulaKey, track) : "#"}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors ${
+                  cn(
+                    "flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors",
                     isActive
                       ? "bg-zinc-800/70 text-white"
-                      : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200"
-                  }`
+                      : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200",
+                  )
                 }
               >
                 {trackContent}

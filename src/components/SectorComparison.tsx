@@ -1,5 +1,6 @@
 import type { LapHistoryEntry, PerLapInfo, TyreStintBasic } from "../types/telemetry";
 import { isLapValid, msToLapTime, msToSectorTime, sectorTimeMs } from "../utils/format";
+import { cn } from "../utils/cn";
 import { getCompoundColor, PERF_COLORS } from "../utils/colors";
 import { ersDeployMjForLap, ersHarvestMjForLap } from "../utils/stats";
 import { accentCardClass, neutralCardClass } from "./Card";
@@ -112,13 +113,14 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
           return (
             <div
               key={d.lap}
-              className={`rounded-lg px-3 py-2.5 ${
+              className={cn(
+                "rounded-lg px-3 py-2.5",
                 !d.valid
                   ? "opacity-60 border border-dashed border-red-500/40 bg-zinc-950/50"
                   : isBest
                     ? accentCardClass("purple")
-                    : neutralCardClass
-              }`}
+                    : neutralCardClass,
+              )}
             >
               {/* Header row: lap number, validity, total time, delta */}
               <div className="flex items-center gap-3 mb-1.5">
@@ -147,13 +149,14 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
 
                 <span className="ml-auto flex items-center gap-3">
                   <span
-                    className={`font-mono text-sm font-semibold ${
+                    className={cn(
+                      "font-mono text-sm font-semibold",
                       !d.valid
                         ? "text-behind/70 line-through"
                         : isBest
                           ? "text-best"
-                          : "text-zinc-200"
-                    }`}
+                          : "text-zinc-200",
+                    )}
                   >
                     {msToLapTime(d.total * 1000)}
                   </span>
@@ -175,13 +178,13 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
               {(hasDeploy || hasHarv) && (
                 <div className="flex items-center gap-3 mb-1 text-xs font-mono">
                   {hasDeploy && (
-                    <span className={`flex items-center gap-1 ${d.deployMj != null && d.deployMj > 0 ? "text-ahead" : "text-zinc-600"}`}>
+                    <span className={cn("flex items-center gap-1", d.deployMj != null && d.deployMj > 0 ? "text-ahead" : "text-zinc-600")}>
                       <span className="text-zinc-500 text-2xs uppercase tracking-wide">Dep</span>
                       <span>{d.deployMj != null && d.deployMj > 0 ? `${d.deployMj.toFixed(1)} MJ` : "–"}</span>
                     </span>
                   )}
                   {hasHarv && (
-                    <span className={`flex items-center gap-1 ${d.harvMj != null && d.harvMj > 0 ? "text-sky-400" : "text-zinc-600"}`}>
+                    <span className={cn("flex items-center gap-1", d.harvMj != null && d.harvMj > 0 ? "text-sky-400" : "text-zinc-600")}>
                       <span className="text-zinc-500 text-2xs uppercase tracking-wide">Harv</span>
                       <span>{d.harvMj != null && d.harvMj > 0 ? `${d.harvMj.toFixed(1)} MJ` : "–"}</span>
                     </span>
@@ -220,9 +223,10 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
                       }}
                     >
                       <span
-                        className={`px-1 truncate ${
-                          isBestSector ? "text-white font-bold" : "text-white/80"
-                        }`}
+                        className={cn(
+                          "px-1 truncate",
+                          isBestSector ? "text-white font-bold" : "text-white/80",
+                        )}
                       >
                         {sectorKey}: {msToSectorTime(time * 1000)}
                       </span>

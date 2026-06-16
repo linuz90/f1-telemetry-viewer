@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { CumulativeDelta } from "../utils/stats";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
+import { cn } from "../utils/cn";
 
 interface PerformanceDeltaChartProps {
   deltas: CumulativeDelta[];
@@ -120,7 +121,10 @@ export function PerformanceDeltaChart({
                     )}
                   </div>
                   <div
-                    className={`font-mono font-medium ${d.delta > 0 ? "text-behind" : "text-ahead"}`}
+                    className={cn(
+                      "font-mono font-medium",
+                      d.delta > 0 ? "text-behind" : "text-ahead",
+                    )}
                   >
                     {d.delta > 0 ? "+" : ""}
                     {d.delta.toFixed(3)}s cumulative

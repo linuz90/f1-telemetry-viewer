@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { useTelemetry } from "../context/TelemetryContext";
 import { AppBrand } from "./AppBrand";
 import { dashboardPath } from "../utils/routes";
+import { cn } from "../utils/cn";
 
 interface BrandHomeLinkProps {
   className?: string;
@@ -21,7 +22,10 @@ export function BrandHomeLink({ className }: BrandHomeLinkProps) {
   return (
     <Link
       to={homePath}
-      className={`relative inline-flex items-center hover:opacity-80 transition-opacity ${className ?? ""}`}
+      className={cn(
+        "relative inline-flex items-center hover:opacity-80 transition-opacity",
+        className,
+      )}
     >
       {/* Invisible spacer keeps the container height stable while children are absolutely positioned for crossfade */}
       <span className="invisible" aria-hidden>

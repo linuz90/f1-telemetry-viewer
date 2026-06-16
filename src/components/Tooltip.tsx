@@ -1,4 +1,5 @@
 import { type ReactNode, useState, useRef, useCallback } from "react";
+import { cn } from "../utils/cn";
 
 interface TooltipProps {
   text: string;
@@ -34,7 +35,7 @@ export function Tooltip({ text, children, className = "" }: TooltipProps) {
   return (
     <span
       ref={ref}
-      className={`inline-flex items-center ${className}`}
+      className={cn("inline-flex items-center", className)}
       onMouseEnter={show}
       onMouseLeave={hide}
     >

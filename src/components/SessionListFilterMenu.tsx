@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Bot, Flag, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { cn } from "../utils/cn";
 import { SegmentedControl } from "./ui/SegmentedControl";
 import { HStack } from "./ui/Stack";
 
@@ -69,11 +70,12 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
         onClick={() => setOpen((v) => !v)}
         aria-label="Filters"
         aria-expanded={open}
-        className={`relative flex items-center justify-center rounded-md p-1.5 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600 ${
+        className={cn(
+          "relative flex items-center justify-center rounded-md p-1.5 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600",
           open || !isDefault
             ? "bg-zinc-900 text-zinc-200"
-            : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-300"
-        }`}
+            : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-300",
+        )}
       >
         <SlidersHorizontal className="h-3.5 w-3.5" />
         {activeCount > 0 && (

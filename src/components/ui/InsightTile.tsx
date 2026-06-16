@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { cn } from "../../utils/cn";
 import {
   ACCENT_TOKENS,
   accentCardClass,
@@ -49,16 +50,21 @@ export function InsightTile({
   const tokens = accent ? ACCENT_TOKENS[accent] : null;
   const surface = accent
     ? accentCardClass(accent)
-    : `bg-zinc-900/70 ${cardHighlight}`;
+    : cn("bg-zinc-900/70", cardHighlight);
   const headerColor = tokens?.iconText ?? "text-zinc-400";
   const hoverClass = to ? "transition-all hover:brightness-125" : "";
-  const wrapperClass = `relative flex flex-col flex-nowrap gap-1 overflow-hidden rounded-2xl ${surface} p-3.5 ${hoverClass} ${className}`;
+  const wrapperClass = cn(
+    "relative flex flex-col flex-nowrap gap-1 overflow-hidden rounded-2xl p-3.5",
+    surface,
+    hoverClass,
+    className,
+  );
 
   const content = (
     <>
       {background}
       <HStack className="relative gap-2">
-        <Icon className={`size-3.5 ${headerColor}`} />
+        <Icon className={cn("size-3.5", headerColor)} />
         <Eyebrow className={headerColor}>{title}</Eyebrow>
         {badge && <span className="ml-auto">{badge}</span>}
       </HStack>

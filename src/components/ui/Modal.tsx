@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { cn } from "../../utils/cn";
 
 const TRANSITION_MS = 180;
 
@@ -37,16 +38,19 @@ export function Modal({ onClose, children, className }: ModalProps) {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-[180ms] ease-out ${
-        open ? "opacity-100" : "opacity-0"
-      }`}
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-[180ms] ease-out",
+        open ? "opacity-100" : "opacity-0",
+      )}
       onClick={handleClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`relative flex w-full flex-col rounded-3xl bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950 shadow-2xl ring-1 ring-white/[0.06] transition-all duration-[180ms] ease-out ${
-          open ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
-        } ${className ?? ""}`}
+        className={cn(
+          "relative flex w-full flex-col rounded-3xl bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950 shadow-2xl ring-1 ring-white/[0.06] transition-all duration-[180ms] ease-out",
+          open ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]",
+          className,
+        )}
       >
         {onClose && (
           <button

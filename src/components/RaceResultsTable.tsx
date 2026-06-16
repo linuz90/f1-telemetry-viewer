@@ -4,6 +4,7 @@ import { getTeamColor, getTeamName } from "../utils/colors";
 import { msToLapTime } from "../utils/format";
 import { getCleanRaceLaps, getBestLapTime, driverTopSpeed, avgErsDeployMj, avgErsHarvestMj, getCompletedStints, RACE_PACE_TOOLTIP } from "../utils/stats";
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
+import { cn } from "../utils/cn";
 import { AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { Badge } from "./ui/Badge";
@@ -22,10 +23,10 @@ type SortDir = "asc" | "desc";
 
 function SortIcon({ column, sortKey, sortDir, side = "right" }: { column: SortKey; sortKey: SortKey; sortDir: SortDir; side?: "left" | "right" }) {
   const margin = side === "left" ? "mr-1" : "ml-1";
-  if (column !== sortKey) return <ChevronDown className={`inline w-3 h-3 ${margin} opacity-0 group-hover:opacity-30`} />;
+  if (column !== sortKey) return <ChevronDown className={cn("inline w-3 h-3", margin, "opacity-0 group-hover:opacity-30")} />;
   return sortDir === "asc"
-    ? <ChevronDown className={`inline w-3 h-3 ${margin} text-active`} />
-    : <ChevronUp className={`inline w-3 h-3 ${margin} text-active`} />;
+    ? <ChevronDown className={cn("inline w-3 h-3", margin, "text-active")} />
+    : <ChevronUp className={cn("inline w-3 h-3", margin, "text-active")} />;
 }
 
 /**
@@ -174,32 +175,32 @@ export function RaceResultsTable({
           <table className="w-full text-xs">
             <thead className={tableHeadClass}>
               <tr>
-                <th className={`text-left ${thClass}`} onClick={() => toggleSort("pos")}>
+                <th className={cn("text-left", thClass)} onClick={() => toggleSort("pos")}>
                   Pos<SortIcon column="pos" sortKey={sortKey} sortDir={sortDir} />
                 </th>
                 <th className="text-left py-1.5 px-2">Driver</th>
                 <th className="text-left py-1.5 px-2">Team</th>
-                <th className={`text-right ${thClass}`} onClick={() => toggleSort("gap")}>
+                <th className={cn("text-right", thClass)} onClick={() => toggleSort("gap")}>
                   <SortIcon column="gap" sortKey={sortKey} sortDir={sortDir} side="left" />Gap
                 </th>
-                <th className={`text-right ${thClass}`} onClick={() => toggleSort("bestLap")}>
+                <th className={cn("text-right", thClass)} onClick={() => toggleSort("bestLap")}>
                   <SortIcon column="bestLap" sortKey={sortKey} sortDir={sortDir} side="left" />Best Lap
                 </th>
-                <th className={`text-right ${thClass}`} onClick={() => toggleSort("racePace")}>
+                <th className={cn("text-right", thClass)} onClick={() => toggleSort("racePace")}>
                   <Tooltip text={RACE_PACE_TOOLTIP}>
                     <span><SortIcon column="racePace" sortKey={sortKey} sortDir={sortDir} side="left" />Race Pace</span>
                   </Tooltip>
                 </th>
-                <th className={`text-right ${thClass}`} onClick={() => toggleSort("topSpeed")}>
+                <th className={cn("text-right", thClass)} onClick={() => toggleSort("topSpeed")}>
                   <SortIcon column="topSpeed" sortKey={sortKey} sortDir={sortDir} side="left" />Top Speed
                 </th>
-                <th className={`text-right ${thClass}`} onClick={() => toggleSort("ers")}>
+                <th className={cn("text-right", thClass)} onClick={() => toggleSort("ers")}>
                   <Tooltip text="Average ERS energy deployed per lap (green-flag laps only, excluding first and last lap).">
                     <span><SortIcon column="ers" sortKey={sortKey} sortDir={sortDir} side="left" />ERS Dep</span>
                   </Tooltip>
                 </th>
                 {hasErsHarv && (
-                  <th className={`text-right ${thClass}`} onClick={() => toggleSort("ersHarv")}>
+                  <th className={cn("text-right", thClass)} onClick={() => toggleSort("ersHarv")}>
                     <Tooltip text="Average ERS energy harvested per lap, MGU-K + MGU-H combined (green-flag laps only, excluding first and last lap). Higher values indicate more lift-and-coast.">
                       <span><SortIcon column="ersHarv" sortKey={sortKey} sortDir={sortDir} side="left" />ERS Harv</span>
                     </Tooltip>
@@ -244,7 +245,7 @@ export function RaceResultsTable({
                 return (
                   <tr
                     key={`${entry.name}-${entry.team}`}
-                    className={`${tableRowClass} ${isFocused ? "bg-zinc-800/40 text-white font-medium" : ""}`}
+                    className={cn(tableRowClass, isFocused && "bg-zinc-800/40 text-white font-medium")}
                   >
                     <td className="py-1.5 px-2">{entry.position}</td>
                     <td className="py-1.5 px-2">
@@ -258,23 +259,23 @@ export function RaceResultsTable({
                       </span>
                     </td>
                     <td className="py-1.5 px-2 text-zinc-400">{getTeamName(entry.team)}</td>
-                    <td className={`py-1.5 px-2 text-right font-mono ${status === "DNF" || status === "DSQ" ? "text-behind" : ""}`}>
+                    <td className={cn("py-1.5 px-2 text-right font-mono", (status === "DNF" || status === "DSQ") && "text-behind")}>
                       {gapStr}
                     </td>
-                    <td className={`py-1.5 px-2 text-right font-mono ${isBestLap ? "text-best" : ""}`}>
+                    <td className={cn("py-1.5 px-2 text-right font-mono", isBestLap && "text-best")}>
                       {bestLap > 0 ? msToLapTime(bestLap) : "–"}
                     </td>
-                    <td className={`py-1.5 px-2 text-right font-mono ${isBestPace ? "text-best" : ""}`}>
+                    <td className={cn("py-1.5 px-2 text-right font-mono", isBestPace && "text-best")}>
                       {racePace > 0 ? msToLapTime(racePace) : "–"}
                     </td>
-                    <td className={`py-1.5 px-2 text-right font-mono ${isBestSpeed ? "text-best" : ""}`}>
+                    <td className={cn("py-1.5 px-2 text-right font-mono", isBestSpeed && "text-best")}>
                       {topSpeed > 0 ? `${Math.round(topSpeed)}` : "–"}
                     </td>
-                    <td className={`py-1.5 px-2 text-right font-mono ${isBestErs ? "text-best" : ""}`}>
+                    <td className={cn("py-1.5 px-2 text-right font-mono", isBestErs && "text-best")}>
                       {ers > 0 ? ers.toFixed(1) : "–"}
                     </td>
                     {hasErsHarv && (
-                      <td className={`py-1.5 px-2 text-right font-mono ${isBestErsHarv ? "text-best" : ""}`}>
+                      <td className={cn("py-1.5 px-2 text-right font-mono", isBestErsHarv && "text-best")}>
                         {ersHarv > 0 ? ersHarv.toFixed(1) : "–"}
                       </td>
                     )}
@@ -325,7 +326,7 @@ export function RaceResultsTable({
               return (
                 <tr
                   key={d.index}
-                  className={`${tableRowClass} ${d.index === focusedDriverIndex ? "bg-zinc-800/40 text-white font-medium" : ""}`}
+                  className={cn(tableRowClass, d.index === focusedDriverIndex && "bg-zinc-800/40 text-white font-medium")}
                 >
                   <td className="py-1.5 px-2">{fc.position}</td>
                   <td className="py-1.5 px-2">

@@ -24,6 +24,7 @@ import type {
   InsightScope,
   TrackInsight,
 } from "../../utils/dashboardStats";
+import { cn } from "../../utils/cn";
 import { sessionPath } from "../../utils/routes";
 import { ACCENT_TOKENS, type AccentColor } from "../Card";
 import { TrackFlag } from "../TrackFlag";
@@ -132,7 +133,7 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
       background={
         <TrackLayout
           track={insight.track}
-          className={`pointer-events-none absolute right-6 top-1/2 size-34 -translate-y-1/2 ${tokens.iconText} opacity-6 [&>svg]:size-full [&_path]:![stroke-width:7]`}
+          className={cn("pointer-events-none absolute right-6 top-1/2 size-34 -translate-y-1/2 opacity-6 [&>svg]:size-full [&_path]:![stroke-width:7]", tokens.iconText)}
         />
       }
     >
@@ -147,7 +148,7 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
           </div>
         </div>
         <div
-          className={`shrink-0 text-right font-mono text-2xl font-semibold tabular-nums ${tokens.accent}`}
+          className={cn("shrink-0 text-right font-mono text-2xl font-semibold tabular-nums", tokens.accent)}
         >
           {insight.headline}
         </div>

@@ -7,6 +7,7 @@ import { getBestLapTime, isRaceSession } from "../utils/stats";
 import { formatSessionType, msToLapTime } from "../utils/format";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { getFormulaComparisonKey, getFormulaLabel, shouldShowFormulaLabel } from "../utils/sessionTypes";
+import { cn } from "../utils/cn";
 import { trackPath } from "../utils/routes";
 import { TrackFlag } from "./TrackFlag";
 import { TrackLayout } from "./TrackLayout";
@@ -239,10 +240,11 @@ function Pill({
   return (
     <HStack
       as="span"
-      className={`gap-1 rounded-full px-2.5 py-1 ${
+      className={cn(
+        "gap-1 rounded-full px-2.5 py-1",
         className ??
-        (accent ? "bg-zinc-900 text-zinc-200" : "bg-zinc-900/50 text-zinc-400")
-      }`}
+          (accent ? "bg-zinc-900 text-zinc-200" : "bg-zinc-900/50 text-zinc-400"),
+      )}
     >
       <Icon className="size-3" />
       {children}

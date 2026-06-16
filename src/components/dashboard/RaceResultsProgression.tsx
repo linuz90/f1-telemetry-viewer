@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { SessionSummary } from "../../types/telemetry";
+import { cn } from "../../utils/cn";
 import { formatShortDate } from "../../utils/format";
 import { sessionSummaryPath } from "../../utils/routes";
 import { TrackFlag } from "../TrackFlag";
@@ -43,7 +44,7 @@ function ProgressionLegendSwatch({
 }) {
   return (
     <span className="inline-flex items-center gap-1">
-      <span className={`inline-block size-2 rounded-sm ${className}`} />
+      <span className={cn("inline-block size-2 rounded-sm", className)} />
       {label}
     </span>
   );
@@ -136,12 +137,12 @@ function ProgressionBar({
   return (
     <div className="flex h-full flex-col items-center justify-end gap-0.5">
       <span
-        className={`font-mono text-[9px] leading-none tabular-nums ${labelClass}`}
+        className={cn("font-mono text-[9px] leading-none tabular-nums", labelClass)}
       >
         {label}
       </span>
       <div
-        className={`w-2 rounded-t-sm transition-all group-hover:brightness-125 ${colorClass}`}
+        className={cn("w-2 rounded-t-sm transition-all group-hover:brightness-125", colorClass)}
         style={{ height: `${heightPx}px` }}
       />
     </div>

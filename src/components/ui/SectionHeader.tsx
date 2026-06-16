@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "../../utils/cn";
 
 /**
  * Canonical section header. Used for top-level sections OUTSIDE cards
@@ -19,7 +20,10 @@ export function SectionHeader({
 }) {
   return (
     <div
-      className={`mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 ${className}`}
+      className={cn(
+        "mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2",
+        className,
+      )}
     >
       <div className="min-w-0">
         <h3 className="text-base font-semibold text-zinc-100">{title}</h3>

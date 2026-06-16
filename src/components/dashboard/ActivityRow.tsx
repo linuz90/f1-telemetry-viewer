@@ -1,3 +1,4 @@
+import { cn } from "../../utils/cn";
 import { ACCENT_TOKENS, type AccentColor, accentCardClass } from "../Card";
 import { TrackFlag } from "../TrackFlag";
 import { Badge } from "../ui/Badge";
@@ -61,15 +62,15 @@ function StatPill({
     : "items-center justify-center px-3.5";
 
   return (
-    <div className={`inline-flex h-9 rounded-lg ${layout} ${accentCardClass(accent)}`}>
+    <div className={cn("inline-flex h-9 rounded-lg", layout, accentCardClass(accent))}>
       <div
-        className={`font-mono text-sm font-bold leading-none tabular-nums ${ACCENT_TOKENS[accent].accent}`}
+        className={cn("font-mono text-sm font-bold leading-none tabular-nums", ACCENT_TOKENS[accent].accent)}
       >
         {value}
       </div>
       {sublabel && (
         <div
-          className={`text-[9px] font-medium uppercase leading-none tracking-wider ${ACCENT_TOKENS[accent].accent} opacity-60`}
+          className={cn("text-[9px] font-medium uppercase leading-none tracking-wider opacity-60", ACCENT_TOKENS[accent].accent)}
         >
           {sublabel}
         </div>
@@ -82,7 +83,7 @@ function PositionChip({ position }: { position: number }) {
   const Icon = podiumIcon(position);
   return (
     <div
-      className={`inline-flex h-9 items-center justify-center gap-1 rounded-lg px-2.5 text-sm font-bold tabular-nums ${positionBadgeClasses(position)}`}
+      className={cn("inline-flex h-9 items-center justify-center gap-1 rounded-lg px-2.5 text-sm font-bold tabular-nums", positionBadgeClasses(position))}
     >
       {Icon ? <Icon className="size-3.5" /> : null}
       <span>{positionLabel(position)}</span>
@@ -99,11 +100,11 @@ function PositionChip({ position }: { position: number }) {
 function QualiPositionChip({ position }: { position: number }) {
   const isPole = position === 1;
   const classes = isPole
-    ? `${accentCardClass("purple")} ${ACCENT_TOKENS.purple.accent}`
+    ? cn(accentCardClass("purple"), ACCENT_TOKENS.purple.accent)
     : "ring-1 ring-inset ring-white/[0.06] bg-zinc-900/70 text-zinc-100";
   return (
     <div
-      className={`inline-flex h-9 items-center justify-center rounded-lg px-2.5 text-sm font-bold tabular-nums ${classes}`}
+      className={cn("inline-flex h-9 items-center justify-center rounded-lg px-2.5 text-sm font-bold tabular-nums", classes)}
     >
       Q P{position}
     </div>
@@ -123,7 +124,7 @@ function RaceMetric({ session }: { session: SessionSummary }) {
   return (
     <>
       <div
-        className={`inline-flex items-center gap-1.5 font-mono text-sm ${gridGainTone(gridGain)} max-sm:hidden`}
+        className={cn("inline-flex items-center gap-1.5 font-mono text-sm max-sm:hidden", gridGainTone(gridGain))}
       >
         <GridGainGlyph value={gridGain} />
         <span className="tabular-nums">{signedNumber(gridGain)}</span>

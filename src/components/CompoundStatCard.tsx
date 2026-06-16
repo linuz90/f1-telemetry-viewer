@@ -3,6 +3,7 @@ import { getCompoundColor } from "../utils/colors";
 import { dynamicAccentCardStyle } from "./Card";
 import { HStack } from "./ui/Stack";
 import { tableRowClass } from "./ui/table";
+import { cn } from "../utils/cn";
 
 interface CompoundStatCardRow {
   label: string;
@@ -32,7 +33,7 @@ export function CompoundStatCard({ compound, subtitle, rows, hero, progress, cla
   // static-color accents (podium chips, insight cards, best-lap highlights).
   return (
     <div
-      className={`rounded-xl px-3 py-3 ${className ?? ""}`}
+      className={cn("rounded-xl px-3 py-3", className)}
       style={dynamicAccentCardStyle(color)}
     >
       <HStack className="mb-1.5 gap-1.5">
@@ -58,7 +59,7 @@ export function CompoundStatCard({ compound, subtitle, rows, hero, progress, cla
       <div className="text-xs text-zinc-400 space-y-1.5">
         {rows.map((row, i) => (
           <div key={i}>
-            {row.divider && <div className={`${tableRowClass} my-2`} />}
+            {row.divider && <div className={cn(tableRowClass, "my-2")} />}
             <HStack justify="between">
               <span>{row.label}</span>
               <span className={row.className ?? "text-zinc-300 font-mono"}>

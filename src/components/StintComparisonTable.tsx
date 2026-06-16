@@ -8,6 +8,7 @@ import {
 } from "../utils/stats";
 import { msToLapTime } from "../utils/format";
 import { getCompoundColor } from "../utils/colors";
+import { cn } from "../utils/cn";
 import { tableHeadClass, tableRowClass } from "./ui/table";
 
 interface StintComparisonTableProps {
@@ -164,7 +165,7 @@ function Delta({
   const positive = display > 0;
   return (
     <span
-      className={`ml-1.5 text-2xs ${positive ? "text-behind" : "text-ahead"}`}
+      className={cn("ml-1.5 text-2xs", positive ? "text-behind" : "text-ahead")}
     >
       {positive ? "+" : ""}
       {display.toFixed(unit === "%" ? 1 : 3)}

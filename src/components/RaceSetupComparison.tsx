@@ -7,6 +7,7 @@ import type {
   RaceSetupStrengthKind,
 } from "../utils/setupComparison";
 import { msToLapTime, formatDate, formatSessionType } from "../utils/format";
+import { cn } from "../utils/cn";
 import { sessionSummaryPath } from "../utils/routes";
 import { cardClass } from "./Card";
 import { CarSetupCard } from "./CarSetupCard";
@@ -164,14 +165,15 @@ function MetricCell({
 }) {
   return (
     <div className="min-w-0">
-      <div className={`font-mono text-xs tabular-nums ${className ?? "text-zinc-200"}`}>
+      <div className={cn("font-mono text-xs tabular-nums", className ?? "text-zinc-200")}>
         {value}
       </div>
       {delta && (
         <div
-          className={`mt-0.5 font-mono text-2xs tabular-nums ${
-            delta === "Best" ? "text-zinc-600" : "text-zinc-500"
-          }`}
+          className={cn(
+            "mt-0.5 font-mono text-2xs tabular-nums",
+            delta === "Best" ? "text-zinc-600" : "text-zinc-500",
+          )}
         >
           {delta}
         </div>
@@ -188,7 +190,7 @@ function StrengthBadge({ strength }: { strength: RaceSetupStrength }) {
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-2xs font-medium leading-4 ring-1 ${meta.className}`}
+      className={cn("inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-2xs font-medium leading-4 ring-1", meta.className)}
     >
       {getStrengthLabel(strength)}
     </span>
@@ -350,11 +352,12 @@ export function RaceSetupComparison({
                   type="button"
                   aria-pressed={selected}
                   onClick={() => setSelectedId(candidate.id)}
-                  className={`grid w-full grid-cols-[minmax(500px,2.4fr)_repeat(4,minmax(90px,0.55fr))] gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600 ${
+                  className={cn(
+                    "grid w-full grid-cols-[minmax(500px,2.4fr)_repeat(4,minmax(90px,0.55fr))] gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600",
                     selected
                       ? "border-sky-400/30 bg-zinc-800/80 text-zinc-100"
-                      : "border-transparent text-zinc-400 hover:bg-zinc-800/35 hover:text-zinc-200"
-                  }`}
+                      : "border-transparent text-zinc-400 hover:bg-zinc-800/35 hover:text-zinc-200",
+                  )}
                 >
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">

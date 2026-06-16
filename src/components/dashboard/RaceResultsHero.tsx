@@ -7,6 +7,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { cn } from "../../utils/cn";
 import type { DashboardResultStats } from "../../utils/dashboardStats";
 import { Card } from "../Card";
 import { HStack, VStack } from "../ui/Stack";
@@ -34,7 +35,7 @@ function PodiumChip({
   return (
     <HStack
       justify="center"
-      className={`flex-1 gap-3 rounded-xl px-4 py-3 ${positionBadgeClasses(position)}`}
+      className={cn("flex-1 gap-3 rounded-xl px-4 py-3", positionBadgeClasses(position))}
     >
       <Icon className="size-5 shrink-0 opacity-80" />
       <VStack align="start" className="gap-0.5">
@@ -68,7 +69,7 @@ function MicroStat({
         {Icon && <Icon className="size-3" />}
         {label}
       </HStack>
-      <div className={`mt-1 text-xl font-semibold tabular-nums ${tone}`}>
+      <div className={cn("mt-1 text-xl font-semibold tabular-nums", tone)}>
         {value}
       </div>
       {detail && <div className="mt-0.5 text-xs text-zinc-500">{detail}</div>}
@@ -135,7 +136,7 @@ export function RaceResultsHero({
           <div className="mt-2 text-sm text-zinc-400">{headlineCaption}</div>
           {gridGain != null && (
             <div
-              className={`mt-3 inline-flex items-center gap-1.5 text-xs font-mono ${gridGainTone(gridGain)}`}
+              className={cn("mt-3 inline-flex items-center gap-1.5 text-xs font-mono", gridGainTone(gridGain))}
             >
               <GridGainGlyph value={gridGain} />
               <span>{signedNumber(gridGain)} avg grid Δ</span>

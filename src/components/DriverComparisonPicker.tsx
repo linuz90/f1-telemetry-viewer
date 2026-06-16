@@ -5,6 +5,7 @@ import {
   findFastestLapDriver,
 } from "../utils/stats";
 import { getTeamColor, getTeamName } from "../utils/colors";
+import { cn } from "../utils/cn";
 
 interface DriverComparisonPickerProps {
   session: TelemetrySession;
@@ -74,22 +75,24 @@ export function DriverComparisonPicker({
 
         <button
           onClick={() => onSelect(null)}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          className={cn(
+            "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
             selectedIndex === null
               ? "bg-zinc-800 text-zinc-200"
-              : "bg-zinc-900/60 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"
-          }`}
+              : "bg-zinc-900/60 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900",
+          )}
         >
           None
         </button>
 
         <button
           onClick={() => onSelect(isActive ? null : singleRival.index)}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+          className={cn(
+            "px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
             isActive
               ? "bg-orange-500/20 text-orange-400 ring-1 ring-orange-500/40"
-              : "bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-          }`}
+              : "bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900",
+          )}
         >
           <span
             className="w-1.5 h-1.5 rounded-full"
@@ -113,11 +116,12 @@ export function DriverComparisonPicker({
       {/* None button */}
       <button
         onClick={() => onSelect(null)}
-        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+        className={cn(
+          "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
           selectedIndex === null
             ? "bg-zinc-800 text-zinc-200"
-            : "bg-zinc-900/60 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"
-        }`}
+            : "bg-zinc-900/60 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900",
+        )}
       >
         None
       </button>
@@ -130,11 +134,12 @@ export function DriverComparisonPicker({
           <button
             key={`${preset.label}-${d.index}`}
             onClick={() => onSelect(isActive ? null : d.index)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            className={cn(
+              "px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
               isActive
                 ? "bg-orange-500/20 text-orange-400 ring-1 ring-orange-500/40"
-                : "bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-            }`}
+                : "bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900",
+            )}
           >
             <span
               className="w-1.5 h-1.5 rounded-full"

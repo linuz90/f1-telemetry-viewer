@@ -1,4 +1,5 @@
 import { Award, Disc } from "lucide-react";
+import { cn } from "../../utils/cn";
 import type { TrackStrategySuggestion } from "../../utils/stats";
 import { PUNCTURE_THRESHOLD } from "../../utils/stats";
 import { cardClass } from "../Card";
@@ -42,7 +43,7 @@ export function TrackStrategySection({
   );
 
   return (
-    <section className={`${cardClass} space-y-7`}>
+    <section className={cn(cardClass, "space-y-7")}>
       <SectionHeader title="Strategy" hint={subtitleParts.join(" · ")} />
 
       <StrategyRow
@@ -96,7 +97,7 @@ function StrategyRow({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <span
-          className={`inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider ${labelTone}`}
+          className={cn("inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider", labelTone)}
         >
           <Icon className="h-3.5 w-3.5" />
           {isRecommended ? "Recommended" : "Alternative"}
@@ -151,9 +152,11 @@ function StintRibbon({
             return (
               <div
                 key={`${compound}-${i}`}
-                className={`flex h-full items-center justify-center overflow-hidden text-xs font-semibold ${
-                  isFirst ? "rounded-l-md" : ""
-                } ${isLast ? "rounded-r-md" : ""}`}
+                className={cn(
+                  "flex h-full items-center justify-center overflow-hidden text-xs font-semibold",
+                  isFirst && "rounded-l-md",
+                  isLast && "rounded-r-md",
+                )}
                 style={{
                   flexGrow: laps,
                   flexBasis: 0,
@@ -169,14 +172,17 @@ function StintRibbon({
           })}
         </div>
 
-        {/* Pit window shading + exact-target line. The shading sits over the
-            stint colors using white/transparent so it reads on any compound. */}
+        {/* Pit window shading + exact-target line. A dark tint reads on both
+            the amber Medium and pale Hard chips (white/10 was invisible on
+            light compounds). Bracketed by thin white edges so the earliest /
+            latest boundaries are unambiguous, with the target lap as a
+            brighter, slightly wider center line. */}
         {pitWindows.map((w, i) => {
           const windowSpan = w.latest - w.earliest + 1;
           return (
             <span key={`window-${i}`}>
               <span
-                className="pointer-events-none absolute inset-y-0 bg-white/10"
+                className="pointer-events-none absolute inset-y-0 bg-black/20 shadow-[inset_1px_0_0_rgba(255,255,255,0.35),inset_-1px_0_0_rgba(255,255,255,0.35)]"
                 style={{
                   left: `${(w.earliest / totalLaps) * 100}%`,
                   width: `${(windowSpan / totalLaps) * 100}%`,

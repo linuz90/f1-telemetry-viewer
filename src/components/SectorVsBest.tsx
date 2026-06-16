@@ -1,6 +1,7 @@
 import type { TelemetrySession } from "../types/telemetry";
 import { bestSectorTimeMs, msToSectorTime, msToLapTime, sectorTimeMs } from "../utils/format";
 import { getValidLaps } from "../utils/stats";
+import { cn } from "../utils/cn";
 import { getTeamColor } from "../utils/colors";
 import { accentCardClass, neutralCardClass } from "./Card";
 
@@ -106,11 +107,12 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
       <div className="grid grid-cols-4 gap-3">
         {/* Fastest lap */}
         <div
-          className={`rounded-lg px-3 py-3 ${
+          className={cn(
+            "rounded-lg px-3 py-3",
             isFocusedBestLap
               ? accentCardClass("purple")
-              : neutralCardClass
-          }`}
+              : neutralCardClass,
+          )}
         >
           <div className="text-xs uppercase text-zinc-500 mb-2">Lap</div>
           <div className="font-mono text-lg font-semibold text-zinc-100">
@@ -118,13 +120,14 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
           </div>
           {lapDeltaMs !== null && (
             <div
-              className={`font-mono text-sm mt-0.5 ${
+              className={cn(
+                "font-mono text-sm mt-0.5",
                 isFocusedBestLap
                   ? "text-best"
                   : lapDeltaMs < 100
                     ? "text-yellow-400"
-                    : "text-behind"
-              }`}
+                    : "text-behind",
+              )}
             >
               {isFocusedBestLap
                 ? "Session best"
@@ -148,11 +151,12 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
         {sectors.map((s) => (
           <div
             key={s.label}
-            className={`rounded-lg px-3 py-3 ${
+            className={cn(
+              "rounded-lg px-3 py-3",
               s.isFocusedBest
                 ? accentCardClass("purple")
-                : neutralCardClass
-            }`}
+                : neutralCardClass,
+            )}
           >
             <div className="text-xs uppercase text-zinc-500 mb-2">
               {s.label}
@@ -166,13 +170,14 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
             {/* Delta */}
             {s.deltaMs !== null && (
               <div
-                className={`font-mono text-sm mt-0.5 ${
+                className={cn(
+                  "font-mono text-sm mt-0.5",
                   s.isFocusedBest
                     ? "text-best"
                     : s.deltaMs < 100
                       ? "text-yellow-400"
-                      : "text-behind"
-                }`}
+                      : "text-behind",
+                )}
               >
                 {s.isFocusedBest
                   ? "Session best"

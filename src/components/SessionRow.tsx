@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { cn } from "../utils/cn";
 import { cardHighlight } from "./Card";
 import { HStack } from "./ui/Stack";
 
@@ -33,7 +34,7 @@ export function SessionRow({ to, leading, meta, trailing }: SessionRowProps) {
     return (
       <HStack
         title="Demo data — upload your telemetry to explore detail"
-        className={`gap-3 rounded-xl bg-zinc-900/40 px-3 py-2 opacity-70 ${cardHighlight}`}
+        className={cn("gap-3 rounded-xl bg-zinc-900/40 px-3 py-2 opacity-70", cardHighlight)}
       >
         {inner}
       </HStack>
@@ -43,7 +44,7 @@ export function SessionRow({ to, leading, meta, trailing }: SessionRowProps) {
     <HStack
       as={Link}
       to={to}
-      className={`gap-3 rounded-xl bg-zinc-900/60 px-3 py-2 transition-colors hover:bg-zinc-800/60 ${cardHighlight}`}
+      className={cn("gap-3 rounded-xl bg-zinc-900/60 px-3 py-2 transition-colors hover:bg-zinc-800/60", cardHighlight)}
     >
       {inner}
     </HStack>

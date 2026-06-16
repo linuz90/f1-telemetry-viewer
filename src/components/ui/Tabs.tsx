@@ -1,3 +1,5 @@
+import { cn } from "../../utils/cn";
+
 export interface TabOption<T extends string = string> {
   value: T;
   label: string;
@@ -27,7 +29,7 @@ export function Tabs<T extends string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={`flex${className ? ` ${className}` : ""}`}
+      className={cn("flex", className)}
     >
       {options.map((opt) => {
         const active = value === opt.value;
@@ -38,11 +40,12 @@ export function Tabs<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(opt.value)}
-            className={`flex-1 pb-2 text-2xs font-semibold uppercase tracking-wider transition-colors ${
+            className={cn(
+              "flex-1 pb-2 text-2xs font-semibold uppercase tracking-wider transition-colors",
               active
                 ? "text-white border-b-2 border-white"
-                : "text-zinc-500 hover:text-zinc-300"
-            }`}
+                : "text-zinc-500 hover:text-zinc-300",
+            )}
           >
             {opt.label}
           </button>

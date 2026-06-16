@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { cn } from "../utils/cn";
 
 /**
  * Base card styles shared across the app.
@@ -184,7 +185,7 @@ export function Card({
   ...rest
 }: React.HTMLAttributes<HTMLElement> & { as?: "div" | "section" }) {
   return (
-    <Tag className={`${cardClass} ${className}`} {...rest}>
+    <Tag className={cn(cardClass, className)} {...rest}>
       {children}
     </Tag>
   );

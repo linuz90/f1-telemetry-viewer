@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import { cardClassCompact } from "../Card";
 import { TrackFlag } from "../TrackFlag";
+import { cn } from "../../utils/cn";
 import { CHART_THEME } from "../../utils/colors";
 import { msToLapTime } from "../../utils/format";
 import { HStack } from "../ui/Stack";
@@ -27,7 +28,7 @@ export function QualifyingPaceCard({ data }: { data: QualifyingPaceData }) {
   return (
     <Link
       to={trackFormulaPath(track, formulaKey)}
-      className={`${cardClassCompact} !p-3 transition-colors hover:bg-zinc-800/50`}
+      className={cn(cardClassCompact, "!p-3 transition-colors hover:bg-zinc-800/50")}
     >
       <HStack justify="between" className="mb-2 gap-3">
         <HStack className="gap-1.5">

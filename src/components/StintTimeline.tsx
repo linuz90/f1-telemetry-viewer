@@ -1,5 +1,6 @@
 import type { TyreStint, LapHistoryEntry } from "../types/telemetry";
 import { getCompoundColor } from "../utils/colors";
+import { cn } from "../utils/cn";
 import { stintChipStyle, stintChipTextStyle } from "./ui/StintChip";
 import { stintWearRate, getWorstWheelWear, estimateMaxLife, PUNCTURE_THRESHOLD } from "../utils/stats";
 import { msToLapTime, isLapValid } from "../utils/format";
@@ -39,9 +40,11 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
           return (
             <div
               key={i}
-              className={`flex items-center justify-center overflow-hidden text-xs font-bold relative ${
-                isFirst ? "rounded-l-lg" : ""
-              } ${isLast ? "rounded-r-lg" : ""}`}
+              className={cn(
+                "flex items-center justify-center overflow-hidden text-xs font-bold relative",
+                isFirst && "rounded-l-lg",
+                isLast && "rounded-r-lg",
+              )}
               style={{
                 width: `${widthPct}%`,
                 ...stintChipStyle(compound),

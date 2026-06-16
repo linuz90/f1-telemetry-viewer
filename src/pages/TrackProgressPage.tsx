@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   Gauge,
-  Hash,
   Target,
   Timer,
   TimerReset,
@@ -37,6 +36,7 @@ import { Badge } from "../components/ui/Badge";
 import { InsightTile } from "../components/ui/InsightTile";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { getSessionTypeMeta } from "../components/sessionTypeMeta";
 import { HStack, VStack } from "../components/ui/Stack";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useSessionList } from "../hooks/useSessionList";
@@ -54,6 +54,7 @@ import {
   msToLapTime,
   msToSectorTime,
 } from "../utils/format";
+import { cn } from "../utils/cn";
 import { buildTrackRivalBenchmark } from "../utils/rivalStats";
 import { dashboardPath, sessionSummaryPath, trackPath } from "../utils/routes";
 import type {
@@ -86,6 +87,16 @@ type TrackSessionKind = "qualifying" | "race" | "time-trial";
 
 const TRACK_TAB_LABELS: Record<TrackSessionKind, string> = {
   qualifying: "Qualifying",
+  race: "Race",
+  "time-trial": "Time Trial",
+};
+
+// Map each tab to the canonical session-type label the shared `getSessionTypeMeta`
+// helper understands. "Qualifying" pools Short Quali + One-Shot Quali, so we
+// resolve via "Short Quali" (the Timer icon) — the timer reads as the more
+// generic "this is a timed session" cue than the One-Shot's Target.
+const TRACK_TAB_META_LABEL: Record<TrackSessionKind, string> = {
+  qualifying: "Short Quali",
   race: "Race",
   "time-trial": "Time Trial",
 };
@@ -920,6 +931,7 @@ export function TrackProgressPage() {
   const tabOptions = availableTabs.map((value) => ({
     value,
     label: TRACK_TAB_LABELS[value],
+    icon: getSessionTypeMeta(TRACK_TAB_META_LABEL[value]).icon,
   }));
   const handleRaceLengthChange = (raceLaps: string) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -1359,9 +1371,12 @@ export function TrackProgressPage() {
       {/* ── Time Trial Section ── */}
       {timeTrialData.length > 0 && selectedTab === "time-trial" && (
         <>
-          <SectionHeader title="Time Trial Pace" />
+          <SectionHeader
+            title="Key Insights"
+            hint={`${timeTrialData.length} attempt${timeTrialData.length === 1 ? "" : "s"}`}
+          />
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <InsightTile title="Best TT Lap" icon={Timer} accent="purple">
               <div className="font-mono text-xl font-semibold text-purple-300">
                 {bestTimeTrialMs > 0 ? msToLapTime(bestTimeTrialMs) : "–"}
@@ -1387,11 +1402,6 @@ export function TrackProgressPage() {
                 {timeTrialGapMs > 0
                   ? `+${(timeTrialGapMs / 1000).toFixed(3)}s`
                   : "–"}
-              </div>
-            </InsightTile>
-            <InsightTile title="Attempts" icon={Hash}>
-              <div className="text-xl text-zinc-100 tabular-nums">
-                {timeTrialData.length}
               </div>
             </InsightTile>
           </div>
@@ -1944,13 +1954,14 @@ export function TrackProgressPage() {
                 meta={metaParts.join(" · ")}
                 trailing={
                   <div
-                    className={`inline-flex h-9 items-center justify-center rounded-lg px-2.5 font-mono text-sm font-bold tabular-nums ${
+                    className={cn(
+                      "inline-flex h-9 items-center justify-center rounded-lg px-2.5 font-mono text-sm font-bold tabular-nums",
                       d.bestLapMs <= 0
                         ? "ring-1 ring-inset ring-white/[0.06] bg-zinc-900/70 text-zinc-500"
                         : isAllTimeBest
-                          ? `${accentCardClass("purple")} text-purple-300`
-                          : `${accentCardClass("cyan")} text-cyan-300`
-                    }`}
+                          ? cn(accentCardClass("purple"), "text-purple-300")
+                          : cn(accentCardClass("cyan"), "text-cyan-300"),
+                    )}
                   >
                     {d.bestLapMs > 0 ? msToLapTime(d.bestLapMs) : "—"}
                   </div>

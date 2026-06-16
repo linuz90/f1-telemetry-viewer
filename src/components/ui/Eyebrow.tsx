@@ -1,3 +1,5 @@
+import { cn } from "../../utils/cn";
+
 /**
  * Section-caption "eyebrow" — the mono uppercase tracking label used above
  * stats, in card headers, and as group titles. Defaults to `text-zinc-500`;
@@ -14,7 +16,10 @@ export function Eyebrow({
   const tone = className ?? "text-zinc-500";
   return (
     <span
-      className={`text-2xs font-mono font-semibold uppercase tracking-wider ${tone}`}
+      className={cn(
+        "text-2xs font-mono font-semibold uppercase tracking-wider",
+        tone,
+      )}
     >
       {children}
     </span>

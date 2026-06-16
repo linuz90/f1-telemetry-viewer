@@ -16,6 +16,7 @@ import { ersDeployMjForLap, ersHarvestMjForLap, getWorstWheelWear } from "../uti
 import { Badge } from "./ui/Badge";
 import { tableHeadClass, tableRowClass } from "./ui/table";
 import { CHART_THEME, TOOLTIP_STYLE, COMPOUND_COLORS, SC_COLORS, SC_FALLBACK } from "../utils/colors";
+import { cn } from "../utils/cn";
 
 interface LapTimeChartProps {
   laps: LapHistoryEntry[];
@@ -477,7 +478,7 @@ export function LapTimeChart({
             return (
               <tr
                 key={rowKey}
-                className={`${tableRowClass} ${!d.valid ? "bg-red-500/10" : scBg}`}
+                className={cn(tableRowClass, !d.valid ? "bg-red-500/10" : scBg)}
               >
                 <td className="py-1 px-2 font-mono">
                   {d.lap}
@@ -499,20 +500,23 @@ export function LapTimeChart({
                     </Badge>
                   )}
                 </td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-behind/70 line-through" : isBestLap ? "text-best font-semibold" : ""}`}>
+                <td className={cn("text-right py-1 px-2 font-mono", !d.valid ? "text-behind/70 line-through" : isBestLap ? "text-best font-semibold" : "")}>
                   {d.timeStr}
                 </td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS1 ? "text-best" : ""}`}>{msToSectorTime(d.s1 * 1000)}</td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS2 ? "text-best" : ""}`}>{msToSectorTime(d.s2 * 1000)}</td>
-                <td className={`text-right py-1 px-2 font-mono ${!d.valid ? "text-zinc-600" : isBestS3 ? "text-best" : ""}`}>{msToSectorTime(d.s3 * 1000)}</td>
+                <td className={cn("text-right py-1 px-2 font-mono", !d.valid ? "text-zinc-600" : isBestS1 ? "text-best" : "")}>{msToSectorTime(d.s1 * 1000)}</td>
+                <td className={cn("text-right py-1 px-2 font-mono", !d.valid ? "text-zinc-600" : isBestS2 ? "text-best" : "")}>{msToSectorTime(d.s2 * 1000)}</td>
+                <td className={cn("text-right py-1 px-2 font-mono", !d.valid ? "text-zinc-600" : isBestS3 ? "text-best" : "")}>{msToSectorTime(d.s3 * 1000)}</td>
                 {hasTopSpeed && (
-                  <td className={`text-right py-1 px-2 font-mono ${d.valid && d.topSpeed != null && d.topSpeed === bestTopSpeed ? "text-best font-semibold" : ""}`}>
+                  <td className={cn("text-right py-1 px-2 font-mono", d.valid && d.topSpeed != null && d.topSpeed === bestTopSpeed ? "text-best font-semibold" : "")}>
                     {d.topSpeed != null ? `${d.topSpeed}` : "–"}
                   </td>
                 )}
                 {hasWear && (
                   <td
-                    className={`text-right py-1 px-2 font-mono ${wear != null && wear >= 75 ? "text-behind" : wear != null && wear >= 50 ? "text-warning" : "text-zinc-400"}`}
+                    className={cn(
+                      "text-right py-1 px-2 font-mono",
+                      wear != null && wear >= 75 ? "text-behind" : wear != null && wear >= 50 ? "text-warning" : "text-zinc-400",
+                    )}
                     title={wear != null ? "Max tyre wear: highest-worn tyre at the end of this lap." : undefined}
                   >
                     {wear != null ? `${wear.toFixed(0)}%` : "–"}
@@ -530,15 +534,16 @@ export function LapTimeChart({
                 )}
                 {hasFuel && (
                   <td
-                    className={`text-right py-1 px-2 font-mono ${
+                    className={cn(
+                      "text-right py-1 px-2 font-mono",
                       d.fuelKg == null
                         ? "text-zinc-600"
                         : medianGreenBurn != null && d.fuelKg < medianGreenBurn * 0.95
                           ? "text-ahead"
                           : medianGreenBurn != null && d.fuelKg > medianGreenBurn * 1.05
                             ? "text-warning"
-                            : "text-zinc-400"
-                    }`}
+                            : "text-zinc-400",
+                    )}
                     title={d.fuelKg != null ? "Fuel burned this lap (kg)." : undefined}
                   >
                     {d.fuelKg != null ? d.fuelKg.toFixed(2) : "–"}
@@ -564,7 +569,7 @@ export function LapTimeChart({
                     );
                     return [
                       <tr key={`stint-${si}`}>
-                        <td colSpan={colCount} className={`py-1.5 px-2 ${si > 0 ? "pt-4" : ""}`}>
+                        <td colSpan={colCount} className={cn("py-1.5 px-2", si > 0 && "pt-4")}>
                           <div className="flex items-center gap-2">
                             <span
                               className="inline-block w-2.5 h-2.5 rounded-full"

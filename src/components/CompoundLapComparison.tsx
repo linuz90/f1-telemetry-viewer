@@ -3,6 +3,7 @@ import { filterOutlierLaps, getBestLapTime, medianLapTimeMs } from "../utils/sta
 import { msToLapTime } from "../utils/format";
 import { getCompoundColor } from "../utils/colors";
 import { tableHeadClass, tableRowClass } from "./ui/table";
+import { cn } from "../utils/cn";
 
 interface CompoundLapComparisonProps {
   playerStints: TyreStint[];
@@ -117,13 +118,14 @@ export function CompoundLapComparison({
                     {msToLapTime(s.rivalMedian)}
                   </td>
                   <td
-                    className={`text-right py-1.5 px-2 font-mono font-bold ${
+                    className={cn(
+                      "text-right py-1.5 px-2 font-mono font-bold",
                       Math.abs(delta) < 0.001
                         ? "text-zinc-400"
                         : positive
                           ? "text-behind"
-                          : "text-ahead"
-                    }`}
+                          : "text-ahead",
+                    )}
                   >
                     {delta <= 0 ? "" : "+"}
                     {delta.toFixed(3)}s

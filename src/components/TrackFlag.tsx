@@ -1,3 +1,4 @@
+import { cn } from "../utils/cn";
 import { getTrackCountryCode } from "../utils/format";
 
 type TrackFlagSize = "tiny" | "small" | "medium" | "large";
@@ -37,7 +38,7 @@ export function TrackFlag({ track, size = "small", className = "" }: TrackFlagPr
       srcSet={srcSet}
       alt=""
       loading="lazy"
-      className={`inline-block rounded-[2px] object-cover ${SIZE_CLASSES[size]} ${className}`}
+      className={cn("inline-block rounded-[2px] object-cover", SIZE_CLASSES[size], className)}
     />
   );
 }

@@ -11,6 +11,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { cn } from "../../utils/cn";
 import { getTeamColor } from "../../utils/colors";
 import type {
   RivalCard as RivalCardData,
@@ -119,7 +120,7 @@ export function RivalCard({ card }: { card: RivalCardData }) {
           indicator rather than the two-tone clash of accent-on-accent. */}
       <div className="mt-1 flex items-baseline font-bold tabular-nums leading-none tracking-tight">
         {sign && (
-          <span className={`text-3xl font-mono ${signClass}`}>{sign}</span>
+          <span className={cn("text-3xl font-mono", signClass)}>{sign}</span>
         )}
         <span className="text-3xl font-mono text-zinc-100">{value}</span>
         {unit && (
