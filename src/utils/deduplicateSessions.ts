@@ -162,22 +162,21 @@ function applyAutoSaveDominanceRule<T extends WithFileSize>(
   recordDrop: (keep: T, drop: T) => void,
 ): void {
   // Broad bucket: same track + session type + formula + game year, on the
-  // same calendar day. We deliberately do NOT key on lap count here — the
-  // whole point is to compare snapshots taken at different progress points.
+  // same calendar day. We deliberately do NOT key on session UID or lap count
+  // here: auto-save snapshots can have distinct UIDs even when a later save
+  // supersedes them, and the whole point is to compare different progress
+  // points from the same on-track run.
   const buckets = new Map<string, T[]>();
   for (const s of sessions) {
     if (removed.has(s)) continue;
     const day = s.date.split("T")[0] ?? s.date;
-    const key = s.sessionUid
-      ? `uid|${s.sessionUid}`
-      : [
-          "legacy",
-          s.gameYear ?? "",
-          s.formula ?? "",
-          s.sessionType,
-          s.track,
-          day,
-        ].join("|");
+    const key = [
+      s.gameYear ?? "",
+      s.formula ?? "",
+      s.sessionType,
+      s.track,
+      day,
+    ].join("|");
     const bucket = buckets.get(key);
     if (bucket) bucket.push(s);
     else buckets.set(key, [s]);
