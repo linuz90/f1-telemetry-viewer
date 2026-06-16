@@ -16,6 +16,12 @@ import {
 } from "../components/dashboard/helpers";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useSessionList } from "../hooks/useSessionList";
+import {
+  areSessionFiltersDefault,
+  DEFAULT_FILTERS,
+  matchesSessionFilters,
+  useSessionFilters,
+} from "../hooks/useSessionFilters";
 import { cn } from "../utils/cn";
 import { buildDashboardActivity } from "../utils/dashboardActivity";
 import {
@@ -32,6 +38,7 @@ const RECENT_ACTIVITY_COLLAPSED = 3;
 export function DashboardPage() {
   const { sessions, loading } = useSessionList();
   const { mode, activeFormulaKey, activeFormula } = useTelemetry();
+  const [filters, setFilters] = useSessionFilters();
   const [showAllActivity, setShowAllActivity] = useState(false);
   const isDemoMode = mode === "demo";
 
@@ -44,13 +51,17 @@ export function DashboardPage() {
   }
 
   const validSessions = sessions.filter((session) => session.validLapCount > 0);
+  const isFiltered = !areSessionFiltersDefault(filters);
+  const visibleSessions = validSessions.filter((session) =>
+    matchesSessionFilters(session, filters),
+  );
   // Synthetic entries are demo-only summary stubs with no backing detail JSON.
   // They flow into every dashboard section (hero, recent results, insights,
   // rivals, tracks) so the prod no-data preview looks like a real dashboard.
   // List/card surfaces either render them as static demo rows or rely on the
   // SessionPage's friendly "demo preview" placeholder when a chart links to one.
   const dashboardStats = getDashboardResultStats(
-    validSessions,
+    visibleSessions,
     activeFormulaKey,
   );
   const scopedSessions = dashboardStats.scopedSessions;
@@ -76,7 +87,7 @@ export function DashboardPage() {
 
   const insights = buildTrackInsights(dashboardStats);
   const rivalStats = buildRivalStats(
-    validSessions,
+    visibleSessions,
     activeFormulaKey,
     getSessionFormulaScopeKey,
   );
@@ -93,6 +104,12 @@ export function DashboardPage() {
     activeFormulaKey,
   );
   const hasScopedData = scopedSessions.length > 0;
+  const unfilteredScopedSessionCount = activeFormulaKey
+    ? validSessions.filter(
+        (session) => getSessionFormulaScopeKey(session) === activeFormulaKey,
+      ).length
+    : validSessions.length;
+  const hasUnfilteredScopedData = unfilteredScopedSessionCount > 0;
   // Aggregate stats (avg finish, DNF rate, podium counts) are noisy or misleading
   // with one or two races, and downright depressing when every race is a DNF
   // (P21 best, 0/0/0 podium, 100% DNF). Hide until there's a meaningful sample
@@ -103,8 +120,16 @@ export function DashboardPage() {
   const hasRecentActivity = recentActivity.length > 0;
   const formulaLabelText = activeFormula?.label ?? "Telemetry";
   const subtitle = hasScopedData
-    ? `${formulaLabelText} · ${scopedSessions.length} ${scopedSessions.length === 1 ? "session" : "sessions"} across ${uniqueTracks.length} ${uniqueTracks.length === 1 ? "track" : "tracks"}`
+    ? `${formulaLabelText} · ${scopedSessions.length} ${isFiltered ? "filtered " : ""}${scopedSessions.length === 1 ? "session" : "sessions"} across ${uniqueTracks.length} ${uniqueTracks.length === 1 ? "track" : "tracks"}`
     : `${formulaLabelText} form across your saved sessions`;
+  const emptyTitle =
+    isFiltered && hasUnfilteredScopedData
+      ? "No sessions match these filters"
+      : "No sessions in this scope";
+  const emptyHint =
+    isFiltered && hasUnfilteredScopedData
+      ? "Reset filters or choose a different game scope."
+      : "Try a different formula or load more telemetry files.";
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 p-6">
@@ -120,11 +145,20 @@ export function DashboardPage() {
       {!hasScopedData ? (
         <section className={cn("rounded-2xl bg-zinc-900/40 px-5 py-8 text-center", cardHighlight)}>
           <h3 className="text-sm font-semibold text-zinc-300">
-            No sessions in this scope
+            {emptyTitle}
           </h3>
           <p className="mt-1 text-sm text-zinc-500">
-            Try a different formula or load more telemetry files.
+            {emptyHint}
           </p>
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={() => setFilters(DEFAULT_FILTERS)}
+              className="mt-4 rounded-md bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600"
+            >
+              Reset filters
+            </button>
+          )}
         </section>
       ) : (
         <>

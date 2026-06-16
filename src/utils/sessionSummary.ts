@@ -104,6 +104,14 @@ function getBestLapMs(classification: FinalClassification): number | undefined {
   return olderField > 0 ? olderField : undefined;
 }
 
+function getSessionUid(session: TelemetrySession | undefined): string | undefined {
+  const uid = session?.debug?.["session-uid"];
+  if (uid == null) return undefined;
+  // Some exported UIDs exceed JS's safe integer range; we only need a stable
+  // identity token for grouping, so keep the parsed value as an opaque string.
+  return String(uid);
+}
+
 interface RaceTelemetryExtras {
   lapOnePosition?: number;
   topSpeedTrapRank?: number;
@@ -537,6 +545,7 @@ export function buildSessionSummary(
   const drivers = getDrivers(session);
   const { driver: focusDriver, isSpectator } = findFocusDriver(drivers);
   const sessionInfo = session?.["session-info"];
+  const sessionUid = getSessionUid(session);
   const isOnline = sessionInfo?.["network-game"] === 1;
   const aiDifficulty = isOnline ? 0 : (sessionInfo?.["ai-difficulty"] ?? 0);
   const classifiedDriverCount = getClassifiedDriverCount(
@@ -621,6 +630,10 @@ export function buildSessionSummary(
     session && focusDriver && !isSpectator && isQualifyingSessionType(parsed.sessionType)
       ? buildQualifyingExtras(session, focusDriver)
       : {};
+  const playerRaceResult = session && !isSpectator
+    ? buildPlayerRaceResult(session, focusDriver, classifiedDriverCount)
+    : undefined;
+  const valid = validLapCount > 0 || playerRaceResult != null;
 
   return {
     summary: {
@@ -629,6 +642,7 @@ export function buildSessionSummary(
       ...parsed,
       gameYear: typeof session?.["game-year"] === "number" ? session["game-year"] : undefined,
       packetFormat: typeof session?.["packet-format"] === "number" ? session["packet-format"] : undefined,
+      sessionUid,
       validLapCount,
       lapIndicators,
       bestLapTime,
@@ -643,12 +657,10 @@ export function buildSessionSummary(
       playerSetFastestLap,
       ...raceExtras,
       ...qualifyingExtras,
-      playerRaceResult: session && !isSpectator
-        ? buildPlayerRaceResult(session, focusDriver, classifiedDriverCount)
-        : undefined,
+      playerRaceResult,
       fileSize,
       isAutoSave: isAutoSaveFilename(relativePath),
     },
-    valid: validLapCount > 0,
+    valid,
   };
 }

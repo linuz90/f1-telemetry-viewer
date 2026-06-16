@@ -20,6 +20,10 @@ const SESSION_ICONS: Record<string, typeof Flag> = {
   Race: Flag,
   "Short Qualifying": Timer,
   "Short Quali": Timer,
+  "Short Sprint Shootout": Timer,
+  "Sprint Shootout": Timer,
+  "Short Session Shootout": Timer,
+  "Session Shootout": Timer,
   "One Shot Qualifying": Target,
   "One-Shot Quali": Target,
   "Time Trial": Gauge,
@@ -65,12 +69,18 @@ export function SessionHeader({
   const formattedDate = date.format("ddd, D MMM YYYY");
   const formattedTime = date.format("HH:mm");
 
-  // Drivers with laps, sorted by position
+  // Keep no-lap classified drivers selectable so terminal-damage DNFs can still
+  // focus the player instead of falling back to the first timed finisher.
   const selectableDrivers = useMemo(() => {
     return drivers
       .filter((d) => {
         const laps = d["session-history"]["lap-history-data"];
-        return laps.some((l) => l["lap-time-in-ms"] > 0);
+        return (
+          laps.some((l) => l["lap-time-in-ms"] > 0) ||
+          d.index === focusedDriverIndex ||
+          d["is-player"] ||
+          d["final-classification"] != null
+        );
       })
       .sort((a, b) => {
         const posA = a["final-classification"]?.position ?? 999;
@@ -81,7 +91,7 @@ export function SessionHeader({
         const bestB = getBestLapTime(b["session-history"]["lap-history-data"]);
         return bestA - bestB;
       });
-  }, [drivers]);
+  }, [drivers, focusedDriverIndex]);
 
   return (
     <HStack align="start" className="mb-6 gap-4">

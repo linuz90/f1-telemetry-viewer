@@ -17,12 +17,13 @@ import type { SessionSummary } from "../types/telemetry";
  *   Rule A — "30-second window" (handles save-now + autosave at the same
  *            instant, or rapid back-to-back regular saves)
  *
- *     Group by an exact identity key (game year, packet format, formula,
- *     session type, track, valid lap count). Within each group, sort by
- *     date and walk forward: any two saves within 30 s are merged, keeping
- *     the larger file (more complete telemetry). Ties prefer the later one.
- *     Applies to both auto- and manual saves — useful when the auto-save
- *     fired moments before the user manually saved the same stint.
+ *     Group by an exact identity key (session UID when present, otherwise game
+ *     year, packet format, formula, session type, track, valid lap count).
+ *     Within each group, sort by date and walk forward: any two saves within
+ *     30 s are merged, keeping the larger file (more complete telemetry). Ties
+ *     prefer the later one. Applies to both auto- and manual saves — useful
+ *     when the auto-save fired moments before the user manually saved the same
+ *     stint.
  *
  *   Rule B — "Auto-save dominance" (handles partial auto-save snapshots
  *            taken mid-session that a later save fully supersedes)
@@ -91,14 +92,17 @@ function applyTimeWindowRule<T extends WithFileSize>(
   const groups = new Map<string, T[]>();
   for (const s of sessions) {
     if (removed.has(s)) continue;
-    const key = [
-      s.gameYear ?? "",
-      s.packetFormat ?? "",
-      s.formula ?? "",
-      s.sessionType,
-      s.track,
-      s.validLapCount,
-    ].join("|");
+    const key = s.sessionUid
+      ? `uid|${s.sessionUid}`
+      : [
+          "legacy",
+          s.gameYear ?? "",
+          s.packetFormat ?? "",
+          s.formula ?? "",
+          s.sessionType,
+          s.track,
+          s.validLapCount,
+        ].join("|");
     const group = groups.get(key);
     if (group) group.push(s);
     else groups.set(key, [s]);
@@ -164,13 +168,16 @@ function applyAutoSaveDominanceRule<T extends WithFileSize>(
   for (const s of sessions) {
     if (removed.has(s)) continue;
     const day = s.date.split("T")[0] ?? s.date;
-    const key = [
-      s.gameYear ?? "",
-      s.formula ?? "",
-      s.sessionType,
-      s.track,
-      day,
-    ].join("|");
+    const key = s.sessionUid
+      ? `uid|${s.sessionUid}`
+      : [
+          "legacy",
+          s.gameYear ?? "",
+          s.formula ?? "",
+          s.sessionType,
+          s.track,
+          day,
+        ].join("|");
     const bucket = buckets.get(key);
     if (bucket) bucket.push(s);
     else buckets.set(key, [s]);
