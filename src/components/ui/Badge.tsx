@@ -1,4 +1,4 @@
-export type BadgeTone = "red" | "amber" | "yellow" | "green" | "sky" | "rose" | "zinc";
+export type BadgeTone = "red" | "amber" | "yellow" | "green" | "sky" | "rose" | "purple" | "zinc";
 export type BadgeSize = "sm" | "xs";
 export type BadgeShape = "pill" | "square";
 
@@ -19,6 +19,7 @@ const TONE: Record<BadgeTone, string> = {
   green: "bg-green-500/10 text-green-400",
   sky: "bg-sky-500/10 text-sky-300",
   rose: "bg-rose-500/10 text-rose-300",
+  purple: "bg-purple-500/10 text-purple-300",
   zinc: "bg-zinc-800/80 text-zinc-400",
 };
 

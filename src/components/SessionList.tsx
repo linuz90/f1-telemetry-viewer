@@ -9,7 +9,11 @@ import {
   formatTime,
   sortTracksByCalendar,
 } from "../utils/format";
-import { isQualifyingSessionType, isRaceSessionType } from "../utils/sessionTypes";
+import {
+  isQualifyingSessionType,
+  isRaceSessionType,
+  isTimeTrialSessionType,
+} from "../utils/sessionTypes";
 import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
 import { sessionSummaryPath, trackPath } from "../utils/routes";
 import { TrackFlag } from "./TrackFlag";
@@ -26,6 +30,17 @@ const SIDEBAR_TABS = [
   { value: "sessions", label: "Sessions" },
   { value: "tracks", label: "Tracks" },
 ] as const;
+
+// Only Quali and Time Trial rows display a best-lap pill in the sidebar; the
+// helper lets us bucket those two kinds into separate per-track bests so a
+// fast Quali lap doesn't steal the purple highlight from the user's best TT.
+function sessionBestLapKind(
+  sessionType: string,
+): "quali" | "tt" | undefined {
+  if (isTimeTrialSessionType(sessionType)) return "tt";
+  if (isQualifyingSessionType(sessionType)) return "quali";
+  return undefined;
+}
 
 /** Groups sessions by date for display */
 function groupByDate(sessions: SessionSummary[]) {
@@ -177,16 +192,21 @@ export function SessionList() {
     activeFormulaKey,
   );
 
-  // Compute best lap time per track (lowest ms wins)
+  // Best lap time per track, split by session-type group. Time Trial is its
+  // own leaderboard in-game, so the user expects the fastest TT lap at a
+  // track to be highlighted even when a Short Quali ran faster — and vice
+  // versa. Keyed by `${track}::${scope}::${kind}` where kind is "tt" or
+  // "quali"; race sessions don't show a best lap in the sidebar row.
   const bestTimeByTrack: Record<string, number> = {};
   for (const s of filteredSessions) {
     if (s.isSpectator) continue;
-    if (s.bestLapTimeMs && s.bestLapTimeMs > 0) {
-      const key = `${s.track}::${getSessionFormulaScopeKey(s)}`;
-      const prev = bestTimeByTrack[key];
-      if (!prev || s.bestLapTimeMs < prev) {
-        bestTimeByTrack[key] = s.bestLapTimeMs;
-      }
+    if (!s.bestLapTimeMs || s.bestLapTimeMs <= 0) continue;
+    const kind = sessionBestLapKind(s.sessionType);
+    if (!kind) continue;
+    const key = `${s.track}::${getSessionFormulaScopeKey(s)}::${kind}`;
+    const prev = bestTimeByTrack[key];
+    if (!prev || s.bestLapTimeMs < prev) {
+      bestTimeByTrack[key] = s.bestLapTimeMs;
     }
   }
 
@@ -278,13 +298,17 @@ export function SessionList() {
                       time={formatTime(s.date)}
                       lapIndicators={s.lapIndicators}
                       bestLapTime={s.bestLapTime}
-                      isTrackBest={
-                        !!s.bestLapTimeMs &&
-                        s.bestLapTimeMs ===
+                      isTrackBest={(() => {
+                        if (!s.bestLapTimeMs) return false;
+                        const kind = sessionBestLapKind(s.sessionType);
+                        if (!kind) return false;
+                        return (
+                          s.bestLapTimeMs ===
                           bestTimeByTrack[
-                            `${s.track}::${getSessionFormulaScopeKey(s)}`
+                            `${s.track}::${getSessionFormulaScopeKey(s)}::${kind}`
                           ]
-                      }
+                        );
+                      })()}
                       aiDifficulty={s.aiDifficulty}
                       isOnline={s.isOnline}
                       isSpectator={s.isSpectator}

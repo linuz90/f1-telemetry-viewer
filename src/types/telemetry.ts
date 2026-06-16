@@ -46,6 +46,13 @@ export interface SessionSummary {
    */
   rivals?: RivalEntry[];
   playerRaceResult?: PlayerRaceResult;
+  /** Player's final classification position in a qualifying session (1 = pole). */
+  qualifyingPosition?: number;
+  /** Number of classified drivers in the qualifying session — denominator for qualifyingPosition. */
+  qualifyingFieldSize?: number;
+  /** Fastest valid lap of the qualifying session (pole time). */
+  poleLapTime?: string;
+  poleLapTimeMs?: number;
   fileSize?: number;
   duplicateCount?: number;
   /**

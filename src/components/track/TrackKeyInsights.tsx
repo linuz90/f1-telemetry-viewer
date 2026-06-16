@@ -167,6 +167,7 @@ function FuelTargetTile({
 }: {
   target: {
     recommendedDeltaLaps: number;
+    recommendedFuelKg: number;
     burnRateKgPerLap: number;
     excessAtFinishLaps: number;
     raceCount: number;
@@ -195,12 +196,13 @@ function FuelTargetTile({
   }
 
   return (
-    <InsightTile title="Fuel Target" icon={Fuel} accent="amber">
+    <InsightTile title="Rec. Initial Fuel" icon={Fuel} accent="amber">
       <div className="font-mono text-lg text-zinc-100">
         {delta >= 0 ? "+" : ""}
-        {delta.toFixed(1)} laps initial fuel
+        {delta.toFixed(1)} laps
       </div>
       <div className="mt-0.5 text-xs text-zinc-500">
+        ≈ {target.recommendedFuelKg.toFixed(1)} kg total ·{" "}
         {target.burnRateKgPerLap.toFixed(2)} kg/lap burn
       </div>
       {note && <div className="mt-1 text-xs text-zinc-500">{note}</div>}

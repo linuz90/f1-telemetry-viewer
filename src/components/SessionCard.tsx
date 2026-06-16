@@ -1,6 +1,6 @@
-import { Eye, Globe, Timer, Target, Flag, Gauge, Save } from "lucide-react";
+import { Eye, Globe, Save } from "lucide-react";
 import { TrackFlag } from "./TrackFlag";
-import { isRaceSessionType } from "../utils/sessionTypes";
+import { getSessionTypeMeta } from "./sessionTypeMeta";
 import { HStack } from "./ui/Stack";
 
 interface SessionCardProps {
@@ -18,13 +18,6 @@ interface SessionCardProps {
   /** When true, the date header already shows the AI/Online context — omit it from the row. */
   hideMode?: boolean;
 }
-
-const TYPE_CONFIG: Record<string, { color: string; icon: typeof Flag }> = {
-  Race: { color: "text-red-400/70", icon: Flag },
-  "Short Quali": { color: "text-yellow-500/70", icon: Timer },
-  "One-Shot Quali": { color: "text-purple-400/70", icon: Target },
-  "Time Trial": { color: "text-cyan-400/70", icon: Gauge },
-};
 
 const INDICATOR_COLORS = {
   valid: "bg-emerald-400",
@@ -45,12 +38,8 @@ export function SessionCard({
   isAutoSave,
   hideMode,
 }: SessionCardProps) {
-  const typeConfig =
-    TYPE_CONFIG[sessionType] ??
-    (isRaceSessionType(sessionType)
-      ? TYPE_CONFIG.Race
-      : { color: "text-zinc-500", icon: Flag });
-  const TypeIcon = typeConfig.icon;
+  const typeMeta = getSessionTypeMeta(sessionType);
+  const TypeIcon = typeMeta.icon;
 
   return (
     <div className="min-w-0">
@@ -76,7 +65,7 @@ export function SessionCard({
           )}
           <HStack
             as="span"
-            className={`gap-0.5 text-2xs font-medium uppercase leading-none ${typeConfig.color}`}
+            className={`gap-0.5 text-2xs font-medium uppercase leading-none ${typeMeta.color}`}
           >
             <TypeIcon className="size-3" />
             {sessionType}
@@ -84,7 +73,7 @@ export function SessionCard({
         </HStack>
       </HStack>
       <HStack justify="between" className="mt-0.5 gap-1">
-        <HStack className="gap-1">
+        <HStack className="shrink-0 gap-1">
           <span className="text-xs text-zinc-500">{time}</span>
           {!hideMode && aiDifficulty != null && aiDifficulty > 0 && (
             <span className="text-2xs font-medium text-zinc-600">
@@ -101,28 +90,41 @@ export function SessionCard({
             </HStack>
           )}
         </HStack>
-        <HStack className="gap-1">
+        <HStack className="min-w-0 flex-1 justify-end gap-1">
           {isSpectator && (
             <HStack
               as="span"
-              className="gap-0.5 text-2xs font-medium text-zinc-500"
+              className="shrink-0 gap-0.5 text-2xs font-medium text-zinc-500"
             >
               <Eye className="size-3" />
               Spectator
             </HStack>
           )}
           {lapIndicators && lapIndicators.length > 0 && (
-            <HStack as="span" className="gap-0.5">
+            // Time trials can pile up 30+ laps. Keep each dot at its full
+            // size and clip the earliest ones on the left when they don't
+            // fit, with a fade mask so the cut-off edge doesn't show a
+            // sliced half-dot.
+            <HStack
+              as="span"
+              className="min-w-0 flex-1 justify-end gap-0.5 overflow-hidden"
+              style={{
+                maskImage:
+                  "linear-gradient(to right, transparent 0, black 12px)",
+                WebkitMaskImage:
+                  "linear-gradient(to right, transparent 0, black 12px)",
+              }}
+            >
               {lapIndicators.map((indicator, i) => (
                 <span
                   key={i}
-                  className={`inline-block size-1.5 rounded-full ${INDICATOR_COLORS[indicator]}`}
+                  className={`inline-block size-1.5 shrink-0 rounded-full ${INDICATOR_COLORS[indicator]}`}
                 />
               ))}
             </HStack>
           )}
           {bestLapTime && (
-            <span className={`text-xs font-mono font-medium ${isTrackBest ? "text-purple-400" : "text-zinc-500"}`}>
+            <span className={`shrink-0 text-xs font-mono font-medium ${isTrackBest ? "text-purple-400" : "text-zinc-500"}`}>
               {bestLapTime}
             </span>
           )}

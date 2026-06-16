@@ -129,6 +129,14 @@ const MIN_PACE_RACES = 2;
 const MIN_VALID_LAPS_PER_RIVAL_RACE = 5;
 const MIN_POSITION_GAP_SAMPLES = 10;
 /**
+ * Higher floor for "X King"-style superlatives (overtake king, most consistent).
+ * These are averages, so 2 races is too few to be credible — one DNF or one
+ * outlier lap can flip the leaderboard. Three races is the minimum we'll trust
+ * to call someone the best at anything. Cards without ≥3 qualifying races stay
+ * hidden, which keeps the dashboard honest when a formula scope is brand new.
+ */
+const MIN_SUPERLATIVE_RACES = 3;
+/**
  * Higher races floor applied ONLY to non-human entries (constructor-slot
  * placeholders like "Mercedes #66" and AI-filled lobby seats). A two-race
  * placeholder is almost certainly a one-off empty seat and shouldn't outrank
@@ -331,7 +339,17 @@ function aggregateRivals(sessions: SessionSummary[]): Map<string, RivalAggregate
         existing.compoundPaceLapSamples +=
           rival.compoundMatchedPaceLapCount ?? 0;
       }
+      // DNFs distort both consistency and overtake-rate averages: a rival
+      // who retires after 5 laps might still have ridden a clean stint
+      // (artificially low stddev) or made a flurry of lap-1 swaps before
+      // bowing out (artificially high overtake count). Either way, the race
+      // isn't a fair sample of their season-long skill, so we keep it in
+      // `races` (the bonding "they showed up" counter) but drop it from the
+      // superlative inputs. The dnf-king card uses `dnfs` directly, so it
+      // still surfaces this race separately.
+      const isFairSample = !isDnfStatus(rival.status);
       if (
+        isFairSample &&
         rival.stddevLapMs != null &&
         rival.validLapCount >= MIN_VALID_LAPS_PER_RIVAL_RACE
       ) {
@@ -340,10 +358,12 @@ function aggregateRivals(sessions: SessionSummary[]): Map<string, RivalAggregate
         existing.weightedStddevSumMs += rival.stddevLapMs * weight;
         existing.weightedStddevWeight += weight;
       }
-      existing.totalOvertakes += rival.overtakes;
-      existing.overtakeRaceSamples += 1;
-      existing.weightedOvertakes += rival.overtakes * weight;
-      existing.weightedOvertakeRaceWeight += weight;
+      if (isFairSample) {
+        existing.totalOvertakes += rival.overtakes;
+        existing.overtakeRaceSamples += 1;
+        existing.weightedOvertakes += rival.overtakes * weight;
+        existing.weightedOvertakeRaceWeight += weight;
+      }
       if (rival.avgPositionGap != null && rival.positionGapSamples != null) {
         existing.positionGapSum += rival.avgPositionGap;
         existing.positionGapSamples += 1;
@@ -597,7 +617,7 @@ function buildMostConsistentRivalCards(
 ): RivalCard[] {
   const candidates = aggregates.filter(
     (r) =>
-      r.stddevSamples >= MIN_PACE_RACES &&
+      r.stddevSamples >= MIN_SUPERLATIVE_RACES &&
       r.weightedRaces >= MIN_RECENCY_SCORE &&
       r.weightedStddevWeight > 0,
   );
@@ -629,7 +649,7 @@ function buildMostConsistentRivalCards(
 function buildOvertakeKingCards(aggregates: RivalAggregate[]): RivalCard[] {
   const candidates = aggregates.filter(
     (r) =>
-      r.overtakeRaceSamples >= MIN_SHARED_RACES &&
+      r.overtakeRaceSamples >= MIN_SUPERLATIVE_RACES &&
       r.totalOvertakes >= 3 &&
       r.weightedOvertakeRaceWeight > 0,
   );
@@ -643,11 +663,16 @@ function buildOvertakeKingCards(aggregates: RivalAggregate[]): RivalCard[] {
   });
   return top.map((winner) => {
     const avgPerRace = winner.totalOvertakes / winner.overtakeRaceSamples;
+    // Whole numbers come out as e.g. "12", not "12.0" — the trailing zero
+    // reads as false precision when totals divide evenly.
+    const headline = Number.isInteger(avgPerRace)
+      ? `${avgPerRace}`
+      : avgPerRace.toFixed(1);
     return {
       kind: "overtake-king",
       driverName: winner.name,
       team: winner.latestTeam ?? winner.team,
-      headline: avgPerRace.toFixed(1),
+      headline,
       detail: `avg overtakes · ${winner.totalOvertakes} total in ${winner.overtakeRaceSamples} races`,
       sampleSize: winner.overtakeRaceSamples,
     };

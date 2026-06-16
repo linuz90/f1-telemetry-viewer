@@ -142,14 +142,18 @@ function StintRibbon({
 
   return (
     <div>
-      <div className="relative h-9 overflow-hidden rounded-md ring-1 ring-white/5">
+      <div className="relative h-9 rounded-md ring-1 ring-white/5">
         <div className="flex h-full">
           {compounds.map((compound, i) => {
             const laps = stintLaps[i];
+            const isFirst = i === 0;
+            const isLast = i === compounds.length - 1;
             return (
               <div
                 key={`${compound}-${i}`}
-                className="flex h-full items-center justify-center overflow-hidden text-xs font-semibold"
+                className={`flex h-full items-center justify-center overflow-hidden text-xs font-semibold ${
+                  isFirst ? "rounded-l-md" : ""
+                } ${isLast ? "rounded-r-md" : ""}`}
                 style={{
                   flexGrow: laps,
                   flexBasis: 0,

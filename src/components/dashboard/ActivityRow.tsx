@@ -1,11 +1,11 @@
-import { ACCENT_TOKENS, accentCardClass } from "../Card";
+import { ACCENT_TOKENS, type AccentColor, accentCardClass } from "../Card";
 import { TrackFlag } from "../TrackFlag";
-import { Badge, type BadgeTone } from "../ui/Badge";
+import { Badge } from "../ui/Badge";
 import { SessionRow } from "../SessionRow";
+import { getSessionTypeMeta } from "../sessionTypeMeta";
 import type { DashboardActivityGroup } from "../../utils/dashboardActivity";
+import type { SessionSummary } from "../../types/telemetry";
 import {
-  formatDate,
-  formatShortDate,
   formatSessionType,
   formatTime,
 } from "../../utils/format";
@@ -29,13 +29,6 @@ function modeLabel(session: DashboardActivityGroup["representative"]): string {
   return "Online";
 }
 
-function kindTone(activity: DashboardActivityGroup): BadgeTone {
-  if (activity.kind === "race") return "red";
-  if (activity.kind === "qualifying") return "amber";
-  if (activity.kind === "time-trial") return "sky";
-  return "zinc";
-}
-
 function attemptLabel(activity: DashboardActivityGroup): string | null {
   const count = activity.sessions.length;
   if (count <= 1) return null;
@@ -43,60 +36,94 @@ function attemptLabel(activity: DashboardActivityGroup): string | null {
   return `best of ${count}`;
 }
 
-function LapMetric({
-  session,
-  label,
-}: {
-  session: DashboardActivityGroup["representative"];
-  label?: string;
-}) {
-  const hasBestLap = Boolean(session.bestLapTime);
-  const value = hasBestLap
-    ? session.bestLapTime
-    : `${session.validLapCount} ${session.validLapCount === 1 ? "lap" : "laps"}`;
-  const metricLabel = hasBestLap ? label ?? null : null;
+function formatPoleGap(playerMs: number, poleMs: number): string {
+  const gapMs = playerMs - poleMs;
+  if (gapMs <= 0) return "POLE";
+  return `+${(gapMs / 1000).toFixed(3)}s`;
+}
 
-  const chipLayout = metricLabel
-    ? "min-w-[5.75rem] flex-col items-end px-2.5 text-right"
+/**
+ * Compact accent pill used as a row's primary stat (best lap, lap count, etc.).
+ * The optional sub-label sits underneath the value, both centered vertically
+ * inside the pill.
+ */
+function StatPill({
+  value,
+  sublabel,
+  accent = "purple",
+}: {
+  value: React.ReactNode;
+  sublabel?: React.ReactNode;
+  accent?: AccentColor;
+}) {
+  const layout = sublabel
+    ? "min-w-[5.75rem] flex-col items-end justify-center gap-1 px-2.5 py-1 text-right"
     : "items-center justify-center px-3.5";
 
   return (
-    <div
-      className={`inline-flex h-9 rounded-lg ${chipLayout} ${accentCardClass("purple")}`}
-    >
+    <div className={`inline-flex h-9 rounded-lg ${layout} ${accentCardClass(accent)}`}>
       <div
-        className={`font-mono text-sm font-bold leading-none tabular-nums ${ACCENT_TOKENS.purple.accent}`}
+        className={`font-mono text-sm font-bold leading-none tabular-nums ${ACCENT_TOKENS[accent].accent}`}
       >
         {value}
       </div>
-      {metricLabel && (
-        <div className="mt-0.5 text-[9px] font-medium uppercase leading-none tracking-wider text-purple-200/60">
-          {metricLabel}
+      {sublabel && (
+        <div
+          className={`text-[9px] font-medium uppercase leading-none tracking-wider ${ACCENT_TOKENS[accent].accent} opacity-60`}
+        >
+          {sublabel}
         </div>
       )}
     </div>
   );
 }
 
-function RaceMetric({
-  session,
-}: {
-  session: DashboardActivityGroup["representative"];
-}) {
+function PositionChip({ position }: { position: number }) {
+  const Icon = podiumIcon(position);
+  return (
+    <div
+      className={`inline-flex h-9 items-center justify-center gap-1 rounded-lg px-2.5 text-sm font-bold tabular-nums ${positionBadgeClasses(position)}`}
+    >
+      {Icon ? <Icon className="size-3.5" /> : null}
+      <span>{positionLabel(position)}</span>
+    </div>
+  );
+}
+
+/**
+ * Qualifying-specific chip — `Q P3` rather than the race podium badge.
+ * Pole gets the purple "fastest" accent (broadcast convention); every other
+ * position is neutral, because finishing P2 in quali isn't a "podium" the way
+ * P2 in a race is.
+ */
+function QualiPositionChip({ position }: { position: number }) {
+  const isPole = position === 1;
+  const classes = isPole
+    ? `${accentCardClass("purple")} ${ACCENT_TOKENS.purple.accent}`
+    : "ring-1 ring-inset ring-white/[0.06] bg-zinc-900/70 text-zinc-100";
+  return (
+    <div
+      className={`inline-flex h-9 items-center justify-center rounded-lg px-2.5 text-sm font-bold tabular-nums ${classes}`}
+    >
+      Q P{position}
+    </div>
+  );
+}
+
+function RaceMetric({ session }: { session: SessionSummary }) {
   const result = session.playerRaceResult;
   if (!result) {
-    return <LapMetric session={session} />;
+    return <LapFallbackMetric session={session} />;
   }
 
   const gridGain = result.gridPosition
     ? result.gridPosition - result.position
     : undefined;
-  const Icon = podiumIcon(result.position);
 
   return (
     <>
       <div
-        className={`inline-flex items-center gap-1.5 font-mono text-sm ${gridGainTone(gridGain)}`}
+        className={`inline-flex items-center gap-1.5 font-mono text-sm ${gridGainTone(gridGain)} max-sm:hidden`}
       >
         <GridGainGlyph value={gridGain} />
         <span className="tabular-nums">{signedNumber(gridGain)}</span>
@@ -105,14 +132,42 @@ function RaceMetric({
         </span>
       </div>
 
-      <div
-        className={`inline-flex h-9 items-center justify-center gap-1 rounded-lg px-2.5 text-sm font-bold tabular-nums ${positionBadgeClasses(result.position)}`}
-      >
-        {Icon ? <Icon className="size-3.5" /> : null}
-        <span>{positionLabel(result.position)}</span>
-      </div>
+      <PositionChip position={result.position} />
     </>
   );
+}
+
+function QualifyingMetric({ session }: { session: SessionSummary }) {
+  const position = session.qualifyingPosition;
+  const bestLap = session.bestLapTime;
+  const bestLapMs = session.bestLapTimeMs;
+  const poleMs = session.poleLapTimeMs;
+
+  if (!bestLap) {
+    return <LapFallbackMetric session={session} />;
+  }
+
+  const isPole = position === 1;
+  const sublabel =
+    isPole
+      ? "POLE"
+      : poleMs && bestLapMs
+        ? formatPoleGap(bestLapMs, poleMs)
+        : "Best lap";
+
+  return (
+    <>
+      {position != null && <QualiPositionChip position={position} />}
+      <StatPill value={bestLap} sublabel={sublabel} />
+    </>
+  );
+}
+
+function LapFallbackMetric({ session }: { session: SessionSummary }) {
+  const value =
+    session.bestLapTime ??
+    `${session.validLapCount} ${session.validLapCount === 1 ? "lap" : "laps"}`;
+  return <StatPill value={value} />;
 }
 
 export function ActivityRow({
@@ -125,11 +180,22 @@ export function ActivityRow({
   const problem = isProblemStatus(result?.status);
   const attempt = attemptLabel(activity);
   const typeLabel = formatSessionType(session.sessionType, session.formula);
-  const fieldSize =
-    session.onlineDriverCount ||
-    session.classifiedDriverCount ||
-    result?.fieldSize ||
-    0;
+  const typeMeta = getSessionTypeMeta(typeLabel);
+  const TypeIcon = typeMeta.icon;
+  const isTimeTrial = activity.kind === "time-trial";
+
+  // Time Trial is solo by definition — "Online · 1 drivers" is meaningless
+  // noise. For race/quali, keep the field size when we actually have an
+  // online lobby or a classified grid bigger than the player.
+  const showMode = !isTimeTrial;
+  const fieldSize = isTimeTrial
+    ? 0
+    : session.onlineDriverCount ||
+      session.qualifyingFieldSize ||
+      session.classifiedDriverCount ||
+      result?.fieldSize ||
+      0;
+  const showFieldSize = fieldSize > 1;
 
   return (
     <SessionRow
@@ -140,11 +206,9 @@ export function ActivityRow({
           <span className="truncate text-sm font-medium text-zinc-100">
             {session.track}
           </span>
-          <Badge tone={kindTone(activity)} className="max-sm:!hidden">
+          <Badge tone={typeMeta.badgeTone} className="gap-1">
+            <TypeIcon className="size-3" />
             {typeLabel}
-          </Badge>
-          <Badge tone="zinc" className="sm:hidden">
-            {formatShortDate(session.date)}
           </Badge>
           {problem && <Badge tone="red">{resultStatusLabel(result?.status)}</Badge>}
           {attempt && (
@@ -156,9 +220,9 @@ export function ActivityRow({
       }
       meta={
         <>
-          {formatDate(session.date)} · {formatTime(session.date)} ·{" "}
-          {modeLabel(session)}
-          {fieldSize > 0 && ` · ${fieldSize} drivers`}
+          {formatTime(session.date)}
+          {showMode && ` · ${modeLabel(session)}`}
+          {showFieldSize && ` · ${fieldSize} drivers`}
           {result?.totalLaps
             ? ` · ${result.playerLaps}/${result.totalLaps} laps`
             : ""}
@@ -167,8 +231,10 @@ export function ActivityRow({
       trailing={
         activity.kind === "race" ? (
           <RaceMetric session={session} />
+        ) : activity.kind === "qualifying" ? (
+          <QualifyingMetric session={session} />
         ) : (
-          <LapMetric session={session} />
+          <LapFallbackMetric session={session} />
         )
       }
     />

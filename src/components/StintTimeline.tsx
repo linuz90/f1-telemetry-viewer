@@ -27,17 +27,21 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
       <h3 className="text-sm font-semibold text-zinc-300 mb-2">
         Stint Analysis
       </h3>
-      <div className="flex h-10 rounded-lg overflow-hidden gap-0.5">
+      <div className="flex h-10 gap-0.5">
         {stints.map((stint, i) => {
           const compound = stint["tyre-set-data"]["visual-tyre-compound"];
           const widthPct = (stint["stint-length"] / effectiveTotal) * 100;
           const isLastUnfinished =
             i === stints.length - 1 && stint["end-lap"] < totalLaps;
+          const isFirst = i === 0;
+          const isLast = i === stints.length - 1;
 
           return (
             <div
               key={i}
-              className="flex items-center justify-center text-xs font-bold relative"
+              className={`flex items-center justify-center overflow-hidden text-xs font-bold relative ${
+                isFirst ? "rounded-l-lg" : ""
+              } ${isLast ? "rounded-r-lg" : ""}`}
               style={{
                 width: `${widthPct}%`,
                 ...stintChipStyle(compound),

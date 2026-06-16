@@ -1744,6 +1744,10 @@ export interface TrackFuelStats {
   avgInitialFuelLaps: number;
   /** Average recommended fuel delta in laps (matches session "Recommended Fuel") */
   avgRecommendedFuelLaps: number;
+  /** Average total fuel load (kg) implied by the recommendation — i.e. enough
+   *  to cover the race distance at the pooled burn rate plus the safety
+   *  margin. Useful for surfacing alongside the laps-based delta. */
+  avgRecommendedFuelKg: number;
   /** Average laps of fuel each race had to spare assuming a clean (all
    *  green-flag) run at the pooled burn rate. Positive = over-fuel, negative
    *  = wouldn't have finished without the SC saves that actually happened. */
@@ -1826,12 +1830,18 @@ export function aggregateFuelData(
     (r, i) =>
       r.startFuelRemaining - (excessAtFinish[i]! - safetyMarginLaps),
   );
+  // The recommendation collapses to "fuel for totalLaps + safetyMargin" at the
+  // pooled burn rate — that's the kg figure the player would set in PnG.
+  const recommendedKgPerRace = perRace.map(
+    (r) => (r.totalLaps + safetyMarginLaps) * pooledBurnRateKg,
+  );
 
   return {
     avgBurnRateKgPerLap: pooledBurnRateKg,
     avgStartingFuelKg: avg(perRace.map((r) => r.startFuelKg)),
     avgInitialFuelLaps: avg(perRace.map((r) => r.startFuelRemaining)),
     avgRecommendedFuelLaps: avg(recommendedPerRace),
+    avgRecommendedFuelKg: avg(recommendedKgPerRace),
     avgExcessAtFinishLaps: avg(excessAtFinish),
     raceCount: perRace.length,
   };
@@ -1873,6 +1883,8 @@ export interface TrackStrategySuggestion {
 export interface TrackFuelTarget {
   /** Recommended delta over zero-laps-remaining at lights out (in laps) */
   recommendedDeltaLaps: number;
+  /** Recommended total fuel load (kg) the delta translates to */
+  recommendedFuelKg: number;
   /** Average green-flag burn rate, kg/lap */
   burnRateKgPerLap: number;
   /** Average projected excess at finish (laps). Positive = over-fueling. */
@@ -2321,6 +2333,7 @@ export function buildTrackRaceRecommendation(
   const fuelTarget: TrackFuelTarget | null = bucketFuelStats
     ? {
         recommendedDeltaLaps: bucketFuelStats.avgRecommendedFuelLaps,
+        recommendedFuelKg: bucketFuelStats.avgRecommendedFuelKg,
         burnRateKgPerLap: bucketFuelStats.avgBurnRateKgPerLap,
         excessAtFinishLaps: bucketFuelStats.avgExcessAtFinishLaps,
         raceCount: bucketFuelStats.raceCount,

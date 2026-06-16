@@ -22,7 +22,7 @@ import {
   getDashboardResultStats,
   getSessionFormulaScopeKey,
 } from "../utils/dashboardStats";
-import { sortTracksByCalendar } from "../utils/format";
+import { formatRelativeDate, sortTracksByCalendar } from "../utils/format";
 import { buildRivalStats } from "../utils/rivalStats";
 import { isRaceSessionType } from "../utils/sessionTypes";
 
@@ -141,15 +141,26 @@ export function DashboardPage() {
                 title="Recent Activity"
                 hint="Best representative sessions from recent driving"
               />
-              <div className="space-y-1.5">
-                {(showAllActivity
-                  ? recentActivity
-                  : recentActivity.slice(
-                      0,
-                      RECENT_ACTIVITY_COLLAPSED,
-                    )
-                ).map((activity) => (
-                  <ActivityRow key={activity.key} activity={activity} />
+              <div className="space-y-4">
+                {Object.entries(
+                  (showAllActivity
+                    ? recentActivity
+                    : recentActivity.slice(0, RECENT_ACTIVITY_COLLAPSED)
+                  ).reduce<Record<string, typeof recentActivity>>((acc, activity) => {
+                    (acc[activity.dayKey] ??= []).push(activity);
+                    return acc;
+                  }, {}),
+                ).map(([dayKey, activities]) => (
+                  <div key={dayKey}>
+                    <h3 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                      {formatRelativeDate(dayKey + "T00:00:00")}
+                    </h3>
+                    <div className="space-y-1.5">
+                      {activities.map((activity) => (
+                        <ActivityRow key={activity.key} activity={activity} />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
               {recentActivity.length >

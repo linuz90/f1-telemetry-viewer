@@ -206,7 +206,7 @@ function ProgressionColumn({ session }: { session: SessionSummary }) {
       </div>
       <TrackFlag
         track={session.track}
-        className="w-4.5! h-3! opacity-70 transition-opacity group-hover:opacity-100"
+        className="opacity-70 transition-opacity group-hover:opacity-100"
       />
     </Link>
   );

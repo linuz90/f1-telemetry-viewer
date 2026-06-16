@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import type { ReactNode } from "react";
 import type { SessionSummary } from "../../types/telemetry";
 import { cn } from "../../utils/cn";
 import { formatShortDate } from "../../utils/format";
@@ -7,6 +8,7 @@ import { TrackFlag } from "../TrackFlag";
 import { TrackLayout } from "../TrackLayout";
 import {
   isProblemStatus,
+  podiumIcon,
   positionLabel,
   positionTone,
   resultStatusLabel,
@@ -25,62 +27,89 @@ function modeLabel(session: SessionSummary): string {
   return "Offline";
 }
 
-function RecordMetric({
+function MetricShell({
   label,
-  value,
   detail,
-  tone = "text-zinc-100",
+  children,
 }: {
   label: string;
-  value?: string;
   detail?: string;
-  tone?: string;
+  children: ReactNode;
 }) {
   return (
     <div className="min-w-0">
       <div className="text-2xs font-medium uppercase tracking-wider text-zinc-500">
         {label}
       </div>
-      <div
-        className={cn(
-          "mt-1 truncate font-mono text-[15px] font-semibold tabular-nums",
-          value ? tone : "text-zinc-700",
-        )}
-      >
-        {value ?? "—"}
-      </div>
+      <div className="mt-1 min-w-0">{children}</div>
       {detail && (
-        <div className="mt-0.5 truncate text-2xs text-zinc-500">
-          {detail}
-        </div>
+        <div className="mt-0.5 truncate text-2xs text-zinc-500">{detail}</div>
       )}
     </div>
   );
 }
 
-function lapRecordMetric(record: TrackLapRecord | undefined) {
-  if (!record) return {};
-  return {
-    value: record.time,
-    detail: formatShortDate(record.session.date),
-  };
+function LapMetric({
+  label,
+  record,
+  tone,
+}: {
+  label: string;
+  record: TrackLapRecord | undefined;
+  tone: string;
+}) {
+  return (
+    <MetricShell
+      label={label}
+      detail={record ? formatShortDate(record.session.date) : undefined}
+    >
+      <div
+        className={cn(
+          "truncate font-mono text-[15px] font-semibold tabular-nums",
+          record ? tone : "text-zinc-700",
+        )}
+      >
+        {record?.time ?? "—"}
+      </div>
+    </MetricShell>
+  );
 }
 
-function raceRecordMetric(record: TrackRaceRecord | undefined) {
-  if (!record) return {};
+function RaceMetric({ record }: { record: TrackRaceRecord | undefined }) {
+  if (!record) {
+    return (
+      <MetricShell label="Race">
+        <div className="truncate font-mono text-[15px] font-semibold tabular-nums text-zinc-700">
+          —
+        </div>
+      </MetricShell>
+    );
+  }
 
   const statusProblem = isProblemStatus(record.status);
-  const details = [
+  const Icon = podiumIcon(record.position);
+  const tone = statusProblem ? "text-red-300" : positionTone(record.position);
+  const detail = [
     statusProblem ? resultStatusLabel(record.status) : null,
     modeLabel(record.session),
     record.gridGain != null ? `${signedNumber(record.gridGain)} grid` : null,
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-  return {
-    value: positionLabel(record.position),
-    detail: details.join(" · "),
-    tone: statusProblem ? "text-red-300" : positionTone(record.position),
-  };
+  return (
+    <MetricShell label="Race" detail={detail}>
+      <div
+        className={cn(
+          "inline-flex items-center gap-1.5 truncate font-mono text-[15px] font-semibold tabular-nums",
+          tone,
+        )}
+      >
+        {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
+        <span>{positionLabel(record.position)}</span>
+      </div>
+    </MetricShell>
+  );
 }
 
 export function TrackOverviewCard({
@@ -100,10 +129,6 @@ export function TrackOverviewCard({
   // Synthetic-only tracks have nothing to show on the TrackPage — render the
   // card as static, dim, and non-interactive in demo mode.
   const isSyntheticOnly = sessions.every((session) => session.isSynthetic);
-  const race = raceRecordMetric(records.race);
-  const onlineQualifying = lapRecordMetric(records.onlineQualifying);
-  const offlineQualifying = lapRecordMetric(records.offlineQualifying);
-  const timeTrial = lapRecordMetric(records.timeTrial);
 
   const inner = (
     <>
@@ -130,28 +155,20 @@ export function TrackOverviewCard({
       </div>
 
       <div className="relative mt-5 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-white/[0.06] pt-4">
-        <RecordMetric
-          label="Race"
-          value={race.value}
-          detail={race.detail}
-          tone={race.tone}
-        />
-        <RecordMetric
+        <RaceMetric record={records.race} />
+        <LapMetric
           label="Online Q"
-          value={onlineQualifying.value}
-          detail={onlineQualifying.detail}
+          record={records.onlineQualifying}
           tone="text-purple-300"
         />
-        <RecordMetric
+        <LapMetric
           label="TT"
-          value={timeTrial.value}
-          detail={timeTrial.detail}
+          record={records.timeTrial}
           tone="text-cyan-300"
         />
-        <RecordMetric
+        <LapMetric
           label="Offline Q"
-          value={offlineQualifying.value}
-          detail={offlineQualifying.detail}
+          record={records.offlineQualifying}
           tone="text-purple-300"
         />
       </div>
