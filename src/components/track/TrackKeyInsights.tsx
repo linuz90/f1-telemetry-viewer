@@ -1,20 +1,16 @@
 import {
-  Award,
-  Disc,
   Fuel,
   Gauge,
   History,
-  Info,
   Swords,
   Timer,
   Trophy,
   Zap,
 } from "lucide-react";
-import type { TrackRaceRecommendation, TrackStrategySuggestion } from "../../utils/stats";
+import type { TrackRaceRecommendation } from "../../utils/stats";
 import type { TrackRivalBenchmark } from "../../utils/rivalStats";
 import { msToLapTime, msToSectorTime } from "../../utils/format";
 import { getCompoundColor } from "../../utils/colors";
-import { cardClass, dynamicAccentCardStyle } from "../Card";
 import { InsightTile } from "../ui/InsightTile";
 import { SectionHeader } from "../ui/SectionHeader";
 
@@ -52,12 +48,9 @@ export function TrackKeyInsights({
   const {
     raceCount,
     fullDistanceRaceCount,
-    hasEvidence,
     bestRaceLap,
     raceVsQualiDeltaMs,
     avgErsDeployMj,
-    recommended,
-    alternative,
     fuelTarget,
     sinceLastRace,
   } = recommendation;
@@ -72,11 +65,8 @@ export function TrackKeyInsights({
   const subtitle = subtitleParts.join(" · ");
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <SectionHeader>Key Insights</SectionHeader>
-        <span className="text-[11px] text-zinc-500">{subtitle}</span>
-      </div>
+    <div>
+      <SectionHeader title="Key Insights" hint={subtitle} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {bestRaceLap && bestRaceLap.bestLapMs > 0 && (
@@ -96,7 +86,7 @@ export function TrackKeyInsights({
             <div className="font-mono text-lg text-zinc-100">
               {avgErsDeployMj.toFixed(2)} MJ
             </div>
-            <div className="mt-0.5 text-[11px] text-zinc-500">
+            <div className="mt-0.5 text-xs text-zinc-500">
               per lap, green-flag avg
             </div>
           </InsightTile>
@@ -112,23 +102,6 @@ export function TrackKeyInsights({
         )}
 
         {rivalBenchmark && <FastestRivalTile benchmark={rivalBenchmark} />}
-
-        {hasEvidence && recommended ? (
-          <>
-            <StrategyTile kind="recommended" strategy={recommended} />
-            {alternative && (
-              <StrategyTile kind="alternative" strategy={alternative} />
-            )}
-          </>
-        ) : (
-          <div className={`${cardClass} flex items-start gap-2 text-xs text-zinc-500`}>
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-600" />
-            <span>
-              Not enough race data yet. Finish a multi-stint race at this track
-              to unlock a strategy recommendation.
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -150,7 +123,7 @@ function BestRaceLapTile({
       <div className="font-mono text-xl font-semibold text-purple-300">
         {msToLapTime(bestLapMs)}
       </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
         {compound && <CompoundBadge compound={compound} />}
         {gapMs > 0 && <span>+{msToSectorTime(gapMs)} vs. theoretical</span>}
       </div>
@@ -161,7 +134,7 @@ function BestRaceLapTile({
 function CompoundBadge({ compound }: { compound: string }) {
   const color = getCompoundColor(compound);
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-900/60 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
+    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-900/60 px-1.5 py-0.5 text-2xs font-medium text-zinc-300">
       <span
         className="inline-block h-1.5 w-1.5 rounded-sm"
         style={{ backgroundColor: color }}
@@ -182,7 +155,7 @@ function RaceVsQualiTile({ deltaMs }: { deltaMs: number }) {
         {isRaceFaster ? "-" : "+"}
         {msToSectorTime(abs)}
       </div>
-      <div className="mt-0.5 text-[11px] text-zinc-500">
+      <div className="mt-0.5 text-xs text-zinc-500">
         best race lap vs. best quali lap
       </div>
     </InsightTile>
@@ -205,14 +178,20 @@ function FuelTargetTile({
   // reads as data, not a verdict.
   const delta = target.recommendedDeltaLaps;
 
-  // Over-/under-fuel note from observed excess at finish (positive = over-fuel).
+  // Clean-race excess: how many laps of fuel you'd typically finish with if
+  // every lap burned at the pooled green-flag rate (i.e. no SC tailwind).
+  // Negative means the slider value you used would only get you home thanks
+  // to safety-car saves — bad advice for next race.
   const excess = target.excessAtFinishLaps;
+  const raceLabel = `${target.raceCount} race${target.raceCount === 1 ? "" : "s"}`;
   let note: string | null = null;
   if (Math.abs(excess) >= 0.4) {
     note =
       excess > 0
-        ? `You usually over-fuel by ${excess.toFixed(1)} laps`
-        : `You usually under-fuel by ${Math.abs(excess).toFixed(1)} laps`;
+        ? `~${excess.toFixed(1)} laps spare in a clean race (${raceLabel})`
+        : `~${Math.abs(excess).toFixed(1)} laps short in a clean race (${raceLabel})`;
+  } else {
+    note = `on target for a clean race (${raceLabel})`;
   }
 
   return (
@@ -221,90 +200,11 @@ function FuelTargetTile({
         {delta >= 0 ? "+" : ""}
         {delta.toFixed(1)} laps initial fuel
       </div>
-      <div className="mt-0.5 text-[11px] text-zinc-500">
+      <div className="mt-0.5 text-xs text-zinc-500">
         {target.burnRateKgPerLap.toFixed(2)} kg/lap burn
       </div>
-      {note && <div className="mt-1 text-[11px] text-zinc-500">{note}</div>}
+      {note && <div className="mt-1 text-xs text-zinc-500">{note}</div>}
     </InsightTile>
-  );
-}
-
-function StrategyTile({
-  kind,
-  strategy,
-}: {
-  kind: "recommended" | "alternative";
-  strategy: TrackStrategySuggestion;
-}) {
-  const isAlt = kind === "alternative";
-  const pitSummary =
-    strategy.pitWindows.length > 0
-      ? strategy.pitWindows
-          .map((w) => `lap ${w.earliest}–${w.latest}`)
-          .join(", ")
-      : "no-stop";
-  // Both recommended and alternative are synthesized from the same compound
-  // pace + wear data, so the sub-line shows the underlying race sample size
-  // honestly instead of pretending the alternative is "what someone else
-  // tried." Falls back to total race count when none of them were full.
-  const raceCount =
-    strategy.fullDistanceRaceCount > 0
-      ? strategy.fullDistanceRaceCount
-      : strategy.raceCount;
-  const raceKind =
-    strategy.fullDistanceRaceCount > 0 ? "full-distance race" : "race";
-  const sub = `Based on ${raceCount} ${raceKind}${raceCount === 1 ? "" : "s"} of tyre data`;
-
-  return (
-    <InsightTile
-      title={isAlt ? "Alternative Strategy" : "Recommended Strategy"}
-      icon={isAlt ? Disc : Award}
-      accent={isAlt ? "zinc" : "emerald"}
-    >
-      <div className="flex flex-wrap items-center gap-1.5">
-        {strategy.compounds.map((compound, i) => (
-          <CompoundLeg
-            key={`${compound}-${i}`}
-            compound={compound}
-            laps={strategy.stintLaps[i]}
-            isLast={i === strategy.compounds.length - 1}
-          />
-        ))}
-      </div>
-      <div className="mt-1.5 text-[11px] text-zinc-500">
-        Pit: {pitSummary} · {sub}
-      </div>
-    </InsightTile>
-  );
-}
-
-function CompoundLeg({
-  compound,
-  laps,
-  isLast,
-}: {
-  compound: string;
-  laps: number;
-  isLast: boolean;
-}) {
-  const color = getCompoundColor(compound);
-  return (
-    <>
-      <span
-        className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs text-zinc-100"
-        style={dynamicAccentCardStyle(color)}
-      >
-        <span
-          className="inline-block h-2 w-2 rounded-sm"
-          style={{ backgroundColor: color }}
-        />
-        {compound}
-        {laps > 0 && (
-          <span className="font-mono text-[11px] text-zinc-400">{laps}L</span>
-        )}
-      </span>
-      {!isLast && <span className="text-zinc-500">→</span>}
-    </>
   );
 }
 
@@ -356,7 +256,7 @@ function FastestRivalTile({ benchmark }: { benchmark: TrackRivalBenchmark }) {
           </>
         )}
       </div>
-      <div className="mt-0.5 text-[11px] text-zinc-500">
+      <div className="mt-0.5 text-xs text-zinc-500">
         {sampleParts.join(" · ")}
       </div>
     </InsightTile>
@@ -409,7 +309,7 @@ function VsLastRaceTile({
         )}
       </div>
       {wearNote && (
-        <div className="mt-0.5 text-[11px] text-zinc-500">
+        <div className="mt-0.5 text-xs text-zinc-500">
           <span className={wearNote.tone}>{wearNote.value}</span>{" "}
           {wearNote.suffix}
         </div>

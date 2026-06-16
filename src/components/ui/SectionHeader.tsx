@@ -1,12 +1,31 @@
+import type { ReactNode } from "react";
+
 /**
- * Section header with a fading right-side rule.
- * Used to introduce sub-sections inside a page (e.g. "Qualifying Progress").
+ * Canonical section header. Used for top-level sections OUTSIDE cards
+ * (Insights, Tracks, Strategy…) and for the title block INSIDE chart cards
+ * (Pace Evolution, Best Lap Over Time…). Same font / weight / color in both
+ * positions so the page reads as one family.
  */
-export function SectionHeader({ children }: { children: React.ReactNode }) {
+export function SectionHeader({
+  title,
+  hint,
+  action,
+  className = "",
+}: {
+  title: ReactNode;
+  hint?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex items-center gap-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">{children}</h3>
-      <div className="flex-1 h-px bg-gradient-to-r from-white/[0.06] to-transparent" />
+    <div
+      className={`mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 ${className}`}
+    >
+      <div className="min-w-0">
+        <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
+        {hint && <p className="mt-0.5 text-xs text-zinc-500">{hint}</p>}
+      </div>
+      {action}
     </div>
   );
 }

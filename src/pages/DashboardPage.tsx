@@ -6,7 +6,7 @@ import { InsightCard } from "../components/dashboard/InsightCard";
 import { QualifyingPaceCard } from "../components/dashboard/QualifyingPaceCard";
 import { RaceResultsHero } from "../components/dashboard/RaceResultsHero";
 import { RivalCard } from "../components/dashboard/RivalCard";
-import { SectionHeader } from "../components/dashboard/SectionHeader";
+import { SectionHeader } from "../components/ui/SectionHeader";
 import { TrackOverviewCard } from "../components/dashboard/TrackOverviewCard";
 import {
   type SessionStats,

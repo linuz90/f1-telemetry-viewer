@@ -3,6 +3,22 @@
 
 @theme {
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale — kept deliberately small (5 tiers) so dense data screens stay
+   * legible. Tweak the rem values here to scale the whole app at once.
+   *
+   *   text-2xs  11px / 14px  uppercase mono eyebrows, pill badges, chip labels
+   *   text-xs   13px / 18px  captions, sub-text, footnotes, table cells
+   *   text-sm   14px / 20px  small body, secondary labels (Tailwind default)
+   *   text-base 16px / 24px  body (Tailwind default)
+   *   text-lg   18px / 28px  hero stats, big numbers (Tailwind default)
+   *
+   * Avoid hardcoded `text-[Npx]` for body copy — pick the closest tier so the
+   * scale stays adjustable from this file. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: calc(0.875 / 0.6875);
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: calc(1.125 / 0.8125);
   /* Pure black for the chrome (sidebar + body fallback). The main content area
    * lifts off this with a slightly lighter canvas so cards have something to
    * sit on. */

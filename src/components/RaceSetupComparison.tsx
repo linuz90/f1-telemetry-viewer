@@ -10,6 +10,8 @@ import { msToLapTime, formatDate, formatSessionType } from "../utils/format";
 import { sessionSummaryPath } from "../utils/routes";
 import { cardClass } from "./Card";
 import { CarSetupCard } from "./CarSetupCard";
+import { Badge } from "./ui/Badge";
+import { SectionHeader } from "./ui/SectionHeader";
 
 interface RaceSetupComparisonProps {
   candidates: RaceSetupCandidate[];
@@ -167,7 +169,7 @@ function MetricCell({
       </div>
       {delta && (
         <div
-          className={`mt-0.5 font-mono text-[10px] tabular-nums ${
+          className={`mt-0.5 font-mono text-2xs tabular-nums ${
             delta === "Best" ? "text-zinc-600" : "text-zinc-500"
           }`}
         >
@@ -175,7 +177,7 @@ function MetricCell({
         </div>
       )}
       {detail && (
-        <div className="mt-0.5 truncate text-[10px] text-zinc-600">{detail}</div>
+        <div className="mt-0.5 truncate text-2xs text-zinc-600">{detail}</div>
       )}
     </div>
   );
@@ -186,7 +188,7 @@ function StrengthBadge({ strength }: { strength: RaceSetupStrength }) {
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium leading-4 ring-1 ${meta.className}`}
+      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-2xs font-medium leading-4 ring-1 ${meta.className}`}
     >
       {getStrengthLabel(strength)}
     </span>
@@ -286,13 +288,14 @@ export function RaceSetupComparison({
 
     return (
       <section className={cardClass}>
-        <h3 className="text-sm font-semibold text-zinc-300 mb-1">
-          Your Best Race Setup
-        </h3>
-        <p className="text-xs text-zinc-500 mb-4">
-          From{" "}
-          <SourceLink candidate={candidate} />
-        </p>
+        <SectionHeader
+          title="Your Best Race Setup"
+          hint={
+            <>
+              From <SourceLink candidate={candidate} />
+            </>
+          }
+        />
         <CarSetupCard setup={candidate.setup} />
       </section>
     );
@@ -312,19 +315,20 @@ export function RaceSetupComparison({
 
   return (
     <section className={cardClass}>
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold text-zinc-300">
-          Race Setup Comparison
-        </h3>
-        <p className="mt-1 text-xs text-zinc-500">
-          Observed across {totalSamples} {raceScope}
-          {pluralizeRace(totalSamples)}. Awards use same-compound evidence.
-        </p>
-      </div>
+      <SectionHeader
+        title="Race Setup Comparison"
+        hint={
+          <>
+            Observed across {totalSamples} {raceScope}
+            {pluralizeRace(totalSamples)}. Awards use same-compound evidence.
+          </>
+        }
+        className="mb-4"
+      />
 
       <div className="-mx-1 overflow-x-auto px-1">
         <div className="min-w-[920px]">
-          <div className="grid grid-cols-[minmax(500px,2.4fr)_repeat(4,minmax(90px,0.55fr))] gap-3 px-3 pb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+          <div className="grid grid-cols-[minmax(500px,2.4fr)_repeat(4,minmax(90px,0.55fr))] gap-3 px-3 pb-2 text-2xs font-medium uppercase tracking-wider text-zinc-600">
             <div>Setup</div>
             <div>Best lap</div>
             <div>Median pace</div>
@@ -358,9 +362,9 @@ export function RaceSetupComparison({
                         {candidate.name}
                       </span>
                       {selected && (
-                        <span className="rounded-full bg-zinc-700/70 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-zinc-400">
+                        <Badge size="xs" tone="zinc" className="uppercase tracking-wide">
                           Selected
-                        </span>
+                        </Badge>
                       )}
                     </div>
                     {displayStrengths.length > 0 && (
@@ -420,14 +424,15 @@ export function RaceSetupComparison({
       </div>
 
       <div className="mt-5 border-t border-white/[0.06] pt-5">
-        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h4 className="text-sm font-semibold text-zinc-300">
-            {selectedCandidate.name} Details
-          </h4>
-          <p className="text-xs text-zinc-500">
-            From <SourceLink candidate={selectedCandidate} />
-          </p>
-        </div>
+        <SectionHeader
+          title={`${selectedCandidate.name} Details`}
+          hint={
+            <>
+              From <SourceLink candidate={selectedCandidate} />
+            </>
+          }
+          className="mb-4"
+        />
         <CarSetupCard setup={selectedCandidate.setup} />
       </div>
     </section>

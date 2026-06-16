@@ -20,6 +20,12 @@ import {
   type SessionListFilters,
 } from "./SessionListFilterMenu";
 import { HStack } from "./ui/Stack";
+import { Tabs } from "./ui/Tabs";
+
+const SIDEBAR_TABS = [
+  { value: "sessions", label: "Sessions" },
+  { value: "tracks", label: "Tracks" },
+] as const;
 
 /** Groups sessions by date for display */
 function groupByDate(sessions: SessionSummary[]) {
@@ -56,6 +62,19 @@ function groupModeLabel(sessions: SessionSummary[]): string | null {
 
 const PAGE_SIZE = 50;
 const FILTERS_STORAGE_KEY = "session-list-filters";
+const TAB_STORAGE_KEY = "session-list-tab";
+
+type SidebarTab = "sessions" | "tracks";
+
+function readPersistedTab(): SidebarTab {
+  if (typeof window === "undefined") return "sessions";
+  try {
+    const raw = window.sessionStorage.getItem(TAB_STORAGE_KEY);
+    return raw === "tracks" ? "tracks" : "sessions";
+  } catch {
+    return "sessions";
+  }
+}
 
 function representativeFormulaKey(sessions: SessionSummary[]): string | undefined {
   return sessions[0] ? getSessionFormulaScopeKey(sessions[0]) : undefined;
@@ -79,11 +98,11 @@ function readPersistedFilters(): SessionListFilters {
 export function SessionList() {
   const { sessions, loading, error } = useSessionList();
   const { activeFormulaKey, formulaOptions } = useTelemetry();
-  const [tab, setTab] = useState<"sessions" | "tracks">("sessions");
+  const [tab, setTab] = useState<SidebarTab>(readPersistedTab);
   const [filters, setFilters] = useState<SessionListFilters>(readPersistedFilters);
   const [page, setPage] = useState(0);
 
-  // Persist filters across reloads within the same tab session.
+  // Persist filters + active tab across reloads within the same tab session.
   useEffect(() => {
     try {
       window.sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters));
@@ -91,6 +110,14 @@ export function SessionList() {
       // Ignore storage failures (e.g. private mode quota limits).
     }
   }, [filters]);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(TAB_STORAGE_KEY, tab);
+    } catch {
+      // Ignore storage failures (e.g. private mode quota limits).
+    }
+  }, [tab]);
 
   const updateFilters = (next: SessionListFilters) => {
     setFilters(next);
@@ -168,28 +195,13 @@ export function SessionList() {
       {/* Sticky header: tabs + filter */}
       <div className="sticky top-0 z-10 bg-black/85 backdrop-blur">
         <HStack className="px-2 pt-2">
-          <div className="flex flex-1">
-            <button
-              onClick={() => setTab("sessions")}
-              className={`flex-1 pb-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
-                tab === "sessions"
-                  ? "text-white border-b-2 border-white"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              Sessions
-            </button>
-            <button
-              onClick={() => setTab("tracks")}
-              className={`flex-1 pb-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
-                tab === "tracks"
-                  ? "text-white border-b-2 border-white"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              Tracks
-            </button>
-          </div>
+          <Tabs
+            className="flex-1"
+            options={SIDEBAR_TABS}
+            value={tab}
+            onChange={setTab}
+            ariaLabel="Sidebar section"
+          />
           <div className="pb-[7px] pl-2">
             <SessionListFilterMenu
               value={filters}

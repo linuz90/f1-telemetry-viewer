@@ -1014,6 +1014,35 @@ export function estimateMaxLife(wearRatePerLap: number): number {
   return wearRatePerLap > 0 ? Math.round(PUNCTURE_THRESHOLD / wearRatePerLap) : 0;
 }
 
+// ─── Fuel safety knobs ───────────────────────────────────────────────────────
+//
+// We frame the fuel recommendation as "what slider value would *just* finish
+// the race assuming every lap is green-flag" and then add two small safety
+// buffers on top, so a literal reading of the chip in a clean race doesn't
+// leave you crossing the line on fumes (or DSQ-risk territory).
+//
+// Both buffers mirror the Pits n' Giggles in-app Fuel Strategy Calculator:
+//   https://github.com/ashwin-nat/pits-n-giggles/blob/hotfix-v4.3.0/apps/frontend/js/fuelCalculator.js
+// where they appear as `MIN_FUEL_LEVEL` (0.2 kg) and the default `surplusLaps`
+// input (0.25 laps), both folded into the "Conservative" strategy output.
+
+/** Unusable fuel that physically can't be burned (F1 cars leave a small
+ *  reserve at the bottom of the tank). Matches PnG's `MIN_FUEL_LEVEL`. */
+const MIN_FUEL_LEVEL_KG = 0.2;
+
+/** Extra laps of fuel kept as a safety buffer above the "clean-race"
+ *  requirement. Matches the default `surplusLaps` input in PnG's
+ *  conservative-strategy calculator. */
+const FUEL_SURPLUS_LAPS = 0.25;
+
+/** Total safety margin (in laps) to subtract from any "clean-race" excess
+ *  projection before turning it into a slider recommendation. Combines the
+ *  unusable-fuel reserve (converted to laps at the green-flag burn rate)
+ *  and the surplus-laps buffer. */
+function fuelSafetyMarginLaps(burnRateKg: number): number {
+  return FUEL_SURPLUS_LAPS + MIN_FUEL_LEVEL_KG / burnRateKg;
+}
+
 /** Result of a fuel burn-rate calculation for a single race session */
 export interface FuelCalcResult {
   burnRateKg: number;
@@ -1032,6 +1061,29 @@ export interface FuelCalcResult {
 /** True when a lap ran under normal green-flag racing conditions */
 function isGreenFlagLap(lap: PerLapInfo): boolean {
   return (lap["max-safety-car-status"] ?? "NO_SAFETY_CAR") === "NO_SAFETY_CAR";
+}
+
+/** Collect per-lap fuel burn deltas (kg) from consecutive green-flag lap
+ *  pairs only. Skips SC/VSC/formation laps so the deltas reflect actual
+ *  racing burn — the conservative quantity for any fuel-load recommendation. */
+function collectGreenFlagBurnDeltas(player: DriverData): number[] {
+  const perLap = player["per-lap-info"];
+  if (!perLap?.length) return [];
+  const lapsWithFuel = perLap.filter(
+    (l) => l["car-status-data"]?.["fuel-in-tank"] > 0,
+  );
+  if (lapsWithFuel.length < 2) return [];
+  const deltas: number[] = [];
+  for (let i = 1; i < lapsWithFuel.length; i++) {
+    const prev = lapsWithFuel[i - 1];
+    const curr = lapsWithFuel[i];
+    if (!isGreenFlagLap(prev) || !isGreenFlagLap(curr)) continue;
+    const delta =
+      prev["car-status-data"]["fuel-in-tank"] -
+      curr["car-status-data"]["fuel-in-tank"];
+    if (delta > 0) deltas.push(delta);
+  }
+  return deltas;
 }
 
 /** ERS energy deployed on a lap, preferring Pits n' Giggles' saved lap aggregate. */
@@ -1113,29 +1165,11 @@ export function calculateBurnRate(
   );
   if (lapsWithFuel.length < 6) return null;
 
-  // Build per-lap fuel deltas, keeping only consecutive green-flag pairs
-  const deltas: number[] = [];
-  for (let i = 1; i < lapsWithFuel.length; i++) {
-    const prev = lapsWithFuel[i - 1];
-    const curr = lapsWithFuel[i];
-    if (!isGreenFlagLap(prev) || !isGreenFlagLap(curr)) continue;
-    const delta =
-      prev["car-status-data"]["fuel-in-tank"] -
-      curr["car-status-data"]["fuel-in-tank"];
-    if (delta > 0) deltas.push(delta);
-  }
-
+  const deltas = collectGreenFlagBurnDeltas(player);
   if (deltas.length < 3) return null;
 
-  // Median is more robust than mean against pit-in/out laps or one-off spikes
-  deltas.sort((a, b) => a - b);
-  const mid = Math.floor(deltas.length / 2);
-  const burnRateKg =
-    deltas.length % 2 === 0
-      ? (deltas[mid - 1] + deltas[mid]) / 2
-      : deltas[mid];
-
-  if (burnRateKg <= 0) return null;
+  const burnRateKg = median(deltas);
+  if (burnRateKg == null || burnRateKg <= 0) return null;
 
   const firstLap = lapsWithFuel[0];
   const lastLap = lapsWithFuel[lapsWithFuel.length - 1];
@@ -1186,9 +1220,7 @@ export function generateFuelInsights(
     ];
   }
 
-  const {
-    burnRateKg, greenFlagLapCount, startFuelRemaining, lastLapNumber,
-  } = result;
+  const { burnRateKg, greenFlagLapCount, startFuelRemaining } = result;
 
   const insights: StrategyInsight[] = [];
 
@@ -1200,47 +1232,37 @@ export function generateFuelInsights(
     detail: `${Math.round(result.startFuelKg)} kg — ${burnRateKg.toFixed(2)} kg/lap avg`,
   });
 
-  // Row 2: Fuel Recommendation — always uses our green-flag burn rate
-  // (avoids SC/VSC laps inflating the excess and skewing the recommendation)
+  // Row 2: Fuel Recommendation — clean-race projection.
+  //
+  // We deliberately ignore the actual fuel remaining at the chequered flag.
+  // Safety-car / VSC laps burn much less than green-flag laps (this race at
+  // Catalunya: ~0.7 kg/lap under FSC vs ~1.05 kg/lap green), so any real
+  // leftover at the line bakes in fuel saved by SCs that the *next* race
+  // probably won't have. The recommendation assumes a worst-case all-green
+  // race at the measured green-flag burn rate, then keeps a small safety
+  // margin on top (see MIN_FUEL_LEVEL_KG + FUEL_SURPLUS_LAPS) so following
+  // it never leaves you stranded in a clean race.
   if (greenFlagLapCount >= 5) {
-    const endFuelRemaining = result.endFuelKg / burnRateKg;
-    const raceComplete = lastLapNumber >= totalRaceLaps - 2;
-    if (!raceComplete) {
-      const lapsToGo = totalRaceLaps - lastLapNumber;
-      const projectedKg = result.endFuelKg - burnRateKg * lapsToGo;
-      const projectedRemaining = projectedKg / burnRateKg;
-      const recommended = startFuelRemaining - projectedRemaining;
-      let detail: string;
-      if (Math.abs(projectedRemaining) < 0.3) {
-        detail = "fuel load was spot on";
-      } else if (projectedRemaining > 0) {
-        detail = `projected ${formatLapDelta(projectedRemaining)} excess (${greenFlagLapCount} green laps)`;
-      } else {
-        detail = `projected ${formatLapDelta(projectedRemaining)} short (${greenFlagLapCount} green laps)`;
-      }
-      insights.push({
-        type: "fuel",
-        label: "Recommended Fuel",
-        value: `${formatLapDelta(recommended)} laps`,
-        detail,
-      });
+    // Raw "clean race" excess — what would be left over if every lap burned
+    // at the measured green-flag rate. Shown verbatim in the detail line.
+    const rawExcessLaps = result.startFuelKg / burnRateKg - totalRaceLaps;
+    // Recommendation bakes in a small safety buffer above the bare minimum.
+    const recommended =
+      startFuelRemaining - (rawExcessLaps - fuelSafetyMarginLaps(burnRateKg));
+    let detail: string;
+    if (Math.abs(rawExcessLaps) < 0.3) {
+      detail = `clean-race fuel load was spot on (${greenFlagLapCount} green laps)`;
+    } else if (rawExcessLaps > 0) {
+      detail = `${formatLapDelta(rawExcessLaps)} laps spare in a clean race (${greenFlagLapCount} green laps)`;
     } else {
-      const recommended = startFuelRemaining - endFuelRemaining;
-      let detail: string;
-      if (Math.abs(endFuelRemaining) < 0.3) {
-        detail = "fuel load was spot on";
-      } else if (endFuelRemaining > 0) {
-        detail = `${formatLapDelta(endFuelRemaining)} excess at finish (green-flag pace)`;
-      } else {
-        detail = `${formatLapDelta(endFuelRemaining)} short at finish (green-flag pace)`;
-      }
-      insights.push({
-        type: "fuel",
-        label: "Recommended Fuel",
-        value: `${formatLapDelta(recommended)} laps`,
-        detail,
-      });
+      detail = `${formatLapDelta(rawExcessLaps)} laps short in a clean race (${greenFlagLapCount} green laps)`;
     }
+    insights.push({
+      type: "fuel",
+      label: "Recommended Fuel",
+      value: `${formatLapDelta(recommended)} laps`,
+      detail,
+    });
   } else {
     insights.push({
       type: "fuel",
@@ -1722,52 +1744,93 @@ export interface TrackFuelStats {
   avgInitialFuelLaps: number;
   /** Average recommended fuel delta in laps (matches session "Recommended Fuel") */
   avgRecommendedFuelLaps: number;
-  /** Average projected excess at finish in green-flag laps (our burn rate) */
+  /** Average laps of fuel each race had to spare assuming a clean (all
+   *  green-flag) run at the pooled burn rate. Positive = over-fuel, negative
+   *  = wouldn't have finished without the SC saves that actually happened. */
   avgExcessAtFinishLaps: number;
   raceCount: number;
 }
 
-/** Aggregate fuel data across all race sessions at a track */
+/** Aggregate fuel data across all race sessions at a track.
+ *
+ *  Two key choices, both aimed at making the chip safe to act on:
+ *
+ *  1. **Pooled burn rate.** Green-flag fuel deltas from every race at the
+ *     track go into a single pool, and the pooled median is the burn rate.
+ *     One race rarely has enough green-flag pairs to nail this down; pooling
+ *     across (e.g.) 23 Catalunya races gives a much tighter number.
+ *
+ *  2. **Clean-race excess, not observed leftover.** Per-race excess is
+ *     `startFuelKg / pooledBurnRate − totalLaps` — i.e. what the leftover
+ *     *would* be if every lap burned at the green-flag rate. We deliberately
+ *     do NOT use the fuel actually left in the tank at the finish: SC/VSC
+ *     laps burn ~30% less, and counting that as headroom would tell the user
+ *     to under-fuel for a race that happens to run clean.
+ */
 export function aggregateFuelData(
   sessions: TelemetrySession[],
 ): TrackFuelStats | null {
-  const perRace: { result: FuelCalcResult; totalLaps: number }[] = [];
+  const pooledDeltas: number[] = [];
+  const perRace: {
+    startFuelKg: number;
+    startFuelRemaining: number;
+    totalLaps: number;
+  }[] = [];
 
   for (const session of sessions) {
     if (!isRaceSession(session)) continue;
     const player = findPlayer(session);
     if (!player) continue;
-    const result = calculateBurnRate(player);
     const totalLaps = session["session-info"]["total-laps"];
-    if (result && totalLaps > 0) perRace.push({ result, totalLaps });
+    if (!(totalLaps > 0)) continue;
+
+    const perLap = player["per-lap-info"];
+    const lapsWithFuel = perLap?.filter(
+      (l) => l["car-status-data"]?.["fuel-in-tank"] > 0,
+    ) ?? [];
+    if (lapsWithFuel.length < 6) continue;
+
+    pooledDeltas.push(...collectGreenFlagBurnDeltas(player));
+
+    const firstLap = lapsWithFuel[0];
+    perRace.push({
+      startFuelKg: firstLap["car-status-data"]["fuel-in-tank"],
+      startFuelRemaining: firstLap["car-status-data"]["fuel-remaining-laps"],
+      totalLaps,
+    });
   }
 
-  if (perRace.length === 0) return null;
+  // Need a representative pool of green-flag pairs to trust the burn rate.
+  // 12 ≈ four races at three pairs each; below that, one weird race could
+  // swing the recommendation by a full lap.
+  if (perRace.length === 0 || pooledDeltas.length < 12) return null;
+
+  const pooledBurnRateKg = median(pooledDeltas);
+  if (pooledBurnRateKg == null || pooledBurnRateKg <= 0) return null;
 
   const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
 
-  // Compute per-race excess at finish using green-flag burn rate consistently
-  // (same formula as generateFuelInsights: endFuelKg / burnRateKg)
-  const excessAtFinish = perRace.map(({ result, totalLaps }) => {
-    const raceComplete = result.lastLapNumber >= totalLaps - 2;
-    if (raceComplete) {
-      return result.endFuelKg / result.burnRateKg;
-    }
-    // Incomplete race: project remaining fuel at green-flag pace
-    const lapsToGo = totalLaps - result.lastLapNumber;
-    return (result.endFuelKg - result.burnRateKg * lapsToGo) / result.burnRateKg;
-  });
+  // Raw clean-race excess per race (laps spare if every lap had burned at
+  // the pooled green-flag rate). This is the honest "how much could we have
+  // shaved" number, surfaced as-is in the tile note.
+  const excessAtFinish = perRace.map(
+    (r) => r.startFuelKg / pooledBurnRateKg - r.totalLaps,
+  );
 
-  // Recommended fuel delta per race (same formula as generateFuelInsights):
-  // recommended = startFuelRemaining - projected/actual end excess
-  const recommendedPerRace = perRace.map(({ result }, i) =>
-    result.startFuelRemaining - excessAtFinish[i],
+  // The actual recommendation keeps a small safety buffer above zero
+  // leftover (unusable-fuel reserve + surplus laps) so following it doesn't
+  // leave the player on fumes in a clean race. Matches the buffers PnG's
+  // calculator bakes into its "Conservative" strategy.
+  const safetyMarginLaps = fuelSafetyMarginLaps(pooledBurnRateKg);
+  const recommendedPerRace = perRace.map(
+    (r, i) =>
+      r.startFuelRemaining - (excessAtFinish[i]! - safetyMarginLaps),
   );
 
   return {
-    avgBurnRateKgPerLap: avg(perRace.map((r) => r.result.burnRateKg)),
-    avgStartingFuelKg: avg(perRace.map((r) => r.result.startFuelKg)),
-    avgInitialFuelLaps: avg(perRace.map((r) => r.result.startFuelRemaining)),
+    avgBurnRateKgPerLap: pooledBurnRateKg,
+    avgStartingFuelKg: avg(perRace.map((r) => r.startFuelKg)),
+    avgInitialFuelLaps: avg(perRace.map((r) => r.startFuelRemaining)),
     avgRecommendedFuelLaps: avg(recommendedPerRace),
     avgExcessAtFinishLaps: avg(excessAtFinish),
     raceCount: perRace.length,
@@ -1801,6 +1864,10 @@ export interface TrackStrategySuggestion {
   fullDistanceRaceCount: number;
   /** True when at least one near-full-distance multi-stint race backs this sequence */
   isEvidenceBacked: boolean;
+  /** True when the first stint is on a softer compound than the second — a
+   *  "fast start, durable finish" shape. False for the mirror "durable start,
+   *  fast finish" alternative. Undefined for two-stop sandwiches. */
+  fastStart?: boolean;
 }
 
 export interface TrackFuelTarget {
@@ -1888,23 +1955,34 @@ function buildPitWindow(stintEndLap: number, totalLaps: number) {
 // most often" lookup — with thin samples (one or two races at a track) that
 // approach surfaces whatever was actually run, including DNFs and weird
 // experiments. Instead, we build a generic F1 one-stopper from compound pace +
-// wear data:
+// wear data, using a wear-balanced pit lap with a slight undercut bias:
 //
 //   1. Rank dry compounds by softness (softer = faster on fresh rubber).
-//   2. Compute each compound's safe stint length at WEAR_PIT_THRESHOLD_PERCENT.
-//   3. Walk compound PAIRS from softest to hardest (S+M → S+H → M+H …) and
-//      pick the first pair whose fast→slow ordering covers the race distance.
-//      Recommended = that pairing; Alternative = its mirror ("go long" for the
-//      undercut) when also feasible. We don't lock ourselves to the top-2
-//      compounds because high-wear tracks (e.g. Catalunya) often need the
-//      Hard tyre in the mix even though it's the slowest.
-//   4. Two-stop sandwich (fast-durable-fast) only when NO one-stop pair fits.
+//   2. Walk compound PAIRS from softest to hardest, SKIPPING Soft+Hard
+//      (across-the-allocation pairings are dominated by Soft+Medium or
+//      Medium+Hard — confirmed at 0/35 observations in user telemetry).
+//   3. For each pair, the pit lap is set so BOTH stints hit roughly the same
+//      fraction of their wear life:
+//          balanced = round(totalLaps * wearRate(second)
+//                           / (wearRate(first) + wearRate(second)))
+//      then nudged 1 lap earlier to bank a small undercut margin (fresh rubber
+//      gives ~1.5–2s on the out-lap; one lap = roughly that gain).
+//   4. Both stints must clear the PUNCTURE_THRESHOLD safety cap — the
+//      puncture-risk threshold beyond which grip falls off a cliff.
+//   5. Recommended = first feasible (fast-first) pairing; Alternative = its
+//      mirror (slow-first, "fast-finisher") when also feasible.
+//   6. Two-stop sandwich (fast-durable-fast) only when NO one-stop pair fits.
 //
 // Pit windows are centered on the projected pit lap with ±1 lap of slack.
 
-/** Wear percentage at which we want the tyre to come off — F1 strategists
- *  typically pit before crossing this since fall-off accelerates beyond. */
-const WEAR_PIT_THRESHOLD_PERCENT = 75;
+// PUNCTURE_THRESHOLD (75% worst-wheel wear) is defined above and reused here
+// as the strategy-synthesis safety cap — same threshold the StintTimeline
+// renders as the red puncture line and the same one estimateMaxLife() uses.
+
+/** How many laps earlier than the wear-balanced pit lap we recommend pitting,
+ *  to bank a small undercut margin. F1 broadcasts cite ~1.5–2s gain on the
+ *  out-lap from fresh rubber, which is roughly one lap of pace differential. */
+const UNDERCUT_NUDGE_LAPS = 1;
 
 /** Dry compound softness priority — lower number = softer = faster on fresh
  *  rubber. Soft/Medium/Hard are the relative labels Pits n' Giggles surfaces
@@ -1929,7 +2007,7 @@ function isDryCompound(compound: string): boolean {
  *  wear threshold, given the observed average wear rate (%/lap). */
 function safeStintMaxLaps(wearRatePerLap: number): number {
   if (wearRatePerLap <= 0) return Number.POSITIVE_INFINITY;
-  return Math.max(1, Math.floor(WEAR_PIT_THRESHOLD_PERCENT / wearRatePerLap));
+  return Math.max(1, Math.floor(PUNCTURE_THRESHOLD / wearRatePerLap));
 }
 
 /** Sort dry compound stats by relative softness (Soft → Medium → Hard).
@@ -1959,30 +2037,38 @@ interface SynthesizedStrategyShape {
 }
 
 /** One-stop strategy with `first` compound on stint 1, `second` on stint 2.
- *  Splits the race proportionally to each compound's safe stint life so
- *  both stints hit roughly the same fraction of their wear limit at the
- *  pit window. That produces a realistic F1 one-stopper (pit roughly mid-
- *  race) rather than running one compound right to the puncture edge and
- *  hot-swapping for a single lap. Returns null when no valid split fits. */
+ *  Pit lap is wear-balanced (both stints hit ~the same fraction of their wear
+ *  life) and nudged earlier by UNDERCUT_NUDGE_LAPS to bank fresh-rubber out-lap
+ *  pace as undercut margin. Returns null when either stint would exceed the
+ *  PUNCTURE_THRESHOLD puncture cap at the recommended pit lap. */
 function buildOneStopShape(
   first: CompoundLifeStats,
   second: CompoundLifeStats,
   totalLaps: number,
 ): SynthesizedStrategyShape | null {
-  const firstMax = safeStintMaxLaps(first.avgWearRatePerLap);
-  const secondMax = safeStintMaxLaps(second.avgWearRatePerLap);
-  // Need at least one lap on each side, so the feasible window for the pit
-  // lap is [1, totalLaps - 1] and stint2 must fit within secondMax.
-  const minStint1 = Math.max(1, totalLaps - secondMax);
-  const maxStint1 = Math.min(firstMax, totalLaps - 1);
-  if (minStint1 > maxStint1) return null;
-  // Proportional ideal pit lap — same fraction-of-life on both compounds.
-  const proportional = Math.round(
-    (totalLaps * firstMax) / (firstMax + secondMax),
+  const firstWear = first.avgWearRatePerLap;
+  const secondWear = second.avgWearRatePerLap;
+  if (firstWear <= 0 || secondWear <= 0) return null;
+  // Wear-balanced pit lap: stint1 ends when both compounds would have burned
+  // the same fraction of their life by the flag. Same as solving
+  //   stint1 * firstWear = (total - stint1) * secondWear  for stint1.
+  const balancedPitLap = Math.round(
+    (totalLaps * secondWear) / (firstWear + secondWear),
   );
-  const stint1 = Math.min(maxStint1, Math.max(minStint1, proportional));
+  // Slight undercut bias: pit one lap earlier than balance so the fresh-tyre
+  // out-lap stings whoever's ahead. Clamped to [1, totalLaps - 1].
+  const stint1 = Math.max(
+    1,
+    Math.min(totalLaps - 1, balancedPitLap - UNDERCUT_NUDGE_LAPS),
+  );
   const stint2 = totalLaps - stint1;
-  if (stint1 < 1 || stint2 < 1) return null;
+  if (stint2 < 1) return null;
+  // Safety cap: both stints must stay under the puncture threshold. If the
+  // user's wear rates are too aggressive for either compound to make its half
+  // of the race, fall through and let synthesizeStrategies try a harder pair
+  // (or eventually a two-stop sandwich).
+  if (stint1 * firstWear > PUNCTURE_THRESHOLD) return null;
+  if (stint2 * secondWear > PUNCTURE_THRESHOLD) return null;
   return {
     compounds: [first.compound, second.compound],
     stintLaps: [stint1, stint2],
@@ -2019,6 +2105,7 @@ function suggestionFromShape(
   totalLaps: number,
   raceCount: number,
   fullDistanceRaceCount: number,
+  fastStart?: boolean,
 ): TrackStrategySuggestion {
   const pitWindows: { earliest: number; latest: number; target: number }[] = [];
   let cumulative = 0;
@@ -2033,7 +2120,21 @@ function suggestionFromShape(
     raceCount,
     fullDistanceRaceCount,
     isEvidenceBacked: true,
+    fastStart,
   };
+}
+
+/** Soft+Hard is a pairing that skips the Medium allocation rung. In observed
+ *  user races (35 dry multi-stint races) it appeared 0 times — strategists
+ *  default to Soft+Medium or Medium+Hard since they share an adjacent rung.
+ *  We suppress it here so the recommendation never offers a shape that
+ *  doesn't show up in practice. */
+function isSoftHardPair(a: CompoundLifeStats, b: CompoundLifeStats): boolean {
+  const aPri = DRY_COMPOUND_PRIORITY[a.compound] ?? Number.POSITIVE_INFINITY;
+  const bPri = DRY_COMPOUND_PRIORITY[b.compound] ?? Number.POSITIVE_INFINITY;
+  const softest = Math.min(aPri, bPri);
+  const hardest = Math.max(aPri, bPri);
+  return softest === 0 && hardest === 2;
 }
 
 function synthesizeStrategies(
@@ -2048,15 +2149,16 @@ function synthesizeStrategies(
   const ranked = rankDryCompoundsByPace(compoundLifeStats);
   if (ranked.length < 2) return { recommended: null, alternative: null };
 
-  // Walk compound pairs in softness order: (0,1) → (0,2) → (1,2) … so the
-  // softest feasible pairing wins. This keeps Soft+Medium as the recommendation
-  // when it covers the distance, but on high-wear tracks (where soft wear
-  // outruns its safe stint) we fall through to harder pairings — e.g.
-  // Medium+Hard at Catalunya — instead of bailing to "no recommendation".
+  // Walk compound pairs in softness order: (0,1) → (1,2) … so the softest
+  // feasible adjacent-rung pairing wins. On high-wear tracks where soft
+  // wear outruns the puncture cap, Soft+Medium gets rejected and we fall
+  // through to Medium+Hard (e.g. Catalunya at full distance). Soft+Hard
+  // is skipped — strategists don't skip rungs in practice.
   for (let i = 0; i < ranked.length - 1; i++) {
     for (let j = i + 1; j < ranked.length; j++) {
       const softer = ranked[i];
       const harder = ranked[j];
+      if (isSoftHardPair(softer, harder)) continue;
       const fastFirst = buildOneStopShape(softer, harder, totalLaps);
       const slowFirst = buildOneStopShape(harder, softer, totalLaps);
       if (fastFirst) {
@@ -2066,6 +2168,7 @@ function synthesizeStrategies(
             totalLaps,
             raceCount,
             fullDistanceRaceCount,
+            true,
           ),
           alternative: slowFirst
             ? suggestionFromShape(
@@ -2073,6 +2176,7 @@ function synthesizeStrategies(
                 totalLaps,
                 raceCount,
                 fullDistanceRaceCount,
+                false,
               )
             : null,
         };
@@ -2084,6 +2188,7 @@ function synthesizeStrategies(
             totalLaps,
             raceCount,
             fullDistanceRaceCount,
+            false,
           ),
           alternative: null,
         };

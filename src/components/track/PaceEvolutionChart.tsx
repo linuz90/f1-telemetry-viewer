@@ -13,6 +13,7 @@ import { CHART_THEME, TOOLTIP_STYLE, getCompoundColor } from "../../utils/colors
 import { msToLapTime } from "../../utils/format";
 import { cardClass } from "../Card";
 import { SegmentedControl } from "../ui/SegmentedControl";
+import { SectionHeader } from "../ui/SectionHeader";
 
 /**
  * Pace Evolution — race-on-race best 3-lap pace window by compound. Replaces
@@ -94,22 +95,21 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
 
   return (
     <section className={cardClass}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2 mb-2">
-        <h3 className="text-sm font-semibold text-zinc-300">
-          Pace Evolution
-          <span className="font-normal text-zinc-500 ml-2">
-            Avg. of fastest 3 clean laps by compound, race-on-race
-          </span>
-        </h3>
-        {showFilter && (
-          <SegmentedControl<ContextFilter>
-            ariaLabel="Race context filter"
-            options={CONTEXT_FILTER_OPTIONS}
-            value={filter}
-            onChange={setFilter}
-          />
-        )}
-      </div>
+      <SectionHeader
+        title="Pace Evolution"
+        hint="Avg. of fastest 3 clean laps by compound, race-on-race"
+        action={
+          showFilter ? (
+            <SegmentedControl<ContextFilter>
+              ariaLabel="Race context filter"
+              options={CONTEXT_FILTER_OPTIONS}
+              value={filter}
+              onChange={setFilter}
+            />
+          ) : undefined
+        }
+      />
+
 
       {filtered.length === 0 ? (
         <div className="py-12 text-center text-sm text-zinc-500">

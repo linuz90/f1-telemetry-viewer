@@ -16,7 +16,7 @@ import {
 import { useSessionList } from "../hooks/useSessionList";
 import { useTelemetry } from "../context/TelemetryContext";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
-import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, isRaceSession, aggregateCompoundLife, aggregateFuelData, buildTrackRaceRecommendation, buildPaceEvolution } from "../utils/stats";
+import { findPlayer, getBestLapTime, lapTimeStdDev, avgWearRate, getValidLaps, isRaceSession, aggregateCompoundLife, aggregateFuelData, buildTrackRaceRecommendation, buildPaceEvolution, PUNCTURE_THRESHOLD } from "../utils/stats";
 import { msToLapTime, msToSectorTime, formatSessionType, formatTime, formatDate, isLapValid, getSessionIcon, bestSectorTimeMs, isTrackSlugMatch } from "../utils/format";
 import { TrackFlag } from "../components/TrackFlag";
 import { CompoundStatCard } from "../components/CompoundStatCard";
@@ -29,6 +29,7 @@ import { InsightTile } from "../components/ui/InsightTile";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { RaceSetupComparison } from "../components/RaceSetupComparison";
 import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
+import { TrackStrategySection } from "../components/track/TrackStrategySection";
 import { PaceEvolutionChart } from "../components/track/PaceEvolutionChart";
 import { SessionRow } from "../components/SessionRow";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
@@ -537,7 +538,7 @@ export function TrackProgressPage() {
 
           <div>
             <div className="mb-3">
-              <SectionHeader>Session History</SectionHeader>
+              <SectionHeader title="Session History" />
             </div>
             <div className="space-y-1.5">
               {spectatorHistory.map(renderSpectatorSessionRow)}
@@ -858,7 +859,7 @@ export function TrackProgressPage() {
       {/* ── Qualifying Section ── */}
       {qualiData.length > 0 && selectedTab === "qualifying" && (
         <>
-          <SectionHeader>Qualifying Progress</SectionHeader>
+          <SectionHeader title="Qualifying Progress" />
 
           {/* Stat cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -887,9 +888,7 @@ export function TrackProgressPage() {
           {/* Best lap over time */}
           {lapTrend.length > 1 && (
             <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                Best Lap Over Time
-              </h3>
+              <SectionHeader title="Best Lap Over Time" />
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={lapTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -956,9 +955,7 @@ export function TrackProgressPage() {
           {/* Sector improvement */}
           {sectorTrend.length > 1 && (
             <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                Sector Improvement
-              </h3>
+              <SectionHeader title="Sector Improvement" />
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={sectorTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -1009,12 +1006,10 @@ export function TrackProgressPage() {
 
             return (
               <section className={cardClass}>
-                <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                  All Qualifying Lap Times
-                  <span className="font-normal text-zinc-500 ml-2">
-                    Every lap across sessions
-                  </span>
-                </h3>
+                <SectionHeader
+                  title="All Qualifying Lap Times"
+                  hint="Every lap across sessions"
+                />
                 <ResponsiveContainer width="100%" height={260}>
                   <ScatterChart margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -1076,12 +1071,10 @@ export function TrackProgressPage() {
           {/* Consistency trend */}
           {consistencyTrend.length > 1 && (
             <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                Consistency Trend
-                <span className="font-normal text-zinc-500 ml-2">
-                  Lower = more consistent lap times
-                </span>
-              </h3>
+              <SectionHeader
+                title="Consistency Trend"
+                hint="Lower = more consistent lap times"
+              />
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={consistencyTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -1104,13 +1097,17 @@ export function TrackProgressPage() {
           {/* Best qualifying setup */}
           {bestQualiSetup && bestQualiSession && (
             <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-1">Your Best Qualifying Setup</h3>
-              <p className="text-xs text-zinc-500 mb-4">
-                From{" "}
-                <Link to={sessionSummaryPath(bestQualiSession.summary)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
-                  {formatSessionType(bestQualiSession.summary.sessionType, bestQualiSession.summary.formula)} · {formatDate(bestQualiSession.summary.date)} · {msToLapTime(bestQualiSession.bestLapMs)}
-                </Link>
-              </p>
+              <SectionHeader
+                title="Your Best Qualifying Setup"
+                hint={
+                  <>
+                    From{" "}
+                    <Link to={sessionSummaryPath(bestQualiSession.summary)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
+                      {formatSessionType(bestQualiSession.summary.sessionType, bestQualiSession.summary.formula)} · {formatDate(bestQualiSession.summary.date)} · {msToLapTime(bestQualiSession.bestLapMs)}
+                    </Link>
+                  </>
+                }
+              />
               <CarSetupCard setup={bestQualiSetup} />
             </section>
           )}
@@ -1120,7 +1117,7 @@ export function TrackProgressPage() {
       {/* ── Time Trial Section ── */}
       {timeTrialData.length > 0 && selectedTab === "time-trial" && (
         <>
-          <SectionHeader>Time Trial Pace</SectionHeader>
+          <SectionHeader title="Time Trial Pace" />
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <InsightTile title="Best TT Lap" icon={Timer} accent="purple">
@@ -1147,9 +1144,7 @@ export function TrackProgressPage() {
 
           {timeTrialLapTrend.length > 1 && (
             <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                Best TT Lap Over Time
-              </h3>
+              <SectionHeader title="Best TT Lap Over Time" />
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={timeTrialLapTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -1214,9 +1209,7 @@ export function TrackProgressPage() {
 
           {timeTrialSectorTrend.length > 1 && (
             <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                TT Sector Improvement
-              </h3>
+              <SectionHeader title="TT Sector Improvement" />
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={timeTrialSectorTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -1266,12 +1259,10 @@ export function TrackProgressPage() {
 
             return (
               <section className={cardClass}>
-                <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                  All Time Trial Lap Times
-                  <span className="font-normal text-zinc-500 ml-2">
-                    Every hotlap across attempts
-                  </span>
-                </h3>
+                <SectionHeader
+                  title="All Time Trial Lap Times"
+                  hint="Every hotlap across attempts"
+                />
                 <ResponsiveContainer width="100%" height={260}>
                   <ScatterChart margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -1332,12 +1323,10 @@ export function TrackProgressPage() {
 
           {timeTrialConsistencyTrend.length > 1 && (
             <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-                TT Consistency Trend
-                <span className="font-normal text-zinc-500 ml-2">
-                  Lower = more repeatable hotlaps
-                </span>
-              </h3>
+              <SectionHeader
+                title="TT Consistency Trend"
+                hint="Lower = more repeatable hotlaps"
+              />
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={timeTrialConsistencyTrend} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -1359,13 +1348,17 @@ export function TrackProgressPage() {
 
           {bestTimeTrialSetup && bestTimeTrialSession && (
             <section className={cardClass}>
-              <h3 className="text-sm font-semibold text-zinc-300 mb-1">Your Best Time Trial Setup</h3>
-              <p className="text-xs text-zinc-500 mb-4">
-                From{" "}
-                <Link to={sessionSummaryPath(bestTimeTrialSession.summary)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
-                  {formatSessionType(bestTimeTrialSession.summary.sessionType, bestTimeTrialSession.summary.formula)} · {formatDate(bestTimeTrialSession.summary.date)} · {msToLapTime(bestTimeTrialSession.bestLapMs)}
-                </Link>
-              </p>
+              <SectionHeader
+                title="Your Best Time Trial Setup"
+                hint={
+                  <>
+                    From{" "}
+                    <Link to={sessionSummaryPath(bestTimeTrialSession.summary)} className="text-zinc-400 hover:text-zinc-200 transition-colors">
+                      {formatSessionType(bestTimeTrialSession.summary.sessionType, bestTimeTrialSession.summary.formula)} · {formatDate(bestTimeTrialSession.summary.date)} · {msToLapTime(bestTimeTrialSession.bestLapMs)}
+                    </Link>
+                  </>
+                }
+              />
               <CarSetupCard setup={bestTimeTrialSetup} />
             </section>
           )}
@@ -1373,93 +1366,109 @@ export function TrackProgressPage() {
       )}
 
       {/* ── Race Section ── */}
-      {raceData.length > 0 && selectedTab === "race" && (
-        <>
-          {/* Key Insights — synthesizes the rest of the tab into "what should
-              I actually do here?". Reacts to the same race-length selector that
-              drives the Compound Tyre Life cards below. */}
-          {(() => {
-            const recommendation = buildTrackRaceRecommendation(
-              selectedRaceSessions,
-              selectedCompoundLifeStats,
-              selectedTrackFuelStats,
-              { bestQualiLapMs: actualBestQualiMs },
-            );
-            if (!recommendation) return null;
-            return (
+      {raceData.length > 0 && selectedTab === "race" && (() => {
+        // Shared recommendation drives Key Insights AND the Strategy section
+        // below Compound Tyre Life. Both reuse the same wear/pace synthesis so
+        // there's a single source of truth per race-length bucket.
+        const recommendation = buildTrackRaceRecommendation(
+          selectedRaceSessions,
+          selectedCompoundLifeStats,
+          selectedTrackFuelStats,
+          { bestQualiLapMs: actualBestQualiMs },
+        );
+        const strategyTotalLaps =
+          recommendation?.recommended?.stintLaps.reduce((sum, n) => sum + n, 0) ?? 0;
+        return (
+          <>
+            {/* Key Insights — synthesizes the rest of the tab into "what should
+                I actually do here?". Reacts to the same race-length selector that
+                drives the Compound Tyre Life cards below. */}
+            {recommendation && (
               <TrackKeyInsights
                 recommendation={recommendation}
                 raceLengthLabel={selectedRaceLengthLabel}
                 rivalBenchmark={trackRivalBenchmark}
               />
-            );
-          })()}
+            )}
 
-          {/* Compound tyre life cards */}
-          {selectedCompoundLifeStats.length > 0 && (
-            <div>
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-sm font-semibold text-zinc-300">
-                  Compound Tyre Life
-                </h4>
-                {showRaceLengthSelector && selectedRaceAnalysisBucket && (
-                  <div className="flex max-w-full items-center gap-2">
-                    <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
-                      Race length
-                    </span>
-                    <SegmentedControl
-                      ariaLabel="Race length"
-                      options={raceLengthOptions}
-                      value={selectedRaceLengthValue}
-                      onChange={handleRaceLengthChange}
-                      size="sm"
-                      scrollable
+            {/* Compound tyre life cards */}
+            {selectedCompoundLifeStats.length > 0 && (
+              <div>
+                <SectionHeader
+                  title="Compound Tyre Life"
+                  action={
+                    showRaceLengthSelector && selectedRaceAnalysisBucket ? (
+                      <div className="flex max-w-full items-center gap-2">
+                        <span className="shrink-0 text-xs font-medium uppercase tracking-wider text-zinc-600">
+                          Race length
+                        </span>
+                        <SegmentedControl
+                          ariaLabel="Race length"
+                          options={raceLengthOptions}
+                          value={selectedRaceLengthValue}
+                          onChange={handleRaceLengthChange}
+                          size="sm"
+                          scrollable
+                        />
+                      </div>
+                    ) : undefined
+                  }
+                />
+                <div
+                  className="grid gap-2"
+                  style={{ gridTemplateColumns: `repeat(${Math.min(selectedCompoundLifeStats.length, 4)}, minmax(0, 1fr))` }}
+                >
+                  {selectedCompoundLifeStats.map((cs) => (
+                    <CompoundStatCard
+                      key={cs.compound}
+                      compound={cs.compound}
+                      hero={{ value: `~${cs.estMaxLife}`, label: "pit by lap" }}
+                      rows={[
+                        ...(cs.bestLapMs > 0 ? [{ label: "Best lap", value: msToLapTime(cs.bestLapMs), className: "font-mono text-best" }] : []),
+                        { label: "Avg wear", value: `${cs.avgWearRatePerLap.toFixed(1)}%/lap`, divider: cs.bestLapMs > 0 },
+                        { label: "Stints", value: `${cs.avgStintLength}–${cs.longestStint} laps` },
+                      ]}
                     />
-                  </div>
-                )}
+                  ))}
+                </div>
+                <p className="text-xs text-zinc-600 mt-1.5">
+                  Pit lap estimated at {PUNCTURE_THRESHOLD}% worst-wheel wear (puncture risk threshold), based on {selectedTyreLifeStintCount} stint{selectedTyreLifeStintCount !== 1 ? "s" : ""} across {selectedTyreLifeRaceCount} {selectedRaceLengthLabel ? `${selectedRaceLengthLabel} ` : ""}race{selectedTyreLifeRaceCount !== 1 ? "s" : ""}.
+                </p>
               </div>
-              <div
-                className="grid gap-2"
-                style={{ gridTemplateColumns: `repeat(${Math.min(selectedCompoundLifeStats.length, 4)}, minmax(0, 1fr))` }}
-              >
-                {selectedCompoundLifeStats.map((cs) => (
-                  <CompoundStatCard
-                    key={cs.compound}
-                    compound={cs.compound}
-                    hero={{ value: `~${cs.estMaxLife}`, label: "pit by lap" }}
-                    rows={[
-                      ...(cs.bestLapMs > 0 ? [{ label: "Best lap", value: msToLapTime(cs.bestLapMs), className: "font-mono text-best" }] : []),
-                      { label: "Avg wear", value: `${cs.avgWearRatePerLap.toFixed(1)}%/lap`, divider: cs.bestLapMs > 0 },
-                      { label: "Stints", value: `${cs.avgStintLength}–${cs.longestStint} laps` },
-                    ]}
-                  />
-                ))}
-              </div>
-              <p className="text-xs text-zinc-600 mt-1.5">
-                Pit lap estimated at {75}% worst-wheel wear (puncture risk threshold), based on {selectedTyreLifeStintCount} stint{selectedTyreLifeStintCount !== 1 ? "s" : ""} across {selectedTyreLifeRaceCount} {selectedRaceLengthLabel ? `${selectedRaceLengthLabel} ` : ""}race{selectedTyreLifeRaceCount !== 1 ? "s" : ""}.
-              </p>
-            </div>
-          )}
+            )}
 
-          {/* Pace evolution (race-on-race median clean lap per compound) */}
-          {paceEvolutionData.length > 1 && (
-            <PaceEvolutionChart data={paceEvolutionData} />
-          )}
+            {/* Strategy — wear-balanced one-stop with optional mirror alternative.
+                Only renders when we have enough data to back the recommended
+                shape; the synthesis itself enforces the puncture-risk cap. */}
+            {recommendation?.recommended && strategyTotalLaps > 0 && (
+              <TrackStrategySection
+                recommended={recommendation.recommended}
+                alternative={recommendation.alternative}
+                totalLaps={strategyTotalLaps}
+                raceLengthLabel={selectedRaceLengthLabel}
+              />
+            )}
 
-          {/* Race setup comparison */}
-          {selectedRaceSetupCandidates.length > 0 && (
-            <RaceSetupComparison
-              candidates={selectedRaceSetupCandidates}
-              raceLengthLabel={selectedRaceLengthLabel}
-            />
-          )}
-        </>
-      )}
+            {/* Pace evolution (race-on-race median clean lap per compound) */}
+            {paceEvolutionData.length > 1 && (
+              <PaceEvolutionChart data={paceEvolutionData} />
+            )}
+
+            {/* Race setup comparison */}
+            {selectedRaceSetupCandidates.length > 0 && (
+              <RaceSetupComparison
+                candidates={selectedRaceSetupCandidates}
+                raceLengthLabel={selectedRaceLengthLabel}
+              />
+            )}
+          </>
+        );
+      })()}
 
       {/* ── Session History ── */}
       <div>
         <div className="mb-3">
-          <SectionHeader>Session History</SectionHeader>
+          <SectionHeader title="Session History" />
         </div>
         <div className="space-y-1.5">
           {sessionHistory.map((d) => {
