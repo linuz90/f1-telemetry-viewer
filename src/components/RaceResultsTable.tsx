@@ -6,8 +6,9 @@ import { getCleanRaceLaps, getBestLapTime, driverTopSpeed, avgErsDeployMj, avgEr
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
 import { AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
 import { Tooltip } from "./Tooltip";
+import { Badge } from "./ui/Badge";
 import { FocusToggle } from "./ui/FocusToggle";
-import { tableRowClass } from "./ui/table";
+import { tableHeadClass, tableRowClass } from "./ui/table";
 import { formatPenaltySummary } from "../utils/raceControl";
 
 interface RaceResultsTableProps {
@@ -171,7 +172,7 @@ export function RaceResultsTable({
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead className="text-zinc-500">
+            <thead className={tableHeadClass}>
               <tr>
                 <th className={`text-left ${thClass}`} onClick={() => toggleSort("pos")}>
                   Pos<SortIcon column="pos" sortKey={sortKey} sortDir={sortDir} />
@@ -308,7 +309,7 @@ export function RaceResultsTable({
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
-          <thead className="text-zinc-500">
+          <thead className={tableHeadClass}>
             <tr>
               <th className="text-left py-1.5 px-2">Pos</th>
               <th className="text-left py-1.5 px-2">Driver</th>
@@ -359,10 +360,10 @@ function PenaltyBadge({ penalties }: { penalties: RaceControlEvent[] }) {
 
   return (
     <Tooltip text={penalties.map(formatPenaltySummary).join(" | ")}>
-      <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-bold text-amber-300">
+      <Badge size="xs" shape="square" tone="amber" className="gap-0.5">
         <AlertTriangle className="size-2.5" />
         {penalties.length}
-      </span>
+      </Badge>
     </Tooltip>
   );
 }

@@ -2,7 +2,7 @@ import type { LapHistoryEntry, TyreStint } from "../types/telemetry";
 import { filterOutlierLaps, getBestLapTime, medianLapTimeMs } from "../utils/stats";
 import { msToLapTime } from "../utils/format";
 import { getCompoundColor } from "../utils/colors";
-import { tableRowClass } from "./ui/table";
+import { tableHeadClass, tableRowClass } from "./ui/table";
 
 interface CompoundLapComparisonProps {
   playerStints: TyreStint[];
@@ -82,7 +82,7 @@ export function CompoundLapComparison({
       </h3>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
-          <thead className="text-zinc-500">
+          <thead className={tableHeadClass}>
             <tr>
               <th className="text-left py-1.5 px-2">Compound</th>
               <th className="text-right py-1.5 px-2">Your Median</th>

@@ -22,7 +22,7 @@ interface Props<T extends string> {
 }
 
 const SIZE = {
-  sm: { container: "gap-0.5 p-0.5", button: "px-2 py-1 text-[11px]" },
+  sm: { container: "gap-0.5 p-0.5", button: "px-2 py-1 text-xs" },
   md: { container: "gap-1 p-1", button: "px-3 py-1.5 text-xs" },
 } as const;
 
@@ -63,7 +63,7 @@ export function SegmentedControl<T extends string>({
               <span className="truncate">{opt.label}</span>
               {opt.meta != null && (
                 <span
-                  className={`font-mono text-[10px] font-medium leading-none ${
+                  className={`font-mono text-2xs font-medium leading-none ${
                     active ? "text-zinc-400/75" : "text-zinc-600"
                   }`}
                 >

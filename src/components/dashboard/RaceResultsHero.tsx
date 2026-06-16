@@ -38,7 +38,7 @@ function PodiumChip({
     >
       <Icon className="size-5 shrink-0 opacity-80" />
       <VStack align="start" className="gap-0.5">
-        <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">
+        <span className="text-2xs font-bold uppercase tracking-wider opacity-80">
           P{position}
         </span>
         <span className="text-2xl font-semibold leading-none tabular-nums">
@@ -64,7 +64,7 @@ function MicroStat({
 }) {
   return (
     <div className="min-w-0">
-      <HStack className="gap-1.5 text-[11px] font-mono font-semibold uppercase tracking-wider text-zinc-500">
+      <HStack className="gap-1.5 text-xs font-mono font-semibold uppercase tracking-wider text-zinc-500">
         {Icon && <Icon className="size-3" />}
         {label}
       </HStack>
@@ -150,7 +150,7 @@ export function RaceResultsHero({
             <PodiumChip position={3} count={stats.p3} />
           </HStack>
           {podiums > 0 && (
-            <p className="text-right font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+            <p className="text-right font-mono text-xs uppercase tracking-wider text-zinc-500">
               {podiums} {podiums === 1 ? "podium" : "podiums"} · {podiumRate}%
               rate
             </p>

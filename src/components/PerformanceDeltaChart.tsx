@@ -53,7 +53,7 @@ export function PerformanceDeltaChart({
         Performance Delta{" "}
         <span className="font-normal text-zinc-500">vs {rivalName}</span>
       </h3>
-      <p className="text-[10px] text-zinc-600 mb-2">
+      <p className="text-2xs text-zinc-600 mb-2">
         Above zero = behind {rivalName} / Below zero = ahead
       </p>
       <ResponsiveContainer width="100%" height={240}>

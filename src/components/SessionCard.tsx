@@ -67,7 +67,7 @@ export function SessionCard({
             // doesn't.
             <HStack
               as="span"
-              className="gap-0.5 text-[10px] font-medium text-amber-500/70"
+              className="gap-0.5 text-2xs font-medium text-amber-500/70"
               title="Pits n' Giggles periodic auto-save"
             >
               <Save className="size-3" />
@@ -76,7 +76,7 @@ export function SessionCard({
           )}
           <HStack
             as="span"
-            className={`gap-0.5 text-[10px] font-medium uppercase leading-none ${typeConfig.color}`}
+            className={`gap-0.5 text-2xs font-medium uppercase leading-none ${typeConfig.color}`}
           >
             <TypeIcon className="size-3" />
             {sessionType}
@@ -87,14 +87,14 @@ export function SessionCard({
         <HStack className="gap-1">
           <span className="text-xs text-zinc-500">{time}</span>
           {!hideMode && aiDifficulty != null && aiDifficulty > 0 && (
-            <span className="text-[10px] font-medium text-zinc-600">
+            <span className="text-2xs font-medium text-zinc-600">
               AI {aiDifficulty}
             </span>
           )}
           {!hideMode && isOnline === true && (
             <HStack
               as="span"
-              className="gap-0.5 text-[10px] font-medium text-sky-500/70"
+              className="gap-0.5 text-2xs font-medium text-sky-500/70"
             >
               <Globe className="size-3" />
               Online
@@ -105,7 +105,7 @@ export function SessionCard({
           {isSpectator && (
             <HStack
               as="span"
-              className="gap-0.5 text-[10px] font-medium text-zinc-500"
+              className="gap-0.5 text-2xs font-medium text-zinc-500"
             >
               <Eye className="size-3" />
               Spectator

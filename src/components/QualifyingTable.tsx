@@ -4,7 +4,7 @@ import { bestSectorTimeMs, msToLapTime, msToSectorTime, sectorTimeMs } from "../
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { getValidLaps } from "../utils/stats";
 import { FocusToggle } from "./ui/FocusToggle";
-import { tableRowClass } from "./ui/table";
+import { tableHeadClass, tableRowClass } from "./ui/table";
 
 interface QualifyingTableProps {
   session: TelemetrySession;
@@ -78,7 +78,7 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="text-zinc-500">
+          <thead className={tableHeadClass}>
             <tr>
               <th className="text-left py-1.5 px-2">Pos</th>
               <th className="text-left py-1.5 px-2">Driver</th>

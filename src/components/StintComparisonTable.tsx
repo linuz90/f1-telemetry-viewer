@@ -8,7 +8,7 @@ import {
 } from "../utils/stats";
 import { msToLapTime } from "../utils/format";
 import { getCompoundColor } from "../utils/colors";
-import { tableRowClass } from "./ui/table";
+import { tableHeadClass, tableRowClass } from "./ui/table";
 
 interface StintComparisonTableProps {
   player: DriverData;
@@ -37,7 +37,7 @@ export function StintComparisonTable({
       </h3>
       <div className="overflow-x-auto">
         <table className="w-full text-xs min-w-[520px]">
-          <thead className="text-zinc-500">
+          <thead className={tableHeadClass}>
             <tr>
               <th className="text-left py-1.5 px-2">Stint</th>
               <th className="text-left py-1.5 px-2">Compound</th>
@@ -135,7 +135,7 @@ export function StintComparisonTable({
                       <Delta value={dropDelta} unit="s" factor={1000} />
                     )}
                   </td>
-                  <td className="text-left py-1.5 px-2 text-zinc-500 text-[10px]">
+                  <td className="text-left py-1.5 px-2 text-zinc-500 text-2xs">
                     {best
                       ? `${best.driver["driver-name"]} L${best.lapStart}-${best.lapEnd}`
                       : "–"}
@@ -164,7 +164,7 @@ function Delta({
   const positive = display > 0;
   return (
     <span
-      className={`ml-1.5 text-[10px] ${positive ? "text-behind" : "text-ahead"}`}
+      className={`ml-1.5 text-2xs ${positive ? "text-behind" : "text-ahead"}`}
     >
       {positive ? "+" : ""}
       {display.toFixed(unit === "%" ? 1 : 3)}

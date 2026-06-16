@@ -38,7 +38,7 @@ function RecordMetric({
 }) {
   return (
     <div className="min-w-0">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      <div className="text-2xs font-medium uppercase tracking-wider text-zinc-500">
         {label}
       </div>
       <div
@@ -50,7 +50,7 @@ function RecordMetric({
         {value ?? "—"}
       </div>
       {detail && (
-        <div className="mt-0.5 truncate text-[10px] text-zinc-500">
+        <div className="mt-0.5 truncate text-2xs text-zinc-500">
           {detail}
         </div>
       )}

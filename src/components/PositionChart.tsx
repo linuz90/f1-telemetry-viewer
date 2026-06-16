@@ -187,7 +187,7 @@ export function PositionChart({ positionHistory, playerName, rivalName, overtake
         </LineChart>
       </ResponsiveContainer>
       {overtakes && overtakes.some((ot) => ot["overtaking-driver-name"] === playerName || ot["overtaken-driver-name"] === playerName) && (
-        <div className="flex items-center gap-4 mt-1.5 text-[10px] text-zinc-400">
+        <div className="flex items-center gap-4 mt-1.5 text-2xs text-zinc-400">
           {overtakes.some((ot) => ot["overtaking-driver-name"] === playerName) && (
             <span className="flex items-center gap-1">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" />

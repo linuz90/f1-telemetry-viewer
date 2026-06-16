@@ -44,7 +44,7 @@ export function CompoundStatCard({ compound, subtitle, rows, hero, progress, cla
           {compound}
         </span>
         {subtitle && (
-          <span className="text-[10px] text-zinc-500 ml-auto">{subtitle}</span>
+          <span className="text-2xs text-zinc-500 ml-auto">{subtitle}</span>
         )}
       </HStack>
       {hero && (
@@ -52,7 +52,7 @@ export function CompoundStatCard({ compound, subtitle, rows, hero, progress, cla
           <div className="font-mono text-2xl font-semibold text-zinc-100">
             {hero.value}
           </div>
-          <div className="text-[11px] text-zinc-500 mt-0.5">{hero.label}</div>
+          <div className="text-xs text-zinc-500 mt-0.5">{hero.label}</div>
         </div>
       )}
       <div className="text-xs text-zinc-400 space-y-1.5">

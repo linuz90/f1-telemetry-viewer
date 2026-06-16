@@ -173,21 +173,21 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
                   When ERS exists for the session but not this specific lap (Pits n' Giggles can omit
                   per-lap-info for some laps), show a dimmed placeholder so the gap is explicit. */}
               {(hasDeploy || hasHarv) && (
-                <div className="flex items-center gap-3 mb-1 text-[11px] font-mono">
+                <div className="flex items-center gap-3 mb-1 text-xs font-mono">
                   {hasDeploy && (
                     <span className={`flex items-center gap-1 ${d.deployMj != null && d.deployMj > 0 ? "text-ahead" : "text-zinc-600"}`}>
-                      <span className="text-zinc-500 text-[10px] uppercase tracking-wide">Dep</span>
+                      <span className="text-zinc-500 text-2xs uppercase tracking-wide">Dep</span>
                       <span>{d.deployMj != null && d.deployMj > 0 ? `${d.deployMj.toFixed(1)} MJ` : "–"}</span>
                     </span>
                   )}
                   {hasHarv && (
                     <span className={`flex items-center gap-1 ${d.harvMj != null && d.harvMj > 0 ? "text-sky-400" : "text-zinc-600"}`}>
-                      <span className="text-zinc-500 text-[10px] uppercase tracking-wide">Harv</span>
+                      <span className="text-zinc-500 text-2xs uppercase tracking-wide">Harv</span>
                       <span>{d.harvMj != null && d.harvMj > 0 ? `${d.harvMj.toFixed(1)} MJ` : "–"}</span>
                     </span>
                   )}
                   {d.deployMj == null && d.harvMj == null && (
-                    <span className="text-zinc-600 text-[10px] italic">no per-lap telemetry captured</span>
+                    <span className="text-zinc-600 text-2xs italic">no per-lap telemetry captured</span>
                   )}
                 </div>
               )}

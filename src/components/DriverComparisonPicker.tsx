@@ -96,7 +96,7 @@ export function DriverComparisonPicker({
             style={{ backgroundColor: getTeamColor(singleRival.team) }}
           />
           Rival
-          <span className="text-zinc-600 text-[10px]">
+          <span className="text-zinc-600 text-2xs">
             {singleRival["driver-name"]}
           </span>
         </button>
@@ -141,7 +141,7 @@ export function DriverComparisonPicker({
               style={{ backgroundColor: getTeamColor(d.team) }}
             />
             {preset.label}
-            <span className="text-zinc-600 text-[10px]">
+            <span className="text-zinc-600 text-2xs">
               {d["driver-name"]}
             </span>
           </button>

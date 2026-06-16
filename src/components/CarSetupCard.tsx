@@ -94,7 +94,7 @@ function Section({
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium mb-2">
+      <div className="text-2xs uppercase tracking-wider text-zinc-400 font-medium mb-2">
         {title}
       </div>
       <div className="space-y-1.5">{children}</div>
@@ -114,7 +114,7 @@ function TyrePressureCell({
   const pct = getRangePercent(setupKey, value);
   return (
     <VStack align="center" className="gap-1 rounded-lg bg-zinc-800/40 px-3 py-2.5">
-      <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+      <span className="text-2xs text-zinc-500 uppercase tracking-wider">
         {label}
       </span>
       <span className="font-mono text-sm font-medium text-zinc-200">

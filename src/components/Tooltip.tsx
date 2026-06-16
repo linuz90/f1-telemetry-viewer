@@ -46,7 +46,7 @@ export function Tooltip({ text, children, className = "" }: TooltipProps) {
             fixed z-50 pointer-events-none
             px-2.5 py-1.5 rounded-md
             bg-zinc-800 border border-zinc-700 shadow-lg
-            text-[11px] leading-snug font-normal text-zinc-300 whitespace-normal text-left
+            text-xs leading-snug font-normal text-zinc-300 whitespace-normal text-left
             w-max max-w-60
             animate-in fade-in duration-100
           "

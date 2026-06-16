@@ -117,13 +117,13 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
 
           {!isDefault && (
             <HStack justify="between" className="px-3 py-2">
-              <span className="text-[11px] text-zinc-500">
+              <span className="text-xs text-zinc-500">
                 {activeCount} {activeCount === 1 ? "filter" : "filters"} active
               </span>
               <button
                 type="button"
                 onClick={() => onChange(DEFAULT_FILTERS)}
-                className="rounded text-[11px] font-medium text-sky-400 transition-colors hover:text-sky-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600"
+                className="rounded text-xs font-medium text-sky-400 transition-colors hover:text-sky-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600"
               >
                 Reset
               </button>
@@ -146,7 +146,7 @@ function Section({
 }) {
   return (
     <div className="px-3 py-2.5">
-      <HStack className="mb-1.5 gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <HStack className="mb-1.5 gap-1.5 text-2xs font-semibold uppercase tracking-wider text-zinc-500">
         <Icon className="h-3 w-3" />
         {label}
       </HStack>

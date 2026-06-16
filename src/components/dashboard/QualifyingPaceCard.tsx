@@ -33,7 +33,7 @@ export function QualifyingPaceCard({ data }: { data: QualifyingPaceData }) {
         <HStack className="gap-1.5">
           <TrackFlag track={track} />
           <span className="truncate text-sm font-medium">{track}</span>
-          <span className="ml-1 text-[11px] text-zinc-500">
+          <span className="ml-1 text-xs text-zinc-500">
             {points.length} days
           </span>
         </HStack>

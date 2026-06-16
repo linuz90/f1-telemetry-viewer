@@ -99,7 +99,7 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
                             href={pullRequestUrl(entry.pr)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] leading-none font-medium bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 transition-colors align-middle"
+                            className="inline-flex items-center rounded px-1.5 py-0.5 text-2xs leading-none font-medium bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 transition-colors align-middle"
                           >
                             #{entry.pr}
                           </a>
