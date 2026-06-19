@@ -196,10 +196,13 @@ function FuelTargetTile({
   }
 
   return (
-    <InsightTile title="Rec. Initial Fuel" icon={Fuel} accent="amber">
+    <InsightTile title="Fuel Plan" icon={Fuel} accent="amber">
       <div className="font-mono text-lg text-zinc-100">
         {delta >= 0 ? "+" : ""}
         {delta.toFixed(1)} laps
+      </div>
+      <div className="mt-0.5 text-xs text-zinc-500">
+        recommended initial fuel
       </div>
       <div className="mt-0.5 text-xs text-zinc-500">
         ≈ {target.recommendedFuelKg.toFixed(1)} kg total ·{" "}
