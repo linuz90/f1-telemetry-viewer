@@ -204,7 +204,7 @@ function FuelTargetTile({
       <div className="mt-0.5 text-xs text-zinc-500">
         recommended initial fuel
       </div>
-      <div className="mt-0.5 text-xs text-zinc-500">
+      <div className="mt-2 text-xs text-zinc-500">
         ≈ {target.recommendedFuelKg.toFixed(1)} kg total ·{" "}
         {target.burnRateKgPerLap.toFixed(2)} kg/lap burn
       </div>
