@@ -11,7 +11,6 @@ import type {
 } from "../utils/setupComparison";
 import { cardClass } from "./Card";
 import { CarSetupCard } from "./CarSetupCard";
-import { Badge } from "./ui/Badge";
 import { SectionHeader } from "./ui/SectionHeader";
 
 interface RaceSetupComparisonProps {
@@ -394,15 +393,6 @@ export function RaceSetupComparison({
                       <span className="shrink-0 text-xs font-semibold text-zinc-200">
                         {candidate.name}
                       </span>
-                      {selected && (
-                        <Badge
-                          size="xs"
-                          tone="zinc"
-                          className="uppercase tracking-wide"
-                        >
-                          Selected
-                        </Badge>
-                      )}
                     </div>
                     {displayStrengths.length > 0 && (
                       <div className="mt-1 flex min-w-0 flex-wrap gap-1">

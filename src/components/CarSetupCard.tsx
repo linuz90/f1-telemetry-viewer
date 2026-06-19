@@ -42,12 +42,9 @@ function formatValue(key: string, value: number): string {
   if (key.includes("camber") || key.includes("toe"))
     return `${value.toFixed(1)}°`;
   if (
-    [
-      "on-throttle",
-      "off-throttle",
-      "brake-pressure",
-      "brake-bias",
-    ].includes(key)
+    ["on-throttle", "off-throttle", "brake-pressure", "brake-bias"].includes(
+      key,
+    )
   )
     return `${value}%`;
   return String(value);
@@ -113,7 +110,10 @@ function TyrePressureCell({
 }) {
   const pct = getRangePercent(setupKey, value);
   return (
-    <VStack align="center" className="gap-1 rounded-lg bg-zinc-800/40 px-3 py-2.5">
+    <VStack
+      align="center"
+      className="gap-1 rounded-lg bg-zinc-800/40 px-3 py-2.5"
+    >
       <span className="text-2xs text-zinc-500 uppercase tracking-wider">
         {label}
       </span>
@@ -269,7 +269,6 @@ export function CarSetupCard({ setup }: CarSetupCardProps) {
               />
             </div>
           </Section>
-
         </div>
       </div>
     </div>
