@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .env
+.conductor/settings.local.toml
 
 # Editor directories and files
 .vscode/*

@@ -13,7 +13,7 @@ import { useTrackHistory } from "../hooks/useTrackHistory";
 import { useSessionList } from "../hooks/useSessionList";
 import { SessionHeader } from "../components/SessionHeader";
 import { DriverComparisonPicker } from "../components/DriverComparisonPicker";
-import { StrategyInsightsCard } from "../components/StrategyInsightsCard";
+import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
 import { StintTimeline, StintDetailCards } from "../components/StintTimeline";
 import { TyreWearChart } from "../components/TyreWearChart";
 import { StintComparisonTable } from "../components/StintComparisonTable";
@@ -30,6 +30,11 @@ import { DuplicateNotice } from "../components/DuplicateNotice";
 import { getRaceControlEvents, raceControlEventsToOvertakes } from "../utils/raceControl";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { Badge } from "../components/ui/Badge";
+import {
+  buildSessionInsightsHint,
+  buildSessionSummaryInsights,
+  curateSessionInsights,
+} from "../utils/sessionInsights";
 
 function timedRaceDrivers(drivers: DriverData[]): DriverData[] {
   return [...drivers]
@@ -164,6 +169,12 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     () => raceControlEventsToOvertakes(raceControlEvents),
     [raceControlEvents],
   );
+  const filteredOvertakes = useMemo(
+    () =>
+      (raceControlOvertakes.length > 0 ? raceControlOvertakes : session.overtakes?.records)
+        ?.filter((ot) => !pitAffectedLaps.has(ot["overtaking-driver-lap"])) ?? [],
+    [pitAffectedLaps, raceControlOvertakes, session.overtakes?.records],
+  );
 
   // Derive rival data
   const rival = useMemo(
@@ -201,6 +212,21 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     }
     return base;
   }, [session, focusedDriver, rival, pbs]);
+  const summaryInsights = useMemo(
+    () =>
+      buildSessionSummaryInsights({
+        session,
+        focusedDriver,
+        overtakes: filteredOvertakes,
+        raceControlEvents,
+      }),
+    [filteredOvertakes, focusedDriver, raceControlEvents, session],
+  );
+  const sessionInsights = useMemo(
+    () => curateSessionInsights(session, [...summaryInsights, ...insights]),
+    [insights, session, summaryInsights],
+  );
+  const insightsHint = useMemo(() => buildSessionInsightsHint(session), [session]);
 
   // Show car setup only for the actual player with valid setup data
   const showSetup =
@@ -258,8 +284,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
         />
       )}
 
-      {/* Strategy insights */}
-      <StrategyInsightsCard insights={insights} />
+      <SessionInsightsGrid insights={sessionInsights} hint={insightsHint} />
 
       {/* Stint strategy + tyre wear */}
       {stints.length > 0 && (
@@ -336,8 +361,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
           positionHistory={session["position-history"] ?? []}
           playerName={focusedDriver?.["driver-name"] ?? ""}
           rivalName={rival?.["driver-name"]}
-          overtakes={(raceControlOvertakes.length > 0 ? raceControlOvertakes : session.overtakes?.records)
-            ?.filter((ot) => !pitAffectedLaps.has(ot["overtaking-driver-lap"]))}
+          overtakes={filteredOvertakes}
         />
       </Card>
 
@@ -360,7 +384,10 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
         />
       </Card>
 
-      <DuplicateNotice count={sessionMeta?.duplicateCount ?? 0} />
+      <DuplicateNotice
+        count={sessionMeta?.duplicateCount ?? 0}
+        isAutoSave={sessionMeta?.isAutoSave}
+      />
     </div>
   );
 }

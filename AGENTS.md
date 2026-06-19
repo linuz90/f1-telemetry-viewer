@@ -33,6 +33,14 @@ pnpm dev:telemetry "/Users/linuz90/PC Stuff/Pits & Giggles/debug data"
 
 For broader local QA, first check whether `DEBUG_TELEMETRY_DIR` is set in the uncommitted `.env`. When present, `pnpm dev:debug` is a good default for smoke testing against generated/repro data instead of the user's full personal telemetry folder. Do not blindly use it when the conversation points at specific sessions, screenshots, or localhost URLs, because those may come from the normal `TELEMETRY_DIR` server or a one-off `pnpm dev:telemetry <folder>` run. Let the user's current context decide which telemetry source to launch; use `pnpm find-session <slug-or-url>` against the active source when a link is involved. In Fabrizio's setup `DEBUG_TELEMETRY_DIR` may point at telemetry generated from the Pits n' Giggles integration runner (`poetry run python tests/integration_test/runner.py` in that repo). Treat it as optional local data: never commit real telemetry files or machine-specific paths.
 
+## Managed Worktree Setup
+
+Managed worktree tools use `.worktreeinclude` to copy ignored local env files (`.env`, `.env.local`, `.env.*.local`) from the source checkout. Keep real telemetry paths and debug corpus paths in those ignored files; never commit machine-specific paths or telemetry data.
+
+`./workspace-setup.sh init` is the shared setup entry point for Codex and Conductor worktrees. It resolves the target checkout, runs `pnpm install --frozen-lockfile`, and leaves local env values untouched. If no `.env` was copied, use `pnpm dev:prod` for demo/upload mode or create `.env` from `.env.example` before running the local telemetry API.
+
+Conductor shared repo settings live in `.conductor/settings.toml`; personal overrides belong in `.conductor/settings.local.toml`, which stays gitignored. Plain `git worktree add` checkouts can run `./workspace-setup.sh init` manually after creation.
+
 ## Architecture
 
 **Stack:** React 19 + TypeScript + Vite 7 + Tailwind CSS 4 + Recharts 3 + React Router 7

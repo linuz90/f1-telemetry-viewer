@@ -1,0 +1,4 @@
+# Copy local telemetry/debug paths into managed worktrees.
+.env
+.env.local
+.env.*.local

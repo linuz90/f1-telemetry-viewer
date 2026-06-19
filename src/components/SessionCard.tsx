@@ -1,4 +1,4 @@
-import { Eye, Globe, Save } from "lucide-react";
+import { Eye, Globe } from "lucide-react";
 import { cn } from "../utils/cn";
 import { TrackFlag } from "./TrackFlag";
 import { getSessionTypeMeta } from "./sessionTypeMeta";
@@ -14,8 +14,6 @@ interface SessionCardProps {
   aiDifficulty?: number;
   isOnline?: boolean;
   isSpectator?: boolean;
-  /** P&G periodic safety-net snapshot — surfaced when not deduped away. */
-  isAutoSave?: boolean;
   /** When true, the date header already shows the AI/Online context — omit it from the row. */
   hideMode?: boolean;
 }
@@ -36,7 +34,6 @@ export function SessionCard({
   aiDifficulty,
   isOnline,
   isSpectator,
-  isAutoSave,
   hideMode,
 }: SessionCardProps) {
   const typeMeta = getSessionTypeMeta(sessionType);
@@ -50,20 +47,6 @@ export function SessionCard({
           <span className="truncate">{track}</span>
         </HStack>
         <HStack className="shrink-0 gap-1.5">
-          {isAutoSave && (
-            // Surviving auto-saves are ones the dedup pipeline couldn't
-            // collapse against a regular save — surfacing the badge makes
-            // it obvious why this row exists even when a sibling save
-            // doesn't.
-            <HStack
-              as="span"
-              className="gap-0.5 text-2xs font-medium text-amber-500/70"
-              title="Pits n' Giggles periodic auto-save"
-            >
-              <Save className="size-3" />
-              Auto-save
-            </HStack>
-          )}
           <HStack
             as="span"
             className={cn("gap-0.5 text-2xs font-medium uppercase leading-none", typeMeta.color)}

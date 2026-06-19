@@ -1,9 +1,23 @@
 import type { SessionSummary } from "../types/telemetry";
 import { getSessionFormulaScopeKey } from "./dashboardStats";
 import { toTrackSlug } from "./format";
+import {
+  isQualifyingSessionType,
+  isRaceSessionType,
+  isTimeTrialSessionType,
+} from "./sessionTypes";
 
 export const TRACKS_ROUTE_SEGMENT = "tracks";
 export const SESSIONS_ROUTE_SEGMENT = "sessions";
+export const TRACK_TAB_QUERY_PARAM = "tab";
+
+export type TrackSessionTab = "qualifying" | "race" | "time-trial";
+
+const TRACK_SESSION_TABS = new Set<TrackSessionTab>([
+  "qualifying",
+  "race",
+  "time-trial",
+]);
 
 /**
  * Canonical app routes are scoped by game/formula as the first path segment:
@@ -18,8 +32,24 @@ export function dashboardPath(formulaKey?: string | null): string {
   return formulaKey ? `/${encodeURIComponent(formulaKey)}` : "/";
 }
 
-export function trackPath(formulaKey: string, track: string): string {
-  return `/${encodeURIComponent(formulaKey)}/${TRACKS_ROUTE_SEGMENT}/${toTrackSlug(track)}`;
+export function isTrackSessionTab(value: string | null | undefined): value is TrackSessionTab {
+  return TRACK_SESSION_TABS.has(value as TrackSessionTab);
+}
+
+export function trackTabForSessionType(sessionType: string | undefined): TrackSessionTab {
+  if (isRaceSessionType(sessionType)) return "race";
+  if (isTimeTrialSessionType(sessionType)) return "time-trial";
+  if (isQualifyingSessionType(sessionType)) return "qualifying";
+  return "qualifying";
+}
+
+export function trackPath(
+  formulaKey: string,
+  track: string,
+  tab?: TrackSessionTab,
+): string {
+  const path = `/${encodeURIComponent(formulaKey)}/${TRACKS_ROUTE_SEGMENT}/${toTrackSlug(track)}`;
+  return tab ? `${path}?${TRACK_TAB_QUERY_PARAM}=${encodeURIComponent(tab)}` : path;
 }
 
 export function sessionPath(formulaKey: string, slug: string): string {

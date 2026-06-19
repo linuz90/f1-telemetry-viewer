@@ -60,8 +60,8 @@ export interface SessionSummary {
   /**
    * True when the save was produced by Pits n' Giggles' periodic
    * "just-in-case" auto-save (detected from the filename). Used for the
-   * dominance-based dedup rule and to render an "Auto-save" badge in the
-   * session list. See `src/utils/deduplicateSessions.ts`.
+   * dominance-based dedup rule and detail-page save provenance. See
+   * `src/utils/deduplicateSessions.ts`.
    */
   isAutoSave?: boolean;
   /**

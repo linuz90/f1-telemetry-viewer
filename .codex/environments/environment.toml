@@ -2,7 +2,7 @@ version = 1
 name = "f1-telemetry-viewer"
 
 [setup]
-script = "for f in .env; do [ -f \"$CODEX_SOURCE_TREE_PATH/$f\" ] && ln -sf \"$CODEX_SOURCE_TREE_PATH/$f\" \"$f\"; done; pnpm install"
+script = "./workspace-setup.sh init"
 
 [[actions]]
 name = "Run Telemetry"
@@ -11,7 +11,7 @@ command = "pnpm dev"
 
 [[actions]]
 name = "Run Debug Telemetry"
-icon = "run"
+icon = "debug"
 command = "pnpm dev:debug"
 
 [[actions]]
@@ -23,13 +23,3 @@ command = "pnpm dev:prod"
 name = "Build"
 icon = "test"
 command = "pnpm build"
-
-[[actions]]
-name = "Preview"
-icon = "run"
-command = "pnpm preview"
-
-[[actions]]
-name = "Generate Demo"
-icon = "tool"
-command = "pnpm generate-demo"

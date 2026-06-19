@@ -56,7 +56,14 @@ import {
 } from "../utils/format";
 import { cn } from "../utils/cn";
 import { buildTrackRivalBenchmark } from "../utils/rivalStats";
-import { dashboardPath, sessionSummaryPath, trackPath } from "../utils/routes";
+import {
+  dashboardPath,
+  isTrackSessionTab,
+  sessionSummaryPath,
+  TRACK_TAB_QUERY_PARAM,
+  trackPath,
+  type TrackSessionTab,
+} from "../utils/routes";
 import type {
   RaceSetupCandidate,
   RaceSetupRunInput,
@@ -83,7 +90,7 @@ interface LapPoint {
   lapNum: number;
 }
 
-type TrackSessionKind = "qualifying" | "race" | "time-trial";
+type TrackSessionKind = TrackSessionTab;
 
 const TRACK_TAB_LABELS: Record<TrackSessionKind, string> = {
   qualifying: "Qualifying",
@@ -314,8 +321,17 @@ export function TrackProgressPage() {
   } = useTelemetry();
   const [data, setData] = useState<TrackSessionData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TrackSessionKind>("race");
+  const requestedTab = searchParams.get(TRACK_TAB_QUERY_PARAM);
+  const [activeTab, setActiveTab] = useState<TrackSessionKind>(() =>
+    isTrackSessionTab(requestedTab) ? requestedTab : "race",
+  );
   const requestedRaceLaps = searchParams.get("raceLaps");
+
+  useEffect(() => {
+    if (isTrackSessionTab(requestedTab)) {
+      setActiveTab(requestedTab);
+    }
+  }, [requestedTab]);
 
   // Route slugs are stable hyphenated ids (`abu-dhabi`), while telemetry keeps
   // display names (`Abu Dhabi`). Match through the shared slug helper so future
@@ -938,6 +954,12 @@ export function TrackProgressPage() {
     nextParams.set("raceLaps", raceLaps);
     setSearchParams(nextParams);
   };
+  const handleTabChange = (tab: TrackSessionKind) => {
+    setActiveTab(tab);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set(TRACK_TAB_QUERY_PARAM, tab);
+    setSearchParams(nextParams);
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -980,7 +1002,7 @@ export function TrackProgressPage() {
               ariaLabel="Session type"
               options={tabOptions}
               value={selectedTab}
-              onChange={setActiveTab}
+              onChange={handleTabChange}
             />
           )}
           {tabOptions.length === 1 && (

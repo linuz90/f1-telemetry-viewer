@@ -288,7 +288,6 @@ export function SessionList() {
                       aiDifficulty={s.aiDifficulty}
                       isOnline={s.isOnline}
                       isSpectator={s.isSpectator}
-                      isAutoSave={s.isAutoSave}
                       hideMode={
                         modeLabel != null && sessionModeLabel(s) === modeLabel
                       }

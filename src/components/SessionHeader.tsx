@@ -1,14 +1,12 @@
 import { useMemo } from "react";
-import dayjs from "dayjs";
-import { AlertTriangle, ArrowDown, ArrowUp, Calendar, ChevronDown, Cloud, Cpu, ExternalLink, Flag, Gauge, Globe, Target, Timer, Trophy } from "lucide-react";
+import { ChevronDown, ExternalLink, Flag, Gauge, Target, Timer } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { TelemetrySession } from "../types/telemetry";
-import { getBestLapTime, isRaceSession } from "../utils/stats";
-import { formatSessionType, msToLapTime } from "../utils/format";
+import { getBestLapTime } from "../utils/stats";
+import { formatSessionType } from "../utils/format";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { getFormulaComparisonKey, getFormulaLabel, shouldShowFormulaLabel } from "../utils/sessionTypes";
-import { cn } from "../utils/cn";
-import { trackPath } from "../utils/routes";
+import { trackPath, trackTabForSessionType } from "../utils/routes";
 import { TrackFlag } from "./TrackFlag";
 import { TrackLayout } from "./TrackLayout";
 import { HStack } from "./ui/Stack";
@@ -47,27 +45,12 @@ export function SessionHeader({
   const info = session["session-info"];
   const drivers = session["classification-data"] ?? [];
   const focusedDriver = drivers.find((d) => d.index === focusedDriverIndex);
-  const debug = session.debug;
-  const isQuali = !isRaceSession(session);
-  const isOnline = info["network-game"] === 1;
 
   const sessionType = formatSessionType(info["session-type"], info.formula);
   const TypeIcon = SESSION_ICONS[info["session-type"]] ?? SESSION_ICONS[sessionType] ?? Flag;
   const formulaKey = getFormulaComparisonKey(info.formula, session["game-year"]);
   const showFormula = shouldShowFormulaLabel(info.formula, session["game-year"]);
-
-  let bestLapTimeStr: string | undefined;
-  if (isQuali && focusedDriver) {
-    const laps = focusedDriver["session-history"]["lap-history-data"];
-    const bestMs = getBestLapTime(laps);
-    if (bestMs > 0) bestLapTimeStr = msToLapTime(bestMs);
-  }
-
-  // Timestamp format: "2026-01-26 22:14:52 GMT Standard Time" — strip timezone name for parsing
-  const rawTs = debug.timestamp.replace(/\s+[A-Z].*$/, "");
-  const date = dayjs(rawTs);
-  const formattedDate = date.format("ddd, D MMM YYYY");
-  const formattedTime = date.format("HH:mm");
+  const trackTab = trackTabForSessionType(info["session-type"]);
 
   // Keep no-lap classified drivers selectable so terminal-damage DNFs can still
   // focus the player instead of falling back to the first timed finisher.
@@ -95,12 +78,12 @@ export function SessionHeader({
 
   return (
     <HStack align="start" className="mb-6 gap-4">
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 space-y-3">
         {/* Title row */}
-        <HStack className="mb-3 gap-3">
+        <HStack className="gap-3">
           <h2 className="text-xl font-bold">
             <Link
-              to={trackPath(formulaKey, info["track-id"])}
+              to={trackPath(formulaKey, info["track-id"], trackTab)}
               className="hover:text-best transition-colors"
             >
               <TrackFlag track={info["track-id"]} className="mr-1" />{" "}
@@ -116,14 +99,8 @@ export function SessionHeader({
               {getFormulaLabel(info.formula, session["game-year"])}
             </span>
           )}
-          {bestLapTimeStr && (
-            <span className="text-lg font-mono font-semibold text-best">
-              {bestLapTimeStr}
-            </span>
-          )}
         </HStack>
 
-        {/* Meta pills */}
         <HStack wrap className="gap-2 text-xs text-zinc-400">
           {showDriverSelector && (
             <span className="relative inline-flex items-center">
@@ -157,64 +134,6 @@ export function SessionHeader({
             </span>
           )}
 
-          {focusedDriver?.["final-classification"] && (
-            <Pill icon={Trophy} accent>
-              P{focusedDriver["final-classification"].position}
-            </Pill>
-          )}
-          {(() => {
-            if (
-              !isRaceSession(session) ||
-              !focusedDriver?.["final-classification"]
-            ) {
-              return null;
-            }
-            const fc = focusedDriver["final-classification"];
-            const gained = fc["grid-position"] - fc.position;
-            if (fc["grid-position"] <= 0 || gained === 0) return null;
-            return gained > 0 ? (
-              <Pill icon={ArrowUp} className="text-ahead bg-ahead/10">
-                +{gained}
-              </Pill>
-            ) : (
-              <Pill icon={ArrowDown} className="text-behind bg-behind/10">
-                {gained}
-              </Pill>
-            );
-          })()}
-          {(() => {
-            if (!focusedDriver?.["final-classification"]) return null;
-            const fc = focusedDriver["final-classification"];
-            if (fc["num-penalties"] <= 0) return null;
-            const penaltyText =
-              fc["penalties-time"] > 0
-                ? `${fc["num-penalties"]} ${
-                    fc["num-penalties"] === 1 ? "penalty" : "penalties"
-                  } (+${fc["penalties-time"]}s)`
-                : `${fc["num-penalties"]} ${
-                    fc["num-penalties"] === 1 ? "penalty" : "penalties"
-                  }`;
-            return (
-              <Pill icon={AlertTriangle} className="text-warning bg-warning/10">
-                {penaltyText}
-              </Pill>
-            );
-          })()}
-          <Pill icon={Calendar}>
-            {formattedDate} · {formattedTime}
-          </Pill>
-          <Pill icon={Cloud}>
-            {info.weather} · Track {info["track-temperature"]}°C · Air{" "}
-            {info["air-temperature"]}°C
-          </Pill>
-          {isOnline ? (
-            <Pill icon={Globe}>Online</Pill>
-          ) : info["ai-difficulty"] > 0 ? (
-            <Pill icon={Cpu}>AI {info["ai-difficulty"]}</Pill>
-          ) : null}
-          {info["total-laps"] > 0 && (
-            <Pill icon={Gauge}>{info["total-laps"]} laps</Pill>
-          )}
           {slug && EXT_LINK_TEMPLATE && EXT_LINK_LABEL && (
             <a
               href={EXT_LINK_TEMPLATE.replace("{slug}", slug)}
@@ -232,32 +151,6 @@ export function SessionHeader({
         track={info["track-id"]}
         className="hidden sm:block size-20 shrink-0 text-zinc-600 [&>svg]:size-full"
       />
-    </HStack>
-  );
-}
-
-function Pill({
-  icon: Icon,
-  accent,
-  className,
-  children,
-}: {
-  icon: typeof Flag;
-  accent?: boolean;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <HStack
-      as="span"
-      className={cn(
-        "gap-1 rounded-full px-2.5 py-1",
-        className ??
-          (accent ? "bg-zinc-900 text-zinc-200" : "bg-zinc-900/50 text-zinc-400"),
-      )}
-    >
-      <Icon className="size-3" />
-      {children}
     </HStack>
   );
 }

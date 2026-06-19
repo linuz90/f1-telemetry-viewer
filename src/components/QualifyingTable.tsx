@@ -4,6 +4,7 @@ import { bestSectorTimeMs, msToLapTime, msToSectorTime, sectorTimeMs } from "../
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { getValidLaps } from "../utils/stats";
 import { cn } from "../utils/cn";
+import { formatQualifyingTableTitle } from "../utils/sessionInsights";
 import { FocusToggle } from "./ui/FocusToggle";
 import { tableHeadClass, tableRowClass } from "./ui/table";
 
@@ -73,7 +74,7 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
     <div>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-base font-semibold text-zinc-300">
-          Qualifying Results
+          {formatQualifyingTableTitle(session)}
         </h3>
         <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
       </div>
