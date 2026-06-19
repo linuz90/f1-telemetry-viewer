@@ -1,11 +1,12 @@
-import type { TelemetrySession, DriverData } from "../types/telemetry";
+import type { DriverData, TelemetrySession } from "../types/telemetry";
+import { cn } from "../utils/cn";
+import { getTeamColor, getTeamName } from "../utils/colors";
 import {
-  findRaceWinner,
   findClosestRival,
   findFastestLapDriver,
+  findRaceWinner,
 } from "../utils/stats";
-import { getTeamColor, getTeamName } from "../utils/colors";
-import { cn } from "../utils/cn";
+import { PillSelect, type PillSelectOption } from "./ui/PillSelect";
 
 interface DriverComparisonPickerProps {
   session: TelemetrySession;
@@ -14,10 +15,10 @@ interface DriverComparisonPickerProps {
   focusedDriverIndex: number;
 }
 
-interface Preset {
-  label: string;
-  driver: DriverData | undefined;
-  tag: string;
+function driverOptionLabel(driver: DriverData, tags: string[]): string {
+  const position = driver["final-classification"]?.position ?? "?";
+  const tagSuffix = tags.length > 0 ? ` (${tags.join(", ")})` : "";
+  return `P${position} ${driver["driver-name"]} — ${getTeamName(driver.team)}${tagSuffix}`;
 }
 
 export function DriverComparisonPicker({
@@ -29,29 +30,9 @@ export function DriverComparisonPicker({
   const drivers = session["classification-data"] ?? [];
   const focused = drivers.find((d) => d.index === focusedDriverIndex);
   const focusedPos = focused?.["final-classification"]?.position ?? 0;
-
-  const presets: Preset[] = [
-    {
-      label: "Winner",
-      driver: findRaceWinner(session),
-      tag: "P1",
-    },
-    {
-      label: "Closest Rival",
-      driver: findClosestRival(session, focusedPos),
-      tag: `P${focusedPos > 1 ? focusedPos - 1 : focusedPos + 1}`,
-    },
-    {
-      label: "Fastest Lap",
-      driver: findFastestLapDriver(session),
-      tag: "FL",
-    },
-  ];
-
-  // Filter out presets that resolve to the focused driver or are undefined
-  const validPresets = presets.filter(
-    (p) => p.driver && p.driver.index !== focusedDriverIndex,
-  );
+  const winner = findRaceWinner(session);
+  const closest = findClosestRival(session, focusedPos);
+  const fastest = findFastestLapDriver(session);
 
   // All drivers sorted by position (for the dropdown)
   const dropdownDrivers = [...drivers].sort(
@@ -59,122 +40,39 @@ export function DriverComparisonPicker({
       (a["final-classification"]?.position ?? 999) -
       (b["final-classification"]?.position ?? 999),
   );
+  const rivalDrivers = dropdownDrivers.filter(
+    (d) => d.index !== focusedDriverIndex,
+  );
+  const selectedDriver = rivalDrivers.find((d) => d.index === selectedIndex);
+  const compareOptions: PillSelectOption[] = [
+    { value: "", label: "Compare with..." },
+    ...rivalDrivers.map((d) => {
+      const tags = [
+        d.index === closest?.index ? "Closest" : undefined,
+        d.index === fastest?.index ? "Fastest" : undefined,
+        d.index === winner?.index ? "Winner" : undefined,
+      ].filter((tag): tag is string => Boolean(tag));
 
-  // All non-focused drivers
-  const allRivals = drivers.filter((d) => d.index !== focusedDriverIndex);
-  const singleRival = allRivals.length === 1 ? allRivals[0] : null;
+      return {
+        value: d.index,
+        label: driverOptionLabel(d, tags),
+      };
+    }),
+  ];
 
-  // Simplified UI when there's only one rival
-  if (singleRival) {
-    const isActive = selectedIndex === singleRival.index;
-    return (
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-xs text-zinc-500 font-medium uppercase tracking-wide">
-          Compare vs
-        </span>
-
-        <button
-          onClick={() => onSelect(null)}
-          className={cn(
-            "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-            selectedIndex === null
-              ? "bg-zinc-800 text-zinc-200"
-              : "bg-zinc-900/60 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900",
-          )}
-        >
-          None
-        </button>
-
-        <button
-          onClick={() => onSelect(isActive ? null : singleRival.index)}
-          className={cn(
-            "px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
-            isActive
-              ? "bg-orange-500/20 text-orange-400 ring-1 ring-orange-500/40"
-              : "bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900",
-          )}
-        >
-          <span
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ backgroundColor: getTeamColor(singleRival.team) }}
-          />
-          Rival
-          <span className="text-zinc-600 text-2xs">
-            {singleRival["driver-name"]}
-          </span>
-        </button>
-      </div>
-    );
-  }
+  if (rivalDrivers.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
-      <span className="text-xs text-zinc-500 font-medium uppercase tracking-wide">
-        Compare vs
-      </span>
-
-      {/* None button */}
-      <button
-        onClick={() => onSelect(null)}
-        className={cn(
-          "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-          selectedIndex === null
-            ? "bg-zinc-800 text-zinc-200"
-            : "bg-zinc-900/60 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900",
-        )}
-      >
-        None
-      </button>
-
-      {/* Preset buttons */}
-      {validPresets.map((preset) => {
-        const d = preset.driver!;
-        const isActive = selectedIndex === d.index;
-        return (
-          <button
-            key={`${preset.label}-${d.index}`}
-            onClick={() => onSelect(isActive ? null : d.index)}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
-              isActive
-                ? "bg-orange-500/20 text-orange-400 ring-1 ring-orange-500/40"
-                : "bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900",
-            )}
-          >
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: getTeamColor(d.team) }}
-            />
-            {preset.label}
-            <span className="text-zinc-600 text-2xs">
-              {d["driver-name"]}
-            </span>
-          </button>
-        );
-      })}
-
-      {/* Full driver dropdown */}
-      <select
-        value={
-          selectedIndex !== null ? selectedIndex : ""
-        }
-        onChange={(e) => {
-          const val = e.target.value;
-          onSelect(val === "" ? null : Number(val));
-        }}
-        className="bg-zinc-900/60 text-zinc-400 text-xs rounded-md px-2 py-1.5 border border-zinc-700/50 hover:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500/40"
-      >
-        <option value="">Any driver...</option>
-        <optgroup label="Drivers">
-          {dropdownDrivers
-            .filter((d) => d.index !== focusedDriverIndex)
-            .map((d) => (
-              <option key={d.index} value={d.index}>
-                P{d["final-classification"]?.position ?? "?"} - {d["driver-name"]} - {getTeamName(d.team)}
-              </option>
-            ))}
-        </optgroup>
-      </select>
-    </div>
+    <PillSelect
+      value={selectedIndex ?? ""}
+      onChange={(value) => {
+        onSelect(value === "" ? null : Number(value));
+      }}
+      options={compareOptions}
+      ariaLabel="Compare with driver"
+      dotColor={selectedDriver ? getTeamColor(selectedDriver.team) : undefined}
+      width="session"
+      className={cn(selectedIndex === null && "text-zinc-400")}
+    />
   );
 }

@@ -487,9 +487,9 @@ function formatDeltaSeconds(ms: number): string {
  * unambiguous English read of who's faster so the user never has to
  * mentally translate the sign convention.
  */
-function relationToYou(deltaMs: number): "faster than you" | "slower than you" | undefined {
-  if (deltaMs > 0) return "slower than you";
-  if (deltaMs < 0) return "faster than you";
+function relationToYou(deltaMs: number): "slower" | "faster" | undefined {
+  if (deltaMs > 0) return "slower";
+  if (deltaMs < 0) return "faster";
   return undefined;
 }
 
@@ -511,7 +511,7 @@ function buildClosestTeammateCards(aggregates: RivalAggregate[]): RivalCard[] {
       paceMedian != null
         ? formatDeltaSeconds(paceMedian.deltaMs)
         : `${winner.teammateRaces}×`;
-    const detailParts: string[] = [`${winner.teammateRaces} races`];
+    const detailParts: string[] = [];
     if (winner.h2hWinsForPlayer + winner.h2hWinsForRival > 0) {
       detailParts.push(
         `H2H ${winner.h2hWinsForPlayer}-${winner.h2hWinsForRival}`,
@@ -549,18 +549,17 @@ function buildFrequentRivalCards(aggregates: RivalAggregate[]): RivalCard[] {
   return top.map((winner) => {
     const opponentRaces = winner.races - winner.teammateRaces;
     const paceMedian = preferredPaceMedian(winner);
-    // Use the magnitude + a direction word in the footer ("0.052s faster
-    // than you") so the slim format reads in plain English — no sign
-    // convention to mentally translate.
+    // Use the magnitude + a direction word in the footer ("0.052s faster")
+    // so the slim format reads in plain English — no sign convention to
+    // mentally translate. "Than you" is implied by the card context.
     const relation = paceMedian != null ? relationToYou(paceMedian.deltaMs) : undefined;
     const gapPhrase =
       paceMedian != null && relation
         ? `${(Math.abs(paceMedian.deltaMs) / 1000).toFixed(3)}s ${relation}`
         : undefined;
     const detail = [
-      `${winner.races} races`,
       gapPhrase,
-      `last at ${winner.latestRaceTrack}`,
+      `last ${winner.latestRaceTrack}`,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -595,7 +594,7 @@ function buildPaceBenchmarkCards(aggregates: RivalAggregate[]): RivalCard[] {
     const evidence =
       winner.paceMedian.basis === "same-compound pace" &&
       winner.paceMedian.lapSamples
-        ? `${winner.paceMedian.raceSamples} races · ${winner.paceMedian.lapSamples} laps · same tyres`
+        ? `${winner.paceMedian.lapSamples} laps · same tyres`
         : `${winner.paceMedian.raceSamples} races`;
     const basis =
       winner.paceMedian.basis === "same-compound pace"
@@ -640,7 +639,7 @@ function buildMostConsistentRivalCards(
       driverName: winner.name,
       team: winner.latestTeam ?? winner.team,
       headline: `±${avgStddevSec.toFixed(2)}s`,
-      detail: `${winner.stddevSamples} races · avg lap spread`,
+      detail: "avg lap spread",
       sampleSize: winner.stddevSamples,
     };
   });
@@ -673,7 +672,7 @@ function buildOvertakeKingCards(aggregates: RivalAggregate[]): RivalCard[] {
       driverName: winner.name,
       team: winner.latestTeam ?? winner.team,
       headline,
-      detail: `avg overtakes · ${winner.totalOvertakes} total in ${winner.overtakeRaceSamples} races`,
+      detail: `${winner.totalOvertakes} overtakes total`,
       sampleSize: winner.overtakeRaceSamples,
     };
   });
@@ -703,7 +702,7 @@ function buildNemesisCards(aggregates: RivalAggregate[]): RivalCard[] {
       driverName: winner.name,
       team: winner.latestTeam ?? winner.team,
       headline: avgGap < 1 ? avgGap.toFixed(2) : avgGap.toFixed(1),
-      detail: `avg position gap · ${winner.positionGapSamples} races`,
+      detail: "avg position gap",
       sampleSize: winner.positionGapSamples,
     };
   });
@@ -726,10 +725,7 @@ function buildFastestLapKingCards(aggregates: RivalAggregate[]): RivalCard[] {
     driverName: winner.name,
     team: winner.latestTeam ?? winner.team,
     headline: `${winner.fastestLapCount}`,
-    detail:
-      winner.fastestLapCount === 1
-        ? `fastest lap · ${winner.races} races shared`
-        : `fastest laps · ${winner.races} races shared`,
+    detail: winner.fastestLapCount === 1 ? "fastest lap" : "fastest laps",
     sampleSize: winner.fastestLapCount,
   }));
 }
@@ -749,10 +745,7 @@ function buildPolePositionKingCards(aggregates: RivalAggregate[]): RivalCard[] {
     driverName: winner.name,
     team: winner.latestTeam ?? winner.team,
     headline: `${winner.polePositions}`,
-    detail:
-      winner.polePositions === 1
-        ? `pole · ${winner.races} races shared`
-        : `poles · ${winner.races} races shared`,
+    detail: winner.polePositions === 1 ? "pole position" : "pole positions",
     sampleSize: winner.polePositions,
   }));
 }

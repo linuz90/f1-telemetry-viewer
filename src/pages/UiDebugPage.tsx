@@ -9,31 +9,24 @@ import {
   Zap,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { CompoundStatCard } from "../components/CompoundStatCard";
+import { DamageTimeline } from "../components/DamageTimeline";
+import { LapTimeChart } from "../components/LapTimeChart";
+import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
+import { PositionChart } from "../components/PositionChart";
+import { SectorComparison } from "../components/SectorComparison";
+import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
+import { StintDetailCards, StintTimeline } from "../components/StintTimeline";
+import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
+import { TrackStrategySection } from "../components/track/TrackStrategySection";
 import { TrackFlag } from "../components/TrackFlag";
+import { TyreWearChart } from "../components/TyreWearChart";
 import { Badge } from "../components/ui/Badge";
 import { CompoundBadge } from "../components/ui/CompoundBadge";
 import { InsightTile } from "../components/ui/InsightTile";
-import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { SectionHeader } from "../components/ui/SectionHeader";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { stintChipStyle, stintChipTextStyle } from "../components/ui/StintChip";
-import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
-import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
-import { TrackStrategySection } from "../components/track/TrackStrategySection";
-import { StintDetailCards, StintTimeline } from "../components/StintTimeline";
-import { CompoundStatCard } from "../components/CompoundStatCard";
-import { LapTimeChart } from "../components/LapTimeChart";
-import { PositionChart } from "../components/PositionChart";
-import { TyreWearChart } from "../components/TyreWearChart";
-import { DamageTimeline } from "../components/DamageTimeline";
-import { SectorComparison } from "../components/SectorComparison";
-import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
-import type { SessionInsight } from "../utils/sessionInsights";
-import type {
-  CumulativeDelta,
-  TrackRaceRecommendation,
-  TrackStrategySuggestion,
-} from "../utils/stats";
-import type { TrackRivalBenchmark } from "../utils/rivalStats";
 import type {
   CarDamage,
   CarStatus,
@@ -46,10 +39,26 @@ import type {
   TyreStintBasic,
   TyreWearEntry,
 } from "../types/telemetry";
-import { msToLapTime, msToSectorTime } from "../utils/format";
 import { cn } from "../utils/cn";
+import { msToLapTime, msToSectorTime } from "../utils/format";
+import type { TrackRivalBenchmark } from "../utils/rivalStats";
+import type { SessionInsight } from "../utils/sessionInsights";
+import type {
+  CumulativeDelta,
+  TrackRaceRecommendation,
+  TrackStrategySuggestion,
+} from "../utils/stats";
 
-const COMPOUNDS = ["Soft", "Medium", "Hard", "Intermediate", "Wet", "C1", "C3", "C5"];
+const COMPOUNDS = [
+  "Soft",
+  "Medium",
+  "Hard",
+  "Intermediate",
+  "Wet",
+  "C1",
+  "C3",
+  "C5",
+];
 
 const sampleInsights: SessionInsight[] = [
   {
@@ -94,7 +103,8 @@ const sampleInsights: SessionInsight[] = [
     accent: "emerald",
     rank: 1,
     rankTotal: 22,
-    tooltip: "Average clean-lap pace excluding lap 1, pit laps, SC, and outliers.",
+    tooltip:
+      "Average clean-lap pace excluding lap 1, pit laps, SC, and outliers.",
   },
   {
     type: "tyre",
@@ -130,10 +140,14 @@ const sampleInsights: SessionInsight[] = [
     label: "Speed & ERS",
     value: "350 km/h",
     detail: "15th of 22 top speed",
-    extraDetails: ["Deploy: 7.0 MJ/lap (1st of 22)", "Harvest: 6.9 MJ/lap (1st of 22)"],
+    extraDetails: [
+      "Deploy: 7.0 MJ/lap (1st of 22)",
+      "Harvest: 6.9 MJ/lap (1st of 22)",
+    ],
     accent: "sky",
     tone: "negative",
-    tooltip: "Top speed is the best non-glitched speed sample for the focused driver.",
+    tooltip:
+      "Top speed is the best non-glitched speed sample for the focused driver.",
   },
 ];
 
@@ -205,15 +219,39 @@ const rivalStints = [
 ];
 const perLapInfo = buildPerLapInfo();
 const basicStints: TyreStintBasic[] = [
-  { "tyre-actual-compound": "C3", "tyre-visual-compound": "Medium", "end-lap": 6 },
-  { "tyre-actual-compound": "C2", "tyre-visual-compound": "Hard", "end-lap": 12 },
+  {
+    "tyre-actual-compound": "C3",
+    "tyre-visual-compound": "Medium",
+    "end-lap": 6,
+  },
+  {
+    "tyre-actual-compound": "C2",
+    "tyre-visual-compound": "Hard",
+    "end-lap": 12,
+  },
 ];
 
 const positionHistory: PositionHistoryEntry[] = [
-  makePositionHistory("ALONSO", "Aston Martin", [19, 17, 15, 12, 9, 8, 6, 5, 3, 2, 2, 1, 1]),
-  makePositionHistory("LECLERC", "Ferrari", [1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3]),
-  makePositionHistory("NORRIS", "McLaren", [2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4]),
-  makePositionHistory("RUSSELL", "Mercedes", [5, 5, 4, 4, 4, 4, 3, 3, 5, 5, 5, 5, 5]),
+  makePositionHistory(
+    "ALONSO",
+    "Aston Martin",
+    [19, 17, 15, 12, 9, 8, 6, 5, 3, 2, 2, 1, 1],
+  ),
+  makePositionHistory(
+    "LECLERC",
+    "Ferrari",
+    [1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
+  ),
+  makePositionHistory(
+    "NORRIS",
+    "McLaren",
+    [2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4],
+  ),
+  makePositionHistory(
+    "RUSSELL",
+    "Mercedes",
+    [5, 5, 4, 4, 4, 4, 3, 3, 5, 5, 5, 5, 5],
+  ),
 ];
 
 const overtakes: OvertakeRecord[] = [
@@ -287,25 +325,51 @@ export function UiDebugPage() {
       </DebugSection>
 
       <DebugSection file="src/components/ui/InsightTile.tsx">
-        <SectionHeader title="Insight Tile Accents" hint="Compact fixture deck for tone checks" />
+        <SectionHeader
+          title="Insight Tile Accents"
+          hint="Compact fixture deck for tone checks"
+        />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <InsightTile title="Amber Fuel" icon={Fuel} accent="amber">
-            <DebugHero value="-2.7 laps" detail="32.9 kg total - 1.20 kg/lap burn" />
+            <DebugHero
+              value="-2.7 laps"
+              detail="32.9 kg total - 1.20 kg/lap burn"
+            />
           </InsightTile>
           <InsightTile title="Purple Best" icon={Timer} accent="purple">
-            <DebugHero value="1:21.736" detail="session fastest" tone="text-purple-300" />
+            <DebugHero
+              value="1:21.736"
+              detail="session fastest"
+              tone="text-purple-300"
+            />
           </InsightTile>
           <InsightTile title="Emerald Gain" icon={ArrowUpDown} accent="emerald">
-            <DebugHero value="+18 pos" detail="started P19, finished P1" tone="text-ahead" />
+            <DebugHero
+              value="+18 pos"
+              detail="started P19, finished P1"
+              tone="text-ahead"
+            />
           </InsightTile>
           <InsightTile title="Rose Risk" icon={Circle} accent="rose">
-            <DebugHero value="20th" detail="of 22 - +3.3%/lap vs best" tone="text-behind" />
+            <DebugHero
+              value="20th"
+              detail="of 22 - +3.3%/lap vs best"
+              tone="text-behind"
+            />
           </InsightTile>
           <InsightTile title="Cyan Sector" icon={Zap} accent="cyan">
-            <DebugHero value="+0.266s" detail="S2 weakest - 8th of 22" tone="text-cyan-300" />
+            <DebugHero
+              value="+0.266s"
+              detail="S2 weakest - 8th of 22"
+              tone="text-cyan-300"
+            />
           </InsightTile>
           <InsightTile title="Sky Speed" icon={Gauge} accent="sky">
-            <DebugHero value="350 km/h" detail="15th of 22 top speed" tone="text-sky-300" />
+            <DebugHero
+              value="350 km/h"
+              detail="15th of 22 top speed"
+              tone="text-sky-300"
+            />
           </InsightTile>
           <InsightTile title="Zinc Neutral" icon={Flag} accent="zinc">
             <DebugHero value="P2" detail="Finished - 33/33 laps" />
@@ -326,7 +390,10 @@ export function UiDebugPage() {
         ]}
       >
         <div className="space-y-8">
-          <SectionHeader title="Badges, Controls & Chips" hint="Small UI variants, explicit sizes, and compound styling" />
+          <SectionHeader
+            title="Badges, Controls & Chips"
+            hint="Small UI variants, explicit sizes, and compound styling"
+          />
           <div>
             <DebugComponentLabel>Badge.tsx</DebugComponentLabel>
             <div className="space-y-4">
@@ -341,11 +408,21 @@ export function UiDebugPage() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <DebugVariantLabel>xs</DebugVariantLabel>
-                <Badge tone="zinc" size="xs">PIT</Badge>
-                <Badge tone="amber" size="xs">SC</Badge>
-                <Badge tone="green" size="xs">VALID</Badge>
-                <Badge tone="red" size="xs" shape="square">INVALID</Badge>
-                <Badge tone="purple" size="xs" shape="square">BEST</Badge>
+                <Badge tone="zinc" size="xs">
+                  PIT
+                </Badge>
+                <Badge tone="amber" size="xs">
+                  SC
+                </Badge>
+                <Badge tone="green" size="xs">
+                  VALID
+                </Badge>
+                <Badge tone="red" size="xs" shape="square">
+                  INVALID
+                </Badge>
+                <Badge tone="purple" size="xs" shape="square">
+                  BEST
+                </Badge>
               </div>
             </div>
           </div>
@@ -397,7 +474,9 @@ export function UiDebugPage() {
               {(["tiny", "small", "medium", "large"] as const).map((size) => (
                 <div key={size} className="flex items-center gap-2">
                   <TrackFlag track="monza" size={size} />
-                  <DebugVariantLabel className="w-auto">{size}</DebugVariantLabel>
+                  <DebugVariantLabel className="w-auto">
+                    {size}
+                  </DebugVariantLabel>
                 </div>
               ))}
             </div>
@@ -444,8 +523,14 @@ export function UiDebugPage() {
               hero={{ value: `~${10 + index * 6}`, label: "pit by lap" }}
               rows={[
                 { label: "Best lap", value: msToLapTime(82200 + index * 380) },
-                { label: "Avg wear", value: `${(7.8 - index * 2.1).toFixed(1)}%/lap` },
-                { label: "Stints", value: `${6 + index * 3}-${9 + index * 4} laps` },
+                {
+                  label: "Avg wear",
+                  value: `${(7.8 - index * 2.1).toFixed(1)}%/lap`,
+                },
+                {
+                  label: "Stints",
+                  value: `${6 + index * 3}-${9 + index * 4} laps`,
+                },
               ]}
               progress={{ ratio: 0.42 + index * 0.18 }}
             />
@@ -559,7 +644,12 @@ function DebugVariantLabel({
   children: ReactNode;
 }) {
   return (
-    <span className={cn("w-14 font-mono text-2xs leading-none text-zinc-600", className)}>
+    <span
+      className={cn(
+        "w-14 font-mono text-2xs leading-none text-zinc-600",
+        className,
+      )}
+    >
       {children}
     </span>
   );
@@ -576,10 +666,10 @@ function DebugHero({
 }) {
   return (
     <>
-      <div className={cn("font-mono text-xl font-semibold tabular-nums", tone)}>
+      <div className={cn("font-mono text-xl font-medium tabular-nums", tone)}>
         {value}
       </div>
-      <div className="mt-1.5 text-sm leading-relaxed text-zinc-400">
+      <div className="mt-1.5 font-mono text-sm leading-relaxed tabular-nums text-zinc-400">
         {detail}
       </div>
     </>
@@ -587,8 +677,13 @@ function DebugHero({
 }
 
 function buildLaps(offsetMs = 0): LapHistoryEntry[] {
-  const times = [84020, 83180, 82540, 81980, 83060, 84680, 86220, 82110, 81736, 82390, 82610, 82840];
-  return times.map((time, index) => makeLap(time + offsetMs + index * 24, index !== 6));
+  const times = [
+    84020, 83180, 82540, 81980, 83060, 84680, 86220, 82110, 81736, 82390, 82610,
+    82840,
+  ];
+  return times.map((time, index) =>
+    makeLap(time + offsetMs + index * 24, index !== 6),
+  );
 }
 
 function makeLap(timeMs: number, valid = true): LapHistoryEntry {

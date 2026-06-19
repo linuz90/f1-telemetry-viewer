@@ -553,7 +553,7 @@ function buildMostConsistentInsight(
     formulaKey: winner.formulaKey,
     scope: "quali",
     headline: `±${(winner.std / 1000).toFixed(2)}s`,
-    detail: `${winner.sessions.length} sessions · best lap spread`,
+    detail: `${winner.sessions.length} sessions · lap spread`,
     sampleSize: winner.sessions.length,
   };
 }

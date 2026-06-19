@@ -63,10 +63,10 @@ export function InsightTile({
   const content = (
     <>
       {background}
-      <HStack className="relative gap-2">
-        <Icon className={cn("size-3.5", headerColor)} />
+      {badge && <span className="absolute right-3 top-2.5 z-10">{badge}</span>}
+      <HStack className={cn("relative gap-2 mt-0.5", badge && "pr-20")}>
+        <Icon className={cn("size-3", headerColor)} />
         <Eyebrow className={headerColor}>{title}</Eyebrow>
-        {badge && <span className="ml-auto">{badge}</span>}
       </HStack>
       <div className="relative mt-2.5">{children}</div>
     </>

@@ -26,8 +26,12 @@ export function SectionHeader({
       )}
     >
       <div className="min-w-0">
-        <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
-        {hint && <p className="mt-0.5 text-xs text-zinc-500">{hint}</p>}
+        <h3 className="text-lg font-semibold text-zinc-100">{title}</h3>
+        {hint && (
+          <p className="mt-0.5 font-mono text-xs tabular-nums text-zinc-500">
+            {hint}
+          </p>
+        )}
       </div>
       {action}
     </div>

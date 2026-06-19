@@ -19,12 +19,12 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { cn } from "../../utils/cn";
 import type {
   InsightKind,
   InsightScope,
   TrackInsight,
 } from "../../utils/dashboardStats";
-import { cn } from "../../utils/cn";
 import { sessionPath } from "../../utils/routes";
 import { ACCENT_TOKENS, type AccentColor } from "../Card";
 import { TrackFlag } from "../TrackFlag";
@@ -125,7 +125,12 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
       to={to}
       badge={
         scopeBadge ? (
-          <Badge size="xs" shape="square" tone="zinc" className="tracking-wider">
+          <Badge
+            size="xs"
+            shape="square"
+            tone="zinc"
+            className="tracking-wider"
+          >
             {scopeBadge}
           </Badge>
         ) : undefined
@@ -133,7 +138,10 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
       background={
         <TrackLayout
           track={insight.track}
-          className={cn("pointer-events-none absolute right-6 top-1/2 size-34 -translate-y-1/2 opacity-6 [&>svg]:size-full [&_path]:![stroke-width:7]", tokens.iconText)}
+          className={cn(
+            "pointer-events-none absolute right-6 top-1/2 size-34 -translate-y-1/2 opacity-6 [&>svg]:size-full [&_path]:![stroke-width:7]",
+            tokens.iconText,
+          )}
         />
       }
     >
@@ -143,12 +151,15 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
             <TrackFlag track={insight.track} />
             <span className="truncate">{insight.track}</span>
           </HStack>
-          <div className="mt-1 truncate text-xs text-zinc-500">
+          <div className="mt-1 font-mono text-xs leading-snug tabular-nums text-zinc-500">
             {insight.detail}
           </div>
         </div>
         <div
-          className={cn("shrink-0 text-right font-mono text-2xl font-semibold tabular-nums", tokens.accent)}
+          className={cn(
+            "shrink-0 text-right font-mono text-2xl font-medium tabular-nums",
+            tokens.accent,
+          )}
         >
           {insight.headline}
         </div>

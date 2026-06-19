@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
+import { cn } from "../utils/cn";
 import { getCompoundColor } from "../utils/colors";
 import { dynamicAccentCardStyle } from "./Card";
 import { HStack } from "./ui/Stack";
 import { tableRowClass } from "./ui/table";
-import { cn } from "../utils/cn";
 
 interface CompoundStatCardRow {
   label: string;
@@ -25,7 +25,15 @@ interface CompoundStatCardProps {
   children?: ReactNode;
 }
 
-export function CompoundStatCard({ compound, subtitle, rows, hero, progress, className, children }: CompoundStatCardProps) {
+export function CompoundStatCard({
+  compound,
+  subtitle,
+  rows,
+  hero,
+  progress,
+  className,
+  children,
+}: CompoundStatCardProps) {
   const color = getCompoundColor(compound);
 
   // Shared accent-tile recipe (see Card.tsx) — compound color drives a linear
@@ -45,15 +53,19 @@ export function CompoundStatCard({ compound, subtitle, rows, hero, progress, cla
           {compound}
         </span>
         {subtitle && (
-          <span className="text-2xs text-zinc-500 ml-auto">{subtitle}</span>
+          <span className="ml-auto font-mono text-2xs tabular-nums text-zinc-500">
+            {subtitle}
+          </span>
         )}
       </HStack>
       {hero && (
         <div className="text-center py-2 mb-1.5">
-          <div className="font-mono text-2xl font-semibold text-zinc-100">
+          <div className="font-mono text-2xl font-medium text-zinc-100">
             {hero.value}
           </div>
-          <div className="text-xs text-zinc-500 mt-0.5">{hero.label}</div>
+          <div className="mt-0.5 font-mono text-xs tabular-nums text-zinc-500">
+            {hero.label}
+          </div>
         </div>
       )}
       <div className="text-xs text-zinc-400 space-y-1.5">
@@ -75,9 +87,11 @@ export function CompoundStatCard({ compound, subtitle, rows, hero, progress, cla
               style={{
                 width: `${Math.min(Math.round(progress.ratio * 100), 100)}%`,
                 backgroundColor:
-                  progress.ratio > 0.8 ? "#ef4444" :
-                  progress.ratio > 0.6 ? "#f59e0b" :
-                  "#22c55e",
+                  progress.ratio > 0.8
+                    ? "#ef4444"
+                    : progress.ratio > 0.6
+                      ? "#f59e0b"
+                      : "#22c55e",
               }}
             />
           </div>

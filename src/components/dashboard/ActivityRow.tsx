@@ -70,7 +70,7 @@ function StatPill({
       </div>
       {sublabel && (
         <div
-          className={cn("text-3xs font-medium uppercase leading-none tracking-wider opacity-60", ACCENT_TOKENS[accent].accent)}
+          className={cn("font-mono text-3xs font-medium uppercase leading-none tracking-wider opacity-60", ACCENT_TOKENS[accent].accent)}
         >
           {sublabel}
         </div>

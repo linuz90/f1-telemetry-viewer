@@ -26,21 +26,21 @@ import { CarSetupCard } from "../components/CarSetupCard";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { RaceSetupComparison } from "../components/RaceSetupComparison";
 import { SessionRow } from "../components/SessionRow";
+import { getSessionTypeMeta } from "../components/sessionTypeMeta";
 import { PaceEvolutionChart } from "../components/track/PaceEvolutionChart";
 import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
 import { TrackQualifyingInsights } from "../components/track/TrackQualifyingInsights";
 import { TrackStrategySection } from "../components/track/TrackStrategySection";
-import { buildTrackQualifyingInsights } from "../utils/qualifyingInsights";
 import { TrackFlag } from "../components/TrackFlag";
 import { Badge } from "../components/ui/Badge";
 import { InsightTile } from "../components/ui/InsightTile";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
-import { getSessionTypeMeta } from "../components/sessionTypeMeta";
 import { HStack, VStack } from "../components/ui/Stack";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useSessionList } from "../hooks/useSessionList";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
+import { cn } from "../utils/cn";
 import { CHART_THEME, SECTOR_COLORS, TOOLTIP_STYLE } from "../utils/colors";
 import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
 import {
@@ -54,7 +54,7 @@ import {
   msToLapTime,
   msToSectorTime,
 } from "../utils/format";
-import { cn } from "../utils/cn";
+import { buildTrackQualifyingInsights } from "../utils/qualifyingInsights";
 import { buildTrackRivalBenchmark } from "../utils/rivalStats";
 import {
   dashboardPath,
@@ -923,14 +923,42 @@ export function TrackProgressPage() {
   // blue/violet/pink would have been decorative here — no nearby legend keys
   // it — and reads as "these mean different things" when they don't.
   const sectorCards: { label: string; bestMs: number; latestMs: number }[] = [
-    { label: "S1", bestMs: theoreticalBestS1, latestMs: latestQuali?.bestS1 ?? 0 },
-    { label: "S2", bestMs: theoreticalBestS2, latestMs: latestQuali?.bestS2 ?? 0 },
-    { label: "S3", bestMs: theoreticalBestS3, latestMs: latestQuali?.bestS3 ?? 0 },
+    {
+      label: "S1",
+      bestMs: theoreticalBestS1,
+      latestMs: latestQuali?.bestS1 ?? 0,
+    },
+    {
+      label: "S2",
+      bestMs: theoreticalBestS2,
+      latestMs: latestQuali?.bestS2 ?? 0,
+    },
+    {
+      label: "S3",
+      bestMs: theoreticalBestS3,
+      latestMs: latestQuali?.bestS3 ?? 0,
+    },
   ];
-  const timeTrialSectorCards: { label: string; bestMs: number; latestMs: number }[] = [
-    { label: "S1", bestMs: theoreticalTimeTrialS1, latestMs: latestTimeTrial?.bestS1 ?? 0 },
-    { label: "S2", bestMs: theoreticalTimeTrialS2, latestMs: latestTimeTrial?.bestS2 ?? 0 },
-    { label: "S3", bestMs: theoreticalTimeTrialS3, latestMs: latestTimeTrial?.bestS3 ?? 0 },
+  const timeTrialSectorCards: {
+    label: string;
+    bestMs: number;
+    latestMs: number;
+  }[] = [
+    {
+      label: "S1",
+      bestMs: theoreticalTimeTrialS1,
+      latestMs: latestTimeTrial?.bestS1 ?? 0,
+    },
+    {
+      label: "S2",
+      bestMs: theoreticalTimeTrialS2,
+      latestMs: latestTimeTrial?.bestS2 ?? 0,
+    },
+    {
+      label: "S3",
+      bestMs: theoreticalTimeTrialS3,
+      latestMs: latestTimeTrial?.bestS3 ?? 0,
+    },
   ];
 
   // Session history sorted newest first
@@ -1204,10 +1232,7 @@ export function TrackProgressPage() {
 
             return (
               <section className={cardClass}>
-                <SectionHeader
-                  title="All Qualifying Lap Times"
-                  hint="Every lap across sessions"
-                />
+                <SectionHeader title="All Qualifying Lap Times" />
                 <ResponsiveContainer width="100%" height={260}>
                   <ScatterChart
                     margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
@@ -1316,10 +1341,7 @@ export function TrackProgressPage() {
           {/* Consistency trend */}
           {consistencyTrend.length > 1 && (
             <section className={cardClass}>
-              <SectionHeader
-                title="Consistency Trend"
-                hint="Lower = more consistent lap times"
-              />
+              <SectionHeader title="Consistency Trend" />
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart
                   data={consistencyTrend}
@@ -1400,7 +1422,7 @@ export function TrackProgressPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <InsightTile title="Best TT Lap" icon={Timer} accent="purple">
-              <div className="font-mono text-xl font-semibold text-purple-300">
+              <div className="font-mono text-xl font-medium text-purple-300">
                 {bestTimeTrialMs > 0 ? msToLapTime(bestTimeTrialMs) : "–"}
               </div>
             </InsightTile>
@@ -1605,10 +1627,7 @@ export function TrackProgressPage() {
 
             return (
               <section className={cardClass}>
-                <SectionHeader
-                  title="All Time Trial Lap Times"
-                  hint="Every hotlap across attempts"
-                />
+                <SectionHeader title="All Time Trial Lap Times" />
                 <ResponsiveContainer width="100%" height={260}>
                   <ScatterChart
                     margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
@@ -1716,10 +1735,7 @@ export function TrackProgressPage() {
 
           {timeTrialConsistencyTrend.length > 1 && (
             <section className={cardClass}>
-              <SectionHeader
-                title="TT Consistency Trend"
-                hint="Lower = more repeatable hotlaps"
-              />
+              <SectionHeader title="TT Consistency Trend" />
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart
                   data={timeTrialConsistencyTrend}
@@ -2026,7 +2042,7 @@ function SectorBestTile({
   const deltaMs = latestMs > 0 && bestMs > 0 ? latestMs - bestMs : 0;
   return (
     <InsightTile title={label} icon={Timer} accent="purple">
-      <div className="font-mono text-lg text-purple-300">
+      <div className="font-mono text-lg font-medium text-purple-300">
         {bestMs > 0 ? msToSectorTime(bestMs) : "–"}
       </div>
       {latestMs > 0 && (

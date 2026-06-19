@@ -30,6 +30,7 @@ import { DuplicateNotice } from "../components/DuplicateNotice";
 import { getRaceControlEvents, raceControlEventsToOvertakes } from "../utils/raceControl";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { Badge } from "../components/ui/Badge";
+import { PillSelect } from "../components/ui/PillSelect";
 import {
   buildSessionInsightsHint,
   buildSessionSummaryInsights,
@@ -64,37 +65,24 @@ function SpectatorDriverPicker({
   if (drivers.length === 0) return null;
 
   const focusedDriver = drivers.find((driver) => driver.index === focusedDriverIndex);
+  const driverOptions = drivers.map((driver) => {
+    const position = driver["final-classification"]?.position;
+    return {
+      value: driver.index,
+      label: `${position ? `P${position} ` : ""}${driver["driver-name"]} — ${getTeamName(driver.team)}`,
+    };
+  });
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-        Driver
-      </span>
-      <span className="relative inline-flex items-center">
-        <span
-          className="mr-1.5 inline-block size-1.5 rounded-full"
-          style={{
-            backgroundColor: focusedDriver
-              ? getTeamColor(focusedDriver.team)
-              : undefined,
-          }}
-        />
-        <select
-          value={focusedDriverIndex}
-          onChange={(event) => onFocusedDriverChange(Number(event.target.value))}
-          className="rounded-md border border-zinc-700/50 bg-zinc-900/60 px-2 py-1.5 text-xs text-zinc-300 outline-none transition-colors hover:border-zinc-600 focus:ring-1 focus:ring-purple-500/40"
-        >
-          {drivers.map((driver) => {
-            const position = driver["final-classification"]?.position;
-            return (
-              <option key={driver.index} value={driver.index}>
-                {position ? `P${position} - ` : ""}
-                {driver["driver-name"]} - {getTeamName(driver.team)}
-              </option>
-            );
-          })}
-        </select>
-      </span>
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <PillSelect
+        value={focusedDriverIndex}
+        onChange={(value) => onFocusedDriverChange(Number(value))}
+        options={driverOptions}
+        ariaLabel="Focused driver"
+        dotColor={focusedDriver ? getTeamColor(focusedDriver.team) : undefined}
+        width="session"
+      />
       <Badge tone="zinc">Spectator save</Badge>
     </div>
   );
@@ -267,22 +255,23 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
         onFocusedDriverChange={handleFocusedDriverChange}
         slug={slug}
         showDriverSelector={!isSpectator}
+        controls={
+          isSpectator ? (
+            <SpectatorDriverPicker
+              drivers={selectableDrivers}
+              focusedDriverIndex={focusedDriverIndex}
+              onFocusedDriverChange={handleFocusedDriverChange}
+            />
+          ) : (
+            <DriverComparisonPicker
+              session={session}
+              selectedIndex={selectedRivalIndex}
+              onSelect={setSelectedRivalIndex}
+              focusedDriverIndex={focusedDriverIndex}
+            />
+          )
+        }
       />
-
-      {isSpectator ? (
-        <SpectatorDriverPicker
-          drivers={selectableDrivers}
-          focusedDriverIndex={focusedDriverIndex}
-          onFocusedDriverChange={handleFocusedDriverChange}
-        />
-      ) : (
-        <DriverComparisonPicker
-          session={session}
-          selectedIndex={selectedRivalIndex}
-          onSelect={setSelectedRivalIndex}
-          focusedDriverIndex={focusedDriverIndex}
-        />
-      )}
 
       <SessionInsightsGrid insights={sessionInsights} hint={insightsHint} />
 

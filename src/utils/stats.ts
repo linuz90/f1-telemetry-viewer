@@ -562,6 +562,8 @@ export interface StrategyInsight {
   value: string;
   /** Smaller context line below the value */
   detail: string;
+  /** Additional context lines, used when a compact card needs peer rows. */
+  extraDetails?: string[];
   /** Tooltip shown on hover — explains how the value was calculated */
   tooltip?: string;
   /** Ranking position (0-indexed) — used for color coding. undefined = neutral. */
@@ -688,14 +690,18 @@ export function generateInsights(
         { sector: 3, label: "S3" },
       ] as const;
 
-      const parts: string[] = [];
+      const sectorRows: string[] = [];
+      let netDelta = 0;
       let gains = 0;
       let losses = 0;
       for (const { sector, label } of sectorKeys) {
         const pAvg = playerCleanLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) / playerCleanLaps.length;
         const rAvg = rivalCleanLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) / rivalCleanLaps.length;
         const d = (pAvg - rAvg) / 1000;
-        parts.push(`${label}: ${d <= 0 ? "" : "+"}${d.toFixed(3)}s`);
+        netDelta += d;
+        const delta = `${d <= 0 ? "" : "+"}${d.toFixed(3)}s`;
+        const direction = d < -0.001 ? "faster" : d > 0.001 ? "slower" : "even";
+        sectorRows.push(`${label} · ${delta} ${direction}`);
         if (d < -0.001) gains++;
         if (d > 0.001) losses++;
       }
@@ -703,14 +709,15 @@ export function generateInsights(
       insights.push({
         type: "sector",
         label: "Sector Analysis",
-        value: parts.join("  "),
+        value: `${netDelta <= 0 ? "" : "+"}${netDelta.toFixed(3)}s`,
         detail: gains > 0 && losses > 0
-          ? `gaining in ${gains}, losing in ${losses} vs ${rivalName}`
+          ? `${gains} sectors faster · ${losses} slower vs ${rivalName}`
           : gains === 3
             ? `faster in all sectors vs ${rivalName}`
             : losses === 3
               ? `slower in all sectors vs ${rivalName}`
-              : `vs ${rivalName}`,
+              : `even by sector vs ${rivalName}`,
+        extraDetails: sectorRows,
       });
     }
 

@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { cn } from "../utils/cn";
+import { formatDate, formatSessionType, msToLapTime } from "../utils/format";
+import { sessionSummaryPath } from "../utils/routes";
 import type {
-  RaceSetupComparableMetric,
   RaceSetupCandidate,
+  RaceSetupComparableMetric,
   RaceSetupStrength,
   RaceSetupStrengthKind,
 } from "../utils/setupComparison";
-import { msToLapTime, formatDate, formatSessionType } from "../utils/format";
-import { cn } from "../utils/cn";
-import { sessionSummaryPath } from "../utils/routes";
 import { cardClass } from "./Card";
 import { CarSetupCard } from "./CarSetupCard";
 import { Badge } from "./ui/Badge";
@@ -25,6 +25,9 @@ interface MetricExtremes {
   best: number | null;
   worst: number | null;
 }
+
+const SETUP_COMPARISON_GRID =
+  "grid-cols-[minmax(12rem,1.55fr)_repeat(4,minmax(5.75rem,0.65fr))]";
 
 const STRENGTH_META: Record<
   RaceSetupStrengthKind,
@@ -80,11 +83,20 @@ function getMetricValue(
     case "bestLap":
       return candidate.bestLapMs;
     case "medianPace":
-      return getComparisonValue(candidate.comparablePace, candidate.medianCleanPaceMs);
+      return getComparisonValue(
+        candidate.comparablePace,
+        candidate.medianCleanPaceMs,
+      );
     case "bestStint":
-      return getComparisonValue(candidate.comparableStint, candidate.bestStintPaceMs);
+      return getComparisonValue(
+        candidate.comparableStint,
+        candidate.bestStintPaceMs,
+      );
     case "wear":
-      return getComparisonValue(candidate.comparableWear, candidate.avgWearRatePerLap);
+      return getComparisonValue(
+        candidate.comparableWear,
+        candidate.avgWearRatePerLap,
+      );
   }
 }
 
@@ -104,7 +116,9 @@ function metricExtremes(
   return {
     best,
     worst:
-      candidates.length > 2 && values.length > 2 && Math.abs(worst - best) > 0.001
+      candidates.length > 2 &&
+      values.length > 2 &&
+      Math.abs(worst - best) > 0.001
         ? worst
         : null,
   };
@@ -114,7 +128,11 @@ function metricValueClassName(
   value: number | null,
   extremes: MetricExtremes,
 ): string {
-  if (value !== null && extremes.best !== null && Math.abs(value - extremes.best) < 0.001) {
+  if (
+    value !== null &&
+    extremes.best !== null &&
+    Math.abs(value - extremes.best) < 0.001
+  ) {
     return "text-purple-300";
   }
 
@@ -133,11 +151,7 @@ function pluralizeRace(count: number): string {
   return count === 1 ? "race" : "races";
 }
 
-function SourceLink({
-  candidate,
-}: {
-  candidate: RaceSetupCandidate;
-}) {
+function SourceLink({ candidate }: { candidate: RaceSetupCandidate }) {
   const { summary, bestLapMs } = candidate.source;
 
   return (
@@ -165,7 +179,12 @@ function MetricCell({
 }) {
   return (
     <div className="min-w-0">
-      <div className={cn("font-mono text-xs tabular-nums", className ?? "text-zinc-200")}>
+      <div
+        className={cn(
+          "font-mono text-xs tabular-nums",
+          className ?? "text-zinc-200",
+        )}
+      >
         {value}
       </div>
       {delta && (
@@ -190,7 +209,10 @@ function StrengthBadge({ strength }: { strength: RaceSetupStrength }) {
 
   return (
     <span
-      className={cn("inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-2xs font-medium leading-4 ring-1", meta.className)}
+      className={cn(
+        "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-2xs font-medium leading-4 ring-1",
+        meta.className,
+      )}
     >
       {getStrengthLabel(strength)}
     </span>
@@ -221,7 +243,9 @@ function getStrengthLabel(strength: RaceSetupStrength): string {
   }
 }
 
-function getDisplayStrengths(candidate: RaceSetupCandidate): RaceSetupStrength[] {
+function getDisplayStrengths(
+  candidate: RaceSetupCandidate,
+): RaceSetupStrength[] {
   const hasOverallVerdict = candidate.strengths.some(
     (strength) => strength.kind === "most-promising",
   );
@@ -329,8 +353,13 @@ export function RaceSetupComparison({
       />
 
       <div className="-mx-1 overflow-x-auto px-1">
-        <div className="min-w-[920px]">
-          <div className="grid grid-cols-[minmax(500px,2.4fr)_repeat(4,minmax(90px,0.55fr))] gap-3 px-3 pb-2 text-2xs font-medium uppercase tracking-wider text-zinc-600">
+        <div className="w-full min-w-[640px]">
+          <div
+            className={cn(
+              "grid gap-3 px-3 pb-2 text-2xs font-medium uppercase tracking-wider text-zinc-600",
+              SETUP_COMPARISON_GRID,
+            )}
+          >
             <div>Setup</div>
             <div>Best lap</div>
             <div>Median pace</div>
@@ -353,9 +382,10 @@ export function RaceSetupComparison({
                   aria-pressed={selected}
                   onClick={() => setSelectedId(candidate.id)}
                   className={cn(
-                    "grid w-full grid-cols-[minmax(500px,2.4fr)_repeat(4,minmax(90px,0.55fr))] gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600",
+                    "grid w-full gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600",
+                    SETUP_COMPARISON_GRID,
                     selected
-                      ? "border-sky-400/30 bg-zinc-800/80 text-zinc-100"
+                      ? "border-zinc-100/20 bg-zinc-800/60 text-zinc-100"
                       : "border-transparent text-zinc-400 hover:bg-zinc-800/35 hover:text-zinc-200",
                   )}
                 >
@@ -365,7 +395,11 @@ export function RaceSetupComparison({
                         {candidate.name}
                       </span>
                       {selected && (
-                        <Badge size="xs" tone="zinc" className="uppercase tracking-wide">
+                        <Badge
+                          size="xs"
+                          tone="zinc"
+                          className="uppercase tracking-wide"
+                        >
                           Selected
                         </Badge>
                       )}
@@ -389,7 +423,10 @@ export function RaceSetupComparison({
                         ? bestLapValue - metricColors.bestLap.best
                         : undefined,
                     )}
-                    className={metricValueClassName(bestLapValue, metricColors.bestLap)}
+                    className={metricValueClassName(
+                      bestLapValue,
+                      metricColors.bestLap,
+                    )}
                   />
                   <MetricCell
                     value={formatLapMetric(medianPaceValue)}
@@ -417,7 +454,10 @@ export function RaceSetupComparison({
                     value={formatWearMetric(wearValue)}
                     delta={formatWearDelta(candidate.comparableWear?.delta)}
                     detail={getWearDetail(candidate)}
-                    className={metricValueClassName(wearValue, metricColors.wear)}
+                    className={metricValueClassName(
+                      wearValue,
+                      metricColors.wear,
+                    )}
                   />
                 </button>
               );

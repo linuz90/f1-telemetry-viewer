@@ -1,8 +1,13 @@
 import type { TelemetrySession } from "../types/telemetry";
-import { bestSectorTimeMs, msToSectorTime, msToLapTime, sectorTimeMs } from "../utils/format";
-import { getValidLaps } from "../utils/stats";
 import { cn } from "../utils/cn";
 import { getTeamColor } from "../utils/colors";
+import {
+  bestSectorTimeMs,
+  msToLapTime,
+  msToSectorTime,
+  sectorTimeMs,
+} from "../utils/format";
+import { getValidLaps } from "../utils/stats";
 import { accentCardClass, neutralCardClass } from "./Card";
 
 interface SectorVsBestProps {
@@ -20,7 +25,10 @@ const SECTOR_KEYS = [
  * Compares the focused driver's best sector times against the session-best sectors,
  * showing deltas and who holds the best in each sector.
  */
-export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps) {
+export function SectorVsBest({
+  session,
+  focusedDriverIndex,
+}: SectorVsBestProps) {
   const drivers = session["classification-data"];
   const focused = drivers.find((d) => d.index === focusedDriverIndex);
   if (!focused) return null;
@@ -55,7 +63,9 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
     sessionBestLap > 0 &&
     Math.abs(focusedBestLap - sessionBestLap) < 1;
   const lapDeltaMs =
-    focusedBestLap !== null && sessionBestLap > 0 ? focusedBestLap - sessionBestLap : null;
+    focusedBestLap !== null && sessionBestLap > 0
+      ? focusedBestLap - sessionBestLap
+      : null;
 
   // Compute session-best and focused-driver-best for each sector
   const sectors = SECTOR_KEYS.map(({ sector, label }) => {
@@ -86,7 +96,9 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
       sessionBest > 0 &&
       Math.abs(focusedBest - sessionBest) < 1;
     const deltaMs =
-      focusedBest !== null && sessionBest > 0 ? focusedBest - sessionBest : null;
+      focusedBest !== null && sessionBest > 0
+        ? focusedBest - sessionBest
+        : null;
 
     return {
       label,
@@ -109,13 +121,11 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
         <div
           className={cn(
             "rounded-lg px-3 py-3",
-            isFocusedBestLap
-              ? accentCardClass("purple")
-              : neutralCardClass,
+            isFocusedBestLap ? accentCardClass("purple") : neutralCardClass,
           )}
         >
           <div className="text-xs uppercase text-zinc-500 mb-2">Lap</div>
-          <div className="font-mono text-lg font-semibold text-zinc-100">
+          <div className="font-mono text-lg font-medium text-zinc-100">
             {focusedBestLap !== null ? msToLapTime(focusedBestLap) : "–"}
           </div>
           {lapDeltaMs !== null && (
@@ -153,9 +163,7 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
             key={s.label}
             className={cn(
               "rounded-lg px-3 py-3",
-              s.isFocusedBest
-                ? accentCardClass("purple")
-                : neutralCardClass,
+              s.isFocusedBest ? accentCardClass("purple") : neutralCardClass,
             )}
           >
             <div className="text-xs uppercase text-zinc-500 mb-2">
@@ -163,7 +171,7 @@ export function SectorVsBest({ session, focusedDriverIndex }: SectorVsBestProps)
             </div>
 
             {/* Focused driver time */}
-            <div className="font-mono text-lg font-semibold text-zinc-100">
+            <div className="font-mono text-lg font-medium text-zinc-100">
               {s.focusedBest !== null ? msToSectorTime(s.focusedBest) : "–"}
             </div>
 

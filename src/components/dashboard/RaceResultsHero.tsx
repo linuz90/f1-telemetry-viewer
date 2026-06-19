@@ -35,7 +35,10 @@ function PodiumChip({
   return (
     <HStack
       justify="center"
-      className={cn("flex-1 gap-3 rounded-xl px-4 py-3", positionBadgeClasses(position))}
+      className={cn(
+        "flex-1 gap-3 rounded-xl px-4 py-3",
+        positionBadgeClasses(position),
+      )}
     >
       <Icon className="size-5 shrink-0 opacity-80" />
       <VStack align="start" className="gap-0.5">
@@ -69,10 +72,16 @@ function MicroStat({
         {Icon && <Icon className="size-3" />}
         {label}
       </HStack>
-      <div className={cn("mt-1 text-xl font-semibold tabular-nums", tone)}>
+      <div
+        className={cn("mt-1 text-xl font-semimediumbold tabular-nums", tone)}
+      >
         {value}
       </div>
-      {detail && <div className="mt-0.5 text-xs text-zinc-500">{detail}</div>}
+      {detail && (
+        <div className="mt-0.5 font-mono text-xs tabular-nums text-zinc-500">
+          {detail}
+        </div>
+      )}
     </div>
   );
 }
@@ -133,10 +142,15 @@ export function RaceResultsHero({
           <div className="text-6xl font-semibold leading-[0.8] tracking-tight tabular-nums text-zinc-100 mb-3.5">
             {headlineValue}
           </div>
-          <div className="mt-2 text-sm text-zinc-400">{headlineCaption}</div>
+          <div className="mt-2 font-mono text-sm tabular-nums text-zinc-400">
+            {headlineCaption}
+          </div>
           {gridGain != null && (
             <div
-              className={cn("mt-3 inline-flex items-center gap-1.5 text-xs font-mono", gridGainTone(gridGain))}
+              className={cn(
+                "mt-3 inline-flex items-center gap-1.5 text-xs font-mono",
+                gridGainTone(gridGain),
+              )}
             >
               <GridGainGlyph value={gridGain} />
               <span>{signedNumber(gridGain)} avg grid Δ</span>
@@ -202,7 +216,9 @@ export function RaceResultsHero({
       )}
 
       {stats.modeDetail && (
-        <p className="mt-5 text-xs text-zinc-500">{stats.modeDetail}</p>
+        <p className="mt-5 font-mono text-xs tabular-nums text-zinc-500">
+          {stats.modeDetail}
+        </p>
       )}
     </Card>
   );

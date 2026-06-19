@@ -6,9 +6,10 @@ import type {
   TelemetrySession,
   TyreStintHistoryV2Entry,
 } from "../types/telemetry";
-import { msToLapTime, msToSectorTime } from "./format";
+import { isLapValid, msToLapTime, msToSectorTime } from "./format";
 import {
   getBestLapTime,
+  getLapCompoundMap,
   getValidLaps,
   type StrategyInsight,
 } from "./stats";
@@ -55,7 +56,8 @@ export interface SessionInsight extends Omit<StrategyInsight, "type"> {
   type: SessionInsightType;
   tone?: SessionInsightTone;
   accent?: SessionInsightAccent;
-  extraDetails?: string[];
+  /** Visual tyre compound for lap-backed insights, when telemetry can map it reliably. */
+  compound?: string;
 }
 
 export interface BuildSessionSummaryInsightsOptions {
@@ -185,6 +187,24 @@ function scanBestLap(session: TelemetrySession): SessionBestLap | undefined {
   return best;
 }
 
+function bestLapNumberForDriver(driver: DriverData, bestLapMs: number): number | undefined {
+  const laps = driver["session-history"]["lap-history-data"] ?? [];
+  const matchingIndex = laps.findIndex(
+    (lap) =>
+      isLapValid(lap["lap-valid-bit-flags"]) &&
+      Math.abs(lap["lap-time-in-ms"] - bestLapMs) < 1,
+  );
+  if (matchingIndex !== -1) return matchingIndex + 1;
+
+  const reportedLap = driver["session-history"]["best-lap-time-lap-num"];
+  return reportedLap > 0 ? reportedLap : undefined;
+}
+
+function compoundForLap(driver: DriverData, lapNumber: number | undefined): string | undefined {
+  if (lapNumber == null) return undefined;
+  return getLapCompoundMap(driver).get(lapNumber);
+}
+
 function buildRaceResultInsight(session: TelemetrySession, driver: DriverData): SessionInsight | null {
   const result = getDriverResult(session, driver);
   if (!result.position && !result.status) return null;
@@ -300,6 +320,7 @@ function buildBestLapInsight(session: TelemetrySession, driver: DriverData): Ses
           : "session fastest lap"
         : `+${msToSectorTime(bestLapMs - sessionBest.timeMs)} vs ${sessionBest.driverName ?? "session best"}`
       : "best valid lap";
+  const compound = compoundForLap(driver, bestLapNumberForDriver(driver, bestLapMs));
 
   return {
     type: "lap",
@@ -308,6 +329,7 @@ function buildBestLapInsight(session: TelemetrySession, driver: DriverData): Ses
     detail,
     tone: isSessionBest ? "best" : "neutral",
     accent: isSessionBest ? "purple" : "cyan",
+    compound,
   };
 }
 
@@ -341,8 +363,8 @@ function buildRaceFlowInsight(
 
   const primary = hasGridMove ? gridMove : netPasses;
   const detailParts = [];
-  if (hasGridMove) detailParts.push(`started P${result.gridPosition}, finished P${result.position}`);
-  if (made > 0 || lost > 0) detailParts.push(`${made} made, ${lost} lost`);
+  if (hasGridMove) detailParts.push(`P${result.gridPosition} to P${result.position}`);
+  if (made > 0 || lost > 0) detailParts.push(`${made} overtakes, ${lost} lost`);
 
   return {
     type: "race-flow",
@@ -350,7 +372,7 @@ function buildRaceFlowInsight(
     value: hasGridMove
       ? `${signedNumber(gridMove)} pos`
       : `${signedNumber(netPasses)} net`,
-    detail: detailParts.join(" - "),
+    detail: detailParts.join(" · "),
     tone: primary > 0 ? "positive" : primary < 0 ? "negative" : "neutral",
     accent: primary > 0 ? "emerald" : primary < 0 ? "rose" : "zinc",
   };
@@ -563,19 +585,37 @@ function extractTimeDelta(text: string): string | undefined {
   return text.match(/[+-]\d+(?:\.\d+)?s(?:\/lap)?/)?.[0];
 }
 
-function rankingPrefix(insight: SessionInsight): string {
-  const total = insight.detail.match(/^of\s+\d+/)?.[0];
-  return total ? `${insight.value} ${total}` : insight.value;
+function rankPosition(value: string): number | undefined {
+  return Number(value.match(/\d+/)?.[0]) || undefined;
+}
+
+function compactRank(value: string, total?: number | string): string {
+  const position = rankPosition(value);
+  const suffix = total ? `/${total}` : "";
+  return position ? `P${position}${suffix}` : `${value}${suffix}`;
+}
+
+function insightRank(insight: SessionInsight, totalOverride?: number | string): string {
+  if (insight.rank != null) {
+    const total = totalOverride ?? insight.rankTotal;
+    return `P${insight.rank + 1}${total ? `/${total}` : ""}`;
+  }
+  return compactRank(insight.value, totalOverride);
+}
+
+function comparisonTarget(detail: string): string | undefined {
+  return detail.match(/\b(?:vs|ahead of)\s+(.+)$/)?.[1];
 }
 
 function comparisonSuffix(detail: string): string | undefined {
-  return detail.match(/\b(?:vs|ahead of)\s+.+$/)?.[0];
+  const target = comparisonTarget(detail);
+  return target ? `vs ${target}` : undefined;
 }
 
 function rankedMetricLine(prefix: string, insight: SessionInsight): string {
   const rankedMetric = insight.detail.match(/^of\s+(\d+)\s+[—-]\s+(.+)$/);
   if (rankedMetric) {
-    return `${prefix}: ${rankedMetric[2]} (${insight.value} of ${rankedMetric[1]})`;
+    return `${prefix} ${rankedMetric[2]} · ${insightRank(insight, rankedMetric[1])}`;
   }
 
   return compactMetricLine(prefix, insight);
@@ -583,7 +623,24 @@ function rankedMetricLine(prefix: string, insight: SessionInsight): string {
 
 function sectorContext(insight: SessionInsight, role: "strongest" | "weakest"): string {
   const comparison = comparisonSuffix(insight.detail);
-  return `${extractSectorLabel(insight.label)} ${role} - ${rankingPrefix(insight)}${comparison ? ` ${comparison}` : ""}`;
+  const roleLabel = role === "strongest" ? "best" : "weak";
+  return `${extractSectorLabel(insight.label)} ${roleLabel} · ${insightRank(insight)}${comparison ? ` ${comparison}` : ""}`;
+}
+
+function compactFuelLoadLine(initial: SessionInsight): string {
+  if (initial.value === "—") return initial.detail;
+  const kg = initial.detail.match(/\b\d+(?:\.\d+)?\s*kg\b/)?.[0];
+  return `Current ${initial.value}${kg ? ` · ${kg}` : ""}`;
+}
+
+function compactFuelRecommendationLine(recommended: SessionInsight | undefined): string | undefined {
+  if (!recommended?.detail) return undefined;
+  const spare = recommended.detail.match(/([+−-]?\d+(?:\.\d+)?)\s+laps?\s+spare/i);
+  if (spare) return `Clean buffer ${spare[1]} laps`;
+  const short = recommended.detail.match(/([+−-]?\d+(?:\.\d+)?)\s+laps?\s+short/i);
+  if (short) return `Clean buffer −${Math.abs(Number(short[1])).toFixed(1)} laps`;
+  if (/on target/i.test(recommended.detail)) return "Clean race on target";
+  return recommended.detail.replace(/\s*\([^)]*\)\s*$/, "");
 }
 
 function mergeBestLapInsight(
@@ -613,16 +670,12 @@ function mergeFuelInsights(fuelInsights: SessionInsight[]): SessionInsight | und
     type: "fuel",
     label: "Fuel Plan",
     value: hasRecommendation ? recommended.value : primary.value,
-    detail: hasRecommendation ? "fuel slider recommendation" : "fuel data unavailable",
+    detail: hasRecommendation ? "recommended start fuel" : "fuel data missing",
     tooltip: recommended?.tooltip ?? initial?.tooltip,
     accent: "amber",
     extraDetails: uniqueLines([
-      initial
-        ? initial.value === "—"
-          ? initial.detail
-          : `Loaded ${initial.value}${initial.detail ? ` (${initial.detail})` : ""}`
-        : undefined,
-      recommended?.detail,
+      initial ? compactFuelLoadLine(initial) : undefined,
+      compactFuelRecommendationLine(recommended),
     ]),
   };
 }
@@ -695,7 +748,7 @@ function mergePowerInsights(
   const speedValue = extractSpeedValue(speed) ?? speed.value;
   const speedRank =
     speed.rank != null && speed.rankTotal != null
-      ? `${speed.value} of ${speed.rankTotal}`
+      ? `${insightRank(speed)}`
       : speed.detail;
   return {
     type: "speed",

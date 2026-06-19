@@ -1,8 +1,21 @@
 @import "@fontsource-variable/geist";
 @import "tailwindcss";
 
+/* Fontsource only ships Quattro as static 400/700 files. Self-host the
+ * official iA variable font so font-medium/font-semibold get true weights. */
+@font-face {
+  font-family: "iA Writer Quattro";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("./assets/fonts/iAWriterQuattroV.woff2") format("woff2");
+}
+
 @theme {
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    "iA Writer Quattro", ui-monospace, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
 
   /* Typography
    * Tweak app-wide type here. The comments show px values at the default
@@ -18,10 +31,10 @@
    * text-xl   20 / 28  prominent stat values
    * text-2xl  24 / 32  page titles
    */
-  --text-3xs: 0.5625rem;
-  --text-3xs--line-height: calc(0.75 / 0.5625);
-  --text-2xs: 0.6875rem;
-  --text-2xs--line-height: calc(0.875 / 0.6875);
+  --text-3xs: 0.65rem;
+  --text-3xs--line-height: calc(0.75 / 0.65);
+  --text-2xs: 0.7rem;
+  --text-2xs--line-height: calc(0.875 / 0.7);
   --text-xs: 0.8125rem;
   --text-xs--line-height: calc(1.125 / 0.8125);
   --text-sm: 0.875rem;

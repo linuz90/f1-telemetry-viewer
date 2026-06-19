@@ -7,11 +7,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { cardClassCompact } from "../Card";
-import { TrackFlag } from "../TrackFlag";
 import { cn } from "../../utils/cn";
 import { CHART_THEME } from "../../utils/colors";
 import { msToLapTime } from "../../utils/format";
+import { cardClassCompact } from "../Card";
+import { TrackFlag } from "../TrackFlag";
 import { HStack } from "../ui/Stack";
 import { trackFormulaPath } from "./helpers";
 
@@ -28,13 +28,13 @@ export function QualifyingPaceCard({ data }: { data: QualifyingPaceData }) {
   return (
     <Link
       to={trackFormulaPath(track, formulaKey)}
-      className={cn(cardClassCompact, "!p-3 transition-colors hover:bg-zinc-800/50")}
+      className={cn(cardClassCompact, "transition-colors hover:bg-zinc-800/50")}
     >
       <HStack justify="between" className="mb-2 gap-3">
         <HStack className="gap-1.5">
           <TrackFlag track={track} />
           <span className="truncate text-sm font-medium">{track}</span>
-          <span className="ml-1 text-xs text-zinc-500">
+          <span className="ml-1 font-mono text-xs tabular-nums text-zinc-500">
             {points.length} days
           </span>
         </HStack>

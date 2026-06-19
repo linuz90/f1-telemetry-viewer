@@ -38,12 +38,14 @@ function MetricShell({
 }) {
   return (
     <div className="min-w-0">
-      <div className="text-2xs font-medium uppercase tracking-wider text-zinc-500">
+      <div className="font-mono text-2xs font-medium uppercase tracking-wider text-zinc-500">
         {label}
       </div>
       <div className="mt-1 min-w-0">{children}</div>
       {detail && (
-        <div className="mt-0.5 truncate text-2xs text-zinc-500">{detail}</div>
+        <div className="mt-0.5 truncate font-mono text-2xs tabular-nums text-zinc-500">
+          {detail}
+        </div>
       )}
     </div>
   );
@@ -142,7 +144,7 @@ export function TrackOverviewCard({
           <TrackFlag track={track} />
           <span className="truncate">{track}</span>
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs tabular-nums text-zinc-400">
           <span>
             {sessions.length} {sessions.length === 1 ? "session" : "sessions"}
           </span>

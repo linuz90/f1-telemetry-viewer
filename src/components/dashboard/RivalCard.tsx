@@ -130,7 +130,7 @@ export function RivalCard({ card }: { card: RivalCardData }) {
         )}
       </div>
 
-      <div className="mt-3 truncate border-t border-white/[0.05] pt-2 text-2xs font-medium uppercase tracking-wider text-zinc-500">
+      <div className="mt-3 border-t border-white/[0.05] pt-2 font-mono text-2xs font-medium leading-snug tabular-nums text-zinc-500">
         {card.detail}
       </div>
     </InsightTile>

@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { ChevronDown, ExternalLink, Flag, Gauge, Target, Timer } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
+import { ExternalLink, Flag, Gauge, Target, Timer } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { TelemetrySession } from "../types/telemetry";
 import { getBestLapTime } from "../utils/stats";
@@ -9,6 +9,7 @@ import { getFormulaComparisonKey, getFormulaLabel, shouldShowFormulaLabel } from
 import { trackPath, trackTabForSessionType } from "../utils/routes";
 import { TrackFlag } from "./TrackFlag";
 import { TrackLayout } from "./TrackLayout";
+import { PillSelect, type PillSelectOption } from "./ui/PillSelect";
 import { HStack } from "./ui/Stack";
 
 const EXT_LINK_TEMPLATE = import.meta.env.VITE_EXTERNAL_LINK_TEMPLATE as string | undefined;
@@ -31,6 +32,7 @@ interface SessionHeaderProps {
   session: TelemetrySession;
   focusedDriverIndex: number;
   onFocusedDriverChange: (index: number) => void;
+  controls?: ReactNode;
   slug?: string;
   showDriverSelector?: boolean;
 }
@@ -39,6 +41,7 @@ export function SessionHeader({
   session,
   focusedDriverIndex,
   onFocusedDriverChange,
+  controls,
   slug,
   showDriverSelector = true,
 }: SessionHeaderProps) {
@@ -75,9 +78,22 @@ export function SessionHeader({
         return bestA - bestB;
       });
   }, [drivers, focusedDriverIndex]);
+  const driverOptions = useMemo<PillSelectOption[]>(
+    () =>
+      selectableDrivers.map((d) => {
+        const pos = d["final-classification"]?.position;
+        const suffix = d["is-player"] ? " (You)" : "";
+        const prefix = pos ? `P${pos} ` : "";
+        return {
+          value: d.index,
+          label: `${prefix}${d["driver-name"]} — ${getTeamName(d.team)}${suffix}`,
+        };
+      }),
+    [selectableDrivers],
+  );
 
   return (
-    <HStack align="start" className="mb-6 gap-4">
+    <HStack align="start" className="gap-4">
       <div className="min-w-0 flex-1 space-y-3">
         {/* Title row */}
         <HStack className="gap-3">
@@ -101,37 +117,16 @@ export function SessionHeader({
           )}
         </HStack>
 
-        <HStack wrap className="gap-2 text-xs text-zinc-400">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-zinc-400">
           {showDriverSelector && (
-            <span className="relative inline-flex items-center">
-              <span
-                className="inline-block w-1.5 h-1.5 rounded-full mr-1"
-                style={{
-                  backgroundColor: focusedDriver
-                    ? getTeamColor(focusedDriver.team)
-                    : undefined,
-                }}
-              />
-              <select
-                value={focusedDriverIndex}
-                onChange={(e) => onFocusedDriverChange(Number(e.target.value))}
-                className="appearance-none bg-zinc-900 text-zinc-200 text-xs font-medium rounded-full pl-2 pr-6 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-purple-500/40 cursor-pointer"
-              >
-                {selectableDrivers.map((d) => {
-                  const pos = d["final-classification"]?.position;
-                  const suffix = d["is-player"] ? " (You)" : "";
-                  const prefix = pos ? `P${pos} ` : "";
-                  return (
-                    <option key={d.index} value={d.index}>
-                      {prefix}
-                      {d["driver-name"]} — {getTeamName(d.team)}
-                      {suffix}
-                    </option>
-                  );
-                })}
-              </select>
-              <ChevronDown className="absolute right-1.5 size-3 pointer-events-none text-zinc-500" />
-            </span>
+            <PillSelect
+              value={focusedDriverIndex}
+              onChange={(value) => onFocusedDriverChange(Number(value))}
+              options={driverOptions}
+              ariaLabel="Focused driver"
+              dotColor={focusedDriver ? getTeamColor(focusedDriver.team) : undefined}
+              width="session"
+            />
           )}
 
           {slug && EXT_LINK_TEMPLATE && EXT_LINK_LABEL && (
@@ -145,7 +140,9 @@ export function SessionHeader({
               {EXT_LINK_LABEL}
             </a>
           )}
-        </HStack>
+
+          {controls && <div className="contents">{controls}</div>}
+        </div>
       </div>
       <TrackLayout
         track={info["track-id"]}

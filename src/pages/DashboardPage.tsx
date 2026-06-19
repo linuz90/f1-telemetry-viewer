@@ -6,22 +6,22 @@ import { InsightCard } from "../components/dashboard/InsightCard";
 import { QualifyingPaceCard } from "../components/dashboard/QualifyingPaceCard";
 import { RaceResultsHero } from "../components/dashboard/RaceResultsHero";
 import { RivalCard } from "../components/dashboard/RivalCard";
-import { SectionHeader } from "../components/ui/SectionHeader";
 import { TrackOverviewCard } from "../components/dashboard/TrackOverviewCard";
 import {
   type SessionStats,
   buildQualifyingPaceData,
-  buildTrackRecords,
   buildTrackGroups,
+  buildTrackRecords,
 } from "../components/dashboard/helpers";
+import { SectionHeader } from "../components/ui/SectionHeader";
 import { useTelemetry } from "../context/TelemetryContext";
-import { useSessionList } from "../hooks/useSessionList";
 import {
   areSessionFiltersDefault,
   DEFAULT_FILTERS,
   matchesSessionFilters,
   useSessionFilters,
 } from "../hooks/useSessionFilters";
+import { useSessionList } from "../hooks/useSessionList";
 import { cn } from "../utils/cn";
 import { buildDashboardActivity } from "../utils/dashboardActivity";
 import {
@@ -148,13 +148,14 @@ export function DashboardPage() {
       </div>
 
       {!hasScopedData ? (
-        <section className={cn("rounded-2xl bg-zinc-900/40 px-5 py-8 text-center", cardHighlight)}>
-          <h3 className="text-sm font-semibold text-zinc-300">
-            {emptyTitle}
-          </h3>
-          <p className="mt-1 text-sm text-zinc-500">
-            {emptyHint}
-          </p>
+        <section
+          className={cn(
+            "rounded-2xl bg-zinc-900/40 px-5 py-8 text-center",
+            cardHighlight,
+          )}
+        >
+          <h3 className="text-sm font-semibold text-zinc-300">{emptyTitle}</h3>
+          <p className="mt-1 text-sm text-zinc-500">{emptyHint}</p>
           {isFiltered && (
             <button
               type="button"
@@ -177,19 +178,19 @@ export function DashboardPage() {
 
           {hasRecentActivity && (
             <section>
-              <SectionHeader
-                title="Recent Activity"
-                hint="Best representative sessions from recent driving"
-              />
+              <SectionHeader title="Recent Activity" />
               <div className="space-y-4">
                 {Object.entries(
                   (showAllActivity
                     ? recentActivity
                     : recentActivity.slice(0, RECENT_ACTIVITY_COLLAPSED)
-                  ).reduce<Record<string, typeof recentActivity>>((acc, activity) => {
-                    (acc[activity.dayKey] ??= []).push(activity);
-                    return acc;
-                  }, {}),
+                  ).reduce<Record<string, typeof recentActivity>>(
+                    (acc, activity) => {
+                      (acc[activity.dayKey] ??= []).push(activity);
+                      return acc;
+                    },
+                    {},
+                  ),
                 ).map(([dayKey, activities]) => (
                   <div key={dayKey}>
                     <h3 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">
@@ -203,8 +204,7 @@ export function DashboardPage() {
                   </div>
                 ))}
               </div>
-              {recentActivity.length >
-                RECENT_ACTIVITY_COLLAPSED && (
+              {recentActivity.length > RECENT_ACTIVITY_COLLAPSED && (
                 <button
                   type="button"
                   onClick={() => setShowAllActivity((value) => !value)}
@@ -216,9 +216,7 @@ export function DashboardPage() {
                     </>
                   ) : (
                     <>
-                      Show{" "}
-                      {recentActivity.length -
-                        RECENT_ACTIVITY_COLLAPSED}{" "}
+                      Show {recentActivity.length - RECENT_ACTIVITY_COLLAPSED}{" "}
                       more <ChevronDown className="size-3" />
                     </>
                   )}
@@ -229,10 +227,7 @@ export function DashboardPage() {
 
           {insights.length > 0 && (
             <section>
-              <SectionHeader
-                title="Insights"
-                hint="Patterns across your sessions — race insights use online results when available"
-              />
+              <SectionHeader title="Insights" />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {insights.map((insight) => (
                   <InsightCard
@@ -246,13 +241,13 @@ export function DashboardPage() {
 
           {rivalStats.cards.length > 0 && (
             <section>
-              <SectionHeader
-                title="Rivals & Teammates"
-                hint={`The drivers you race online — across ${rivalStats.raceCount} ${rivalStats.raceCount === 1 ? "race" : "races"}`}
-              />
+              <SectionHeader title="Rivals & Teammates" />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {rivalStats.cards.map((card) => (
-                  <RivalCard key={`${card.kind}-${card.driverName}`} card={card} />
+                  <RivalCard
+                    key={`${card.kind}-${card.driverName}`}
+                    card={card}
+                  />
                 ))}
               </div>
             </section>
@@ -262,7 +257,6 @@ export function DashboardPage() {
             <section>
               <SectionHeader
                 title="Qualifying Pace"
-                hint="Best lap per day"
                 action={<Timer className="size-4 text-zinc-600" />}
               />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
