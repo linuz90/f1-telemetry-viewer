@@ -143,7 +143,7 @@ export function Layout() {
         <div className="w-px h-full absolute right-0 top-0 z-99 pointer-events-none bg-[rgba(255,255,255,0.08)]" />
         <div className="p-4">
           <div className="flex items-center justify-between">
-            <BrandHomeLink className="text-[15px] font-bold tracking-tight" />
+            <BrandHomeLink className="text-md font-bold tracking-tight" />
             <div className="flex items-center gap-1">
               <button
                 onClick={openChangelog}
@@ -210,7 +210,7 @@ export function Layout() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <BrandHomeLink className="text-[15px] font-bold tracking-tight" />
+          <BrandHomeLink className="text-md font-bold tracking-tight" />
         </div>
 
         {mode === "demo" && (

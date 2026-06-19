@@ -4,24 +4,40 @@
 @theme {
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
 
-  /* Type scale — kept deliberately small (5 tiers) so dense data screens stay
-   * legible. Tweak the rem values here to scale the whole app at once.
+  /* Typography
+   * Tweak app-wide type here. The comments show px values at the default
+   * 16px browser root; the variables stay in rem so user zoom still works.
    *
-   *   text-2xs  11px / 14px  uppercase mono eyebrows, pill badges, chip labels
-   *   text-xs   13px / 18px  captions, sub-text, footnotes, table cells
-   *   text-sm   14px / 20px  small body, secondary labels (Tailwind default)
-   *   text-base 16px / 24px  body (Tailwind default)
-   *   text-lg   18px / 28px  hero stats, big numbers (Tailwind default)
-   *
-   * Avoid hardcoded `text-[Npx]` for body copy — pick the closest tier so the
-   * scale stays adjustable from this file. */
+   * text-3xs   9 / 12  micro labels inside dense badges and tiny charts
+   * text-2xs  11 / 14  eyebrows, compact chips, tiny metadata
+   * text-xs   13 / 18  captions, footnotes, dense tables
+   * text-sm   14 / 20  secondary body, controls
+   * text-md   15 / 22  compact headings and mono values
+   * text-base 16 / 24  base body copy
+   * text-lg   18 / 28  compact stat values
+   * text-xl   20 / 28  prominent stat values
+   * text-2xl  24 / 32  page titles
+   */
+  --text-3xs: 0.5625rem;
+  --text-3xs--line-height: calc(0.75 / 0.5625);
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: calc(0.875 / 0.6875);
   --text-xs: 0.8125rem;
   --text-xs--line-height: calc(1.125 / 0.8125);
-  /* Pure black for the chrome (sidebar + body fallback). The main content area
-   * lifts off this with a slightly lighter canvas so cards have something to
-   * sit on. */
+  --text-sm: 0.875rem;
+  --text-sm--line-height: calc(1.25 / 0.875);
+  --text-md: 0.9375rem;
+  --text-md--line-height: calc(1.375 / 0.9375);
+  --text-base: 1rem;
+  --text-base--line-height: 1.5;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: calc(1.75 / 1.125);
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.4;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: calc(2 / 1.5);
+
+  /* Surfaces */
   --color-shell: #000000;
   --color-canvas: hsl(240deg, 14.3%, 3.75%);
   --color-card-surface: color-mix(
@@ -30,11 +46,11 @@
     theme("--color-zinc-900") 70%
   );
 
-  /* Semantic palette — clear UI states mapped to specific hues. Use these
-   * (text-best, bg-ahead/10, ring-behind/15, …) for anything that carries one
-   * of these meanings; reach for the raw Tailwind tint only when the color is
-   * decorative. Chart equivalents live in CHART_THEME (utils/colors.ts) using
-   * a brighter -500 shade for legibility on Recharts surfaces. */
+  /* Semantic colors
+   * Use text-best, bg-ahead/10, ring-behind/15, etc. for meaning-bearing UI.
+   * Chart equivalents live in CHART_THEME (utils/colors.ts), where Recharts
+   * often needs brighter shades for contrast.
+   */
   --color-best: #c084fc; /* purple-400 — session best, records */
   --color-active: #22d3ee; /* cyan-400 — current/active driver */
   --color-ahead: #4ade80; /* green-400 — gains, improvement, valid */
@@ -46,9 +62,12 @@ html,
 body {
   background-color: var(--color-shell);
   color-scheme: dark;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
 }
 
-/* Custom scrollbar for dark theme */
+/* Scrollbars */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -64,8 +83,6 @@ body {
   background: theme("--color-zinc-700");
 }
 
-/* Sidebar scroll: thin, subtle, and ALWAYS reserves gutter space so layout
- * doesn't shift when the content fits without scrolling (e.g. Tracks tab). */
 .sidebar-scroll {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -82,15 +99,12 @@ body {
   background: rgba(255, 255, 255, 0.12);
 }
 
-/* Remove focus ring on Recharts containers */
+/* Focus */
 .recharts-wrapper:focus,
 .recharts-surface:focus {
   outline: none;
 }
 
-/* Tame the loud browser default focus ring to match the subtle zinc style
- * used by SegmentedControl. Components that need a custom focus treatment
- * still opt in with `focus:outline-none` + their own ring. */
 :focus-visible {
   outline: 1px solid theme("--color-zinc-600");
   outline-offset: 1px;

@@ -171,7 +171,7 @@ export function SessionInsightsGrid({ insights, hint }: SessionInsightsGridProps
               {insight.extraDetails?.map((detail) => (
                 <div
                   key={detail}
-                  className="mt-1 break-words text-[13px] leading-relaxed text-zinc-500"
+                  className="mt-1 break-words text-xs leading-relaxed text-zinc-500"
                 >
                   {highlightDetailValues(detail)}
                 </div>

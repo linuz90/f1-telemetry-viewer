@@ -194,13 +194,13 @@ function FuelTargetTile({
       <div className="mt-1.5 text-sm leading-relaxed text-zinc-400">
         recommended initial fuel
       </div>
-      <div className="mt-2 text-[13px] leading-relaxed text-zinc-500">
+      <div className="mt-2 text-xs leading-relaxed text-zinc-500">
         {highlightDetailValues(
           `≈ ${target.recommendedFuelKg.toFixed(1)} kg total · ${target.burnRateKgPerLap.toFixed(2)} kg/lap burn`,
         )}
       </div>
       {note && (
-        <div className="mt-1 text-[13px] leading-relaxed text-zinc-500">
+        <div className="mt-1 text-xs leading-relaxed text-zinc-500">
           {highlightDetailValues(note)}
         </div>
       )}
@@ -256,7 +256,7 @@ function FastestRivalTile({ benchmark }: { benchmark: TrackRivalBenchmark }) {
           </>
         )}
       </div>
-      <div className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">
+      <div className="mt-1.5 text-xs leading-relaxed text-zinc-500">
         {highlightDetailValues(sampleParts.join(" · "))}
       </div>
     </InsightTile>

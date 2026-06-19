@@ -65,7 +65,7 @@ function LapMetric({
     >
       <div
         className={cn(
-          "truncate font-mono text-[15px] font-semibold tabular-nums",
+          "truncate font-mono text-md font-semibold tabular-nums",
           record ? tone : "text-zinc-700",
         )}
       >
@@ -79,7 +79,7 @@ function RaceMetric({ record }: { record: TrackRaceRecord | undefined }) {
   if (!record) {
     return (
       <MetricShell label="Race">
-        <div className="truncate font-mono text-[15px] font-semibold tabular-nums text-zinc-700">
+        <div className="truncate font-mono text-md font-semibold tabular-nums text-zinc-700">
           —
         </div>
       </MetricShell>
@@ -101,7 +101,7 @@ function RaceMetric({ record }: { record: TrackRaceRecord | undefined }) {
     <MetricShell label="Race" detail={detail}>
       <div
         className={cn(
-          "inline-flex items-center gap-1.5 truncate font-mono text-[15px] font-semibold tabular-nums",
+          "inline-flex items-center gap-1.5 truncate font-mono text-md font-semibold tabular-nums",
           tone,
         )}
       >

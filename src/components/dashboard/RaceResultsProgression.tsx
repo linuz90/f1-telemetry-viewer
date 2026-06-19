@@ -137,7 +137,7 @@ function ProgressionBar({
   return (
     <div className="flex h-full flex-col items-center justify-end gap-0.5">
       <span
-        className={cn("font-mono text-[9px] leading-none tabular-nums", labelClass)}
+        className={cn("font-mono text-3xs leading-none tabular-nums", labelClass)}
       >
         {label}
       </span>
