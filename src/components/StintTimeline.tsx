@@ -10,6 +10,7 @@ import {
 } from "../utils/stats";
 import { msToLapTime, isLapValid } from "../utils/format";
 import { CompoundStatCard } from "./CompoundStatCard";
+import { SectionHeader } from "./ui/SectionHeader";
 
 interface StintTimelineProps {
   stints: TyreStint[];
@@ -30,9 +31,7 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-        Stint Analysis
-      </h3>
+      <SectionHeader size="sm" title="Stint Analysis" />
       <div className="flex h-10 gap-0.5">
         {stints.map((stint, i) => {
           const compound = stint["tyre-set-data"]["visual-tyre-compound"];
@@ -121,7 +120,7 @@ export function StintDetailCards({
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-2">Stints</h3>
+      <SectionHeader size="sm" title="Stints" />
       <div
         className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid"
         style={{

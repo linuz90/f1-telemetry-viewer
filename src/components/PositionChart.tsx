@@ -11,6 +11,7 @@ import {
 import type { OvertakeRecord, PositionHistoryEntry } from "../types/telemetry";
 import { getTeamColor, CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 import { EmptyState } from "./EmptyState";
+import { SectionHeader } from "./ui/SectionHeader";
 
 interface PositionChartProps {
   positionHistory: PositionHistoryEntry[];
@@ -110,9 +111,7 @@ export function PositionChart({
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-        Position Changes
-      </h3>
+      <SectionHeader size="sm" title="Position Changes" />
       <ResponsiveContainer width="100%" height={300}>
         <LineChart
           data={data}
@@ -178,7 +177,9 @@ export function PositionChart({
                         key={i}
                         className="mt-1"
                         style={{
-                          color: isPlayerOvertaking ? "#22c55e" : "#ef4444",
+                          color: isPlayerOvertaking
+                            ? CHART_THEME.ahead
+                            : CHART_THEME.behind,
                         }}
                       >
                         {isPlayerOvertaking
@@ -199,7 +200,9 @@ export function PositionChart({
                 key={driver.name}
                 type="stepAfter"
                 dataKey={driver.name}
-                stroke={isPlayer ? "#22d3ee" : getTeamColor(driver.team)}
+                stroke={
+                  isPlayer ? CHART_THEME.player : getTeamColor(driver.team)
+                }
                 strokeWidth={isPlayer ? 3 : 1}
                 strokeOpacity={isPlayer ? 1 : 0.4}
                 dot={false}
@@ -224,9 +227,13 @@ export function PositionChart({
                 x={lap}
                 y={position}
                 r={5}
-                fill={isPlayerOvertaking ? "#22c55e" : "#ef4444"}
+                fill={
+                  isPlayerOvertaking ? CHART_THEME.ahead : CHART_THEME.behind
+                }
                 fillOpacity={0.8}
-                stroke={isPlayerOvertaking ? "#22c55e" : "#ef4444"}
+                stroke={
+                  isPlayerOvertaking ? CHART_THEME.ahead : CHART_THEME.behind
+                }
                 strokeWidth={1.5}
               />
             );
@@ -244,7 +251,10 @@ export function PositionChart({
               (ot) => ot["overtaking-driver-name"] === playerName,
             ) && (
               <span className="flex items-center gap-1">
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" />
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: CHART_THEME.ahead }}
+                />
                 Overtake
               </span>
             )}
@@ -252,7 +262,10 @@ export function PositionChart({
               (ot) => ot["overtaken-driver-name"] === playerName,
             ) && (
               <span className="flex items-center gap-1">
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: CHART_THEME.behind }}
+                />
                 Overtaken
               </span>
             )}

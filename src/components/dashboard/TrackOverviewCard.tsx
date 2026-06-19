@@ -161,13 +161,13 @@ export function TrackOverviewCard({
         <LapMetric
           label="Online Q"
           record={records.onlineQualifying}
-          tone="text-purple-300"
+          tone="text-best"
         />
         <LapMetric label="TT" record={records.timeTrial} tone="text-cyan-300" />
         <LapMetric
           label="Offline Q"
           record={records.offlineQualifying}
-          tone="text-purple-300"
+          tone="text-best"
         />
       </div>
     </>

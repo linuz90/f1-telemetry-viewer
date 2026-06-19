@@ -30,6 +30,7 @@ import { ACCENT_TOKENS, type AccentColor } from "../Card";
 import { TrackFlag } from "../TrackFlag";
 import { TrackLayout } from "../TrackLayout";
 import { Badge } from "../ui/Badge";
+import { InsightDetail, InsightValue } from "../ui/InsightText";
 import { InsightTile } from "../ui/InsightTile";
 import { HStack } from "../ui/Stack";
 import { trackFormulaPath } from "./helpers";
@@ -151,18 +152,17 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
             <TrackFlag track={insight.track} />
             <span className="truncate">{insight.track}</span>
           </HStack>
-          <div className="mt-1 font-mono text-xs leading-snug tabular-nums text-zinc-500">
+          <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
             {insight.detail}
-          </div>
+          </InsightDetail>
         </div>
-        <div
-          className={cn(
-            "shrink-0 text-right font-mono text-2xl font-medium tabular-nums",
-            tokens.accent,
-          )}
+        <InsightValue
+          size="xl"
+          tone={tokens.accent}
+          className="shrink-0 text-right"
         >
           {insight.headline}
-        </div>
+        </InsightValue>
       </HStack>
     </InsightTile>
   );

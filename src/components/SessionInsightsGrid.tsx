@@ -27,6 +27,7 @@ import { Tooltip } from "./Tooltip";
 import { podiumIcon, positionTone } from "./dashboard/helpers";
 import { CompoundBadge } from "./ui/CompoundBadge";
 import { highlightDetailValues } from "./ui/HighlightedDetailText";
+import { InsightDetail, InsightValue } from "./ui/InsightText";
 import { InsightTile } from "./ui/InsightTile";
 import { SectionHeader } from "./ui/SectionHeader";
 
@@ -170,15 +171,7 @@ export function SessionInsightsGrid({
               badge={insightBadge(insight)}
               className="h-full min-h-[8.25rem]"
             >
-              <div
-                className={cn(
-                  "break-words font-mono tabular-nums",
-                  valueIsLong
-                    ? "text-sm leading-snug font-semibold"
-                    : "text-xl font-medium",
-                  valueColor,
-                )}
-              >
+              <InsightValue size={valueIsLong ? "sm" : "lg"} tone={valueColor}>
                 {PodiumIcon && resultPosition != null ? (
                   <span className="inline-flex items-center gap-2">
                     <PodiumIcon className="size-5 opacity-80" />
@@ -187,24 +180,23 @@ export function SessionInsightsGrid({
                 ) : (
                   insight.value
                 )}
-              </div>
+              </InsightValue>
               {insight.detail && (
-                <div className="mt-2 break-words font-mono text-sm leading-relaxed tabular-nums text-zinc-400">
+                <InsightDetail className="mt-2">
                   {highlightDetailValues(insight.detail)}
-                </div>
+                </InsightDetail>
               )}
               {insight.extraDetails?.map((detail) => (
-                <div
+                <InsightDetail
                   key={detail}
-                  className={cn(
-                    "mt-1 break-words font-mono leading-relaxed tabular-nums",
-                    extraDetailsArePeerLines
-                      ? "text-sm text-zinc-400"
-                      : "text-xs text-zinc-500",
-                  )}
+                  size={extraDetailsArePeerLines ? "md" : "sm"}
+                  tone={
+                    extraDetailsArePeerLines ? "text-zinc-400" : "text-zinc-500"
+                  }
+                  className={cn("mt-1")}
                 >
                   {highlightDetailValues(detail)}
-                </div>
+                </InsightDetail>
               ))}
               {showRankFooter && (
                 <div

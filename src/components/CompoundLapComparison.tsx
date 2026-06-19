@@ -5,8 +5,15 @@ import {
   medianLapTimeMs,
 } from "../utils/stats";
 import { msToLapTime } from "../utils/format";
-import { getCompoundColor } from "../utils/colors";
-import { tableHeadClass, tableRowClass } from "./ui/table";
+import { CompoundSwatchLabel } from "./ui/CompoundSwatchLabel";
+import { SectionHeader } from "./ui/SectionHeader";
+import {
+  tableCellClass,
+  tableClass,
+  tableHeadCellClass,
+  tableHeadClass,
+  tableRowClass,
+} from "./ui/table";
 import { cn } from "../utils/cn";
 
 interface CompoundLapComparisonProps {
@@ -81,21 +88,30 @@ export function CompoundLapComparison({
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-        Compound Comparison{" "}
-        <span className="font-normal text-zinc-500">vs {rivalName}</span>
-      </h3>
+      <SectionHeader
+        size="sm"
+        title="Compound Comparison"
+        hint={`vs ${rivalName}`}
+      />
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className={tableClass}>
           <thead className={tableHeadClass}>
             <tr>
-              <th className="text-left py-1.5 px-2">Compound</th>
-              <th className="text-right py-1.5 px-2">Your Median</th>
-              <th className="text-right py-1.5 px-2">Rival Median</th>
-              <th className="text-right py-1.5 px-2">Delta</th>
-              <th className="text-right py-1.5 px-2">Your Best</th>
-              <th className="text-right py-1.5 px-2">Rival Best</th>
-              <th className="text-right py-1.5 px-2">Laps</th>
+              <th className={tableHeadCellClass()}>Compound</th>
+              <th className={tableHeadCellClass({ align: "right" })}>
+                Your Median
+              </th>
+              <th className={tableHeadCellClass({ align: "right" })}>
+                Rival Median
+              </th>
+              <th className={tableHeadCellClass({ align: "right" })}>Delta</th>
+              <th className={tableHeadCellClass({ align: "right" })}>
+                Your Best
+              </th>
+              <th className={tableHeadCellClass({ align: "right" })}>
+                Rival Best
+              </th>
+              <th className={tableHeadCellClass({ align: "right" })}>Laps</th>
             </tr>
           </thead>
           <tbody>
@@ -104,26 +120,34 @@ export function CompoundLapComparison({
               const positive = delta > 0;
               return (
                 <tr key={s.compound} className={tableRowClass}>
-                  <td className="py-1.5 px-2">
-                    <span className="flex items-center gap-1.5">
-                      <span
-                        className="w-2 h-2 rounded-sm inline-block"
-                        style={{
-                          backgroundColor: getCompoundColor(s.compound),
-                        }}
-                      />
-                      <span className="text-zinc-300">{s.compound}</span>
-                    </span>
+                  <td className={tableCellClass()}>
+                    <CompoundSwatchLabel compound={s.compound} />
                   </td>
-                  <td className="text-right py-1.5 px-2 font-mono text-zinc-300">
+                  <td
+                    className={tableCellClass({
+                      align: "right",
+                      mono: true,
+                      className: "text-zinc-300",
+                    })}
+                  >
                     {msToLapTime(s.playerMedian)}
                   </td>
-                  <td className="text-right py-1.5 px-2 font-mono text-zinc-300">
+                  <td
+                    className={tableCellClass({
+                      align: "right",
+                      mono: true,
+                      className: "text-zinc-300",
+                    })}
+                  >
                     {msToLapTime(s.rivalMedian)}
                   </td>
                   <td
                     className={cn(
-                      "text-right py-1.5 px-2 font-mono font-bold",
+                      tableCellClass({
+                        align: "right",
+                        mono: true,
+                        className: "font-bold",
+                      }),
                       Math.abs(delta) < 0.001
                         ? "text-zinc-400"
                         : positive
@@ -134,13 +158,31 @@ export function CompoundLapComparison({
                     {delta <= 0 ? "" : "+"}
                     {delta.toFixed(3)}s
                   </td>
-                  <td className="text-right py-1.5 px-2 font-mono text-zinc-400">
+                  <td
+                    className={tableCellClass({
+                      align: "right",
+                      mono: true,
+                      className: "text-zinc-400",
+                    })}
+                  >
                     {msToLapTime(s.playerBest)}
                   </td>
-                  <td className="text-right py-1.5 px-2 font-mono text-zinc-400">
+                  <td
+                    className={tableCellClass({
+                      align: "right",
+                      mono: true,
+                      className: "text-zinc-400",
+                    })}
+                  >
                     {msToLapTime(s.rivalBest)}
                   </td>
-                  <td className="text-right py-1.5 px-2 font-mono text-zinc-500">
+                  <td
+                    className={tableCellClass({
+                      align: "right",
+                      mono: true,
+                      className: "text-zinc-500",
+                    })}
+                  >
                     {s.playerLapCount} / {s.rivalLapCount}
                   </td>
                 </tr>

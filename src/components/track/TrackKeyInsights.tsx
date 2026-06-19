@@ -1,9 +1,18 @@
 import { Fuel, Gauge, History, Swords, Timer, Trophy, Zap } from "lucide-react";
-import { msToLapTime, msToSectorTime } from "../../utils/format";
+import {
+  formatEnergyMj,
+  formatFuelKg,
+  formatKgPerLap,
+  joinMetaParts,
+  msToLapTime,
+  msToSectorTime,
+  pluralize,
+} from "../../utils/format";
 import type { TrackRivalBenchmark } from "../../utils/rivalStats";
 import type { TrackRaceRecommendation } from "../../utils/stats";
 import { CompoundBadge } from "../ui/CompoundBadge";
 import { highlightDetailValues } from "../ui/HighlightedDetailText";
+import { InsightDetail, InsightValue } from "../ui/InsightText";
 import { InsightTile } from "../ui/InsightTile";
 import { SectionHeader } from "../ui/SectionHeader";
 
@@ -49,13 +58,13 @@ export function TrackKeyInsights({
   } = recommendation;
 
   // Section subtitle: race count moves here (replaces the dead "Races: N" tile).
-  const subtitleParts: string[] = [];
-  subtitleParts.push(`${raceCount} race${raceCount === 1 ? "" : "s"}`);
-  if (fullDistanceRaceCount > 0 && fullDistanceRaceCount !== raceCount) {
-    subtitleParts.push(`${fullDistanceRaceCount} full-distance`);
-  }
-  if (raceLengthLabel) subtitleParts.push(raceLengthLabel);
-  const subtitle = subtitleParts.join(" · ");
+  const subtitle = joinMetaParts([
+    pluralize(raceCount, "race"),
+    fullDistanceRaceCount > 0 && fullDistanceRaceCount !== raceCount
+      ? `${fullDistanceRaceCount} full-distance`
+      : null,
+    raceLengthLabel,
+  ]);
 
   return (
     <div>
@@ -76,12 +85,10 @@ export function TrackKeyInsights({
 
         {avgErsDeployMj > 0 && (
           <InsightTile title="Avg ERS Deployed" icon={Zap} accent="cyan">
-            <div className="font-mono text-xl font-medium text-zinc-100">
-              {avgErsDeployMj.toFixed(2)} MJ
-            </div>
-            <div className="mt-1.5 font-mono text-sm leading-relaxed tabular-nums text-zinc-400">
+            <InsightValue>{formatEnergyMj(avgErsDeployMj, 2)}</InsightValue>
+            <InsightDetail className="mt-1.5">
               per lap, green-flag avg
-            </div>
+            </InsightDetail>
           </InsightTile>
         )}
 
@@ -120,13 +127,11 @@ function BestRaceLapTile({
       accent="purple"
       badge={compound ? <CompoundBadge compound={compound} /> : undefined}
     >
-      <div className="font-mono text-xl font-medium text-purple-300">
-        {msToLapTime(bestLapMs)}
-      </div>
+      <InsightValue tone="text-best">{msToLapTime(bestLapMs)}</InsightValue>
       {gapMs > 0 && (
-        <div className="mt-1.5 font-mono text-sm leading-relaxed tabular-nums text-zinc-400">
+        <InsightDetail className="mt-1.5">
           {highlightDetailValues(`+${msToSectorTime(gapMs)} vs. theoretical`)}
-        </div>
+        </InsightDetail>
       )}
     </InsightTile>
   );
@@ -139,13 +144,13 @@ function RaceVsQualiTile({ deltaMs }: { deltaMs: number }) {
   const isRaceFaster = deltaMs < 0;
   return (
     <InsightTile title="Race vs. Quali" icon={Gauge}>
-      <div className="font-mono text-xl font-medium text-zinc-100">
+      <InsightValue>
         {isRaceFaster ? "-" : "+"}
         {msToSectorTime(abs)}
-      </div>
-      <div className="mt-1.5 font-mono text-sm leading-relaxed tabular-nums text-zinc-400">
+      </InsightValue>
+      <InsightDetail className="mt-1.5">
         best race lap vs. best quali lap
-      </div>
+      </InsightDetail>
     </InsightTile>
   );
 }
@@ -172,7 +177,7 @@ function FuelTargetTile({
   // Negative means the slider value you used would only get you home thanks
   // to safety-car saves — bad advice for next race.
   const excess = target.excessAtFinishLaps;
-  const raceLabel = `${target.raceCount} race${target.raceCount === 1 ? "" : "s"}`;
+  const raceLabel = pluralize(target.raceCount, "race");
   let note: string | null = null;
   if (Math.abs(excess) >= 0.4) {
     note =
@@ -185,22 +190,20 @@ function FuelTargetTile({
 
   return (
     <InsightTile title="Fuel Plan" icon={Fuel} accent="amber">
-      <div className="font-mono text-xl font-medium text-zinc-100">
+      <InsightValue>
         {delta >= 0 ? "+" : ""}
         {delta.toFixed(1)} laps
-      </div>
-      <div className="mt-1.5 font-mono text-sm leading-relaxed tabular-nums text-zinc-400">
-        recommended initial fuel
-      </div>
-      <div className="mt-2 font-mono text-xs leading-relaxed tabular-nums text-zinc-500">
+      </InsightValue>
+      <InsightDetail className="mt-1.5">recommended initial fuel</InsightDetail>
+      <InsightDetail size="sm" tone="text-zinc-500" className="mt-2">
         {highlightDetailValues(
-          `≈ ${target.recommendedFuelKg.toFixed(1)} kg total · ${target.burnRateKgPerLap.toFixed(2)} kg/lap burn`,
+          `≈ ${formatFuelKg(target.recommendedFuelKg)} total · ${formatKgPerLap(target.burnRateKgPerLap)} burn`,
         )}
-      </div>
+      </InsightDetail>
       {note && (
-        <div className="mt-1 font-mono text-xs leading-relaxed tabular-nums text-zinc-500">
+        <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
           {highlightDetailValues(note)}
-        </div>
+        </InsightDetail>
       )}
     </InsightTile>
   );
@@ -228,7 +231,7 @@ function FastestRivalTile({ benchmark }: { benchmark: TrackRivalBenchmark }) {
   const seconds = (Math.abs(paceDeltaMs) / 1000).toFixed(3);
 
   // Detail: who they are + sample size + which evidence stream.
-  const sampleParts = [`${raceCount} race${raceCount === 1 ? "" : "s"}`];
+  const sampleParts = [pluralize(raceCount, "race")];
   if (basis === "same-compound pace" && lapSamples && lapSamples > 0) {
     sampleParts.push(`${lapSamples} laps · same tyres`);
   } else if (basis === "best-lap fallback") {
@@ -242,7 +245,7 @@ function FastestRivalTile({ benchmark }: { benchmark: TrackRivalBenchmark }) {
       icon={playerLeads ? Trophy : Swords}
       accent={playerLeads ? "purple" : "rose"}
     >
-      <div className="font-mono text-xl font-medium text-zinc-100">
+      <InsightValue>
         {matched ? (
           <>
             Matched{" "}
@@ -259,10 +262,10 @@ function FastestRivalTile({ benchmark }: { benchmark: TrackRivalBenchmark }) {
             </span>
           </>
         )}
-      </div>
-      <div className="mt-1.5 font-mono text-xs leading-relaxed tabular-nums text-zinc-500">
+      </InsightValue>
+      <InsightDetail size="sm" tone="text-zinc-500" className="mt-1.5">
         {highlightDetailValues(sampleParts.join(" · "))}
-      </div>
+      </InsightDetail>
     </InsightTile>
   );
 }
@@ -300,7 +303,7 @@ function VsLastRaceTile({
 
   return (
     <InsightTile title="vs. Last Race Here" icon={History}>
-      <div className="font-mono text-lg font-medium text-zinc-100">
+      <InsightValue size="md">
         {matched ? (
           <span className="text-zinc-100">Matched last best lap</span>
         ) : (
@@ -311,12 +314,12 @@ function VsLastRaceTile({
             </span>
           </>
         )}
-      </div>
+      </InsightValue>
       {wearNote && (
-        <div className="mt-1.5 font-mono text-sm leading-relaxed tabular-nums text-zinc-400">
+        <InsightDetail className="mt-1.5">
           <span className={wearNote.tone}>{wearNote.value}</span>{" "}
           {wearNote.suffix}
-        </div>
+        </InsightDetail>
       )}
     </InsightTile>
   );

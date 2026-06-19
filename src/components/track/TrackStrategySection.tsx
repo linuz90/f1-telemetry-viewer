@@ -98,7 +98,7 @@ function StrategyRow({
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={cn(
-            "inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider",
+            "inline-flex items-center gap-1.5 font-mono text-xs font-medium uppercase tracking-wider",
             labelTone,
           )}
         >

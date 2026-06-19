@@ -12,6 +12,7 @@ import { Badge } from "./ui/Badge";
 import { DAMAGE_COLORS } from "../utils/colors";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 import { EmptyState } from "./EmptyState";
+import { SectionHeader } from "./ui/SectionHeader";
 
 interface DamageTimelineProps {
   perLapInfo: PerLapInfo[];
@@ -133,7 +134,7 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
     // Only faults, no damage chart needed — just show badges
     return (
       <div>
-        <h3 className="text-sm font-semibold text-zinc-300 mb-2">Damage</h3>
+        <SectionHeader size="sm" title="Damage" />
         <FaultBadges faults={faults} />
       </div>
     );
@@ -143,7 +144,7 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-2">Damage</h3>
+      <SectionHeader size="sm" title="Damage" />
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart
           data={data}

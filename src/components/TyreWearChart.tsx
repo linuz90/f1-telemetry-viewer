@@ -19,6 +19,7 @@ import {
 } from "../utils/colors";
 import { getWorstWheelWear } from "../utils/stats";
 import { EmptyState } from "./EmptyState";
+import { SectionHeader } from "./ui/SectionHeader";
 
 interface TyreWearChartProps {
   stints: TyreStint[];
@@ -138,15 +139,20 @@ export function TyreWearChart({
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-        Tyre Wear{" "}
-        <span
-          className="font-normal text-zinc-500"
-          title="Tyre wear uses max/worst-wheel wear: the highest-worn tyre at each lap."
-        >
-          max wheel
-        </span>
-      </h3>
+      <SectionHeader
+        size="sm"
+        title={
+          <>
+            Tyre Wear{" "}
+            <span
+              className="font-normal text-zinc-500"
+              title="Tyre wear uses max/worst-wheel wear: the highest-worn tyre at each lap."
+            >
+              max wheel
+            </span>
+          </>
+        }
+      />
       <ResponsiveContainer width="100%" height={280}>
         <LineChart
           data={data}

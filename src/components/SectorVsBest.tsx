@@ -9,6 +9,9 @@ import {
 } from "../utils/format";
 import { getValidLaps } from "../utils/stats";
 import { accentCardClass, neutralCardClass } from "./Card";
+import { Eyebrow } from "./ui/Eyebrow";
+import { InsightValue } from "./ui/InsightText";
+import { SectionHeader } from "./ui/SectionHeader";
 
 interface SectorVsBestProps {
   session: TelemetrySession;
@@ -113,9 +116,7 @@ export function SectorVsBest({
 
   return (
     <div>
-      <h3 className="text-base font-semibold text-zinc-300 mb-3">
-        Sectors vs Best
-      </h3>
+      <SectionHeader size="sm" title="Sectors vs Best" />
       <div className="grid grid-cols-4 gap-3">
         {/* Fastest lap */}
         <div
@@ -124,10 +125,12 @@ export function SectorVsBest({
             isFocusedBestLap ? accentCardClass("purple") : neutralCardClass,
           )}
         >
-          <div className="text-xs uppercase text-zinc-500 mb-2">Lap</div>
-          <div className="font-mono text-lg font-medium text-zinc-100">
-            {focusedBestLap !== null ? msToLapTime(focusedBestLap) : "–"}
+          <div className="mb-2">
+            <Eyebrow>Lap</Eyebrow>
           </div>
+          <InsightValue size="md">
+            {focusedBestLap !== null ? msToLapTime(focusedBestLap) : "–"}
+          </InsightValue>
           {lapDeltaMs !== null && (
             <div
               className={cn(
@@ -166,14 +169,14 @@ export function SectorVsBest({
               s.isFocusedBest ? accentCardClass("purple") : neutralCardClass,
             )}
           >
-            <div className="text-xs uppercase text-zinc-500 mb-2">
-              {s.label}
+            <div className="mb-2">
+              <Eyebrow>{s.label}</Eyebrow>
             </div>
 
             {/* Focused driver time */}
-            <div className="font-mono text-lg font-medium text-zinc-100">
+            <InsightValue size="md">
               {s.focusedBest !== null ? msToSectorTime(s.focusedBest) : "–"}
-            </div>
+            </InsightValue>
 
             {/* Delta */}
             {s.deltaMs !== null && (

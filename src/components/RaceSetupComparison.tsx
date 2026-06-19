@@ -132,7 +132,7 @@ function metricValueClassName(
     extremes.best !== null &&
     Math.abs(value - extremes.best) < 0.001
   ) {
-    return "text-purple-300";
+    return "text-best";
   }
 
   if (
@@ -140,7 +140,7 @@ function metricValueClassName(
     extremes.worst !== null &&
     Math.abs(value - extremes.worst) < 0.001
   ) {
-    return "text-red-300";
+    return "text-behind";
   }
 
   return "text-zinc-200";
@@ -355,7 +355,7 @@ export function RaceSetupComparison({
         <div className="w-full min-w-[640px]">
           <div
             className={cn(
-              "grid gap-3 px-3 pb-2 text-2xs font-medium uppercase tracking-wider text-zinc-600",
+              "grid gap-3 px-3 pb-2 font-mono text-2xs font-medium uppercase tracking-wider text-zinc-600",
               SETUP_COMPARISON_GRID,
             )}
           >

@@ -11,6 +11,7 @@ import {
 import type { CumulativeDelta } from "../utils/stats";
 import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
 import { cn } from "../utils/cn";
+import { SectionHeader } from "./ui/SectionHeader";
 
 interface PerformanceDeltaChartProps {
   deltas: CumulativeDelta[];
@@ -50,13 +51,16 @@ export function PerformanceDeltaChart({
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-1">
-        Performance Delta{" "}
-        <span className="font-normal text-zinc-500">vs {rivalName}</span>
-      </h3>
-      <p className="text-2xs text-zinc-600 mb-2">
-        Above zero = behind {rivalName} / Below zero = ahead
-      </p>
+      <SectionHeader
+        size="sm"
+        title={
+          <>
+            Performance Delta{" "}
+            <span className="font-normal text-zinc-500">vs {rivalName}</span>
+          </>
+        }
+        hint={`Above zero = behind ${rivalName} / Below zero = ahead`}
+      />
       <ResponsiveContainer width="100%" height={240}>
         <AreaChart
           data={data}

@@ -141,7 +141,7 @@ function Section({
 }) {
   return (
     <div className="px-3 py-2.5">
-      <HStack className="mb-1.5 gap-1.5 text-2xs font-semibold uppercase tracking-wider text-zinc-500">
+      <HStack className="mb-1.5 gap-1.5 font-mono text-2xs font-semibold uppercase tracking-wider text-zinc-500">
         <Icon className="h-3 w-3" />
         {label}
       </HStack>

@@ -10,9 +10,12 @@ import {
   sectorTimeMs,
 } from "../utils/format";
 import { cn } from "../utils/cn";
-import { getCompoundColor, PERF_COLORS } from "../utils/colors";
+import { PERF_COLORS } from "../utils/colors";
 import { ersDeployMjForLap, ersHarvestMjForLap } from "../utils/stats";
 import { accentCardClass, neutralCardClass } from "./Card";
+import { CompoundSwatchLabel } from "./ui/CompoundSwatchLabel";
+import { Eyebrow } from "./ui/Eyebrow";
+import { SectionHeader } from "./ui/SectionHeader";
 
 interface SectorComparisonProps {
   laps: LapHistoryEntry[];
@@ -110,9 +113,7 @@ export function SectorComparison({
 
   return (
     <div>
-      <h3 className="text-base font-semibold text-zinc-300 mb-3">
-        Your Lap Breakdown
-      </h3>
+      <SectionHeader size="sm" title="Your Lap Breakdown" />
 
       {/* Legend */}
       <div className="flex gap-4 mb-3 text-sm text-zinc-400">
@@ -161,13 +162,10 @@ export function SectorComparison({
                 </span>
 
                 {d.compound && (
-                  <span className="flex items-center gap-1">
-                    <span
-                      className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: getCompoundColor(d.compound) }}
-                    />
-                    <span className="text-xs text-zinc-500">{d.compound}</span>
-                  </span>
+                  <CompoundSwatchLabel
+                    compound={d.compound}
+                    labelClassName="text-zinc-500"
+                  />
                 )}
 
                 {!d.valid && (
@@ -218,9 +216,7 @@ export function SectorComparison({
                           : "text-zinc-600",
                       )}
                     >
-                      <span className="text-zinc-500 text-2xs uppercase tracking-wide">
-                        Dep
-                      </span>
+                      <Eyebrow className="text-zinc-500">Dep</Eyebrow>
                       <span>
                         {d.deployMj != null && d.deployMj > 0
                           ? `${d.deployMj.toFixed(1)} MJ`
@@ -237,9 +233,7 @@ export function SectorComparison({
                           : "text-zinc-600",
                       )}
                     >
-                      <span className="text-zinc-500 text-2xs uppercase tracking-wide">
-                        Harv
-                      </span>
+                      <Eyebrow className="text-zinc-500">Harv</Eyebrow>
                       <span>
                         {d.harvMj != null && d.harvMj > 0
                           ? `${d.harvMj.toFixed(1)} MJ`

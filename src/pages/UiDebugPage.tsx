@@ -22,8 +22,12 @@ import { TrackStrategySection } from "../components/track/TrackStrategySection";
 import { TrackFlag } from "../components/TrackFlag";
 import { TyreWearChart } from "../components/TyreWearChart";
 import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
 import { CompoundBadge } from "../components/ui/CompoundBadge";
+import { CompoundSwatchLabel } from "../components/ui/CompoundSwatchLabel";
+import { InsightDetail, InsightValue } from "../components/ui/InsightText";
 import { InsightTile } from "../components/ui/InsightTile";
+import { PillSelect } from "../components/ui/PillSelect";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { stintChipStyle, stintChipTextStyle } from "../components/ui/StintChip";
@@ -293,6 +297,8 @@ const deltas: CumulativeDelta[] = Array.from({ length: 12 }, (_, index) => {
 export function UiDebugPage() {
   const [compactSegment, setCompactSegment] = useState("race");
   const [pageSegment, setPageSegment] = useState("sessions");
+  const [compactPill, setCompactPill] = useState("leclerc");
+  const [sessionPill, setSessionPill] = useState("alonso");
 
   return (
     <div className="mx-auto max-w-7xl space-y-14 px-6 py-10 lg:px-10">
@@ -340,7 +346,7 @@ export function UiDebugPage() {
             <DebugHero
               value="1:21.736"
               detail="session fastest"
-              tone="text-purple-300"
+              tone="text-best"
             />
           </InsightTile>
           <InsightTile title="Emerald Gain" icon={ArrowUpDown} accent="emerald">
@@ -383,7 +389,10 @@ export function UiDebugPage() {
       <DebugSection
         files={[
           "Badge.tsx",
+          "Button.tsx",
           "CompoundBadge.tsx",
+          "CompoundSwatchLabel.tsx",
+          "InsightText.tsx",
           "SegmentedControl.tsx",
           "TrackFlag.tsx",
           "StintChip.tsx",
@@ -427,11 +436,115 @@ export function UiDebugPage() {
             </div>
           </div>
           <div>
+            <DebugComponentLabel>Button.tsx</DebugComponentLabel>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="primary">Primary</Button>
+              <Button variant="secondary">Secondary</Button>
+              <Button variant="subtle">Subtle</Button>
+              <Button variant="ghost">Ghost</Button>
+              <Button variant="danger">Danger</Button>
+              <Button size="sm">Small</Button>
+              <Button size="xs" variant="ghost">
+                Tiny
+              </Button>
+            </div>
+          </div>
+          <div>
             <DebugComponentLabel>CompoundBadge.tsx</DebugComponentLabel>
             <div className="flex flex-wrap gap-2">
               {COMPOUNDS.map((compound) => (
                 <CompoundBadge key={compound} compound={compound} />
               ))}
+            </div>
+          </div>
+          <div>
+            <DebugComponentLabel>CompoundSwatchLabel.tsx</DebugComponentLabel>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {COMPOUNDS.slice(0, 5).map((compound) => (
+                <CompoundSwatchLabel key={compound} compound={compound} />
+              ))}
+              <CompoundSwatchLabel
+                compound="Hard"
+                size="xs"
+                labelClassName="text-zinc-500"
+              />
+            </div>
+          </div>
+          <div>
+            <DebugComponentLabel>InsightText.tsx</DebugComponentLabel>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <DebugVariantLabel className="w-auto">
+                  value lg
+                </DebugVariantLabel>
+                <InsightValue tone="text-best">1:21.736</InsightValue>
+                <InsightDetail className="mt-1">session fastest</InsightDetail>
+              </div>
+              <div>
+                <DebugVariantLabel className="w-auto">
+                  value md
+                </DebugVariantLabel>
+                <InsightValue size="md" tone="text-ahead">
+                  Faster by 0.410s
+                </InsightValue>
+                <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
+                  same tyres · clean laps
+                </InsightDetail>
+              </div>
+              <div>
+                <DebugVariantLabel className="w-auto">
+                  value sm
+                </DebugVariantLabel>
+                <InsightValue size="sm" tone="text-warning">
+                  Mario_Cavallaro_
+                </InsightValue>
+                <InsightDetail size="xs" tone="text-zinc-500" className="mt-1">
+                  compact fallback
+                </InsightDetail>
+              </div>
+            </div>
+          </div>
+          <div>
+            <DebugComponentLabel>PillSelect.tsx</DebugComponentLabel>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="space-y-1.5">
+                <DebugVariantLabel className="w-auto">
+                  sm / compact
+                </DebugVariantLabel>
+                <PillSelect
+                  ariaLabel="Compact pill select"
+                  size="sm"
+                  width="compact"
+                  value={compactPill}
+                  onChange={setCompactPill}
+                  dotColor="#ef4444"
+                  options={[
+                    { value: "leclerc", label: "P2 LECLERC - Ferrari '26" },
+                    { value: "hamilton", label: "P4 HAMILTON - Ferrari '26" },
+                    { value: "norris", label: "P5 NORRIS - Mclaren '26" },
+                  ]}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <DebugVariantLabel className="w-auto">
+                  md / session
+                </DebugVariantLabel>
+                <PillSelect
+                  ariaLabel="Session pill select"
+                  width="session"
+                  value={sessionPill}
+                  onChange={setSessionPill}
+                  dotColor="#22c55e"
+                  options={[
+                    {
+                      value: "alonso",
+                      label: "P1 ALONSO - Aston Martin '26 (You)",
+                    },
+                    { value: "leclerc", label: "P2 LECLERC - Ferrari '26" },
+                    { value: "hadjar", label: "P3 HADJAR - Red Bull '26" },
+                  ]}
+                />
+              </div>
             </div>
           </div>
           <div>
@@ -666,12 +779,8 @@ function DebugHero({
 }) {
   return (
     <>
-      <div className={cn("font-mono text-xl font-medium tabular-nums", tone)}>
-        {value}
-      </div>
-      <div className="mt-1.5 font-mono text-sm leading-relaxed tabular-nums text-zinc-400">
-        {detail}
-      </div>
+      <InsightValue tone={tone}>{value}</InsightValue>
+      <InsightDetail className="mt-1.5">{detail}</InsightDetail>
     </>
   );
 }

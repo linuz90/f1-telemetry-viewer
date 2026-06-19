@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, type ReactNode } from "react";
 import type { DriverData, TelemetrySession } from "../types/telemetry";
 import {
   findFocusedDriver,
@@ -12,6 +12,7 @@ import {
 import { useTrackHistory } from "../hooks/useTrackHistory";
 import { useSessionList } from "../hooks/useSessionList";
 import { SessionHeader } from "../components/SessionHeader";
+import { SessionDriverSelect } from "../components/SessionDriverSelect";
 import { DriverComparisonPicker } from "../components/DriverComparisonPicker";
 import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
 import { StintTimeline, StintDetailCards } from "../components/StintTimeline";
@@ -33,7 +34,11 @@ import {
 } from "../utils/raceControl";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { Badge } from "../components/ui/Badge";
-import { PillSelect } from "../components/ui/PillSelect";
+import {
+  PillSelect,
+  type PillSelectSize,
+  type PillSelectWidth,
+} from "../components/ui/PillSelect";
 import {
   buildSessionInsightsHint,
   buildSessionSummaryInsights,
@@ -60,10 +65,14 @@ function SpectatorDriverPicker({
   drivers,
   focusedDriverIndex,
   onFocusedDriverChange,
+  size = "md",
+  width = "session",
 }: {
   drivers: DriverData[];
   focusedDriverIndex: number;
   onFocusedDriverChange: (index: number) => void;
+  size?: PillSelectSize;
+  width?: PillSelectWidth;
 }) {
   if (drivers.length === 0) return null;
 
@@ -86,9 +95,22 @@ function SpectatorDriverPicker({
         options={driverOptions}
         ariaLabel="Focused driver"
         dotColor={focusedDriver ? getTeamColor(focusedDriver.team) : undefined}
-        width="session"
+        size={size}
+        width={width}
       />
       <Badge tone="zinc">Spectator save</Badge>
+    </div>
+  );
+}
+
+function StickySessionContextBar({ children }: { children: ReactNode }) {
+  return (
+    <div className="sticky top-0 z-30 -mx-1 !-mt-2 py-2 sm:!-mt-4">
+      <div className="flex min-w-0 justify-end">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 rounded-lg border border-zinc-800/70 bg-zinc-950/85 p-1.5 shadow-lg shadow-black/25 backdrop-blur-md">
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
@@ -245,6 +267,34 @@ export function RaceSessionView({
   const showSetup =
     focusedDriver?.["is-player"] && focusedDriver["car-setup"]?.["is-valid"];
 
+  const sessionContextControls = isSpectator ? (
+    <SpectatorDriverPicker
+      drivers={selectableDrivers}
+      focusedDriverIndex={focusedDriverIndex}
+      onFocusedDriverChange={handleFocusedDriverChange}
+      size="sm"
+      width="compact"
+    />
+  ) : (
+    <>
+      <SessionDriverSelect
+        session={session}
+        focusedDriverIndex={focusedDriverIndex}
+        onFocusedDriverChange={handleFocusedDriverChange}
+        size="sm"
+        width="compact"
+      />
+      <DriverComparisonPicker
+        session={session}
+        selectedIndex={selectedRivalIndex}
+        onSelect={setSelectedRivalIndex}
+        focusedDriverIndex={focusedDriverIndex}
+        size="sm"
+        width="compact"
+      />
+    </>
+  );
+
   // Compute laps where damage increased
   const damageLaps = useMemo(() => {
     const result: number[] = [];
@@ -281,24 +331,11 @@ export function RaceSessionView({
         focusedDriverIndex={focusedDriverIndex}
         onFocusedDriverChange={handleFocusedDriverChange}
         slug={slug}
-        showDriverSelector={!isSpectator}
-        controls={
-          isSpectator ? (
-            <SpectatorDriverPicker
-              drivers={selectableDrivers}
-              focusedDriverIndex={focusedDriverIndex}
-              onFocusedDriverChange={handleFocusedDriverChange}
-            />
-          ) : (
-            <DriverComparisonPicker
-              session={session}
-              selectedIndex={selectedRivalIndex}
-              onSelect={setSelectedRivalIndex}
-              focusedDriverIndex={focusedDriverIndex}
-            />
-          )
-        }
+        showDriverSelector={false}
       />
+      <StickySessionContextBar>
+        {sessionContextControls}
+      </StickySessionContextBar>
 
       <SessionInsightsGrid insights={sessionInsights} hint={insightsHint} />
 
@@ -328,6 +365,7 @@ export function RaceSessionView({
         <LapTimeChart
           laps={laps}
           pitLaps={pitLaps}
+          rivalPitLaps={rival ? rivalPitLaps : undefined}
           rivalLaps={rival ? rivalLaps : undefined}
           rivalName={rival?.["driver-name"]}
           perLapInfo={perLapInfo}

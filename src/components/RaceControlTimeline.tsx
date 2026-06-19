@@ -25,6 +25,11 @@ import {
   isKeyRaceControlEvent,
 } from "../utils/raceControl";
 import { EmptyState } from "./EmptyState";
+import { Badge } from "./ui/Badge";
+import { Eyebrow } from "./ui/Eyebrow";
+import { FocusToggle } from "./ui/FocusToggle";
+import { SectionHeader } from "./ui/SectionHeader";
+import { SegmentedControl } from "./ui/SegmentedControl";
 
 interface RaceControlTimelineProps {
   events: RaceControlEvent[];
@@ -32,6 +37,11 @@ interface RaceControlTimelineProps {
 }
 
 type ViewMode = "key" | "all";
+
+const VIEW_MODE_OPTIONS = [
+  { value: "key", label: "Key events" },
+  { value: "all", label: "All events" },
+] as const;
 
 interface EventStyle {
   label: string;
@@ -193,58 +203,30 @@ export function RaceControlTimeline({
 
   return (
     <div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-300">Race Control</h3>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            {keyEventCount} key event{keyEventCount === 1 ? "" : "s"} /{" "}
-            {events.length} total
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-0.5 rounded-lg bg-zinc-900/80 p-0.5">
-            {(["key", "all"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setViewMode(mode)}
-                className={cn(
-                  "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                  viewMode === mode
-                    ? "bg-zinc-800 text-zinc-100"
-                    : "text-zinc-500 hover:text-zinc-300",
-                )}
-              >
-                {mode === "key" ? "Key events" : "All events"}
-              </button>
-            ))}
+      <SectionHeader
+        size="sm"
+        title="Race Control"
+        hint={`${keyEventCount} key event${keyEventCount === 1 ? "" : "s"} / ${events.length} total`}
+        className="mb-5"
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedControl
+              ariaLabel="Race control events"
+              size="sm"
+              value={viewMode}
+              onChange={setViewMode}
+              options={VIEW_MODE_OPTIONS}
+            />
+            {focusedDriver && (
+              <FocusToggle
+                label="Focus driver"
+                value={focusOnly}
+                onChange={() => setFocusOnly((value) => !value)}
+              />
+            )}
           </div>
-
-          {focusedDriver && (
-            <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer select-none">
-              Focus driver
-              <button
-                type="button"
-                role="switch"
-                aria-checked={focusOnly}
-                onClick={() => setFocusOnly((value) => !value)}
-                className={cn(
-                  "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
-                  focusOnly ? "bg-cyan-600" : "bg-zinc-800",
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-block h-3 w-3 rounded-full bg-white transition-transform",
-                    focusOnly ? "translate-x-3.5" : "translate-x-0.5",
-                  )}
-                />
-              </button>
-            </label>
-          )}
-        </div>
-      </div>
+        }
+      />
 
       {visibleEvents.length === 0 ? (
         <EmptyState
@@ -263,9 +245,7 @@ export function RaceControlTimeline({
             {groups.map((group) => (
               <section key={group.key} className="space-y-2">
                 <div className="sticky top-0 z-10 -mx-1 flex items-center gap-2 bg-card-surface px-1 py-1.5">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                    {group.label}
-                  </span>
+                  <Eyebrow className="text-zinc-500">{group.label}</Eyebrow>
                   <span className="h-px flex-1 bg-zinc-800/70" />
                 </div>
                 <div className="space-y-1.5">
@@ -321,14 +301,9 @@ function RaceControlEventRow({
             <span className="text-sm leading-snug text-zinc-200">
               {formatRaceControlEvent(event)}
             </span>
-            <span
-              className={cn(
-                "rounded px-1.5 py-0.5 text-2xs font-semibold",
-                style.badgeClass,
-              )}
-            >
+            <Badge size="xs" shape="square" className={style.badgeClass}>
               {style.label}
-            </span>
+            </Badge>
             {clock && (
               <span className="font-mono text-2xs text-zinc-500">{clock}</span>
             )}
@@ -347,12 +322,14 @@ function RaceControlEventRow({
           {details.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {details.map((detail) => (
-                <span
+                <Badge
                   key={detail}
-                  className="rounded bg-zinc-950/80 px-1.5 py-0.5 text-2xs text-zinc-500"
+                  size="xs"
+                  shape="square"
+                  className="bg-zinc-950/80 text-zinc-500"
                 >
                   {detail}
-                </span>
+                </Badge>
               ))}
             </div>
           )}

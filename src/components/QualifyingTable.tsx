@@ -11,7 +11,14 @@ import { getValidLaps } from "../utils/stats";
 import { cn } from "../utils/cn";
 import { formatQualifyingTableTitle } from "../utils/sessionInsights";
 import { FocusToggle } from "./ui/FocusToggle";
-import { tableHeadClass, tableRowClass } from "./ui/table";
+import { SectionHeader } from "./ui/SectionHeader";
+import {
+  tableCellClass,
+  tableClassLoose,
+  tableHeadCellClass,
+  tableHeadClass,
+  tableRowClass,
+} from "./ui/table";
 
 interface QualifyingTableProps {
   session: TelemetrySession;
@@ -80,24 +87,27 @@ export function QualifyingTable({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-base font-semibold text-zinc-300">
-          {formatQualifyingTableTitle(session)}
-        </h3>
-        <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
-      </div>
+      <SectionHeader
+        size="sm"
+        title={formatQualifyingTableTitle(session)}
+        action={
+          <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
+        }
+      />
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className={tableClassLoose}>
           <thead className={tableHeadClass}>
             <tr>
-              <th className="text-left py-1.5 px-2">Pos</th>
-              <th className="text-left py-1.5 px-2">Driver</th>
-              <th className="text-left py-1.5 px-2">Team</th>
-              <th className="text-right py-1.5 px-2">Best Lap</th>
-              <th className="text-right py-1.5 px-2">S1</th>
-              <th className="text-right py-1.5 px-2">S2</th>
-              <th className="text-right py-1.5 px-2">S3</th>
-              <th className="text-right py-1.5 px-2">Gap</th>
+              <th className={tableHeadCellClass()}>Pos</th>
+              <th className={tableHeadCellClass()}>Driver</th>
+              <th className={tableHeadCellClass()}>Team</th>
+              <th className={tableHeadCellClass({ align: "right" })}>
+                Best Lap
+              </th>
+              <th className={tableHeadCellClass({ align: "right" })}>S1</th>
+              <th className={tableHeadCellClass({ align: "right" })}>S2</th>
+              <th className={tableHeadCellClass({ align: "right" })}>S3</th>
+              <th className={tableHeadCellClass({ align: "right" })}>Gap</th>
             </tr>
           </thead>
           <tbody>
@@ -123,20 +133,22 @@ export function QualifyingTable({
                     isFocused && "bg-zinc-800/40 text-white font-medium",
                   )}
                 >
-                  <td className="py-1.5 px-2">{i + 1}</td>
-                  <td className="py-1.5 px-2">
+                  <td className={tableCellClass()}>{i + 1}</td>
+                  <td className={tableCellClass()}>
                     <span
                       className="inline-block w-1 h-3 rounded-sm mr-1.5 align-middle"
                       style={{ backgroundColor: getTeamColor(row.driver.team) }}
                     />
                     {row.driver["driver-name"]}
                   </td>
-                  <td className="py-1.5 px-2 text-zinc-400">
+                  <td
+                    className={tableCellClass({ className: "text-zinc-400" })}
+                  >
                     {getTeamName(row.driver.team)}
                   </td>
                   <td
                     className={cn(
-                      "py-1.5 px-2 text-right font-mono",
+                      tableCellClass({ align: "right", mono: true }),
                       row.bestLap &&
                         bestLapTime !== null &&
                         row.bestLap["lap-time-in-ms"] === bestLapTime &&
@@ -149,7 +161,7 @@ export function QualifyingTable({
                   </td>
                   <td
                     className={cn(
-                      "py-1.5 px-2 text-right font-mono",
+                      tableCellClass({ align: "right", mono: true }),
                       row.bestLap && bestS1 !== null && rowS1 === bestS1
                         ? "text-best font-bold"
                         : "text-zinc-400",
@@ -159,7 +171,7 @@ export function QualifyingTable({
                   </td>
                   <td
                     className={cn(
-                      "py-1.5 px-2 text-right font-mono",
+                      tableCellClass({ align: "right", mono: true }),
                       row.bestLap && bestS2 !== null && rowS2 === bestS2
                         ? "text-best font-bold"
                         : "text-zinc-400",
@@ -169,7 +181,7 @@ export function QualifyingTable({
                   </td>
                   <td
                     className={cn(
-                      "py-1.5 px-2 text-right font-mono",
+                      tableCellClass({ align: "right", mono: true }),
                       row.bestLap && bestS3 !== null && rowS3 === bestS3
                         ? "text-best font-bold"
                         : "text-zinc-400",
@@ -179,7 +191,7 @@ export function QualifyingTable({
                   </td>
                   <td
                     className={cn(
-                      "py-1.5 px-2 text-right font-mono",
+                      tableCellClass({ align: "right", mono: true }),
                       row.allInvalid && "text-behind",
                     )}
                   >

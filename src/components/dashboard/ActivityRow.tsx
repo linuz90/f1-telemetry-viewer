@@ -146,7 +146,7 @@ function RaceMetric({ session }: { session: SessionSummary }) {
       >
         <GridGainGlyph value={gridGain} />
         <span className="tabular-nums">{signedNumber(gridGain)}</span>
-        <span className="text-2xs uppercase tracking-wider text-zinc-500">
+        <span className="font-mono text-2xs uppercase tracking-wider text-zinc-500">
           grid
         </span>
       </div>

@@ -1,25 +1,32 @@
+import { useState } from "react";
 import {
+  Bar,
+  CartesianGrid,
+  ComposedChart,
   Line,
+  ReferenceArea,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-  ReferenceArea,
-  Bar,
-  ComposedChart,
 } from "recharts";
-import { useState } from "react";
 import type {
   LapHistoryEntry,
   PerLapInfo,
   TyreStint,
 } from "../types/telemetry";
+import { cn } from "../utils/cn";
 import {
+  CHART_THEME,
+  COMPOUND_COLORS,
+  SC_COLORS,
+  SC_FALLBACK,
+} from "../utils/colors";
+import {
+  isLapValid,
   msToLapTime,
   msToSectorTime,
-  isLapValid,
   sectorTimeMs,
 } from "../utils/format";
 import {
@@ -27,22 +34,36 @@ import {
   ersHarvestMjForLap,
   getWorstWheelWear,
 } from "../utils/stats";
+import { Tooltip as HoverTooltip } from "./Tooltip";
 import { Badge } from "./ui/Badge";
-import { tableHeadClass, tableRowClass } from "./ui/table";
-import {
-  CHART_THEME,
-  TOOLTIP_STYLE,
-  COMPOUND_COLORS,
-  SC_COLORS,
-  SC_FALLBACK,
-} from "../utils/colors";
-import { cn } from "../utils/cn";
 import { FocusToggle } from "./ui/FocusToggle";
+import { SectionHeader } from "./ui/SectionHeader";
+import {
+  tableCellClass,
+  tableClass,
+  tableHeadCellClass,
+  tableHeadClass,
+  tableRowClass,
+} from "./ui/table";
+
+interface LapTooltipPayload {
+  name?: string | number;
+  value?: number;
+  color?: string;
+}
+
+interface LapTooltipProps {
+  active?: boolean;
+  label?: string | number;
+  payload?: readonly LapTooltipPayload[];
+}
 
 interface LapTimeChartProps {
   laps: LapHistoryEntry[];
   /** Pit stop laps to mark with dashed lines */
   pitLaps?: number[];
+  /** Rival pit stop laps, used only by the clean-laps display filter. */
+  rivalPitLaps?: number[];
   /** Rival lap data for overlay */
   rivalLaps?: LapHistoryEntry[];
   /** Rival driver name */
@@ -56,15 +77,50 @@ interface LapTimeChartProps {
 }
 
 const BATTERY_VISIBILITY_STORAGE_KEY = "f1.lapTimeChart.showBattery";
+const CLEAN_LAPS_STORAGE_KEY = "f1.lapTimeChart.cleanLaps";
 
-function readPersistedBatteryVisibility(): boolean {
+function minOrZero(values: number[]): number {
+  return values.length > 0 ? Math.min(...values) : 0;
+}
+
+function maxOrZero(values: number[]): number {
+  return values.length > 0 ? Math.max(...values) : 0;
+}
+
+function buildLapTicks(maxLap: number): number[] {
+  if (maxLap <= 1) return [1];
+  const step =
+    maxLap <= 12
+      ? 1
+      : maxLap <= 24
+        ? 2
+        : maxLap <= 40
+          ? 4
+          : maxLap <= 60
+            ? 5
+            : 10;
+  const ticks = [1];
+  for (let lap = 1 + step; lap < maxLap; lap += step) {
+    ticks.push(lap);
+  }
+  if (ticks[ticks.length - 1] !== maxLap) ticks.push(maxLap);
+  return ticks;
+}
+
+function readPersistedBoolean(key: string): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return (
-      window.localStorage.getItem(BATTERY_VISIBILITY_STORAGE_KEY) === "true"
-    );
+    return window.localStorage.getItem(key) === "true";
   } catch {
     return false;
+  }
+}
+
+function persistBoolean(key: string, value: boolean) {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // A blocked storage write should not make chart toggles feel broken.
   }
 }
 
@@ -77,14 +133,18 @@ function readPersistedBatteryVisibility(): boolean {
 export function LapTimeChart({
   laps,
   pitLaps = [],
+  rivalPitLaps = [],
   rivalLaps,
   rivalName,
   perLapInfo,
   damageLaps = [],
   stints,
 }: LapTimeChartProps) {
-  const [showBattery, setShowBattery] = useState(
-    readPersistedBatteryVisibility,
+  const [showBattery, setShowBattery] = useState(() =>
+    readPersistedBoolean(BATTERY_VISIBILITY_STORAGE_KEY),
+  );
+  const [showCleanLaps, setShowCleanLaps] = useState(() =>
+    readPersistedBoolean(CLEAN_LAPS_STORAGE_KEY),
   );
 
   if (!laps.length) {
@@ -94,14 +154,15 @@ export function LapTimeChart({
   const toggleBatteryVisibility = () => {
     setShowBattery((prev) => {
       const next = !prev;
-      try {
-        window.localStorage.setItem(
-          BATTERY_VISIBILITY_STORAGE_KEY,
-          String(next),
-        );
-      } catch {
-        // A blocked storage write should not make the chart toggle feel broken.
-      }
+      persistBoolean(BATTERY_VISIBILITY_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
+  const toggleCleanLaps = () => {
+    setShowCleanLaps((prev) => {
+      const next = !prev;
+      persistBoolean(CLEAN_LAPS_STORAGE_KEY, next);
       return next;
     });
   };
@@ -190,10 +251,39 @@ export function LapTimeChart({
       };
     });
 
+  const pitOutlierLaps = new Set<number>();
+  const addPitOutlierLaps = (pitStopLaps: number[]) => {
+    for (const lap of pitStopLaps) {
+      if (lap > 1) pitOutlierLaps.add(lap - 1);
+      pitOutlierLaps.add(lap);
+    }
+  };
+  if (stints && stints.length > 0) {
+    for (let i = 1; i < stints.length; i++) {
+      pitOutlierLaps.add(stints[i - 1]!["end-lap"]);
+      pitOutlierLaps.add(stints[i]!["start-lap"]);
+    }
+  } else {
+    addPitOutlierLaps(pitLaps);
+  }
+  addPitOutlierLaps(rivalPitLaps);
+  const hasPitOutliers = data.some((d) => pitOutlierLaps.has(d.lap));
+  const hasSafetyCarOutliers = data.some((d) => d.isSC || d.isVSC);
+  const hasCleanLapOutliers = hasPitOutliers || hasSafetyCarOutliers;
+  const cleanChartData =
+    hasCleanLapOutliers && showCleanLaps
+      ? data.filter((d) => !pitOutlierLaps.has(d.lap) && !d.isSC && !d.isVSC)
+      : data;
+  const chartData = cleanChartData.length > 0 ? cleanChartData : data;
+  const maxLap = maxOrZero(data.map((d) => d.lap)) || 1;
+  const lapTicks = buildLapTicks(maxLap);
+
   // Y-axis domain: round to whole seconds for clean tick marks
   const allTimes = [
-    ...data.map((d) => d.timeSec),
-    ...data.filter((d) => d.rivalTimeSec != null).map((d) => d.rivalTimeSec!),
+    ...chartData.map((d) => d.timeSec),
+    ...chartData
+      .filter((d) => d.rivalTimeSec != null)
+      .map((d) => d.rivalTimeSec!),
   ];
   const minTime = Math.min(...allTimes);
   const maxTime = Math.max(...allTimes);
@@ -215,27 +305,25 @@ export function LapTimeChart({
   const hasFuel = data.some((d) => d.fuelKg != null);
   const hasTopSpeed = data.some((d) => d.topSpeed != null);
   const bestTopSpeed = hasTopSpeed
-    ? Math.max(
-        ...data
+    ? maxOrZero(
+        data
           .filter((d) => d.valid && d.topSpeed != null)
           .map((d) => d.topSpeed!),
       )
     : 0;
 
-  // Best lap time for reference line
-  const bestTime = Math.min(
-    ...data.filter((d) => d.valid).map((d) => d.timeSec),
-  );
-
-  // Best sectors (among valid laps only)
-  const validData = data.filter((d) => d.valid);
-  const bestS1 = Math.min(...validData.map((d) => d.s1));
-  const bestS2 = Math.min(...validData.map((d) => d.s2));
-  const bestS3 = Math.min(...validData.map((d) => d.s3));
+  // Chart display filters should not alter the full lap table highlights.
+  const validChartData = chartData.filter((d) => d.valid);
+  const validTableData = data.filter((d) => d.valid);
+  const chartBestTime = minOrZero(validChartData.map((d) => d.timeSec));
+  const tableBestTime = minOrZero(validTableData.map((d) => d.timeSec));
+  const bestS1 = minOrZero(validTableData.map((d) => d.s1));
+  const bestS2 = minOrZero(validTableData.map((d) => d.s2));
+  const bestS3 = minOrZero(validTableData.map((d) => d.s3));
 
   // Collect SC/VSC ranges for reference areas
   const scRanges: { x1: number; x2: number; status: string }[] = [];
-  for (const d of data) {
+  for (const d of chartData) {
     if (d.isSC || d.isVSC) {
       const prev = scRanges[scRanges.length - 1];
       if (prev && prev.status === d.scStatus && prev.x2 === d.lap - 1) {
@@ -245,50 +333,87 @@ export function LapTimeChart({
       }
     }
   }
+  const renderLapTooltip = ({ active, label, payload }: LapTooltipProps) => {
+    if (!active || !payload?.length) return null;
+    const entry = chartData.find((d) => d.lap === Number(label));
+    const scLabel = entry?.isSC ? " SC" : entry?.isVSC ? " VSC" : "";
+
+    return (
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs shadow-lg">
+        <div className="mb-1 text-zinc-400">
+          Lap {label}
+          {scLabel}
+        </div>
+        <div className="grid min-w-36 grid-cols-[auto_auto] gap-x-4 gap-y-0.5">
+          {payload.map((item) => {
+            if (item.value == null) return null;
+            const name = String(item.name ?? "");
+            const value =
+              name === "ERS Deploy" || name === "ERS Harv"
+                ? `${item.value.toFixed(1)} MJ`
+                : msToLapTime(item.value * 1000);
+
+            return (
+              <div
+                key={name}
+                className="contents"
+                style={{ color: item.color }}
+              >
+                <span>{name}:</span>
+                <span className="text-right font-mono">{value}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-2">
-        <h3 className="text-sm font-semibold text-zinc-300">Lap Times</h3>
-        {scRanges.length > 0 && (
-          <div className="flex items-center gap-3 text-2xs text-zinc-400">
-            {scRanges.some(
-              (r) =>
-                r.status === "SAFETY_CAR" || r.status === "FULL_SAFETY_CAR",
-            ) && (
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-3 h-2.5 rounded-sm bg-amber-500/25 border border-amber-500/40" />
-                SC
+      <SectionHeader
+        size="sm"
+        className="items-center mb-4"
+        title={
+          <span className="inline-flex min-w-0 items-center gap-3">
+            <span>Lap Times</span>
+            {scRanges.length > 0 && (
+              <span className="flex items-center gap-3 text-2xs font-normal text-zinc-400">
+                {scRanges.some(
+                  (r) =>
+                    r.status === "SAFETY_CAR" || r.status === "FULL_SAFETY_CAR",
+                ) && (
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block w-3 h-2.5 rounded-sm bg-amber-500/25 border border-amber-500/40" />
+                    SC
+                  </span>
+                )}
+                {scRanges.some((r) => r.status === "VIRTUAL_SAFETY_CAR") && (
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block w-3 h-2.5 rounded-sm bg-yellow-500/25 border border-yellow-500/40" />
+                    VSC
+                  </span>
+                )}
               </span>
             )}
-            {scRanges.some((r) => r.status === "VIRTUAL_SAFETY_CAR") && (
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-3 h-2.5 rounded-sm bg-yellow-500/25 border border-yellow-500/40" />
-                VSC
-              </span>
-            )}
-          </div>
-        )}
-        {hasBattery && (
-          <div className="ml-auto">
-            <FocusToggle
-              label="Battery"
-              value={showBattery}
-              onChange={toggleBatteryVisibility}
-            />
-          </div>
-        )}
-      </div>
+          </span>
+        }
+      />
       <ResponsiveContainer width="100%" height={showBatteryDetails ? 320 : 280}>
         <ComposedChart
-          data={data}
+          data={chartData}
           margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
           <XAxis
             dataKey="lap"
+            type="number"
             stroke={CHART_THEME.axis}
             fontSize={11}
+            domain={[1, maxLap]}
+            ticks={lapTicks}
+            interval={0}
+            allowDecimals={false}
             label={{
               value: "Lap",
               position: "insideBottom",
@@ -316,27 +441,7 @@ export function LapTimeChart({
               width={45}
             />
           )}
-          <Tooltip
-            {...TOOLTIP_STYLE}
-            formatter={(
-              value: number | undefined,
-              name: string | undefined,
-            ) => {
-              if (value == null) return ["–", name ?? ""];
-              if (name === "ERS Deploy" || name === "ERS Harv")
-                return [`${value.toFixed(1)} MJ`, name];
-              return [msToLapTime(value * 1000), name ?? ""];
-            }}
-            labelFormatter={(lap) => {
-              const entry = data.find((d) => d.lap === lap);
-              const scLabel = entry?.isSC
-                ? " 🟡 SC"
-                : entry?.isVSC
-                  ? " 🟡 VSC"
-                  : "";
-              return `Lap ${lap}${scLabel}`;
-            }}
-          />
+          <Tooltip content={renderLapTooltip} />
 
           {/* SC/VSC background shading */}
           {scRanges.map((range) => (
@@ -376,15 +481,15 @@ export function LapTimeChart({
           ))}
 
           {/* Best lap reference */}
-          {bestTime > 0 && (
+          {chartBestTime > 0 && (
             <ReferenceLine
               yAxisId="time"
-              y={bestTime}
+              y={chartBestTime}
               stroke={CHART_THEME.best}
               strokeDasharray="4 4"
               strokeOpacity={0.5}
               label={{
-                value: `Best: ${msToLapTime(bestTime * 1000)}`,
+                value: `Best: ${msToLapTime(chartBestTime * 1000)}`,
                 fill: CHART_THEME.best,
                 fontSize: 10,
                 position: "insideRight",
@@ -455,7 +560,7 @@ export function LapTimeChart({
             yAxisId="time"
             type="monotone"
             dataKey="timeSec"
-            name="Player"
+            name="You"
             stroke={CHART_THEME.player}
             strokeWidth={2}
             dot={(props) => {
@@ -464,7 +569,7 @@ export function LapTimeChart({
                 cy?: number;
                 index?: number;
               };
-              const entry = index != null ? data[index] : undefined;
+              const entry = index != null ? chartData[index] : undefined;
               if (!entry || cx == null || cy == null)
                 return <circle key={`lap-dot-${index}`} cx={0} cy={0} r={0} />;
 
@@ -519,7 +624,9 @@ export function LapTimeChart({
                   </g>
                 );
               }
-              const isBest = Math.abs(entry.timeSec - bestTime) < 0.001;
+              const isBest =
+                chartBestTime > 0 &&
+                Math.abs(entry.timeSec - chartBestTime) < 0.001;
               const color = isBest ? CHART_THEME.best : CHART_THEME.player;
               return (
                 <circle
@@ -537,6 +644,26 @@ export function LapTimeChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
+      {(hasCleanLapOutliers || hasBattery) && (
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
+          {hasCleanLapOutliers && (
+            <HoverTooltip text="Hides pit in/out laps and Safety Car/VSC laps from the chart only. The lap table still shows every lap.">
+              <FocusToggle
+                label="Clean laps"
+                value={showCleanLaps}
+                onChange={toggleCleanLaps}
+              />
+            </HoverTooltip>
+          )}
+          {hasBattery && (
+            <FocusToggle
+              label="Battery"
+              value={showBattery}
+              onChange={toggleBatteryVisibility}
+            />
+          )}
+        </div>
+      )}
 
       {/* Lap table grouped by stint */}
       <div className="mt-3 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -569,29 +696,59 @@ export function LapTimeChart({
             (hasFuel ? 1 : 0);
           const headerRow = (
             <tr>
-              <th className="text-left py-1 px-2">Lap</th>
-              <th className="text-right py-1 px-2">Time</th>
-              <th className="text-right py-1 px-2">S1</th>
-              <th className="text-right py-1 px-2">S2</th>
-              <th className="text-right py-1 px-2">S3</th>
-              {hasTopSpeed && <th className="text-right py-1 px-2">Speed</th>}
+              <th className={tableHeadCellClass({ size: "sm" })}>Lap</th>
+              <th
+                className={tableHeadCellClass({ align: "right", size: "sm" })}
+              >
+                Time
+              </th>
+              <th
+                className={tableHeadCellClass({ align: "right", size: "sm" })}
+              >
+                S1
+              </th>
+              <th
+                className={tableHeadCellClass({ align: "right", size: "sm" })}
+              >
+                S2
+              </th>
+              <th
+                className={tableHeadCellClass({ align: "right", size: "sm" })}
+              >
+                S3
+              </th>
+              {hasTopSpeed && (
+                <th
+                  className={tableHeadCellClass({ align: "right", size: "sm" })}
+                >
+                  Speed
+                </th>
+              )}
               {hasWear && (
                 <th
-                  className="text-right py-1 px-2"
+                  className={tableHeadCellClass({ align: "right", size: "sm" })}
                   title="Max tyre wear: highest-worn tyre at the end of the lap."
                 >
                   Max wear
                 </th>
               )}
               {showBatteryDetails && hasErs && (
-                <th className="text-right py-1 px-2">ERS Dep</th>
+                <th
+                  className={tableHeadCellClass({ align: "right", size: "sm" })}
+                >
+                  ERS Dep
+                </th>
               )}
               {showBatteryDetails && hasErsHarv && (
-                <th className="text-right py-1 px-2">ERS Harv</th>
+                <th
+                  className={tableHeadCellClass({ align: "right", size: "sm" })}
+                >
+                  ERS Harv
+                </th>
               )}
               {hasFuel && (
                 <th
-                  className="text-right py-1 px-2"
+                  className={tableHeadCellClass({ align: "right", size: "sm" })}
                   title="Fuel burned this lap (kg). Push laps trend higher than the green-flag median; saving laps trend lower."
                 >
                   Fuel (kg)
@@ -601,10 +758,16 @@ export function LapTimeChart({
           );
 
           const renderLapRow = (d: (typeof data)[number], rowKey: string) => {
-            const isBestLap = d.valid && Math.abs(d.timeSec - bestTime) < 0.001;
-            const isBestS1 = d.valid && Math.abs(d.s1 - bestS1) < 0.001;
-            const isBestS2 = d.valid && Math.abs(d.s2 - bestS2) < 0.001;
-            const isBestS3 = d.valid && Math.abs(d.s3 - bestS3) < 0.001;
+            const isBestLap =
+              d.valid &&
+              tableBestTime > 0 &&
+              Math.abs(d.timeSec - tableBestTime) < 0.001;
+            const isBestS1 =
+              d.valid && bestS1 > 0 && Math.abs(d.s1 - bestS1) < 0.001;
+            const isBestS2 =
+              d.valid && bestS2 > 0 && Math.abs(d.s2 - bestS2) < 0.001;
+            const isBestS3 =
+              d.valid && bestS3 > 0 && Math.abs(d.s3 - bestS3) < 0.001;
             const wear = wearMap.get(d.lap);
             const scBg = d.isSC
               ? "bg-amber-500/10"
@@ -616,7 +779,7 @@ export function LapTimeChart({
                 key={rowKey}
                 className={cn(tableRowClass, !d.valid ? "bg-red-500/10" : scBg)}
               >
-                <td className="py-1 px-2 font-mono">
+                <td className={tableCellClass({ size: "sm", mono: true })}>
                   {d.lap}
                   {!d.valid && (
                     // text-behind is the app-wide "you're behind" red, not a
@@ -652,7 +815,7 @@ export function LapTimeChart({
                 </td>
                 <td
                   className={cn(
-                    "text-right py-1 px-2 font-mono",
+                    tableCellClass({ align: "right", size: "sm", mono: true }),
                     !d.valid
                       ? "text-behind/70 line-through"
                       : isBestLap
@@ -664,7 +827,7 @@ export function LapTimeChart({
                 </td>
                 <td
                   className={cn(
-                    "text-right py-1 px-2 font-mono",
+                    tableCellClass({ align: "right", size: "sm", mono: true }),
                     !d.valid ? "text-zinc-600" : isBestS1 ? "text-best" : "",
                   )}
                 >
@@ -672,7 +835,7 @@ export function LapTimeChart({
                 </td>
                 <td
                   className={cn(
-                    "text-right py-1 px-2 font-mono",
+                    tableCellClass({ align: "right", size: "sm", mono: true }),
                     !d.valid ? "text-zinc-600" : isBestS2 ? "text-best" : "",
                   )}
                 >
@@ -680,7 +843,7 @@ export function LapTimeChart({
                 </td>
                 <td
                   className={cn(
-                    "text-right py-1 px-2 font-mono",
+                    tableCellClass({ align: "right", size: "sm", mono: true }),
                     !d.valid ? "text-zinc-600" : isBestS3 ? "text-best" : "",
                   )}
                 >
@@ -689,7 +852,11 @@ export function LapTimeChart({
                 {hasTopSpeed && (
                   <td
                     className={cn(
-                      "text-right py-1 px-2 font-mono",
+                      tableCellClass({
+                        align: "right",
+                        size: "sm",
+                        mono: true,
+                      }),
                       d.valid &&
                         d.topSpeed != null &&
                         d.topSpeed === bestTopSpeed
@@ -703,7 +870,11 @@ export function LapTimeChart({
                 {hasWear && (
                   <td
                     className={cn(
-                      "text-right py-1 px-2 font-mono",
+                      tableCellClass({
+                        align: "right",
+                        size: "sm",
+                        mono: true,
+                      }),
                       wear != null && wear >= 75
                         ? "text-behind"
                         : wear != null && wear >= 50
@@ -720,12 +891,26 @@ export function LapTimeChart({
                   </td>
                 )}
                 {showBatteryDetails && hasErs && (
-                  <td className="text-right py-1 px-2 font-mono text-ahead">
+                  <td
+                    className={tableCellClass({
+                      align: "right",
+                      size: "sm",
+                      mono: true,
+                      className: "text-ahead",
+                    })}
+                  >
                     {d.ersMj != null && d.ersMj > 0 ? d.ersMj.toFixed(1) : "–"}
                   </td>
                 )}
                 {showBatteryDetails && hasErsHarv && (
-                  <td className="text-right py-1 px-2 font-mono text-sky-400">
+                  <td
+                    className={tableCellClass({
+                      align: "right",
+                      size: "sm",
+                      mono: true,
+                      className: "text-sky-400",
+                    })}
+                  >
                     {d.ersHarvMj != null && d.ersHarvMj > 0
                       ? d.ersHarvMj.toFixed(1)
                       : "–"}
@@ -734,7 +919,11 @@ export function LapTimeChart({
                 {hasFuel && (
                   <td
                     className={cn(
-                      "text-right py-1 px-2 font-mono",
+                      tableCellClass({
+                        align: "right",
+                        size: "sm",
+                        mono: true,
+                      }),
                       d.fuelKg == null
                         ? "text-zinc-600"
                         : medianGreenBurn != null &&
@@ -761,7 +950,7 @@ export function LapTimeChart({
           // Group laps by stint when stints are available
           if (stints && stints.length > 0) {
             return (
-              <table className="w-full text-xs min-w-[500px]">
+              <table className={cn(tableClass, "min-w-[500px]")}>
                 <thead className={tableHeadClass}>{headerRow}</thead>
                 <tbody>
                   {stints.map((stint, si) => {
@@ -777,7 +966,7 @@ export function LapTimeChart({
                       <tr key={`stint-${si}`}>
                         <td
                           colSpan={colCount}
-                          className={cn("py-1.5 px-2", si > 0 && "pt-4")}
+                          className={cn(tableCellClass(), si > 0 && "pt-4")}
                         >
                           <div className="flex items-center gap-2">
                             <span
@@ -806,7 +995,7 @@ export function LapTimeChart({
 
           // Fallback: no stint grouping
           return (
-            <table className="w-full text-xs min-w-[500px]">
+            <table className={cn(tableClass, "min-w-[500px]")}>
               <thead className={tableHeadClass}>{headerRow}</thead>
               <tbody>
                 {data.map((lap, i) => renderLapRow(lap, `lap-${lap.lap}-${i}`))}

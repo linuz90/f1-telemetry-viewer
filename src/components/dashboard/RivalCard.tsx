@@ -18,6 +18,7 @@ import type {
   RivalCardKind,
 } from "../../utils/rivalStats";
 import { type AccentColor } from "../Card";
+import { InsightDetail, InsightValue } from "../ui/InsightText";
 import { InsightTile } from "../ui/InsightTile";
 
 interface RivalCardStyle {
@@ -118,7 +119,10 @@ export function RivalCard({ card }: { card: RivalCardData }) {
           sign is the one place we still tint: emerald = you're ahead,
           rose = you're behind. Against a white number it reads as a clean
           indicator rather than the two-tone clash of accent-on-accent. */}
-      <div className="mt-1 flex items-baseline font-bold tabular-nums leading-none tracking-tight">
+      <InsightValue
+        size="xl"
+        className="mt-1 flex items-baseline font-bold leading-none tracking-tight"
+      >
         {sign && (
           <span className={cn("text-3xl font-mono", signClass)}>{sign}</span>
         )}
@@ -128,11 +132,15 @@ export function RivalCard({ card }: { card: RivalCardData }) {
             {unit}
           </span>
         )}
-      </div>
+      </InsightValue>
 
-      <div className="mt-3 border-t border-white/[0.05] pt-2 font-mono text-2xs font-medium leading-snug tabular-nums text-zinc-500">
+      <InsightDetail
+        size="xs"
+        tone="text-zinc-500"
+        className="mt-3 border-t border-white/[0.05] pt-2 font-medium"
+      >
         {card.detail}
-      </div>
+      </InsightDetail>
     </InsightTile>
   );
 }

@@ -7,6 +7,8 @@ import { QualifyingPaceCard } from "../components/dashboard/QualifyingPaceCard";
 import { RaceResultsHero } from "../components/dashboard/RaceResultsHero";
 import { RivalCard } from "../components/dashboard/RivalCard";
 import { TrackOverviewCard } from "../components/dashboard/TrackOverviewCard";
+import { Button } from "../components/ui/Button";
+import { Eyebrow } from "../components/ui/Eyebrow";
 import {
   type SessionStats,
   buildQualifyingPaceData,
@@ -157,13 +159,14 @@ export function DashboardPage() {
           <h3 className="text-sm font-semibold text-zinc-300">{emptyTitle}</h3>
           <p className="mt-1 text-sm text-zinc-500">{emptyHint}</p>
           {isFiltered && (
-            <button
-              type="button"
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => setFilters(DEFAULT_FILTERS)}
-              className="mt-4 rounded-md bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600"
+              className="mt-4"
             >
               Reset filters
-            </button>
+            </Button>
           )}
         </section>
       ) : (
@@ -193,8 +196,10 @@ export function DashboardPage() {
                   ),
                 ).map(([dayKey, activities]) => (
                   <div key={dayKey}>
-                    <h3 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                      {formatRelativeDate(dayKey + "T00:00:00")}
+                    <h3 className="mb-1.5 px-1">
+                      <Eyebrow>
+                        {formatRelativeDate(dayKey + "T00:00:00")}
+                      </Eyebrow>
                     </h3>
                     <div className="space-y-1.5">
                       {activities.map((activity) => (
@@ -205,10 +210,11 @@ export function DashboardPage() {
                 ))}
               </div>
               {recentActivity.length > RECENT_ACTIVITY_COLLAPSED && (
-                <button
-                  type="button"
+                <Button
+                  size="xs"
+                  variant="ghost"
                   onClick={() => setShowAllActivity((value) => !value)}
-                  className="mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600"
+                  className="mt-2"
                 >
                   {showAllActivity ? (
                     <>
@@ -220,7 +226,7 @@ export function DashboardPage() {
                       more <ChevronDown className="size-3" />
                     </>
                   )}
-                </button>
+                </Button>
               )}
             </section>
           )}

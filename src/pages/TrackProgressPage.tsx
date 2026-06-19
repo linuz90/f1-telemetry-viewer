@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ActionEmptyState } from "../components/ActionEmptyState";
 import {
   CartesianGrid,
   Line,
@@ -33,6 +34,8 @@ import { TrackQualifyingInsights } from "../components/track/TrackQualifyingInsi
 import { TrackStrategySection } from "../components/track/TrackStrategySection";
 import { TrackFlag } from "../components/TrackFlag";
 import { Badge } from "../components/ui/Badge";
+import { Button, buttonVariants } from "../components/ui/Button";
+import { InsightDetail, InsightValue } from "../components/ui/InsightText";
 import { InsightTile } from "../components/ui/InsightTile";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
@@ -644,67 +647,59 @@ export function TrackProgressPage() {
 
     return (
       <div className="flex items-center justify-center h-full">
-        <VStack align="center" className="max-w-md text-center">
-          <HStack
-            justify="center"
-            className="h-12 w-12 rounded-full bg-zinc-900"
-          >
-            {isUploadWithNoData ? (
-              <Upload className="h-5 w-5 text-zinc-500" />
-            ) : (
-              <ArrowLeft className="h-5 w-5 text-zinc-500" />
-            )}
-          </HStack>
-          <div>
-            <h3 className="text-base font-medium text-zinc-200">
-              {isUploadWithNoData
-                ? "Track data not available"
-                : hasOnlyOtherFormulaScopes
-                  ? `No ${formulaLabel} data for ${displayTrackName}`
-                  : "No sessions found"}
-            </h3>
-            <p className="mt-1 text-sm text-zinc-500">
-              {isUploadWithNoData
-                ? "Uploaded telemetry is stored in memory and lost when the browser is closed. Re-upload your .zip to continue."
-                : hasOnlyOtherFormulaScopes
-                  ? `${displayTrackName} exists in another game scope. Scoped track pages stay strict so tyre life, PBs, setups, and history never mix incompatible data.`
-                  : `No sessions found for ${displayTrackName}.`}
-            </p>
-          </div>
-          {isUploadWithNoData ? (
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 transition-colors"
-            >
-              Upload telemetry
-            </button>
-          ) : hasOnlyOtherFormulaScopes ? (
-            <HStack wrap justify="center" className="gap-2">
-              {otherTrackScopes.map((option) => (
+        <ActionEmptyState
+          icon={isUploadWithNoData ? Upload : ArrowLeft}
+          className="max-w-md"
+          title={
+            isUploadWithNoData
+              ? "Track data not available"
+              : hasOnlyOtherFormulaScopes
+                ? `No ${formulaLabel} data for ${displayTrackName}`
+                : "No sessions found"
+          }
+          message={
+            isUploadWithNoData
+              ? "Uploaded telemetry is stored in memory and lost when the browser is closed. Re-upload your .zip to continue."
+              : hasOnlyOtherFormulaScopes
+                ? `${displayTrackName} exists in another game scope. Scoped track pages stay strict so tyre life, PBs, setups, and history never mix incompatible data.`
+                : `No sessions found for ${displayTrackName}.`
+          }
+          actions={
+            isUploadWithNoData ? (
+              <Button
+                variant="primary"
+                onClick={() => setShowUploadModal(true)}
+              >
+                Upload telemetry
+              </Button>
+            ) : hasOnlyOtherFormulaScopes ? (
+              <HStack wrap justify="center" className="gap-2">
+                {otherTrackScopes.map((option) => (
+                  <Link
+                    key={option.key}
+                    to={trackPath(option.key, displayTrackName)}
+                    className={buttonVariants({ variant: "secondary" })}
+                  >
+                    View {option.label} ({option.trackSessionCount})
+                  </Link>
+                ))}
                 <Link
-                  key={option.key}
-                  to={trackPath(option.key, displayTrackName)}
-                  className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
+                  to={backToDashboardPath}
+                  className={buttonVariants({ variant: "subtle" })}
                 >
-                  View {option.label} ({option.trackSessionCount})
+                  Back to dashboard
                 </Link>
-              ))}
+              </HStack>
+            ) : (
               <Link
                 to={backToDashboardPath}
-                className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+                className={buttonVariants({ variant: "secondary" })}
               >
                 Back to dashboard
               </Link>
-            </HStack>
-          ) : (
-            <Link
-              to={backToDashboardPath}
-              className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
-            >
-              Back to dashboard
-            </Link>
-          )}
-        </VStack>
+            )
+          }
+        />
       </div>
     );
   }
@@ -1422,31 +1417,31 @@ export function TrackProgressPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <InsightTile title="Best TT Lap" icon={Timer} accent="purple">
-              <div className="font-mono text-xl font-medium text-purple-300">
+              <InsightValue tone="text-best">
                 {bestTimeTrialMs > 0 ? msToLapTime(bestTimeTrialMs) : "–"}
-              </div>
+              </InsightValue>
             </InsightTile>
             <InsightTile
               title="Theoretical Best"
               icon={Target}
               accent="emerald"
             >
-              <div className="font-mono text-xl text-ahead">
+              <InsightValue tone="text-ahead">
                 {theoreticalTimeTrialMs > 0
                   ? msToLapTime(theoreticalTimeTrialMs)
                   : "–"}
-              </div>
+              </InsightValue>
             </InsightTile>
             <InsightTile
               title="Gap to Theoretical"
               icon={TimerReset}
               accent="amber"
             >
-              <div className="font-mono text-xl text-warning">
+              <InsightValue tone="text-warning">
                 {timeTrialGapMs > 0
                   ? `+${(timeTrialGapMs / 1000).toFixed(3)}s`
                   : "–"}
-              </div>
+              </InsightValue>
             </InsightTile>
           </div>
 
@@ -1846,7 +1841,7 @@ export function TrackProgressPage() {
                     action={
                       showRaceLengthSelector && selectedRaceAnalysisBucket ? (
                         <div className="flex max-w-full items-center gap-2">
-                          <span className="shrink-0 text-xs font-medium uppercase tracking-wider text-zinc-600">
+                          <span className="shrink-0 font-mono text-xs font-medium uppercase tracking-wider text-zinc-600">
                             Race length
                           </span>
                           <SegmentedControl
@@ -1997,7 +1992,7 @@ export function TrackProgressPage() {
                       d.bestLapMs <= 0
                         ? "ring-1 ring-inset ring-white/[0.06] bg-zinc-900/70 text-zinc-500"
                         : isAllTimeBest
-                          ? cn(accentCardClass("purple"), "text-purple-300")
+                          ? cn(accentCardClass("purple"), "text-best")
                           : cn(accentCardClass("cyan"), "text-cyan-300"),
                     )}
                   >
@@ -2042,11 +2037,11 @@ function SectorBestTile({
   const deltaMs = latestMs > 0 && bestMs > 0 ? latestMs - bestMs : 0;
   return (
     <InsightTile title={label} icon={Timer} accent="purple">
-      <div className="font-mono text-lg font-medium text-purple-300">
+      <InsightValue size="md" tone="text-best">
         {bestMs > 0 ? msToSectorTime(bestMs) : "–"}
-      </div>
+      </InsightValue>
       {latestMs > 0 && (
-        <div className="text-xs mt-1">
+        <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
           <span className="text-zinc-500">Latest: </span>
           <span className="font-mono text-zinc-300">
             {msToSectorTime(latestMs)}
@@ -2059,7 +2054,7 @@ function SectorBestTile({
           {deltaMs === 0 && bestMs > 0 && (
             <span className="font-mono text-ahead ml-1">PB</span>
           )}
-        </div>
+        </InsightDetail>
       )}
     </InsightTile>
   );

@@ -17,7 +17,14 @@ import { AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { Badge } from "./ui/Badge";
 import { FocusToggle } from "./ui/FocusToggle";
-import { tableHeadClass, tableRowClass } from "./ui/table";
+import { SectionHeader } from "./ui/SectionHeader";
+import {
+  tableCellClass,
+  tableClass,
+  tableHeadCellClass,
+  tableHeadClass,
+  tableRowClass,
+} from "./ui/table";
 import { formatPenaltySummary } from "../utils/raceControl";
 
 interface RaceResultsTableProps {
@@ -201,7 +208,8 @@ export function RaceResultsTable({
     }
   }
 
-  const thClass = "py-1.5 px-2 cursor-pointer select-none group";
+  const thClass = (align: "left" | "right" = "left") =>
+    tableHeadCellClass({ align, sortable: true });
 
   // Use tyre-stint-history-v2 if available (has clean per-driver race results)
   if (stintHistory?.length) {
@@ -223,27 +231,25 @@ export function RaceResultsTable({
 
     return (
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-zinc-300">
-            Classification
-          </h3>
-          <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
-        </div>
+        <SectionHeader
+          size="sm"
+          title="Classification"
+          action={
+            <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
+          }
+        />
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className={tableClass}>
             <thead className={tableHeadClass}>
               <tr>
-                <th
-                  className={cn("text-left", thClass)}
-                  onClick={() => toggleSort("pos")}
-                >
+                <th className={thClass()} onClick={() => toggleSort("pos")}>
                   Pos
                   <SortIcon column="pos" sortKey={sortKey} sortDir={sortDir} />
                 </th>
-                <th className="text-left py-1.5 px-2">Driver</th>
-                <th className="text-left py-1.5 px-2">Team</th>
+                <th className={tableHeadCellClass()}>Driver</th>
+                <th className={tableHeadCellClass()}>Team</th>
                 <th
-                  className={cn("text-right", thClass)}
+                  className={thClass("right")}
                   onClick={() => toggleSort("gap")}
                 >
                   <SortIcon
@@ -255,7 +261,7 @@ export function RaceResultsTable({
                   Gap
                 </th>
                 <th
-                  className={cn("text-right", thClass)}
+                  className={thClass("right")}
                   onClick={() => toggleSort("bestLap")}
                 >
                   <SortIcon
@@ -267,7 +273,7 @@ export function RaceResultsTable({
                   Best Lap
                 </th>
                 <th
-                  className={cn("text-right", thClass)}
+                  className={thClass("right")}
                   onClick={() => toggleSort("racePace")}
                 >
                   <Tooltip text={RACE_PACE_TOOLTIP}>
@@ -283,7 +289,7 @@ export function RaceResultsTable({
                   </Tooltip>
                 </th>
                 <th
-                  className={cn("text-right", thClass)}
+                  className={thClass("right")}
                   onClick={() => toggleSort("topSpeed")}
                 >
                   <SortIcon
@@ -295,7 +301,7 @@ export function RaceResultsTable({
                   Top Speed
                 </th>
                 <th
-                  className={cn("text-right", thClass)}
+                  className={thClass("right")}
                   onClick={() => toggleSort("ers")}
                 >
                   <Tooltip text="Average ERS energy deployed per lap (green-flag laps only, excluding first and last lap).">
@@ -312,7 +318,7 @@ export function RaceResultsTable({
                 </th>
                 {hasErsHarv && (
                   <th
-                    className={cn("text-right", thClass)}
+                    className={thClass("right")}
                     onClick={() => toggleSort("ersHarv")}
                   >
                     <Tooltip text="Average ERS energy harvested per lap, MGU-K + MGU-H combined (green-flag laps only, excluding first and last lap). Higher values indicate more lift-and-coast.">
@@ -328,7 +334,9 @@ export function RaceResultsTable({
                     </Tooltip>
                   </th>
                 )}
-                <th className="text-right py-1.5 px-2">Strategy</th>
+                <th className={tableHeadCellClass({ align: "right" })}>
+                  Strategy
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -379,8 +387,8 @@ export function RaceResultsTable({
                       isFocused && "bg-zinc-800/40 text-white font-medium",
                     )}
                   >
-                    <td className="py-1.5 px-2">{entry.position}</td>
-                    <td className="py-1.5 px-2">
+                    <td className={tableCellClass()}>{entry.position}</td>
+                    <td className={tableCellClass()}>
                       <span
                         className="inline-block w-1 h-3 rounded-sm mr-1.5 align-middle"
                         style={{ backgroundColor: getTeamColor(entry.team) }}
@@ -390,12 +398,14 @@ export function RaceResultsTable({
                         <PenaltyBadge penalties={penalties} />
                       </span>
                     </td>
-                    <td className="py-1.5 px-2 text-zinc-400">
+                    <td
+                      className={tableCellClass({ className: "text-zinc-400" })}
+                    >
                       {getTeamName(entry.team)}
                     </td>
                     <td
                       className={cn(
-                        "py-1.5 px-2 text-right font-mono",
+                        tableCellClass({ align: "right", mono: true }),
                         (status === "DNF" || status === "DSQ") && "text-behind",
                       )}
                     >
@@ -403,7 +413,7 @@ export function RaceResultsTable({
                     </td>
                     <td
                       className={cn(
-                        "py-1.5 px-2 text-right font-mono",
+                        tableCellClass({ align: "right", mono: true }),
                         isBestLap && "text-best",
                       )}
                     >
@@ -411,7 +421,7 @@ export function RaceResultsTable({
                     </td>
                     <td
                       className={cn(
-                        "py-1.5 px-2 text-right font-mono",
+                        tableCellClass({ align: "right", mono: true }),
                         isBestPace && "text-best",
                       )}
                     >
@@ -419,7 +429,7 @@ export function RaceResultsTable({
                     </td>
                     <td
                       className={cn(
-                        "py-1.5 px-2 text-right font-mono",
+                        tableCellClass({ align: "right", mono: true }),
                         isBestSpeed && "text-best",
                       )}
                     >
@@ -427,7 +437,7 @@ export function RaceResultsTable({
                     </td>
                     <td
                       className={cn(
-                        "py-1.5 px-2 text-right font-mono",
+                        tableCellClass({ align: "right", mono: true }),
                         isBestErs && "text-best",
                       )}
                     >
@@ -436,14 +446,19 @@ export function RaceResultsTable({
                     {hasErsHarv && (
                       <td
                         className={cn(
-                          "py-1.5 px-2 text-right font-mono",
+                          tableCellClass({ align: "right", mono: true }),
                           isBestErsHarv && "text-best",
                         )}
                       >
                         {ersHarv > 0 ? ersHarv.toFixed(1) : "–"}
                       </td>
                     )}
-                    <td className="py-1.5 px-2 text-right text-zinc-400">
+                    <td
+                      className={tableCellClass({
+                        align: "right",
+                        className: "text-zinc-400",
+                      })}
+                    >
                       {stintStr}
                     </td>
                   </tr>
@@ -468,19 +483,26 @@ export function RaceResultsTable({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-zinc-300">Classification</h3>
-        <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
-      </div>
+      <SectionHeader
+        size="sm"
+        title="Classification"
+        action={
+          <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
+        }
+      />
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className={tableClass}>
           <thead className={tableHeadClass}>
             <tr>
-              <th className="text-left py-1.5 px-2">Pos</th>
-              <th className="text-left py-1.5 px-2">Driver</th>
-              <th className="text-left py-1.5 px-2">Team</th>
-              <th className="text-right py-1.5 px-2">Best Lap</th>
-              <th className="text-right py-1.5 px-2">Top Speed</th>
+              <th className={tableHeadCellClass()}>Pos</th>
+              <th className={tableHeadCellClass()}>Driver</th>
+              <th className={tableHeadCellClass()}>Team</th>
+              <th className={tableHeadCellClass({ align: "right" })}>
+                Best Lap
+              </th>
+              <th className={tableHeadCellClass({ align: "right" })}>
+                Top Speed
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -496,8 +518,8 @@ export function RaceResultsTable({
                       "bg-zinc-800/40 text-white font-medium",
                   )}
                 >
-                  <td className="py-1.5 px-2">{fc.position}</td>
-                  <td className="py-1.5 px-2">
+                  <td className={tableCellClass()}>{fc.position}</td>
+                  <td className={tableCellClass()}>
                     <span
                       className="inline-block w-1 h-3 rounded-sm mr-1.5 align-middle"
                       style={{ backgroundColor: getTeamColor(d.team) }}
@@ -507,13 +529,19 @@ export function RaceResultsTable({
                       <PenaltyBadge penalties={penalties} />
                     </span>
                   </td>
-                  <td className="py-1.5 px-2 text-zinc-400">
+                  <td
+                    className={tableCellClass({ className: "text-zinc-400" })}
+                  >
                     {getTeamName(d.team)}
                   </td>
-                  <td className="py-1.5 px-2 text-right font-mono">
+                  <td
+                    className={tableCellClass({ align: "right", mono: true })}
+                  >
                     {fc["best-lap-time-str"] || "–"}
                   </td>
-                  <td className="py-1.5 px-2 text-right font-mono">
+                  <td
+                    className={tableCellClass({ align: "right", mono: true })}
+                  >
                     {driverTopSpeed(d) > 0
                       ? `${Math.round(driverTopSpeed(d))}`
                       : "–"}

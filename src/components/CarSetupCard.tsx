@@ -1,4 +1,6 @@
 import type { CarSetup } from "../types/telemetry";
+import { Eyebrow } from "./ui/Eyebrow";
+import { SectionHeader } from "./ui/SectionHeader";
 import { HStack, VStack } from "./ui/Stack";
 
 interface CarSetupCardProps {
@@ -91,8 +93,8 @@ function Section({
 }) {
   return (
     <div>
-      <div className="text-2xs uppercase tracking-wider text-zinc-400 font-medium mb-2">
-        {title}
+      <div className="mb-2">
+        <Eyebrow className="text-zinc-400">{title}</Eyebrow>
       </div>
       <div className="space-y-1.5">{children}</div>
     </div>
@@ -114,7 +116,7 @@ function TyrePressureCell({
       align="center"
       className="gap-1 rounded-lg bg-zinc-800/40 px-3 py-2.5"
     >
-      <span className="text-2xs text-zinc-500 uppercase tracking-wider">
+      <span className="font-mono text-2xs uppercase tracking-wider text-zinc-500">
         {label}
       </span>
       <span className="font-mono text-sm font-medium text-zinc-200">
@@ -140,7 +142,7 @@ export function CarSetupCard({ setup }: CarSetupCardProps) {
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-4">Car Setup</h3>
+      <SectionHeader size="sm" title="Car Setup" className="mb-4" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
         {/* Column 1: Aero + Transmission + Brakes */}
         <div className="space-y-5">

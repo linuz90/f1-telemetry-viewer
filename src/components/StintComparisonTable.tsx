@@ -7,9 +7,16 @@ import {
   getDriverStints,
 } from "../utils/stats";
 import { msToLapTime } from "../utils/format";
-import { getCompoundColor } from "../utils/colors";
 import { cn } from "../utils/cn";
-import { tableHeadClass, tableRowClass } from "./ui/table";
+import { CompoundSwatchLabel } from "./ui/CompoundSwatchLabel";
+import { SectionHeader } from "./ui/SectionHeader";
+import {
+  tableCellClass,
+  tableClass,
+  tableHeadCellClass,
+  tableHeadClass,
+  tableRowClass,
+} from "./ui/table";
 
 interface StintComparisonTableProps {
   player: DriverData;
@@ -32,21 +39,28 @@ export function StintComparisonTable({
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-zinc-300 mb-2">
-        Stint Comparison{" "}
-        <span className="font-normal text-zinc-500">vs best on compound</span>
-      </h3>
+      <SectionHeader
+        size="sm"
+        title="Stint Comparison"
+        hint="vs best on compound"
+      />
       <div className="overflow-x-auto">
-        <table className="w-full text-xs min-w-[520px]">
+        <table className={cn(tableClass, "min-w-[520px]")}>
           <thead className={tableHeadClass}>
             <tr>
-              <th className="text-left py-1.5 px-2">Stint</th>
-              <th className="text-left py-1.5 px-2">Compound</th>
-              <th className="text-right py-1.5 px-2">Laps</th>
-              <th className="text-right py-1.5 px-2">Median Pace</th>
-              <th className="text-right py-1.5 px-2">Wear/Lap</th>
-              <th className="text-right py-1.5 px-2">Pace Drop</th>
-              <th className="text-left py-1.5 px-2">vs Best</th>
+              <th className={tableHeadCellClass()}>Stint</th>
+              <th className={tableHeadCellClass()}>Compound</th>
+              <th className={tableHeadCellClass({ align: "right" })}>Laps</th>
+              <th className={tableHeadCellClass({ align: "right" })}>
+                Median Pace
+              </th>
+              <th className={tableHeadCellClass({ align: "right" })}>
+                Wear/Lap
+              </th>
+              <th className={tableHeadCellClass({ align: "right" })}>
+                Pace Drop
+              </th>
+              <th className={tableHeadCellClass()}>vs Best</th>
             </tr>
           </thead>
           <tbody>
@@ -93,22 +107,28 @@ export function StintComparisonTable({
 
               return (
                 <tr key={i} className={tableRowClass}>
-                  <td className="py-1.5 px-2 font-medium text-zinc-300">
+                  <td
+                    className={tableCellClass({
+                      className: "font-medium text-zinc-300",
+                    })}
+                  >
                     {i + 1}
                   </td>
-                  <td className="py-1.5 px-2">
-                    <span className="flex items-center gap-1.5">
-                      <span
-                        className="w-2 h-2 rounded-sm inline-block"
-                        style={{ backgroundColor: getCompoundColor(compound) }}
-                      />
-                      <span className="text-zinc-300">{compound}</span>
-                    </span>
+                  <td className={tableCellClass()}>
+                    <CompoundSwatchLabel compound={compound} />
                   </td>
-                  <td className="text-right py-1.5 px-2 text-zinc-300 font-mono">
+                  <td
+                    className={tableCellClass({
+                      align: "right",
+                      mono: true,
+                      className: "text-zinc-300",
+                    })}
+                  >
                     {stint["stint-length"]}
                   </td>
-                  <td className="text-right py-1.5 px-2 font-mono">
+                  <td
+                    className={tableCellClass({ align: "right", mono: true })}
+                  >
                     <span className="text-zinc-300">
                       {playerPace > 0 ? msToLapTime(playerPace) : "–"}
                     </span>
@@ -116,13 +136,17 @@ export function StintComparisonTable({
                       <Delta value={paceDelta} unit="s" factor={1000} />
                     )}
                   </td>
-                  <td className="text-right py-1.5 px-2 font-mono">
+                  <td
+                    className={tableCellClass({ align: "right", mono: true })}
+                  >
                     <span className="text-zinc-300">
                       {playerRate > 0 ? `${playerRate.toFixed(1)}%` : "–"}
                     </span>
                     {wearDelta !== 0 && <Delta value={wearDelta} unit="%" />}
                   </td>
-                  <td className="text-right py-1.5 px-2 font-mono">
+                  <td
+                    className={tableCellClass({ align: "right", mono: true })}
+                  >
                     <span className="text-zinc-300">
                       {playerDrop !== 0
                         ? `${playerDrop > 0 ? "+" : ""}${(playerDrop / 1000).toFixed(3)}s`
@@ -132,7 +156,11 @@ export function StintComparisonTable({
                       <Delta value={dropDelta} unit="s" factor={1000} />
                     )}
                   </td>
-                  <td className="text-left py-1.5 px-2 text-zinc-500 text-2xs">
+                  <td
+                    className={tableCellClass({
+                      className: "text-2xs text-zinc-500",
+                    })}
+                  >
                     {best
                       ? `${best.driver["driver-name"]} L${best.lapStart}-${best.lapEnd}`
                       : "–"}

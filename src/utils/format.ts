@@ -120,6 +120,41 @@ export function formatGap(ms: number): string {
   return `${sign}${(Math.abs(ms) / 1000).toFixed(3)}s`;
 }
 
+export function pluralize(
+  count: number,
+  singular: string,
+  plural = `${singular}s`,
+): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+export function joinMetaParts(
+  parts: readonly (string | null | undefined | false)[],
+): string {
+  return parts.filter(Boolean).join(" · ");
+}
+
+export function formatSignedSeconds(valueMs: number, decimals = 3): string {
+  const sign = valueMs >= 0 ? "+" : "−";
+  return `${sign}${(Math.abs(valueMs) / 1000).toFixed(decimals)}s`;
+}
+
+export function formatEnergyMj(value: number, decimals = 1): string {
+  return `${value.toFixed(decimals)} MJ`;
+}
+
+export function formatEnergyMjPerLap(value: number, decimals = 1): string {
+  return `${formatEnergyMj(value, decimals)}/lap`;
+}
+
+export function formatFuelKg(value: number, decimals = 1): string {
+  return `${value.toFixed(decimals)} kg`;
+}
+
+export function formatKgPerLap(value: number, decimals = 2): string {
+  return `${value.toFixed(decimals)} kg/lap`;
+}
+
 /**
  * Format session type for display (shorter labels).
  *

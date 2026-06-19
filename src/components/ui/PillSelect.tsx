@@ -9,12 +9,30 @@ export interface PillSelectOption {
   disabled?: boolean;
 }
 
-type PillSelectWidth = "auto" | "session" | "full";
+export type PillSelectWidth = "auto" | "compact" | "session" | "full";
+export type PillSelectSize = "sm" | "md";
 
 const WIDTH: Record<PillSelectWidth, string> = {
   auto: "w-auto",
+  compact: "w-[min(15rem,calc(100vw-3rem))]",
   session: "w-[min(20rem,calc(100vw-3rem))]",
   full: "w-full",
+};
+
+const SIZE: Record<
+  PillSelectSize,
+  { dot: string; icon: string; select: string }
+> = {
+  sm: {
+    dot: "left-2.5 size-1.5",
+    icon: "right-2 size-3",
+    select: "h-6.5 rounded-md py-1 pl-6 pr-7 text-2xs",
+  },
+  md: {
+    dot: "left-3 size-1.5",
+    icon: "right-2.5 size-3",
+    select: "h-7.5 rounded-lg py-1.5 pl-6.5 pr-8 text-xs",
+  },
 };
 
 export function PillSelect({
@@ -24,6 +42,7 @@ export function PillSelect({
   ariaLabel,
   dotColor,
   width = "auto",
+  size = "md",
   className,
 }: {
   value: PillSelectValue;
@@ -32,8 +51,10 @@ export function PillSelect({
   ariaLabel: string;
   dotColor?: string;
   width?: PillSelectWidth;
+  size?: PillSelectSize;
   className?: string;
 }) {
+  const styles = SIZE[size];
   return (
     <span
       className={cn(
@@ -44,14 +65,20 @@ export function PillSelect({
       )}
     >
       <span
-        className="pointer-events-none absolute left-3 size-1.5 rounded-full bg-zinc-500/60"
+        className={cn(
+          "pointer-events-none absolute rounded-full bg-zinc-500/60",
+          styles.dot,
+        )}
         style={{ backgroundColor: dotColor }}
       />
       <select
         value={String(value)}
         onChange={(event) => onChange(event.target.value)}
         aria-label={ariaLabel}
-        className="h-7.5 w-full min-w-0 appearance-none rounded-lg border border-zinc-800/80 bg-zinc-900/70 py-1.5 pl-6.5 pr-8 text-xs font-medium outline-none transition-colors hover:border-zinc-700 focus:ring-1 focus:ring-zinc-500/40"
+        className={cn(
+          "w-full min-w-0 appearance-none border border-zinc-800/80 bg-zinc-900/70 font-medium outline-none transition-colors hover:border-zinc-700 focus:ring-1 focus:ring-zinc-500/40",
+          styles.select,
+        )}
       >
         {options.map((option) => (
           <option
@@ -63,7 +90,12 @@ export function PillSelect({
           </option>
         ))}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 size-3 text-zinc-500" />
+      <ChevronDown
+        className={cn(
+          "pointer-events-none absolute text-zinc-500",
+          styles.icon,
+        )}
+      />
     </span>
   );
 }

@@ -6,13 +6,20 @@ import {
   findFastestLapDriver,
   findRaceWinner,
 } from "../utils/stats";
-import { PillSelect, type PillSelectOption } from "./ui/PillSelect";
+import {
+  PillSelect,
+  type PillSelectOption,
+  type PillSelectSize,
+  type PillSelectWidth,
+} from "./ui/PillSelect";
 
 interface DriverComparisonPickerProps {
   session: TelemetrySession;
   selectedIndex: number | null;
   onSelect: (index: number | null) => void;
   focusedDriverIndex: number;
+  size?: PillSelectSize;
+  width?: PillSelectWidth;
 }
 
 function driverOptionLabel(driver: DriverData, tags: string[]): string {
@@ -26,6 +33,8 @@ export function DriverComparisonPicker({
   selectedIndex,
   onSelect,
   focusedDriverIndex,
+  size = "md",
+  width = "session",
 }: DriverComparisonPickerProps) {
   const drivers = session["classification-data"] ?? [];
   const focused = drivers.find((d) => d.index === focusedDriverIndex);
@@ -71,7 +80,8 @@ export function DriverComparisonPicker({
       options={compareOptions}
       ariaLabel="Compare with driver"
       dotColor={selectedDriver ? getTeamColor(selectedDriver.team) : undefined}
-      width="session"
+      size={size}
+      width={width}
       className={cn(selectedIndex === null && "text-zinc-400")}
     />
   );

@@ -262,7 +262,7 @@ export function SessionList() {
             const modeLabel = groupModeLabel(dateSessions);
             return (
               <div key={dateKey}>
-                <h3 className="px-2 mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                <h3 className="mb-1 px-2 font-mono text-xs font-semibold uppercase tracking-wider text-zinc-500">
                   {formatRelativeDate(dateKey + "T00:00:00")}
                   {modeLabel && (
                     <span className="ml-1.5 text-zinc-600">· {modeLabel}</span>
