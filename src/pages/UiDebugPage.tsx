@@ -27,7 +27,6 @@ import { TyreWearChart } from "../components/TyreWearChart";
 import { DamageTimeline } from "../components/DamageTimeline";
 import { SectorComparison } from "../components/SectorComparison";
 import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
-import { cardClass, cardClassCompact } from "../components/Card";
 import type { SessionInsight } from "../utils/sessionInsights";
 import type {
   CumulativeDelta,
@@ -258,7 +257,7 @@ export function UiDebugPage() {
   const [pageSegment, setPageSegment] = useState("sessions");
 
   return (
-    <div className="mx-auto max-w-7xl space-y-10 px-6 py-8 lg:px-10">
+    <div className="mx-auto max-w-7xl space-y-14 px-6 py-10 lg:px-10">
       <header>
         <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">
           dev-only route
@@ -317,18 +316,22 @@ export function UiDebugPage() {
         </div>
       </DebugSection>
 
-      <DebugSection file="src/components/ui/Badge.tsx + CompoundBadge.tsx + SegmentedControl.tsx + TrackFlag.tsx + StintChip.tsx">
-        <div className={cn(cardClassCompact, "space-y-5")}>
+      <DebugSection
+        files={[
+          "Badge.tsx",
+          "CompoundBadge.tsx",
+          "SegmentedControl.tsx",
+          "TrackFlag.tsx",
+          "StintChip.tsx",
+        ]}
+      >
+        <div className="space-y-8">
           <SectionHeader title="Badges, Controls & Chips" hint="Small UI variants, explicit sizes, and compound styling" />
           <div>
-            <p className="mb-2 font-mono text-2xs uppercase tracking-wider text-zinc-500">
-              Badge.tsx
-            </p>
-            <div className="space-y-3">
+            <DebugComponentLabel>Badge.tsx</DebugComponentLabel>
+            <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 font-mono text-2xs uppercase tracking-wider text-zinc-600">
-                  sm
-                </span>
+                <DebugVariantLabel>sm</DebugVariantLabel>
                 <Badge tone="zinc">Neutral</Badge>
                 <Badge tone="amber">Warning</Badge>
                 <Badge tone="green">Valid</Badge>
@@ -337,9 +340,7 @@ export function UiDebugPage() {
                 <Badge tone="sky">Online</Badge>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-14 font-mono text-2xs uppercase tracking-wider text-zinc-600">
-                  xs
-                </span>
+                <DebugVariantLabel>xs</DebugVariantLabel>
                 <Badge tone="zinc" size="xs">PIT</Badge>
                 <Badge tone="amber" size="xs">SC</Badge>
                 <Badge tone="green" size="xs">VALID</Badge>
@@ -349,9 +350,7 @@ export function UiDebugPage() {
             </div>
           </div>
           <div>
-            <p className="mb-2 font-mono text-2xs uppercase tracking-wider text-zinc-500">
-              CompoundBadge.tsx
-            </p>
+            <DebugComponentLabel>CompoundBadge.tsx</DebugComponentLabel>
             <div className="flex flex-wrap gap-2">
               {COMPOUNDS.map((compound) => (
                 <CompoundBadge key={compound} compound={compound} />
@@ -359,14 +358,10 @@ export function UiDebugPage() {
             </div>
           </div>
           <div>
-            <p className="mb-2 font-mono text-2xs uppercase tracking-wider text-zinc-500">
-              SegmentedControl.tsx
-            </p>
-            <div className="grid gap-3 lg:grid-cols-2">
+            <DebugComponentLabel>SegmentedControl.tsx</DebugComponentLabel>
+            <div className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-1.5">
-                <p className="font-mono text-2xs uppercase tracking-wider text-zinc-600">
-                  sm
-                </p>
+                <DebugVariantLabel className="w-auto">sm</DebugVariantLabel>
                 <SegmentedControl
                   ariaLabel="Small segmented control"
                   size="sm"
@@ -380,9 +375,7 @@ export function UiDebugPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <p className="font-mono text-2xs uppercase tracking-wider text-zinc-600">
-                  md
-                </p>
+                <DebugVariantLabel className="w-auto">md</DebugVariantLabel>
                 <SegmentedControl
                   ariaLabel="Medium segmented control"
                   size="md"
@@ -399,25 +392,19 @@ export function UiDebugPage() {
             </div>
           </div>
           <div>
-            <p className="mb-2 font-mono text-2xs uppercase tracking-wider text-zinc-500">
-              TrackFlag.tsx
-            </p>
-            <div className="flex flex-wrap items-end gap-4">
+            <DebugComponentLabel>TrackFlag.tsx</DebugComponentLabel>
+            <div className="flex flex-wrap items-end gap-6">
               {(["tiny", "small", "medium", "large"] as const).map((size) => (
                 <div key={size} className="flex items-center gap-2">
                   <TrackFlag track="monza" size={size} />
-                  <span className="font-mono text-2xs uppercase tracking-wider text-zinc-500">
-                    {size}
-                  </span>
+                  <DebugVariantLabel className="w-auto">{size}</DebugVariantLabel>
                 </div>
               ))}
             </div>
           </div>
           <div>
-            <p className="mb-2 font-mono text-2xs uppercase tracking-wider text-zinc-500">
-              StintChip.tsx
-            </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <DebugComponentLabel>StintChip.tsx</DebugComponentLabel>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {COMPOUNDS.slice(0, 5).map((compound, index) => (
                 <div
                   key={compound}
@@ -444,9 +431,7 @@ export function UiDebugPage() {
       </DebugSection>
 
       <DebugSection file="src/components/StintTimeline.tsx">
-        <div className={cardClass}>
-          <StintTimeline stints={stints} totalLaps={12} />
-        </div>
+        <StintTimeline stints={stints} totalLaps={12} />
       </DebugSection>
 
       <DebugSection file="src/components/CompoundStatCard.tsx">
@@ -469,71 +454,57 @@ export function UiDebugPage() {
       </DebugSection>
 
       <DebugSection file="src/components/StintTimeline.tsx / StintDetailCards">
-        <div className={cardClass}>
-          <StintDetailCards stints={stints} laps={laps} />
-        </div>
+        <StintDetailCards stints={stints} laps={laps} />
       </DebugSection>
 
       <DebugSection file="src/components/LapTimeChart.tsx">
-        <div className={cardClass}>
-          <LapTimeChart
-            laps={laps}
-            rivalLaps={rivalLaps}
-            rivalName="LECLERC"
-            pitLaps={[7]}
-            perLapInfo={perLapInfo}
-            damageLaps={[8]}
-            stints={stints}
-          />
-        </div>
+        <LapTimeChart
+          laps={laps}
+          rivalLaps={rivalLaps}
+          rivalName="LECLERC"
+          pitLaps={[7]}
+          perLapInfo={perLapInfo}
+          damageLaps={[8]}
+          stints={stints}
+        />
       </DebugSection>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <DebugSection file="src/components/PositionChart.tsx">
-          <div className={cardClass}>
-            <PositionChart
-              positionHistory={positionHistory}
-              playerName="ALONSO"
-              rivalName="LECLERC"
-              overtakes={overtakes}
-            />
-          </div>
+          <PositionChart
+            positionHistory={positionHistory}
+            playerName="ALONSO"
+            rivalName="LECLERC"
+            overtakes={overtakes}
+          />
         </DebugSection>
 
         <DebugSection file="src/components/TyreWearChart.tsx">
-          <div className={cardClass}>
-            <TyreWearChart
-              stints={stints}
-              rivalStints={rivalStints}
-              rivalName="LECLERC"
-              perLapInfo={perLapInfo}
-            />
-          </div>
+          <TyreWearChart
+            stints={stints}
+            rivalStints={rivalStints}
+            rivalName="LECLERC"
+            perLapInfo={perLapInfo}
+          />
         </DebugSection>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <DebugSection file="src/components/DamageTimeline.tsx">
-          <div className={cardClass}>
-            <DamageTimeline perLapInfo={perLapInfo} />
-          </div>
+          <DamageTimeline perLapInfo={perLapInfo} />
         </DebugSection>
 
         <DebugSection file="src/components/PerformanceDeltaChart.tsx">
-          <div className={cardClass}>
-            <PerformanceDeltaChart deltas={deltas} rivalName="LECLERC" />
-          </div>
+          <PerformanceDeltaChart deltas={deltas} rivalName="LECLERC" />
         </DebugSection>
       </div>
 
       <DebugSection file="src/components/SectorComparison.tsx">
-        <div className={cardClass}>
-          <SectorComparison
-            laps={laps.slice(0, 5)}
-            stints={basicStints}
-            perLapInfo={perLapInfo.slice(0, 5)}
-          />
-        </div>
+        <SectorComparison
+          laps={laps.slice(0, 5)}
+          stints={basicStints}
+          perLapInfo={perLapInfo.slice(0, 5)}
+        />
       </DebugSection>
     </div>
   );
@@ -541,18 +512,56 @@ export function UiDebugPage() {
 
 function DebugSection({
   file,
+  files,
   children,
 }: {
-  file: string;
+  file?: string;
+  files?: string[];
+  children: ReactNode;
+}) {
+  const labels = files ?? (file ? [file] : []);
+
+  return (
+    <section className="space-y-4">
+      {labels.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {labels.map((label) => (
+            <DebugCodeChip key={label}>{label}</DebugCodeChip>
+          ))}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+function DebugComponentLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="mb-3">
+      <DebugCodeChip>{children}</DebugCodeChip>
+    </div>
+  );
+}
+
+function DebugCodeChip({ children }: { children: ReactNode }) {
+  return (
+    <code className="inline-flex rounded-md bg-zinc-950/55 px-1.5 py-0.5 font-mono text-2xs leading-none text-zinc-500 ring-1 ring-white/[0.04]">
+      {children}
+    </code>
+  );
+}
+
+function DebugVariantLabel({
+  className,
+  children,
+}: {
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-2">
-      <p className="font-mono text-2xs uppercase tracking-[0.18em] text-zinc-600">
-        {file}
-      </p>
+    <span className={cn("w-14 font-mono text-2xs leading-none text-zinc-600", className)}>
       {children}
-    </section>
+    </span>
   );
 }
 
