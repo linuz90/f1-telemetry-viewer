@@ -8,10 +8,12 @@ import {
   Timer,
   Zap,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { TrackFlag } from "../components/TrackFlag";
 import { Badge } from "../components/ui/Badge";
 import { CompoundBadge } from "../components/ui/CompoundBadge";
 import { InsightTile } from "../components/ui/InsightTile";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { stintChipStyle, stintChipTextStyle } from "../components/ui/StintChip";
 import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
@@ -252,6 +254,9 @@ const deltas: CumulativeDelta[] = Array.from({ length: 12 }, (_, index) => {
 });
 
 export function UiDebugPage() {
+  const [compactSegment, setCompactSegment] = useState("race");
+  const [pageSegment, setPageSegment] = useState("sessions");
+
   return (
     <div className="mx-auto max-w-7xl space-y-10 px-6 py-8 lg:px-10">
       <header>
@@ -312,21 +317,35 @@ export function UiDebugPage() {
         </div>
       </DebugSection>
 
-      <DebugSection file="src/components/ui/Badge.tsx + CompoundBadge.tsx + StintChip.tsx">
+      <DebugSection file="src/components/ui/Badge.tsx + CompoundBadge.tsx + SegmentedControl.tsx + TrackFlag.tsx + StintChip.tsx">
         <div className={cn(cardClassCompact, "space-y-5")}>
-          <SectionHeader title="Badges & Compound Chips" hint="Status badges, metadata badges, and stint block styling" />
+          <SectionHeader title="Badges, Controls & Chips" hint="Small UI variants, explicit sizes, and compound styling" />
           <div>
             <p className="mb-2 font-mono text-2xs uppercase tracking-wider text-zinc-500">
               Badge.tsx
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Badge tone="zinc">Neutral</Badge>
-              <Badge tone="amber">Warning</Badge>
-              <Badge tone="green">Valid</Badge>
-              <Badge tone="rose">Penalty</Badge>
-              <Badge tone="purple">Best</Badge>
-              <Badge tone="sky">Online</Badge>
-              <Badge tone="red" size="xs" shape="square">INVALID</Badge>
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-14 font-mono text-2xs uppercase tracking-wider text-zinc-600">
+                  sm
+                </span>
+                <Badge tone="zinc">Neutral</Badge>
+                <Badge tone="amber">Warning</Badge>
+                <Badge tone="green">Valid</Badge>
+                <Badge tone="rose">Penalty</Badge>
+                <Badge tone="purple">Best</Badge>
+                <Badge tone="sky">Online</Badge>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-14 font-mono text-2xs uppercase tracking-wider text-zinc-600">
+                  xs
+                </span>
+                <Badge tone="zinc" size="xs">PIT</Badge>
+                <Badge tone="amber" size="xs">SC</Badge>
+                <Badge tone="green" size="xs">VALID</Badge>
+                <Badge tone="red" size="xs" shape="square">INVALID</Badge>
+                <Badge tone="purple" size="xs" shape="square">BEST</Badge>
+              </div>
             </div>
           </div>
           <div>
@@ -336,6 +355,61 @@ export function UiDebugPage() {
             <div className="flex flex-wrap gap-2">
               {COMPOUNDS.map((compound) => (
                 <CompoundBadge key={compound} compound={compound} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 font-mono text-2xs uppercase tracking-wider text-zinc-500">
+              SegmentedControl.tsx
+            </p>
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="space-y-1.5">
+                <p className="font-mono text-2xs uppercase tracking-wider text-zinc-600">
+                  sm
+                </p>
+                <SegmentedControl
+                  ariaLabel="Small segmented control"
+                  size="sm"
+                  value={compactSegment}
+                  onChange={setCompactSegment}
+                  options={[
+                    { value: "race", label: "Race", meta: 27, icon: Flag },
+                    { value: "quali", label: "Quali", meta: 4, icon: Timer },
+                    { value: "tt", label: "TT", meta: 12, icon: Gauge },
+                  ]}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <p className="font-mono text-2xs uppercase tracking-wider text-zinc-600">
+                  md
+                </p>
+                <SegmentedControl
+                  ariaLabel="Medium segmented control"
+                  size="md"
+                  value={pageSegment}
+                  onChange={setPageSegment}
+                  fullWidth
+                  options={[
+                    { value: "sessions", label: "Sessions", meta: 53 },
+                    { value: "tracks", label: "Tracks", meta: 18 },
+                    { value: "rivals", label: "Rivals", meta: 9 },
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 font-mono text-2xs uppercase tracking-wider text-zinc-500">
+              TrackFlag.tsx
+            </p>
+            <div className="flex flex-wrap items-end gap-4">
+              {(["tiny", "small", "medium", "large"] as const).map((size) => (
+                <div key={size} className="flex items-center gap-2">
+                  <TrackFlag track="monza" size={size} />
+                  <span className="font-mono text-2xs uppercase tracking-wider text-zinc-500">
+                    {size}
+                  </span>
+                </div>
               ))}
             </div>
           </div>
