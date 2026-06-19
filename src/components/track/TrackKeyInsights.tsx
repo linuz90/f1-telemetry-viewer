@@ -11,6 +11,7 @@ import type { TrackRaceRecommendation } from "../../utils/stats";
 import type { TrackRivalBenchmark } from "../../utils/rivalStats";
 import { msToLapTime, msToSectorTime } from "../../utils/format";
 import { getCompoundColor } from "../../utils/colors";
+import { highlightDetailValues } from "../ui/HighlightedDetailText";
 import { InsightTile } from "../ui/InsightTile";
 import { SectionHeader } from "../ui/SectionHeader";
 
@@ -86,7 +87,7 @@ export function TrackKeyInsights({
             <div className="font-mono text-lg text-zinc-100">
               {avgErsDeployMj.toFixed(2)} MJ
             </div>
-            <div className="mt-0.5 text-xs text-zinc-500">
+            <div className="mt-1.5 text-sm leading-relaxed text-zinc-400">
               per lap, green-flag avg
             </div>
           </InsightTile>
@@ -123,9 +124,11 @@ function BestRaceLapTile({
       <div className="font-mono text-xl font-semibold text-purple-300">
         {msToLapTime(bestLapMs)}
       </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sm leading-relaxed text-zinc-400">
         {compound && <CompoundBadge compound={compound} />}
-        {gapMs > 0 && <span>+{msToSectorTime(gapMs)} vs. theoretical</span>}
+        {gapMs > 0 && (
+          <span>{highlightDetailValues(`+${msToSectorTime(gapMs)} vs. theoretical`)}</span>
+        )}
       </div>
     </InsightTile>
   );
@@ -155,7 +158,7 @@ function RaceVsQualiTile({ deltaMs }: { deltaMs: number }) {
         {isRaceFaster ? "-" : "+"}
         {msToSectorTime(abs)}
       </div>
-      <div className="mt-0.5 text-xs text-zinc-500">
+      <div className="mt-1.5 text-sm leading-relaxed text-zinc-400">
         best race lap vs. best quali lap
       </div>
     </InsightTile>
@@ -201,14 +204,19 @@ function FuelTargetTile({
         {delta >= 0 ? "+" : ""}
         {delta.toFixed(1)} laps
       </div>
-      <div className="mt-0.5 text-xs text-zinc-500">
+      <div className="mt-1.5 text-sm leading-relaxed text-zinc-400">
         recommended initial fuel
       </div>
-      <div className="mt-2 text-xs text-zinc-500">
-        ≈ {target.recommendedFuelKg.toFixed(1)} kg total ·{" "}
-        {target.burnRateKgPerLap.toFixed(2)} kg/lap burn
+      <div className="mt-2 text-[13px] leading-relaxed text-zinc-500">
+        {highlightDetailValues(
+          `≈ ${target.recommendedFuelKg.toFixed(1)} kg total · ${target.burnRateKgPerLap.toFixed(2)} kg/lap burn`,
+        )}
       </div>
-      {note && <div className="mt-1 text-xs text-zinc-500">{note}</div>}
+      {note && (
+        <div className="mt-1 text-[13px] leading-relaxed text-zinc-500">
+          {highlightDetailValues(note)}
+        </div>
+      )}
     </InsightTile>
   );
 }
@@ -261,8 +269,8 @@ function FastestRivalTile({ benchmark }: { benchmark: TrackRivalBenchmark }) {
           </>
         )}
       </div>
-      <div className="mt-0.5 text-xs text-zinc-500">
-        {sampleParts.join(" · ")}
+      <div className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">
+        {highlightDetailValues(sampleParts.join(" · "))}
       </div>
     </InsightTile>
   );
@@ -314,7 +322,7 @@ function VsLastRaceTile({
         )}
       </div>
       {wearNote && (
-        <div className="mt-0.5 text-xs text-zinc-500">
+        <div className="mt-1.5 text-sm leading-relaxed text-zinc-400">
           <span className={wearNote.tone}>{wearNote.value}</span>{" "}
           {wearNote.suffix}
         </div>
