@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Link, Navigate, Routes, Route, useLocation, useParams } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { Layout } from "./components/Layout";
@@ -11,10 +11,16 @@ import { GlobalDropZone } from "./components/GlobalDropZone";
 import { PNG_VERSION_TITLE_PREFIX } from "./config/branding";
 import { dashboardPath, replaceFormulaScopeInPath } from "./utils/routes";
 
+const UiDebugPage = import.meta.env.DEV
+  ? lazy(() => import("./pages/UiDebugPage").then((module) => ({ default: module.UiDebugPage })))
+  : null;
+
 function AppRoutes() {
   const { mode, sessions, sessionsLoading, showUploadModal } = useTelemetry();
+  const location = useLocation();
+  const isUiDebugRoute = import.meta.env.DEV && location.pathname === "/ui-debug";
 
-  if (mode === "detecting" || sessionsLoading) {
+  if (!isUiDebugRoute && (mode === "detecting" || sessionsLoading)) {
     return (
       <div className="flex h-screen items-center justify-center bg-black">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-zinc-600 border-t-red-500" />
@@ -22,12 +28,22 @@ function AppRoutes() {
     );
   }
 
-  const needsData = mode === "upload" && sessions.length === 0;
+  const needsData = !isUiDebugRoute && mode === "upload" && sessions.length === 0;
 
   return (
     <>
       <Routes>
         <Route element={<Layout />}>
+          {UiDebugPage && (
+            <Route
+              path="ui-debug"
+              element={
+                <Suspense fallback={<UiDebugLoading />}>
+                  <UiDebugPage />
+                </Suspense>
+              }
+            />
+          )}
           <Route index element={<DefaultScopeRedirect />} />
           <Route
             path=":formulaKey"
@@ -61,6 +77,19 @@ function AppRoutes() {
       )}
       <GlobalDropZone />
     </>
+  );
+}
+
+function UiDebugLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center px-6 text-center">
+      <div>
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-cyan-400" />
+        <p className="mt-3 font-mono text-xs uppercase tracking-[0.18em] text-zinc-500">
+          loading ui debug
+        </p>
+      </div>
+    </div>
   );
 }
 
