@@ -1,11 +1,13 @@
 import { getCompoundColor } from "../../utils/colors";
+import { dynamicAccentCardStyle } from "../Card";
 
 export function CompoundBadge({ compound }: { compound: string }) {
   const color = getCompoundColor(compound);
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-2xs font-semibold text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+      className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-2xs font-semibold text-zinc-100"
+      style={dynamicAccentCardStyle(color)}
       title={compound}
     >
       <span
