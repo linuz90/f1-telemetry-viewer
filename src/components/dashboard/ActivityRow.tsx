@@ -6,10 +6,7 @@ import { SessionRow } from "../SessionRow";
 import { getSessionTypeMeta } from "../sessionTypeMeta";
 import type { DashboardActivityGroup } from "../../utils/dashboardActivity";
 import type { SessionSummary } from "../../types/telemetry";
-import {
-  formatSessionType,
-  formatTime,
-} from "../../utils/format";
+import { formatSessionType, formatTime } from "../../utils/format";
 import { sessionSummaryPath } from "../../utils/routes";
 import { GridGainGlyph } from "./GridGainGlyph";
 import {
@@ -62,15 +59,27 @@ function StatPill({
     : "items-center justify-center px-3.5";
 
   return (
-    <div className={cn("inline-flex h-9 rounded-lg", layout, accentCardClass(accent))}>
+    <div
+      className={cn(
+        "inline-flex h-9 rounded-lg",
+        layout,
+        accentCardClass(accent),
+      )}
+    >
       <div
-        className={cn("font-mono text-sm font-bold leading-none tabular-nums", ACCENT_TOKENS[accent].accent)}
+        className={cn(
+          "font-mono text-sm font-bold leading-none tabular-nums",
+          ACCENT_TOKENS[accent].accent,
+        )}
       >
         {value}
       </div>
       {sublabel && (
         <div
-          className={cn("font-mono text-3xs font-medium uppercase leading-none tracking-wider opacity-60", ACCENT_TOKENS[accent].accent)}
+          className={cn(
+            "font-mono text-3xs font-medium uppercase leading-none tracking-wider opacity-60",
+            ACCENT_TOKENS[accent].accent,
+          )}
         >
           {sublabel}
         </div>
@@ -83,7 +92,10 @@ function PositionChip({ position }: { position: number }) {
   const Icon = podiumIcon(position);
   return (
     <div
-      className={cn("inline-flex h-9 items-center justify-center gap-1 rounded-lg px-2.5 text-sm font-bold tabular-nums", positionBadgeClasses(position))}
+      className={cn(
+        "inline-flex h-9 items-center justify-center gap-1 rounded-lg px-2.5 text-sm font-bold tabular-nums",
+        positionBadgeClasses(position),
+      )}
     >
       {Icon ? <Icon className="size-3.5" /> : null}
       <span>{positionLabel(position)}</span>
@@ -104,7 +116,10 @@ function QualiPositionChip({ position }: { position: number }) {
     : "ring-1 ring-inset ring-white/[0.06] bg-zinc-900/70 text-zinc-100";
   return (
     <div
-      className={cn("inline-flex h-9 items-center justify-center rounded-lg px-2.5 text-sm font-bold tabular-nums", classes)}
+      className={cn(
+        "inline-flex h-9 items-center justify-center rounded-lg px-2.5 text-sm font-bold tabular-nums",
+        classes,
+      )}
     >
       Q P{position}
     </div>
@@ -124,7 +139,10 @@ function RaceMetric({ session }: { session: SessionSummary }) {
   return (
     <>
       <div
-        className={cn("inline-flex items-center gap-1.5 font-mono text-sm max-sm:hidden", gridGainTone(gridGain))}
+        className={cn(
+          "inline-flex items-center gap-1.5 font-mono text-sm max-sm:hidden",
+          gridGainTone(gridGain),
+        )}
       >
         <GridGainGlyph value={gridGain} />
         <span className="tabular-nums">{signedNumber(gridGain)}</span>
@@ -149,12 +167,11 @@ function QualifyingMetric({ session }: { session: SessionSummary }) {
   }
 
   const isPole = position === 1;
-  const sublabel =
-    isPole
-      ? "POLE"
-      : poleMs && bestLapMs
-        ? formatPoleGap(bestLapMs, poleMs)
-        : "Best lap";
+  const sublabel = isPole
+    ? "POLE"
+    : poleMs && bestLapMs
+      ? formatPoleGap(bestLapMs, poleMs)
+      : "Best lap";
 
   return (
     <>
@@ -211,7 +228,9 @@ export function ActivityRow({
             <TypeIcon className="size-3" />
             {typeLabel}
           </Badge>
-          {problem && <Badge tone="red">{resultStatusLabel(result?.status)}</Badge>}
+          {problem && (
+            <Badge tone="red">{resultStatusLabel(result?.status)}</Badge>
+          )}
           {attempt && (
             <Badge tone="zinc" className="max-sm:hidden">
               {attempt}

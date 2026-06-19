@@ -33,7 +33,11 @@ export async function loadZipFile(file: File): Promise<LoadResult> {
     try {
       const text = await entry.async("text");
       const json = JSON.parse(text) as TelemetrySession;
-      const { summary, valid } = buildSessionSummary(relativePath, json, new Blob([text]).size);
+      const { summary, valid } = buildSessionSummary(
+        relativePath,
+        json,
+        new Blob([text]).size,
+      );
       if (valid) {
         sessions.push(summary as LoadedSessionSummary);
         sessionData.set(summary.slug, json);
@@ -62,7 +66,11 @@ export async function loadJsonFiles(files: File[]): Promise<LoadResult> {
     try {
       const text = await file.text();
       const json = JSON.parse(text) as TelemetrySession;
-      const { summary, valid } = buildSessionSummary(file.name, json, file.size);
+      const { summary, valid } = buildSessionSummary(
+        file.name,
+        json,
+        file.size,
+      );
       if (valid) {
         sessions.push(summary as LoadedSessionSummary);
         sessionData.set(summary.slug, json);

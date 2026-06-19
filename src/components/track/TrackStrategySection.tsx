@@ -59,13 +59,13 @@ export function TrackStrategySection({
         />
       )}
 
-        {/* Footer footnote — separated by a faint hairline so it reads as
+      {/* Footer footnote — separated by a faint hairline so it reads as
             "context about the algorithm" instead of crowding the alternative
             row's pit-detail line directly above. */}
       <p className="border-t border-white/[0.04] pt-4 text-xs leading-relaxed text-zinc-500">
-        Pit lap is balanced so both stints reach the same fraction of their
-        tyre life, then nudged one lap earlier to bank a small undercut. Both
-        stints stay under the {PUNCTURE_THRESHOLD}% puncture-risk threshold.
+        Pit lap is balanced so both stints reach the same fraction of their tyre
+        life, then nudged one lap earlier to bank a small undercut. Both stints
+        stay under the {PUNCTURE_THRESHOLD}% puncture-risk threshold.
       </p>
     </section>
   );
@@ -97,7 +97,10 @@ function StrategyRow({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <span
-          className={cn("inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider", labelTone)}
+          className={cn(
+            "inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider",
+            labelTone,
+          )}
         >
           <Icon className="h-3.5 w-3.5" />
           {isRecommended ? "Recommended" : "Alternative"}
@@ -164,7 +167,10 @@ function StintRibbon({
                 }}
                 title={`${compound} · ${laps} laps`}
               >
-                <span className="truncate px-1" style={stintChipTextStyle(compound)}>
+                <span
+                  className="truncate px-1"
+                  style={stintChipTextStyle(compound)}
+                >
                   {compound} · {laps}L
                 </span>
               </div>
@@ -234,16 +240,13 @@ function PitDetail({
   totalLaps: number;
 }) {
   if (pitWindows.length === 0) {
-    return (
-      <p className="text-xs text-zinc-500">No-stop — run to the flag.</p>
-    );
+    return <p className="text-xs text-zinc-500">No-stop — run to the flag.</p>;
   }
   return (
     <p className="text-xs text-zinc-500">
       {pitWindows
         .map((w, i) => {
-          const label =
-            pitWindows.length > 1 ? `Pit ${i + 1}` : "Pit window";
+          const label = pitWindows.length > 1 ? `Pit ${i + 1}` : "Pit window";
           return `${label} target lap ${w.target} (${w.earliest}–${w.latest} of ${totalLaps})`;
         })
         .join(" · ")}

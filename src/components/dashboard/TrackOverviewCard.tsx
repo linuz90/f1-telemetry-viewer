@@ -163,11 +163,7 @@ export function TrackOverviewCard({
           record={records.onlineQualifying}
           tone="text-purple-300"
         />
-        <LapMetric
-          label="TT"
-          record={records.timeTrial}
-          tone="text-cyan-300"
-        />
+        <LapMetric label="TT" record={records.timeTrial} tone="text-cyan-300" />
         <LapMetric
           label="Offline Q"
           record={records.offlineQualifying}
@@ -181,7 +177,10 @@ export function TrackOverviewCard({
     return (
       <div
         title="Demo data — upload your telemetry to explore this track"
-        className={cn(cardClass, "relative min-h-40 overflow-hidden opacity-70")}
+        className={cn(
+          cardClass,
+          "relative min-h-40 overflow-hidden opacity-70",
+        )}
       >
         {inner}
       </div>
@@ -190,7 +189,12 @@ export function TrackOverviewCard({
 
   if (!activeFormulaKey) {
     return (
-      <div className={cn(cardClass, "relative min-h-40 overflow-hidden opacity-70")}>
+      <div
+        className={cn(
+          cardClass,
+          "relative min-h-40 overflow-hidden opacity-70",
+        )}
+      >
         {inner}
       </div>
     );

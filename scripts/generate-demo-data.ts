@@ -9,7 +9,10 @@
 
 import fs from "fs";
 import path from "path";
-import type { SessionSummary, TelemetrySession } from "../src/types/telemetry.ts";
+import type {
+  SessionSummary,
+  TelemetrySession,
+} from "../src/types/telemetry.ts";
 import { toSlug } from "../src/utils/parseFilename.ts";
 import { buildSessionSummary } from "../src/utils/sessionSummary.ts";
 import { buildSyntheticOnlineRaces } from "./generate-demo-synthetic.ts";
@@ -26,7 +29,9 @@ function readTelemetryDir(): string {
 
   const envPath = path.resolve(import.meta.dirname, "../.env");
   if (fs.existsSync(envPath)) {
-    const match = fs.readFileSync(envPath, "utf-8").match(/^TELEMETRY_DIR=(.+)$/m);
+    const match = fs
+      .readFileSync(envPath, "utf-8")
+      .match(/^TELEMETRY_DIR=(.+)$/m);
     if (match?.[1]) return unquote(match[1]);
   }
 
@@ -52,7 +57,10 @@ interface DriverEntry {
   "track-position": number;
   "final-classification": { position: number } | null;
   "session-history": {
-    "lap-history-data": { "lap-time-in-ms": number; "lap-valid-bit-flags": number }[];
+    "lap-history-data": {
+      "lap-time-in-ms": number;
+      "lap-valid-bit-flags": number;
+    }[];
     "best-lap-time-lap-num": number;
   };
   [key: string]: unknown;
@@ -68,8 +76,10 @@ function pickDrivers(classificationData: DriverEntry[]): Set<string> {
   const others = classificationData
     .filter((d) => !d["is-player"])
     .sort((a, b) => {
-      const posA = a["final-classification"]?.position ?? a["track-position"] ?? 99;
-      const posB = b["final-classification"]?.position ?? b["track-position"] ?? 99;
+      const posA =
+        a["final-classification"]?.position ?? a["track-position"] ?? 99;
+      const posB =
+        b["final-classification"]?.position ?? b["track-position"] ?? 99;
       return posA - posB;
     });
 
@@ -81,40 +91,50 @@ function pickDrivers(classificationData: DriverEntry[]): Set<string> {
   return names;
 }
 
-function trimSession(raw: Record<string, unknown>, keepNames: Set<string>): Record<string, unknown> {
+function trimSession(
+  raw: Record<string, unknown>,
+  keepNames: Set<string>,
+): Record<string, unknown> {
   const data = structuredClone(raw);
 
   // Trim classification-data
-  data["classification-data"] = (data["classification-data"] as DriverEntry[]).filter(
-    (d) => keepNames.has(d["driver-name"]),
-  );
+  data["classification-data"] = (
+    data["classification-data"] as DriverEntry[]
+  ).filter((d) => keepNames.has(d["driver-name"]));
 
   // Trim position-history
   if (Array.isArray(data["position-history"])) {
-    data["position-history"] = (data["position-history"] as { name: string }[]).filter(
-      (d) => keepNames.has(d.name),
-    );
+    data["position-history"] = (
+      data["position-history"] as { name: string }[]
+    ).filter((d) => keepNames.has(d.name));
   }
 
   // Trim tyre-stint-history-v2
   if (Array.isArray(data["tyre-stint-history-v2"])) {
-    data["tyre-stint-history-v2"] = (data["tyre-stint-history-v2"] as { name: string }[]).filter(
-      (d) => keepNames.has(d.name),
-    );
+    data["tyre-stint-history-v2"] = (
+      data["tyre-stint-history-v2"] as { name: string }[]
+    ).filter((d) => keepNames.has(d.name));
   }
 
   // Trim speed-trap-records
   if (Array.isArray(data["speed-trap-records"])) {
-    data["speed-trap-records"] = (data["speed-trap-records"] as { name: string }[]).filter(
-      (d) => keepNames.has(d.name),
-    );
+    data["speed-trap-records"] = (
+      data["speed-trap-records"] as { name: string }[]
+    ).filter((d) => keepNames.has(d.name));
   }
 
   // Trim overtakes
   if (data.overtakes && typeof data.overtakes === "object") {
-    const ot = data.overtakes as { records: { "overtaking-driver-name": string; "overtaken-driver-name": string }[] };
+    const ot = data.overtakes as {
+      records: {
+        "overtaking-driver-name": string;
+        "overtaken-driver-name": string;
+      }[];
+    };
     ot.records = ot.records.filter(
-      (r) => keepNames.has(r["overtaking-driver-name"]) || keepNames.has(r["overtaken-driver-name"]),
+      (r) =>
+        keepNames.has(r["overtaking-driver-name"]) ||
+        keepNames.has(r["overtaken-driver-name"]),
     );
   }
 
@@ -134,11 +154,20 @@ for (const relPath of SOURCES) {
   console.log(`Processing ${filename}...`);
   const raw = JSON.parse(fs.readFileSync(srcPath, "utf-8")) as TelemetrySession;
   const rawText = JSON.stringify(raw);
-  const rawSummary = buildSessionSummary(filename, raw, Buffer.byteLength(rawText)).summary;
+  const rawSummary = buildSessionSummary(
+    filename,
+    raw,
+    Buffer.byteLength(rawText),
+  ).summary;
   const keepNames = pickDrivers(raw["classification-data"]);
-  console.log(`  Keeping ${keepNames.size} drivers: ${[...keepNames].join(", ")}`);
+  console.log(
+    `  Keeping ${keepNames.size} drivers: ${[...keepNames].join(", ")}`,
+  );
 
-  const trimmed = trimSession(raw as unknown as Record<string, unknown>, keepNames);
+  const trimmed = trimSession(
+    raw as unknown as Record<string, unknown>,
+    keepNames,
+  );
   const slug = toSlug(filename);
   const outPath = path.join(OUT_DIR, `${slug}.json`);
   const json = JSON.stringify(trimmed);
@@ -165,8 +194,12 @@ console.log(`\nGenerated ${synthetic.length} synthetic online race summaries.`);
 const fullManifest: SessionSummary[] = [...manifest, ...synthetic];
 
 // Sort manifest by date descending
-fullManifest.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+fullManifest.sort(
+  (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+);
 
 const manifestPath = path.join(OUT_DIR, "sessions.json");
 fs.writeFileSync(manifestPath, JSON.stringify(fullManifest, null, 2));
-console.log(`Manifest written to ${manifestPath} (${fullManifest.length} sessions)`);
+console.log(
+  `Manifest written to ${manifestPath} (${fullManifest.length} sessions)`,
+);

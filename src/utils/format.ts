@@ -34,7 +34,10 @@ const SECTOR_TIME_FIELDS = {
 } as const;
 
 /** PnG stores sector minutes separately from the millisecond remainder. */
-export function sectorTimeMs(lap: LapHistoryEntry, sector: SectorNumber): number {
+export function sectorTimeMs(
+  lap: LapHistoryEntry,
+  sector: SectorNumber,
+): number {
   const fields = SECTOR_TIME_FIELDS[sector];
   const ms = lap[fields.ms];
   const minutes = lap[fields.minutes] ?? 0;
@@ -74,9 +77,13 @@ export function formatDate(dateStr: string): string {
  * otherwise weekday + day + month, and the year only when it differs from now.
  * Compared against `now` (defaults to current time) so the result is stable per render.
  */
-export function formatRelativeDate(dateStr: string, now: Date = new Date()): string {
+export function formatRelativeDate(
+  dateStr: string,
+  now: Date = new Date(),
+): string {
   const d = new Date(dateStr);
-  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const startOf = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const dayMs = 24 * 60 * 60 * 1000;
   const diffDays = Math.round((startOf(now) - startOf(d)) / dayMs);
   if (diffDays === 0) return "Today";
@@ -150,7 +157,10 @@ export function toTrackSlug(track: string): string {
     .replace(/^-|-$/g, "");
 }
 
-export function isTrackSlugMatch(track: string, slug: string | undefined): boolean {
+export function isTrackSlugMatch(
+  track: string,
+  slug: string | undefined,
+): boolean {
   return toTrackSlug(track) === (slug ?? "").toLowerCase();
 }
 

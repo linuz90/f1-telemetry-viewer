@@ -10,13 +10,34 @@ import {
   Bar,
   ComposedChart,
 } from "recharts";
-import type { LapHistoryEntry, PerLapInfo, TyreStint } from "../types/telemetry";
-import { msToLapTime, msToSectorTime, isLapValid, sectorTimeMs } from "../utils/format";
-import { ersDeployMjForLap, ersHarvestMjForLap, getWorstWheelWear } from "../utils/stats";
+import { useState } from "react";
+import type {
+  LapHistoryEntry,
+  PerLapInfo,
+  TyreStint,
+} from "../types/telemetry";
+import {
+  msToLapTime,
+  msToSectorTime,
+  isLapValid,
+  sectorTimeMs,
+} from "../utils/format";
+import {
+  ersDeployMjForLap,
+  ersHarvestMjForLap,
+  getWorstWheelWear,
+} from "../utils/stats";
 import { Badge } from "./ui/Badge";
 import { tableHeadClass, tableRowClass } from "./ui/table";
-import { CHART_THEME, TOOLTIP_STYLE, COMPOUND_COLORS, SC_COLORS, SC_FALLBACK } from "../utils/colors";
+import {
+  CHART_THEME,
+  TOOLTIP_STYLE,
+  COMPOUND_COLORS,
+  SC_COLORS,
+  SC_FALLBACK,
+} from "../utils/colors";
 import { cn } from "../utils/cn";
+import { FocusToggle } from "./ui/FocusToggle";
 
 interface LapTimeChartProps {
   laps: LapHistoryEntry[];
@@ -34,6 +55,19 @@ interface LapTimeChartProps {
   stints?: TyreStint[];
 }
 
+const BATTERY_VISIBILITY_STORAGE_KEY = "f1.lapTimeChart.showBattery";
+
+function readPersistedBatteryVisibility(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return (
+      window.localStorage.getItem(BATTERY_VISIBILITY_STORAGE_KEY) === "true"
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Line chart showing lap time progression.
  * Invalid laps shown in red, valid laps in cyan.
@@ -49,9 +83,28 @@ export function LapTimeChart({
   damageLaps = [],
   stints,
 }: LapTimeChartProps) {
+  const [showBattery, setShowBattery] = useState(
+    readPersistedBatteryVisibility,
+  );
+
   if (!laps.length) {
     return <p className="text-sm text-zinc-500">No lap data.</p>;
   }
+
+  const toggleBatteryVisibility = () => {
+    setShowBattery((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(
+          BATTERY_VISIBILITY_STORAGE_KEY,
+          String(next),
+        );
+      } catch {
+        // A blocked storage write should not make the chart toggle feel broken.
+      }
+      return next;
+    });
+  };
 
   // Build per-lap-info lookup by lap number
   const lapInfoMap = new Map<number, PerLapInfo>();
@@ -150,7 +203,9 @@ export function LapTimeChart({
   const hasRival = rivalLaps && rivalLaps.length > 0;
   const hasErs = data.some((d) => d.ersMj != null && d.ersMj > 0);
   const hasErsHarv = data.some((d) => d.ersHarvMj != null && d.ersHarvMj > 0);
-  const maxErsMj = hasErs || hasErsHarv
+  const hasBattery = hasErs || hasErsHarv;
+  const showBatteryDetails = hasBattery && showBattery;
+  const maxErsMj = hasBattery
     ? Math.max(
         0,
         ...data.filter((d) => d.ersMj != null).map((d) => d.ersMj!),
@@ -160,7 +215,11 @@ export function LapTimeChart({
   const hasFuel = data.some((d) => d.fuelKg != null);
   const hasTopSpeed = data.some((d) => d.topSpeed != null);
   const bestTopSpeed = hasTopSpeed
-    ? Math.max(...data.filter((d) => d.valid && d.topSpeed != null).map((d) => d.topSpeed!))
+    ? Math.max(
+        ...data
+          .filter((d) => d.valid && d.topSpeed != null)
+          .map((d) => d.topSpeed!),
+      )
     : 0;
 
   // Best lap time for reference line
@@ -193,7 +252,10 @@ export function LapTimeChart({
         <h3 className="text-sm font-semibold text-zinc-300">Lap Times</h3>
         {scRanges.length > 0 && (
           <div className="flex items-center gap-3 text-2xs text-zinc-400">
-            {scRanges.some((r) => r.status === "SAFETY_CAR" || r.status === "FULL_SAFETY_CAR") && (
+            {scRanges.some(
+              (r) =>
+                r.status === "SAFETY_CAR" || r.status === "FULL_SAFETY_CAR",
+            ) && (
               <span className="flex items-center gap-1">
                 <span className="inline-block w-3 h-2.5 rounded-sm bg-amber-500/25 border border-amber-500/40" />
                 SC
@@ -207,15 +269,33 @@ export function LapTimeChart({
             )}
           </div>
         )}
+        {hasBattery && (
+          <div className="ml-auto">
+            <FocusToggle
+              label="Battery"
+              value={showBattery}
+              onChange={toggleBatteryVisibility}
+            />
+          </div>
+        )}
       </div>
-      <ResponsiveContainer width="100%" height={hasErs || hasErsHarv ? 320 : 280}>
-        <ComposedChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+      <ResponsiveContainer width="100%" height={showBatteryDetails ? 320 : 280}>
+        <ComposedChart
+          data={data}
+          margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
           <XAxis
             dataKey="lap"
             stroke={CHART_THEME.axis}
             fontSize={11}
-            label={{ value: "Lap", position: "insideBottom", offset: -2, fill: CHART_THEME.axis, fontSize: 11 }}
+            label={{
+              value: "Lap",
+              position: "insideBottom",
+              offset: -2,
+              fill: CHART_THEME.axis,
+              fontSize: 11,
+            }}
           />
           <YAxis
             yAxisId="time"
@@ -225,7 +305,7 @@ export function LapTimeChart({
             allowDecimals={false}
             tickFormatter={(v) => msToLapTime(Math.round(v) * 1000)}
           />
-          {(hasErs || hasErsHarv) && (
+          {showBatteryDetails && (
             <YAxis
               yAxisId="ers"
               orientation="right"
@@ -238,15 +318,22 @@ export function LapTimeChart({
           )}
           <Tooltip
             {...TOOLTIP_STYLE}
-            formatter={(value: number | undefined, name: string | undefined) => {
+            formatter={(
+              value: number | undefined,
+              name: string | undefined,
+            ) => {
               if (value == null) return ["–", name ?? ""];
-              if (name === "ERS Deploy" || name === "ERS Harv") return [`${value.toFixed(1)} MJ`, name];
+              if (name === "ERS Deploy" || name === "ERS Harv")
+                return [`${value.toFixed(1)} MJ`, name];
               return [msToLapTime(value * 1000), name ?? ""];
             }}
             labelFormatter={(lap) => {
               const entry = data.find((d) => d.lap === lap);
-              const scLabel =
-                entry?.isSC ? " 🟡 SC" : entry?.isVSC ? " 🟡 VSC" : "";
+              const scLabel = entry?.isSC
+                ? " 🟡 SC"
+                : entry?.isVSC
+                  ? " 🟡 VSC"
+                  : "";
               return `Lap ${lap}${scLabel}`;
             }}
           />
@@ -263,7 +350,11 @@ export function LapTimeChart({
               stroke={SC_COLORS[range.status] ?? SC_FALLBACK}
               strokeOpacity={0.3}
               label={{
-                value: range.status === "SAFETY_CAR" || range.status === "FULL_SAFETY_CAR" ? "SC" : "VSC",
+                value:
+                  range.status === "SAFETY_CAR" ||
+                  range.status === "FULL_SAFETY_CAR"
+                    ? "SC"
+                    : "VSC",
                 fill: SC_COLORS[range.status] ?? SC_FALLBACK,
                 fontSize: 10,
                 position: "insideTopLeft",
@@ -310,12 +401,17 @@ export function LapTimeChart({
               x={lap}
               stroke={CHART_THEME.muted}
               strokeDasharray="4 4"
-              label={{ value: "PIT", fill: CHART_THEME.muted, fontSize: 10, position: "top" }}
+              label={{
+                value: "PIT",
+                fill: CHART_THEME.muted,
+                fontSize: 10,
+                position: "top",
+              }}
             />
           ))}
 
           {/* ERS bars */}
-          {hasErs && (
+          {showBatteryDetails && hasErs && (
             <Bar
               yAxisId="ers"
               dataKey="ersMj"
@@ -327,7 +423,7 @@ export function LapTimeChart({
               radius={[2, 2, 0, 0]}
             />
           )}
-          {hasErsHarv && (
+          {showBatteryDetails && hasErsHarv && (
             <Bar
               yAxisId="ers"
               dataKey="ersHarvMj"
@@ -363,13 +459,20 @@ export function LapTimeChart({
             stroke={CHART_THEME.player}
             strokeWidth={2}
             dot={(props) => {
-              const { cx, cy, index } = props as { cx?: number; cy?: number; index?: number };
+              const { cx, cy, index } = props as {
+                cx?: number;
+                cy?: number;
+                index?: number;
+              };
               const entry = index != null ? data[index] : undefined;
-              if (!entry || cx == null || cy == null) return <circle key={`lap-dot-${index}`} cx={0} cy={0} r={0} />;
+              if (!entry || cx == null || cy == null)
+                return <circle key={`lap-dot-${index}`} cx={0} cy={0} r={0} />;
 
               // SC/VSC dot styling
               if (entry.isSC || entry.isVSC) {
-                const color = entry.isSC ? SC_COLORS.SAFETY_CAR : SC_COLORS.VIRTUAL_SAFETY_CAR;
+                const color = entry.isSC
+                  ? SC_COLORS.SAFETY_CAR
+                  : SC_COLORS.VIRTUAL_SAFETY_CAR;
                 return (
                   <circle
                     key={`lap-dot-${index}`}
@@ -388,9 +491,31 @@ export function LapTimeChart({
                 // Invalid: larger red circle with X
                 return (
                   <g key={`lap-dot-${index}`}>
-                    <circle cx={cx} cy={cy} r={5} fill={CHART_THEME.behind} fillOpacity={0.2} stroke={CHART_THEME.behind} strokeWidth={2} />
-                    <line x1={cx - 2.5} y1={cy - 2.5} x2={cx + 2.5} y2={cy + 2.5} stroke={CHART_THEME.behind} strokeWidth={1.5} />
-                    <line x1={cx + 2.5} y1={cy - 2.5} x2={cx - 2.5} y2={cy + 2.5} stroke={CHART_THEME.behind} strokeWidth={1.5} />
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={5}
+                      fill={CHART_THEME.behind}
+                      fillOpacity={0.2}
+                      stroke={CHART_THEME.behind}
+                      strokeWidth={2}
+                    />
+                    <line
+                      x1={cx - 2.5}
+                      y1={cy - 2.5}
+                      x2={cx + 2.5}
+                      y2={cy + 2.5}
+                      stroke={CHART_THEME.behind}
+                      strokeWidth={1.5}
+                    />
+                    <line
+                      x1={cx + 2.5}
+                      y1={cy - 2.5}
+                      x2={cx - 2.5}
+                      y2={cy + 2.5}
+                      stroke={CHART_THEME.behind}
+                      strokeWidth={1.5}
+                    />
                   </g>
                 );
               }
@@ -416,7 +541,8 @@ export function LapTimeChart({
       {/* Lap table grouped by stint */}
       <div className="mt-3 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
         {(() => {
-          const hasWear = stints?.some((s) => s["tyre-wear-history"]?.length > 0) ?? false;
+          const hasWear =
+            stints?.some((s) => s["tyre-wear-history"]?.length > 0) ?? false;
           // Build wear lookup: lap number → max/worst-wheel wear %
           // Each stint's wear history starts with the pit-lap at 0% (fresh tyres),
           // which would overwrite the previous stint's final wear. Keep the higher
@@ -434,7 +560,13 @@ export function LapTimeChart({
             }
           }
 
-          const colCount = 5 + (hasTopSpeed ? 1 : 0) + (hasErs ? 1 : 0) + (hasErsHarv ? 1 : 0) + (hasWear ? 1 : 0) + (hasFuel ? 1 : 0);
+          const colCount =
+            5 +
+            (hasTopSpeed ? 1 : 0) +
+            (showBatteryDetails && hasErs ? 1 : 0) +
+            (showBatteryDetails && hasErsHarv ? 1 : 0) +
+            (hasWear ? 1 : 0) +
+            (hasFuel ? 1 : 0);
           const headerRow = (
             <tr>
               <th className="text-left py-1 px-2">Lap</th>
@@ -451,8 +583,12 @@ export function LapTimeChart({
                   Max wear
                 </th>
               )}
-              {hasErs && <th className="text-right py-1 px-2">ERS Dep</th>}
-              {hasErsHarv && <th className="text-right py-1 px-2">ERS Harv</th>}
+              {showBatteryDetails && hasErs && (
+                <th className="text-right py-1 px-2">ERS Dep</th>
+              )}
+              {showBatteryDetails && hasErsHarv && (
+                <th className="text-right py-1 px-2">ERS Harv</th>
+              )}
               {hasFuel && (
                 <th
                   className="text-right py-1 px-2"
@@ -464,7 +600,7 @@ export function LapTimeChart({
             </tr>
           );
 
-          const renderLapRow = (d: typeof data[number], rowKey: string) => {
+          const renderLapRow = (d: (typeof data)[number], rowKey: string) => {
             const isBestLap = d.valid && Math.abs(d.timeSec - bestTime) < 0.001;
             const isBestS1 = d.valid && Math.abs(d.s1 - bestS1) < 0.001;
             const isBestS2 = d.valid && Math.abs(d.s2 - bestS2) < 0.001;
@@ -485,29 +621,82 @@ export function LapTimeChart({
                   {!d.valid && (
                     // text-behind is the app-wide "you're behind" red, not a
                     // generic chip tone — keep the override here.
-                    <Badge size="xs" shape="square" className="ml-1.5 bg-red-500/20 text-behind">
+                    <Badge
+                      size="xs"
+                      shape="square"
+                      className="ml-1.5 bg-red-500/20 text-behind"
+                    >
                       INVALID
                     </Badge>
                   )}
                   {d.isSC && (
-                    <Badge size="xs" shape="square" tone="amber" className="ml-1.5">
+                    <Badge
+                      size="xs"
+                      shape="square"
+                      tone="amber"
+                      className="ml-1.5"
+                    >
                       SC
                     </Badge>
                   )}
                   {d.isVSC && (
-                    <Badge size="xs" shape="square" tone="yellow" className="ml-1.5">
+                    <Badge
+                      size="xs"
+                      shape="square"
+                      tone="yellow"
+                      className="ml-1.5"
+                    >
                       VSC
                     </Badge>
                   )}
                 </td>
-                <td className={cn("text-right py-1 px-2 font-mono", !d.valid ? "text-behind/70 line-through" : isBestLap ? "text-best font-semibold" : "")}>
+                <td
+                  className={cn(
+                    "text-right py-1 px-2 font-mono",
+                    !d.valid
+                      ? "text-behind/70 line-through"
+                      : isBestLap
+                        ? "text-best font-semibold"
+                        : "",
+                  )}
+                >
                   {d.timeStr}
                 </td>
-                <td className={cn("text-right py-1 px-2 font-mono", !d.valid ? "text-zinc-600" : isBestS1 ? "text-best" : "")}>{msToSectorTime(d.s1 * 1000)}</td>
-                <td className={cn("text-right py-1 px-2 font-mono", !d.valid ? "text-zinc-600" : isBestS2 ? "text-best" : "")}>{msToSectorTime(d.s2 * 1000)}</td>
-                <td className={cn("text-right py-1 px-2 font-mono", !d.valid ? "text-zinc-600" : isBestS3 ? "text-best" : "")}>{msToSectorTime(d.s3 * 1000)}</td>
+                <td
+                  className={cn(
+                    "text-right py-1 px-2 font-mono",
+                    !d.valid ? "text-zinc-600" : isBestS1 ? "text-best" : "",
+                  )}
+                >
+                  {msToSectorTime(d.s1 * 1000)}
+                </td>
+                <td
+                  className={cn(
+                    "text-right py-1 px-2 font-mono",
+                    !d.valid ? "text-zinc-600" : isBestS2 ? "text-best" : "",
+                  )}
+                >
+                  {msToSectorTime(d.s2 * 1000)}
+                </td>
+                <td
+                  className={cn(
+                    "text-right py-1 px-2 font-mono",
+                    !d.valid ? "text-zinc-600" : isBestS3 ? "text-best" : "",
+                  )}
+                >
+                  {msToSectorTime(d.s3 * 1000)}
+                </td>
                 {hasTopSpeed && (
-                  <td className={cn("text-right py-1 px-2 font-mono", d.valid && d.topSpeed != null && d.topSpeed === bestTopSpeed ? "text-best font-semibold" : "")}>
+                  <td
+                    className={cn(
+                      "text-right py-1 px-2 font-mono",
+                      d.valid &&
+                        d.topSpeed != null &&
+                        d.topSpeed === bestTopSpeed
+                        ? "text-best font-semibold"
+                        : "",
+                    )}
+                  >
                     {d.topSpeed != null ? `${d.topSpeed}` : "–"}
                   </td>
                 )}
@@ -515,21 +704,31 @@ export function LapTimeChart({
                   <td
                     className={cn(
                       "text-right py-1 px-2 font-mono",
-                      wear != null && wear >= 75 ? "text-behind" : wear != null && wear >= 50 ? "text-warning" : "text-zinc-400",
+                      wear != null && wear >= 75
+                        ? "text-behind"
+                        : wear != null && wear >= 50
+                          ? "text-warning"
+                          : "text-zinc-400",
                     )}
-                    title={wear != null ? "Max tyre wear: highest-worn tyre at the end of this lap." : undefined}
+                    title={
+                      wear != null
+                        ? "Max tyre wear: highest-worn tyre at the end of this lap."
+                        : undefined
+                    }
                   >
                     {wear != null ? `${wear.toFixed(0)}%` : "–"}
                   </td>
                 )}
-                {hasErs && (
+                {showBatteryDetails && hasErs && (
                   <td className="text-right py-1 px-2 font-mono text-ahead">
                     {d.ersMj != null && d.ersMj > 0 ? d.ersMj.toFixed(1) : "–"}
                   </td>
                 )}
-                {hasErsHarv && (
+                {showBatteryDetails && hasErsHarv && (
                   <td className="text-right py-1 px-2 font-mono text-sky-400">
-                    {d.ersHarvMj != null && d.ersHarvMj > 0 ? d.ersHarvMj.toFixed(1) : "–"}
+                    {d.ersHarvMj != null && d.ersHarvMj > 0
+                      ? d.ersHarvMj.toFixed(1)
+                      : "–"}
                   </td>
                 )}
                 {hasFuel && (
@@ -538,13 +737,19 @@ export function LapTimeChart({
                       "text-right py-1 px-2 font-mono",
                       d.fuelKg == null
                         ? "text-zinc-600"
-                        : medianGreenBurn != null && d.fuelKg < medianGreenBurn * 0.95
+                        : medianGreenBurn != null &&
+                            d.fuelKg < medianGreenBurn * 0.95
                           ? "text-ahead"
-                          : medianGreenBurn != null && d.fuelKg > medianGreenBurn * 1.05
+                          : medianGreenBurn != null &&
+                              d.fuelKg > medianGreenBurn * 1.05
                             ? "text-warning"
                             : "text-zinc-400",
                     )}
-                    title={d.fuelKg != null ? "Fuel burned this lap (kg)." : undefined}
+                    title={
+                      d.fuelKg != null
+                        ? "Fuel burned this lap (kg)."
+                        : undefined
+                    }
                   >
                     {d.fuelKg != null ? d.fuelKg.toFixed(2) : "–"}
                   </td>
@@ -557,19 +762,23 @@ export function LapTimeChart({
           if (stints && stints.length > 0) {
             return (
               <table className="w-full text-xs min-w-[500px]">
-                <thead className={tableHeadClass}>
-                  {headerRow}
-                </thead>
+                <thead className={tableHeadClass}>{headerRow}</thead>
                 <tbody>
                   {stints.map((stint, si) => {
-                    const compound = stint["tyre-set-data"]["visual-tyre-compound"];
+                    const compound =
+                      stint["tyre-set-data"]["visual-tyre-compound"];
                     const color = COMPOUND_COLORS[compound] ?? "#a1a1aa";
                     const stintLaps = data.filter(
-                      (d) => d.lap >= stint["start-lap"] && d.lap <= stint["end-lap"],
+                      (d) =>
+                        d.lap >= stint["start-lap"] &&
+                        d.lap <= stint["end-lap"],
                     );
                     return [
                       <tr key={`stint-${si}`}>
-                        <td colSpan={colCount} className={cn("py-1.5 px-2", si > 0 && "pt-4")}>
+                        <td
+                          colSpan={colCount}
+                          className={cn("py-1.5 px-2", si > 0 && "pt-4")}
+                        >
                           <div className="flex items-center gap-2">
                             <span
                               className="inline-block w-2.5 h-2.5 rounded-full"
@@ -579,12 +788,15 @@ export function LapTimeChart({
                               Stint {si + 1} — {compound}
                             </span>
                             <span className="text-2xs text-zinc-500">
-                              Laps {stint["start-lap"]}–{stint["end-lap"]} ({stint["stint-length"]} laps)
+                              Laps {stint["start-lap"]}–{stint["end-lap"]} (
+                              {stint["stint-length"]} laps)
                             </span>
                           </div>
                         </td>
                       </tr>,
-                      ...stintLaps.map((lap, li) => renderLapRow(lap, `stint-${si}-lap-${lap.lap}-${li}`)),
+                      ...stintLaps.map((lap, li) =>
+                        renderLapRow(lap, `stint-${si}-lap-${lap.lap}-${li}`),
+                      ),
                     ];
                   })}
                 </tbody>
@@ -595,9 +807,7 @@ export function LapTimeChart({
           // Fallback: no stint grouping
           return (
             <table className="w-full text-xs min-w-[500px]">
-              <thead className={tableHeadClass}>
-                {headerRow}
-              </thead>
+              <thead className={tableHeadClass}>{headerRow}</thead>
               <tbody>
                 {data.map((lap, i) => renderLapRow(lap, `lap-${lap.lap}-${i}`))}
               </tbody>

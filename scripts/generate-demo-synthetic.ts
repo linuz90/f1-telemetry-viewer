@@ -18,7 +18,16 @@ import type {
 } from "../src/types/telemetry.ts";
 
 const POINTS_BY_POSITION: Record<number, number> = {
-  1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1,
+  1: 25,
+  2: 18,
+  3: 15,
+  4: 12,
+  5: 10,
+  6: 8,
+  7: 6,
+  8: 4,
+  9: 2,
+  10: 1,
 };
 
 // --- PRNG ---
@@ -71,32 +80,134 @@ const PLAYER_TEAM = "Ferrari";
 // patterns (acronyms, numeric tails, bracketed clans) so the Rivals section
 // still reads like a real lobby.
 const PLAYER_TEAMMATES: DriverProfile[] = [
-  { name: "AlpineWraith", team: "Ferrari", paceFactor: 1.005, consistency: 1.25, aggression: 0.5 },
+  {
+    name: "AlpineWraith",
+    team: "Ferrari",
+    paceFactor: 1.005,
+    consistency: 1.25,
+    aggression: 0.5,
+  },
 ];
 
 const STARS: DriverProfile[] = [
-  { name: "VRT_Apex91", team: "Red Bull Racing", paceFactor: 0.962, consistency: 0.85, aggression: 1.4 },
-  { name: "NeonCometX", team: "Mclaren", paceFactor: 0.968, consistency: 0.88, aggression: 1.1 },
-  { name: "Astralis_47", team: "Aston Martin", paceFactor: 0.971, consistency: 0.9, aggression: 0.9 },
-  { name: "BlazePilot", team: "Mclaren", paceFactor: 0.974, consistency: 0.95, aggression: 1.6 },
-  { name: "PhantomDrift", team: "Mercedes", paceFactor: 0.978, consistency: 0.78, aggression: 0.95 },
+  {
+    name: "VRT_Apex91",
+    team: "Red Bull Racing",
+    paceFactor: 0.962,
+    consistency: 0.85,
+    aggression: 1.4,
+  },
+  {
+    name: "NeonCometX",
+    team: "Mclaren",
+    paceFactor: 0.968,
+    consistency: 0.88,
+    aggression: 1.1,
+  },
+  {
+    name: "Astralis_47",
+    team: "Aston Martin",
+    paceFactor: 0.971,
+    consistency: 0.9,
+    aggression: 0.9,
+  },
+  {
+    name: "BlazePilot",
+    team: "Mclaren",
+    paceFactor: 0.974,
+    consistency: 0.95,
+    aggression: 1.6,
+  },
+  {
+    name: "PhantomDrift",
+    team: "Mercedes",
+    paceFactor: 0.978,
+    consistency: 0.78,
+    aggression: 0.95,
+  },
 ];
 
 const MIDFIELD: DriverProfile[] = [
-  { name: "GTX_Falcon", team: "Haas", paceFactor: 0.985, consistency: 1.0, aggression: 1.5 },
-  { name: "MercuryRise", team: "Alpine", paceFactor: 0.99, consistency: 0.95, aggression: 1.3 },
-  { name: "Vapor_Lane", team: "Sauber", paceFactor: 0.992, consistency: 1.0, aggression: 0.9 },
-  { name: "NightBlitz", team: "RB", paceFactor: 0.995, consistency: 1.1, aggression: 1.0 },
-  { name: "ChromeShade", team: "Williams", paceFactor: 1.002, consistency: 1.05, aggression: 1.0 },
-  { name: "Halftrack_K", team: "Alpine", paceFactor: 1.005, consistency: 1.15, aggression: 1.4 },
-  { name: "OniRunner", team: "Williams", paceFactor: 1.01, consistency: 1.1, aggression: 0.7 },
-  { name: "[SR] Embertide", team: "Aston Martin", paceFactor: 1.012, consistency: 1.1, aggression: 0.6 },
+  {
+    name: "GTX_Falcon",
+    team: "Haas",
+    paceFactor: 0.985,
+    consistency: 1.0,
+    aggression: 1.5,
+  },
+  {
+    name: "MercuryRise",
+    team: "Alpine",
+    paceFactor: 0.99,
+    consistency: 0.95,
+    aggression: 1.3,
+  },
+  {
+    name: "Vapor_Lane",
+    team: "Sauber",
+    paceFactor: 0.992,
+    consistency: 1.0,
+    aggression: 0.9,
+  },
+  {
+    name: "NightBlitz",
+    team: "RB",
+    paceFactor: 0.995,
+    consistency: 1.1,
+    aggression: 1.0,
+  },
+  {
+    name: "ChromeShade",
+    team: "Williams",
+    paceFactor: 1.002,
+    consistency: 1.05,
+    aggression: 1.0,
+  },
+  {
+    name: "Halftrack_K",
+    team: "Alpine",
+    paceFactor: 1.005,
+    consistency: 1.15,
+    aggression: 1.4,
+  },
+  {
+    name: "OniRunner",
+    team: "Williams",
+    paceFactor: 1.01,
+    consistency: 1.1,
+    aggression: 0.7,
+  },
+  {
+    name: "[SR] Embertide",
+    team: "Aston Martin",
+    paceFactor: 1.012,
+    consistency: 1.1,
+    aggression: 0.6,
+  },
 ];
 
 const PLACEHOLDERS: DriverProfile[] = [
-  { name: "Haas #2", team: "Haas", paceFactor: 1.018, consistency: 1.2, aggression: 0.6 },
-  { name: "Sauber #2", team: "Sauber", paceFactor: 1.022, consistency: 1.25, aggression: 0.7 },
-  { name: "RB #67", team: "RB", paceFactor: 1.025, consistency: 1.2, aggression: 0.6 },
+  {
+    name: "Haas #2",
+    team: "Haas",
+    paceFactor: 1.018,
+    consistency: 1.2,
+    aggression: 0.6,
+  },
+  {
+    name: "Sauber #2",
+    team: "Sauber",
+    paceFactor: 1.022,
+    consistency: 1.25,
+    aggression: 0.7,
+  },
+  {
+    name: "RB #67",
+    team: "RB",
+    paceFactor: 1.025,
+    consistency: 1.2,
+    aggression: 0.6,
+  },
 ];
 
 const ALL_PROFILES: DriverProfile[] = [
@@ -395,7 +506,11 @@ interface RankedDriver {
 
 function buildRivalsForRace(scenario: RaceScenario): {
   rivals: RivalEntry[];
-  playerLapStats: { meanLapMs: number; stddevLapMs: number; validLapCount: number };
+  playerLapStats: {
+    meanLapMs: number;
+    stddevLapMs: number;
+    validLapCount: number;
+  };
   playerMeanMs: number;
   fieldSize: number;
 } {
@@ -408,16 +523,21 @@ function buildRivalsForRace(scenario: RaceScenario): {
   ];
 
   // Generate lap stats per driver scaled to their pace factor vs the player's best.
-  const playerStddev = scenario.playerStddevMs ?? 1900 + Math.round(jitter(400));
+  const playerStddev =
+    scenario.playerStddevMs ?? 1900 + Math.round(jitter(400));
   const playerMean =
-    scenario.playerMeanMs ?? scenario.playerBestMs + 2200 + Math.round(jitter(500));
+    scenario.playerMeanMs ??
+    scenario.playerBestMs + 2200 + Math.round(jitter(500));
 
   const ranked: RankedDriver[] = cast.map((profile) => {
     const bestMs = Math.round(
       scenario.playerBestMs * profile.paceFactor + jitter(220),
     );
-    const stddevMs = Math.round(playerStddev * profile.consistency + jitter(250));
-    const meanMs = bestMs + Math.round(2100 * profile.consistency + jitter(420));
+    const stddevMs = Math.round(
+      playerStddev * profile.consistency + jitter(250),
+    );
+    const meanMs =
+      bestMs + Math.round(2100 * profile.consistency + jitter(420));
     return {
       profile,
       bestMs,
@@ -490,7 +610,9 @@ function buildRivalsForRace(scenario: RaceScenario): {
   const rivals: RivalEntry[] = ranked.map((r) => {
     const isTeammate = r.profile.team === PLAYER_TEAM;
     const finalPosition =
-      typeof scenario.playerFinish === "number" ? scenario.playerFinish : fieldSize;
+      typeof scenario.playerFinish === "number"
+        ? scenario.playerFinish
+        : fieldSize;
     const positionGap = Math.abs(r.position - finalPosition);
     // avg gap drifts a bit from the final-classification gap.
     const avgPositionGap = Math.max(
@@ -500,13 +622,17 @@ function buildRivalsForRace(scenario: RaceScenario): {
     // Overtakes scale with aggression + how much they moved through the field.
     const gridDelta = Math.max(0, r.gridPosition - r.position);
     const baseOvertakes = Math.round(
-      (3 + gridDelta * 1.8 + r.profile.aggression * 4) + jitter(2.2),
+      3 + gridDelta * 1.8 + r.profile.aggression * 4 + jitter(2.2),
     );
     const overtakes = Math.max(0, baseOvertakes);
     // Player ↔ this driver overtakes: more likely when they finished near the player.
     const nearPlayer = positionGap <= 3;
-    const overtakesOnPlayer = nearPlayer ? Math.max(0, Math.round(rng() * 3)) : 0;
-    const overtakesByPlayer = nearPlayer ? Math.max(0, Math.round(rng() * 3)) : 0;
+    const overtakesOnPlayer = nearPlayer
+      ? Math.max(0, Math.round(rng() * 3))
+      : 0;
+    const overtakesByPlayer = nearPlayer
+      ? Math.max(0, Math.round(rng() * 3))
+      : 0;
 
     return {
       key: r.profile.name.trim().toLowerCase(),
@@ -529,7 +655,8 @@ function buildRivalsForRace(scenario: RaceScenario): {
       avgPositionGap,
       positionGapSamples: scenario.totalLaps,
       hadFastestLap:
-        !scenario.playerSetFastestLap && r.profile.name === scenario.fastestLapDriver,
+        !scenario.playerSetFastestLap &&
+        r.profile.name === scenario.fastestLapDriver,
     };
   });
 
@@ -562,10 +689,15 @@ function buildSummaryForRace(scenario: RaceScenario): SessionSummary {
   const pad = (n: number) => String(n).padStart(2, "0");
   const stamp = `${d.getFullYear()}_${pad(d.getMonth() + 1)}_${pad(d.getDate())}_${pad(d.getHours())}_${pad(d.getMinutes())}_${pad(d.getSeconds())}`;
   const filename = `Race_${trackUnderscore(scenario.track)}_${stamp}.json`;
-  const slug = filename.replace(/\.json$/, "").toLowerCase().replace(/_/g, "-");
+  const slug = filename
+    .replace(/\.json$/, "")
+    .toLowerCase()
+    .replace(/_/g, "-");
 
   const playerFinishedNum =
-    typeof scenario.playerFinish === "number" ? scenario.playerFinish : undefined;
+    typeof scenario.playerFinish === "number"
+      ? scenario.playerFinish
+      : undefined;
   const playerBestStr = formatLapTime(scenario.playerBestMs);
 
   // Derive insight-friendly fields. Defaults are sensible mid-pack values so
@@ -588,18 +720,27 @@ function buildSummaryForRace(scenario: RaceScenario): SessionSummary {
     (sum, r) => sum + r.overtakesOnPlayer,
     0,
   );
-  const stints =
-    scenario.playerStints ?? [
-      { compound: "Medium", laps: Math.ceil(scenario.totalLaps * 0.55), endWearAvg: 38 },
-      { compound: "Hard", laps: Math.floor(scenario.totalLaps * 0.45), endWearAvg: 24 },
-    ];
+  const stints = scenario.playerStints ?? [
+    {
+      compound: "Medium",
+      laps: Math.ceil(scenario.totalLaps * 0.55),
+      endWearAvg: 38,
+    },
+    {
+      compound: "Hard",
+      laps: Math.floor(scenario.totalLaps * 0.45),
+      endWearAvg: 24,
+    },
+  ];
   const purpleSectors = {
     s1: scenario.playerPurpleSectors?.s1 ?? false,
     s2: scenario.playerPurpleSectors?.s2 ?? false,
     s3: scenario.playerPurpleSectors?.s3 ?? false,
   };
   const finishPoints =
-    playerFinishedNum != null ? (POINTS_BY_POSITION[playerFinishedNum] ?? 0) : 0;
+    playerFinishedNum != null
+      ? (POINTS_BY_POSITION[playerFinishedNum] ?? 0)
+      : 0;
   const playerPenaltyCount = scenario.playerPenaltyCount ?? 0;
   const playerSetFastestLap = scenario.playerSetFastestLap ?? false;
 
@@ -687,7 +828,9 @@ export function buildSyntheticOnlineRaces(): SessionSummary[] {
     for (const name of refs) {
       if (name == null) continue;
       if (!knownNames.has(name)) {
-        throw new Error(`Synthetic scenario references unknown driver: ${name}`);
+        throw new Error(
+          `Synthetic scenario references unknown driver: ${name}`,
+        );
       }
     }
   }

@@ -42,14 +42,20 @@ export function SessionCard({
   return (
     <div className="min-w-0">
       <HStack justify="between" className="gap-1.5">
-        <HStack as="span" className="min-w-0 gap-1.5 truncate text-sm font-medium">
+        <HStack
+          as="span"
+          className="min-w-0 gap-1.5 truncate text-sm font-medium"
+        >
           <TrackFlag track={track} />
           <span className="truncate">{track}</span>
         </HStack>
         <HStack className="shrink-0 gap-1.5">
           <HStack
             as="span"
-            className={cn("gap-0.5 text-2xs font-medium uppercase leading-none", typeMeta.color)}
+            className={cn(
+              "gap-0.5 text-2xs font-medium uppercase leading-none",
+              typeMeta.color,
+            )}
           >
             <TypeIcon className="size-3" />
             {sessionType}
@@ -102,13 +108,21 @@ export function SessionCard({
               {lapIndicators.map((indicator, i) => (
                 <span
                   key={i}
-                  className={cn("inline-block size-1.5 shrink-0 rounded-full", INDICATOR_COLORS[indicator])}
+                  className={cn(
+                    "inline-block size-1.5 shrink-0 rounded-full",
+                    INDICATOR_COLORS[indicator],
+                  )}
                 />
               ))}
             </HStack>
           )}
           {bestLapTime && (
-            <span className={cn("shrink-0 text-xs font-mono font-medium", isTrackBest ? "text-purple-400" : "text-zinc-500")}>
+            <span
+              className={cn(
+                "shrink-0 text-xs font-mono font-medium",
+                isTrackBest ? "text-purple-400" : "text-zinc-500",
+              )}
+            >
               {bestLapTime}
             </span>
           )}

@@ -13,10 +13,7 @@ import {
   getValidLaps,
   type StrategyInsight,
 } from "./stats";
-import {
-  isRaceSession,
-  isTimeTrialSessionType,
-} from "./sessionTypes";
+import { isRaceSession, isTimeTrialSessionType } from "./sessionTypes";
 import {
   eventMatchesRaceControlFocus,
   humanizeRaceControlType,
@@ -111,7 +108,10 @@ function isNegativeResultStatus(status: string | undefined): boolean {
   return Boolean(status && status !== "FINISHED");
 }
 
-function getTotalLaps(session: TelemetrySession, drivers: DriverData[]): number | undefined {
+function getTotalLaps(
+  session: TelemetrySession,
+  drivers: DriverData[],
+): number | undefined {
   const configured = session["session-info"]["total-laps"];
   if (configured > 0) return configured;
 
@@ -127,17 +127,25 @@ function matchingStintResult(
   driver: DriverData,
 ): TyreStintHistoryV2Entry | undefined {
   return session["tyre-stint-history-v2"]?.find(
-    (entry) => entry.index === driver.index || entry.name === driver["driver-name"],
+    (entry) =>
+      entry.index === driver.index || entry.name === driver["driver-name"],
   );
 }
 
 function getFieldSize(session: TelemetrySession): number {
   const drivers = session["classification-data"] ?? [];
-  const classified = drivers.filter((driver) => driver["final-classification"]).length;
-  return classified || session["tyre-stint-history-v2"]?.length || drivers.length;
+  const classified = drivers.filter(
+    (driver) => driver["final-classification"],
+  ).length;
+  return (
+    classified || session["tyre-stint-history-v2"]?.length || drivers.length
+  );
 }
 
-function getDriverResult(session: TelemetrySession, driver: DriverData): DriverResult {
+function getDriverResult(
+  session: TelemetrySession,
+  driver: DriverData,
+): DriverResult {
   const drivers = session["classification-data"] ?? [];
   const classification = driver["final-classification"];
   const stintResult = matchingStintResult(session, driver);
@@ -145,12 +153,18 @@ function getDriverResult(session: TelemetrySession, driver: DriverData): DriverR
   const laps =
     classification?.["num-laps"] ??
     driver["session-history"]?.["num-laps"] ??
-    driver["session-history"]?.["lap-history-data"]?.filter((lap) => lap["lap-time-in-ms"] > 0).length;
+    driver["session-history"]?.["lap-history-data"]?.filter(
+      (lap) => lap["lap-time-in-ms"] > 0,
+    ).length;
 
   return {
     position: classification?.position ?? stintResult?.position,
-    gridPosition: classification?.["grid-position"] ?? stintResult?.["grid-position"],
-    status: classification?.["result-status"] || stintResult?.["result-status"] || undefined,
+    gridPosition:
+      classification?.["grid-position"] ?? stintResult?.["grid-position"],
+    status:
+      classification?.["result-status"] ||
+      stintResult?.["result-status"] ||
+      undefined,
     laps,
     totalLaps,
     points: classification?.points,
@@ -174,7 +188,9 @@ function scanBestLap(session: TelemetrySession): SessionBestLap | undefined {
   // summary tile useful without depending on a newer Pits n' Giggles schema.
   let best: SessionBestLap | undefined;
   for (const driver of session["classification-data"] ?? []) {
-    const timeMs = getBestLapTime(driver["session-history"]["lap-history-data"]);
+    const timeMs = getBestLapTime(
+      driver["session-history"]["lap-history-data"],
+    );
     if (timeMs <= 0) continue;
     if (!best || timeMs < best.timeMs) {
       best = {
@@ -187,7 +203,10 @@ function scanBestLap(session: TelemetrySession): SessionBestLap | undefined {
   return best;
 }
 
-function bestLapNumberForDriver(driver: DriverData, bestLapMs: number): number | undefined {
+function bestLapNumberForDriver(
+  driver: DriverData,
+  bestLapMs: number,
+): number | undefined {
   const laps = driver["session-history"]["lap-history-data"] ?? [];
   const matchingIndex = laps.findIndex(
     (lap) =>
@@ -200,12 +219,18 @@ function bestLapNumberForDriver(driver: DriverData, bestLapMs: number): number |
   return reportedLap > 0 ? reportedLap : undefined;
 }
 
-function compoundForLap(driver: DriverData, lapNumber: number | undefined): string | undefined {
+function compoundForLap(
+  driver: DriverData,
+  lapNumber: number | undefined,
+): string | undefined {
   if (lapNumber == null) return undefined;
   return getLapCompoundMap(driver).get(lapNumber);
 }
 
-function buildRaceResultInsight(session: TelemetrySession, driver: DriverData): SessionInsight | null {
+function buildRaceResultInsight(
+  session: TelemetrySession,
+  driver: DriverData,
+): SessionInsight | null {
   const result = getDriverResult(session, driver);
   if (!result.position && !result.status) return null;
 
@@ -224,7 +249,11 @@ function buildRaceResultInsight(session: TelemetrySession, driver: DriverData): 
     label: "Result",
     value: result.position ? `P${result.position}` : statusLabel,
     detail: detailParts.join(" - "),
-    tone: negativeStatus ? "negative" : result.position === 1 ? "best" : "neutral",
+    tone: negativeStatus
+      ? "negative"
+      : result.position === 1
+        ? "best"
+        : "neutral",
     accent: negativeStatus ? "rose" : result.position === 1 ? "amber" : "zinc",
     rank: result.position ? result.position - 1 : undefined,
     rankTotal: result.fieldSize,
@@ -235,7 +264,9 @@ function buildQualifyingResultInsight(
   session: TelemetrySession,
   driver: DriverData,
 ): SessionInsight | null {
-  const isTimeTrial = isTimeTrialSessionType(session["session-info"]["session-type"]);
+  const isTimeTrial = isTimeTrialSessionType(
+    session["session-info"]["session-type"],
+  );
   const laps = driver["session-history"]["lap-history-data"];
   const timedCount = laps.filter((lap) => lap["lap-time-in-ms"] > 0).length;
   const validCount = getValidLaps(laps).length;
@@ -263,12 +294,15 @@ function buildQualifyingResultInsight(
   const ranking = (session["classification-data"] ?? [])
     .map((candidate) => ({
       driver: candidate,
-      bestLapMs: getBestLapTime(candidate["session-history"]["lap-history-data"]),
+      bestLapMs: getBestLapTime(
+        candidate["session-history"]["lap-history-data"],
+      ),
     }))
     .filter((entry) => entry.bestLapMs > 0)
     .sort((a, b) => a.bestLapMs - b.bestLapMs);
   const positionFromLap =
-    ranking.findIndex((entry) => entry.driver.index === driver.index) + 1 || undefined;
+    ranking.findIndex((entry) => entry.driver.index === driver.index) + 1 ||
+    undefined;
   const position = positionFromClassification ?? positionFromLap;
   const status = formatResultStatus(classification?.["result-status"]);
   const hasValidLap = validCount > 0;
@@ -292,11 +326,16 @@ function buildQualifyingResultInsight(
   };
 }
 
-function buildBestLapInsight(session: TelemetrySession, driver: DriverData): SessionInsight | null {
+function buildBestLapInsight(
+  session: TelemetrySession,
+  driver: DriverData,
+): SessionInsight | null {
   const laps = driver["session-history"]["lap-history-data"];
   const bestLapMs = getBestLapTime(laps);
   const sessionBest = scanBestLap(session);
-  const isTimeTrial = isTimeTrialSessionType(session["session-info"]["session-type"]);
+  const isTimeTrial = isTimeTrialSessionType(
+    session["session-info"]["session-type"],
+  );
 
   if (bestLapMs <= 0) {
     return {
@@ -311,7 +350,8 @@ function buildBestLapInsight(session: TelemetrySession, driver: DriverData): Ses
 
   const isSessionBest =
     sessionBest != null &&
-    (sessionBest.driverIndex === driver.index || Math.abs(bestLapMs - sessionBest.timeMs) < 1);
+    (sessionBest.driverIndex === driver.index ||
+      Math.abs(bestLapMs - sessionBest.timeMs) < 1);
   const detail =
     sessionBest && sessionBest.timeMs > 0
       ? isSessionBest
@@ -320,7 +360,10 @@ function buildBestLapInsight(session: TelemetrySession, driver: DriverData): Ses
           : "session fastest lap"
         : `+${msToSectorTime(bestLapMs - sessionBest.timeMs)} vs ${sessionBest.driverName ?? "session best"}`
       : "best valid lap";
-  const compound = compoundForLap(driver, bestLapNumberForDriver(driver, bestLapMs));
+  const compound = compoundForLap(
+    driver,
+    bestLapNumberForDriver(driver, bestLapMs),
+  );
 
   return {
     type: "lap",
@@ -333,10 +376,19 @@ function buildBestLapInsight(session: TelemetrySession, driver: DriverData): Ses
   };
 }
 
-function matchesFocusedDriver(record: OvertakeRecord, driver: DriverData, side: "overtaker" | "overtaken"): boolean {
-  const indexKey = side === "overtaker" ? "overtaking-driver-index" : "overtaken-driver-index";
-  const nameKey = side === "overtaker" ? "overtaking-driver-name" : "overtaken-driver-name";
-  return record[indexKey] === driver.index || record[nameKey] === driver["driver-name"];
+function matchesFocusedDriver(
+  record: OvertakeRecord,
+  driver: DriverData,
+  side: "overtaker" | "overtaken",
+): boolean {
+  const indexKey =
+    side === "overtaker" ? "overtaking-driver-index" : "overtaken-driver-index";
+  const nameKey =
+    side === "overtaker" ? "overtaking-driver-name" : "overtaken-driver-name";
+  return (
+    record[indexKey] === driver.index ||
+    record[nameKey] === driver["driver-name"]
+  );
 }
 
 function buildRaceFlowInsight(
@@ -355,15 +407,20 @@ function buildRaceFlowInsight(
     result.gridPosition > 0 &&
     result.position > 0;
   const gridMove = hasGridMove ? result.gridPosition! - result.position! : 0;
-  const made = overtakes.filter((record) => matchesFocusedDriver(record, driver, "overtaker")).length;
-  const lost = overtakes.filter((record) => matchesFocusedDriver(record, driver, "overtaken")).length;
+  const made = overtakes.filter((record) =>
+    matchesFocusedDriver(record, driver, "overtaker"),
+  ).length;
+  const lost = overtakes.filter((record) =>
+    matchesFocusedDriver(record, driver, "overtaken"),
+  ).length;
   const netPasses = made - lost;
 
   if (!hasGridMove && made === 0 && lost === 0) return null;
 
   const primary = hasGridMove ? gridMove : netPasses;
   const detailParts = [];
-  if (hasGridMove) detailParts.push(`P${result.gridPosition} to P${result.position}`);
+  if (hasGridMove)
+    detailParts.push(`P${result.gridPosition} to P${result.position}`);
   if (made > 0 || lost > 0) detailParts.push(`${made} overtakes, ${lost} lost`);
 
   return {
@@ -405,13 +462,18 @@ function buildPenaltyInsight(
 
 function buildSafetyCarInsight(driver: DriverData): SessionInsight | null {
   const safetyLaps = (driver["per-lap-info"] ?? []).filter(
-    (lap) => (lap["max-safety-car-status"] ?? "NO_SAFETY_CAR") !== "NO_SAFETY_CAR",
+    (lap) =>
+      (lap["max-safety-car-status"] ?? "NO_SAFETY_CAR") !== "NO_SAFETY_CAR",
   );
   if (safetyLaps.length === 0) return null;
 
-  const labels = [...new Set(
-    safetyLaps.map((lap) => humanizeRaceControlType(lap["max-safety-car-status"])),
-  )];
+  const labels = [
+    ...new Set(
+      safetyLaps.map((lap) =>
+        humanizeRaceControlType(lap["max-safety-car-status"]),
+      ),
+    ),
+  ];
 
   return {
     type: "context",
@@ -455,7 +517,9 @@ function buildDamageInsight(driver: DriverData): SessionInsight | null {
     type: "incident",
     label: "Car Damage",
     value: peak >= 15 ? `${Math.round(peak)}%` : "Fault",
-    detail: [peak >= 15 ? `${peakLabel} peak` : null, ...faults].filter(Boolean).join(" - "),
+    detail: [peak >= 15 ? `${peakLabel} peak` : null, ...faults]
+      .filter(Boolean)
+      .join(" - "),
     tone: "negative",
     accent: "rose",
   };
@@ -483,15 +547,25 @@ function buildRaceControlIncidentInsight(
   const focusedEvents = raceControlEvents.filter((event) =>
     eventMatchesRaceControlFocus(event, driver),
   );
-  const collisionCount = focusedEvents.filter((event) => event["message-type"] === "COLLISION").length;
-  const wingChangeCount = focusedEvents.filter((event) => event["message-type"] === "WING_CHANGE").length;
-  const retirementCount = focusedEvents.filter((event) => event["message-type"] === "RETIREMENT").length;
+  const collisionCount = focusedEvents.filter(
+    (event) => event["message-type"] === "COLLISION",
+  ).length;
+  const wingChangeCount = focusedEvents.filter(
+    (event) => event["message-type"] === "WING_CHANGE",
+  ).length;
+  const retirementCount = focusedEvents.filter(
+    (event) => event["message-type"] === "RETIREMENT",
+  ).length;
   const total = collisionCount + wingChangeCount + retirementCount;
   if (total === 0) return null;
 
   const parts = [
-    collisionCount > 0 ? `${collisionCount} collision${collisionCount === 1 ? "" : "s"}` : null,
-    wingChangeCount > 0 ? `${wingChangeCount} wing change${wingChangeCount === 1 ? "" : "s"}` : null,
+    collisionCount > 0
+      ? `${collisionCount} collision${collisionCount === 1 ? "" : "s"}`
+      : null,
+    wingChangeCount > 0
+      ? `${wingChangeCount} wing change${wingChangeCount === 1 ? "" : "s"}`
+      : null,
     retirementCount > 0 ? "retirement" : null,
   ].filter(Boolean);
 
@@ -532,7 +606,9 @@ export function buildSessionSummaryInsights({
       : null,
   ];
 
-  return insights.filter((insight): insight is SessionInsight => insight != null);
+  return insights.filter(
+    (insight): insight is SessionInsight => insight != null,
+  );
 }
 
 const MAX_SESSION_INSIGHTS = 9;
@@ -549,11 +625,17 @@ function startsWithLabel(insight: SessionInsight, label: string): boolean {
   return insight.label.toLowerCase().startsWith(label.toLowerCase());
 }
 
-function findByLabel(insights: SessionInsight[], label: string): SessionInsight | undefined {
+function findByLabel(
+  insights: SessionInsight[],
+  label: string,
+): SessionInsight | undefined {
   return insights.find((insight) => insight.label === label);
 }
 
-function takeByLabel(insights: SessionInsight[], label: string): SessionInsight | undefined {
+function takeByLabel(
+  insights: SessionInsight[],
+  label: string,
+): SessionInsight | undefined {
   const index = insights.findIndex((insight) => insight.label === label);
   if (index === -1) return undefined;
   return insights.splice(index, 1)[0];
@@ -595,7 +677,10 @@ function compactRank(value: string, total?: number | string): string {
   return position ? `P${position}${suffix}` : `${value}${suffix}`;
 }
 
-function insightRank(insight: SessionInsight, totalOverride?: number | string): string {
+function insightRank(
+  insight: SessionInsight,
+  totalOverride?: number | string,
+): string {
   if (insight.rank != null) {
     const total = totalOverride ?? insight.rankTotal;
     return `P${insight.rank + 1}${total ? `/${total}` : ""}`;
@@ -621,7 +706,10 @@ function rankedMetricLine(prefix: string, insight: SessionInsight): string {
   return compactMetricLine(prefix, insight);
 }
 
-function sectorContext(insight: SessionInsight, role: "strongest" | "weakest"): string {
+function sectorContext(
+  insight: SessionInsight,
+  role: "strongest" | "weakest",
+): string {
   const comparison = comparisonSuffix(insight.detail);
   const roleLabel = role === "strongest" ? "best" : "weak";
   return `${extractSectorLabel(insight.label)} ${roleLabel} · ${insightRank(insight)}${comparison ? ` ${comparison}` : ""}`;
@@ -633,12 +721,19 @@ function compactFuelLoadLine(initial: SessionInsight): string {
   return `Current ${initial.value}${kg ? ` · ${kg}` : ""}`;
 }
 
-function compactFuelRecommendationLine(recommended: SessionInsight | undefined): string | undefined {
+function compactFuelRecommendationLine(
+  recommended: SessionInsight | undefined,
+): string | undefined {
   if (!recommended?.detail) return undefined;
-  const spare = recommended.detail.match(/([+−-]?\d+(?:\.\d+)?)\s+laps?\s+spare/i);
+  const spare = recommended.detail.match(
+    /([+−-]?\d+(?:\.\d+)?)\s+laps?\s+spare/i,
+  );
   if (spare) return `Clean buffer ${spare[1]} laps`;
-  const short = recommended.detail.match(/([+−-]?\d+(?:\.\d+)?)\s+laps?\s+short/i);
-  if (short) return `Clean buffer −${Math.abs(Number(short[1])).toFixed(1)} laps`;
+  const short = recommended.detail.match(
+    /([+−-]?\d+(?:\.\d+)?)\s+laps?\s+short/i,
+  );
+  if (short)
+    return `Clean buffer −${Math.abs(Number(short[1])).toFixed(1)} laps`;
   if (/on target/i.test(recommended.detail)) return "Clean race on target";
   return recommended.detail.replace(/\s*\([^)]*\)\s*$/, "");
 }
@@ -659,7 +754,9 @@ function mergeBestLapInsight(
   };
 }
 
-function mergeFuelInsights(fuelInsights: SessionInsight[]): SessionInsight | undefined {
+function mergeFuelInsights(
+  fuelInsights: SessionInsight[],
+): SessionInsight | undefined {
   const initial = findByLabel(fuelInsights, "Initial Fuel");
   const recommended = findByLabel(fuelInsights, "Recommended Fuel");
   const primary = recommended ?? initial;
@@ -680,7 +777,9 @@ function mergeFuelInsights(fuelInsights: SessionInsight[]): SessionInsight | und
   };
 }
 
-function mergeSectorInsights(sectorInsights: SessionInsight[]): SessionInsight | undefined {
+function mergeSectorInsights(
+  sectorInsights: SessionInsight[],
+): SessionInsight | undefined {
   if (sectorInsights.length === 0) return undefined;
   if (sectorInsights.length === 1) {
     const insight = sectorInsights[0];
@@ -699,8 +798,12 @@ function mergeSectorInsights(sectorInsights: SessionInsight[]): SessionInsight |
     };
   }
 
-  const strongest = sectorInsights.find((insight) => startsWithLabel(insight, "Strongest"));
-  const weakest = sectorInsights.find((insight) => startsWithLabel(insight, "Weakest"));
+  const strongest = sectorInsights.find((insight) =>
+    startsWithLabel(insight, "Strongest"),
+  );
+  const weakest = sectorInsights.find((insight) =>
+    startsWithLabel(insight, "Weakest"),
+  );
   if (!strongest && !weakest) return sectorInsights[0];
 
   const primary = strongest ?? weakest;
@@ -708,13 +811,19 @@ function mergeSectorInsights(sectorInsights: SessionInsight[]): SessionInsight |
   const primarySector = extractSectorLabel(primary.label);
   const weakestSector = weakest ? extractSectorLabel(weakest.label) : undefined;
   const weakestDelta = weakest ? extractTimeDelta(weakest.detail) : undefined;
-  const weakestContext = weakest ? sectorContext(weakest, "weakest") : undefined;
-  const strongestContext = strongest ? sectorContext(strongest, "strongest") : undefined;
+  const weakestContext = weakest
+    ? sectorContext(weakest, "weakest")
+    : undefined;
+  const strongestContext = strongest
+    ? sectorContext(strongest, "strongest")
+    : undefined;
 
   return {
     type: "sector",
     label: "Sector Split",
-    value: weakestDelta ?? (weakest ? `${weakestSector} weakest` : `${primarySector} strongest`),
+    value:
+      weakestDelta ??
+      (weakest ? `${weakestSector} weakest` : `${primarySector} strongest`),
     detail: weakestContext ?? primary.detail,
     tooltip: primary.tooltip,
     rank: weakest?.rank ?? primary.rank,
@@ -738,7 +847,10 @@ function mergePowerInsights(
       ...primary,
       label: deploy && harvest ? "ERS Usage" : primary.label,
       value: deploy ? deploy.value : primary.value,
-      detail: deploy && harvest ? rankedMetricLine("Harvest", harvest) : primary.detail,
+      detail:
+        deploy && harvest
+          ? rankedMetricLine("Harvest", harvest)
+          : primary.detail,
       extraDetails: uniqueLines([
         deploy ? rankedMetricLine("Deploy", deploy) : undefined,
       ]),
@@ -766,7 +878,9 @@ function mergePowerInsights(
   };
 }
 
-function mergeHistoryInsights(historyInsights: SessionInsight[]): SessionInsight | undefined {
+function mergeHistoryInsights(
+  historyInsights: SessionInsight[],
+): SessionInsight | undefined {
   if (historyInsights.length === 0) return undefined;
   if (historyInsights.length === 1) {
     const insight = historyInsights[0];
@@ -805,31 +919,49 @@ function mergeHistoryInsights(historyInsights: SessionInsight[]): SessionInsight
     accent: isPersonalBest ? "purple" : "zinc",
     extraDetails: historyInsights
       .filter((insight) => insight !== primary)
-      .map((insight) => compactMetricLine(insight.label.replace(/^vs\s+/i, ""), insight)),
+      .map((insight) =>
+        compactMetricLine(insight.label.replace(/^vs\s+/i, ""), insight),
+      ),
   };
 }
 
 function mergeEventInsights(events: SessionInsight[]): SessionInsight[] {
   if (events.length <= 1) return events;
 
-  const priority = ["Penalties", "Car Damage", "Race Control", "Neutralized Laps", "Conditions"];
+  const priority = [
+    "Penalties",
+    "Car Damage",
+    "Race Control",
+    "Neutralized Laps",
+    "Conditions",
+  ];
   const eventRank = (label: string) => {
     const index = priority.indexOf(label);
     return index === -1 ? priority.length : index;
   };
-  const sorted = [...events].sort((a, b) => eventRank(a.label) - eventRank(b.label));
+  const sorted = [...events].sort(
+    (a, b) => eventRank(a.label) - eventRank(b.label),
+  );
   const primary = sorted[0];
-  const hasNegativeEvent = sorted.some((insight) => insight.tone === "negative");
+  const hasNegativeEvent = sorted.some(
+    (insight) => insight.tone === "negative",
+  );
   return [
     {
       type: primary.type,
       label: "Session Events",
       value: `${events.length} ${hasNegativeEvent ? "issues" : "notes"}`,
-      detail: sorted.map((insight) => `${insight.label}: ${insight.value}`).join(" - "),
+      detail: sorted
+        .map((insight) => `${insight.label}: ${insight.value}`)
+        .join(" - "),
       tooltip: primary.tooltip,
       tone: hasNegativeEvent ? "negative" : "warning",
-      accent: sorted.some((insight) => insight.accent === "rose") ? "rose" : "amber",
-      extraDetails: sorted.map((insight) => compactMetricLine(insight.label, insight)),
+      accent: sorted.some((insight) => insight.accent === "rose")
+        ? "rose"
+        : "amber",
+      extraDetails: sorted.map((insight) =>
+        compactMetricLine(insight.label, insight),
+      ),
     },
   ];
 }
@@ -845,7 +977,10 @@ function isHighValueHistory(insight: SessionInsight | undefined): boolean {
   );
 }
 
-function appendIfPresent(target: SessionInsight[], insight: SessionInsight | undefined) {
+function appendIfPresent(
+  target: SessionInsight[],
+  insight: SessionInsight | undefined,
+) {
   if (insight) target.push(insight);
 }
 
@@ -854,8 +989,12 @@ export function curateSessionInsights(
   insights: SessionInsight[],
   limit = MAX_SESSION_INSIGHTS,
 ): SessionInsight[] {
-  const isTimeTrial = isTimeTrialSessionType(session["session-info"]["session-type"]);
-  const remaining = insights.filter((insight) => insight.label !== "Lap Quality");
+  const isTimeTrial = isTimeTrialSessionType(
+    session["session-info"]["session-type"],
+  );
+  const remaining = insights.filter(
+    (insight) => insight.label !== "Lap Quality",
+  );
   const result =
     takeByLabel(remaining, "Result") ??
     takeByLabel(remaining, "Timed Laps") ??
@@ -875,13 +1014,19 @@ export function curateSessionInsights(
   const qualifying = takeByLabel(remaining, "Qualifying");
   takeByLabel(remaining, "Consistency");
   const firstPit = takeByLabel(remaining, "First Pit Stop");
-  const fuel = mergeFuelInsights(takeWhere(remaining, (insight) => insight.type === "fuel"));
-  const sectors = mergeSectorInsights(takeWhere(remaining, (insight) => insight.type === "sector"));
+  const fuel = mergeFuelInsights(
+    takeWhere(remaining, (insight) => insight.type === "fuel"),
+  );
+  const sectors = mergeSectorInsights(
+    takeWhere(remaining, (insight) => insight.type === "sector"),
+  );
   const power = mergePowerInsights(
     takeByLabel(remaining, "Top Speed"),
     takeWhere(remaining, (insight) => insight.type === "ers"),
   );
-  const history = mergeHistoryInsights(takeWhere(remaining, (insight) => insight.type === "history"));
+  const history = mergeHistoryInsights(
+    takeWhere(remaining, (insight) => insight.type === "history"),
+  );
 
   const curated: SessionInsight[] = [];
   appendIfPresent(curated, result);
@@ -937,7 +1082,9 @@ export function buildSessionInsightsHint(session: TelemetrySession): string {
   }
 
   if (info["total-laps"] > 0) {
-    parts.push(`${info["total-laps"]} lap${info["total-laps"] === 1 ? "" : "s"}`);
+    parts.push(
+      `${info["total-laps"]} lap${info["total-laps"] === 1 ? "" : "s"}`,
+    );
   }
 
   return parts.join(" - ");

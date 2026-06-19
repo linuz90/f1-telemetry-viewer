@@ -1,6 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import type { TelemetrySession } from "../types/telemetry";
-import { findFocusedDriver, generateQualiInsights, generateQualiHistoryInsights } from "../utils/stats";
+import {
+  findFocusedDriver,
+  generateQualiInsights,
+  generateQualiHistoryInsights,
+} from "../utils/stats";
 import { useTrackHistory } from "../hooks/useTrackHistory";
 import { useSessionList } from "../hooks/useSessionList";
 import { SessionHeader } from "../components/SessionHeader";
@@ -42,7 +46,8 @@ export function QualifyingSessionView({
   );
 
   const laps = focusedDriver?.["session-history"]["lap-history-data"] ?? [];
-  const stints = focusedDriver?.["session-history"]["tyre-stints-history-data"] ?? [];
+  const stints =
+    focusedDriver?.["session-history"]["tyre-stints-history-data"] ?? [];
   const perLapInfo = focusedDriver?.["per-lap-info"] ?? [];
   // Find track name from session list to match history
   const { sessions: allSessions } = useSessionList();
@@ -51,7 +56,12 @@ export function QualifyingSessionView({
     [allSessions, slug],
   );
   const trackName = sessionMeta?.track ?? session["session-info"]["track-id"];
-  const { pbs } = useTrackHistory(trackName, slug, session["session-info"].formula, session["game-year"]);
+  const { pbs } = useTrackHistory(
+    trackName,
+    slug,
+    session["session-info"].formula,
+    session["game-year"],
+  );
 
   const insights = useMemo(() => {
     if (!focusedDriver) return [];
@@ -69,12 +79,14 @@ export function QualifyingSessionView({
     () => curateSessionInsights(session, [...summaryInsights, ...insights]),
     [insights, session, summaryInsights],
   );
-  const insightsHint = useMemo(() => buildSessionInsightsHint(session), [session]);
+  const insightsHint = useMemo(
+    () => buildSessionInsightsHint(session),
+    [session],
+  );
 
   // Show car setup only for the actual player with valid setup data
   const showSetup =
-    focusedDriver?.["is-player"] &&
-    focusedDriver["car-setup"]?.["is-valid"];
+    focusedDriver?.["is-player"] && focusedDriver["car-setup"]?.["is-valid"];
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6 sm:space-y-8">
@@ -89,18 +101,28 @@ export function QualifyingSessionView({
 
       {/* Results table */}
       <Card as="section">
-        <QualifyingTable session={session} focusedDriverIndex={focusedDriverIndex} />
+        <QualifyingTable
+          session={session}
+          focusedDriverIndex={focusedDriverIndex}
+        />
       </Card>
 
       {/* Sector comparison vs session best */}
       <Card as="section">
-        <SectorVsBest session={session} focusedDriverIndex={focusedDriverIndex} />
+        <SectorVsBest
+          session={session}
+          focusedDriverIndex={focusedDriverIndex}
+        />
       </Card>
 
       {/* Player lap breakdown */}
       {laps.length > 0 && (
         <Card as="section">
-          <SectorComparison laps={laps} stints={stints} perLapInfo={perLapInfo} />
+          <SectorComparison
+            laps={laps}
+            stints={stints}
+            perLapInfo={perLapInfo}
+          />
         </Card>
       )}
 

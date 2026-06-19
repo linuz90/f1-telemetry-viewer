@@ -1,5 +1,14 @@
-import type { LapHistoryEntry, PerLapInfo, TyreStintBasic } from "../types/telemetry";
-import { isLapValid, msToLapTime, msToSectorTime, sectorTimeMs } from "../utils/format";
+import type {
+  LapHistoryEntry,
+  PerLapInfo,
+  TyreStintBasic,
+} from "../types/telemetry";
+import {
+  isLapValid,
+  msToLapTime,
+  msToSectorTime,
+  sectorTimeMs,
+} from "../utils/format";
 import { cn } from "../utils/cn";
 import { getCompoundColor, PERF_COLORS } from "../utils/colors";
 import { ersDeployMjForLap, ersHarvestMjForLap } from "../utils/stats";
@@ -15,7 +24,11 @@ interface SectorComparisonProps {
  * Horizontal segment layout showing each qualifying lap with proportional
  * sector bars, times, and deltas. Replaces the stacked BarChart.
  */
-export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonProps) {
+export function SectorComparison({
+  laps,
+  stints,
+  perLapInfo,
+}: SectorComparisonProps) {
   // Build a lap→compound lookup from stint data
   const lapCompound = new Map<number, string>();
   if (stints?.length) {
@@ -76,12 +89,24 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
   const maxTotal = Math.max(...data.map((d) => d.s1 + d.s2 + d.s3));
 
   // Best and worst individual sectors across valid laps
-  const bestS1 = validLaps.length ? Math.min(...validLaps.map((d) => d.s1)) : Infinity;
-  const bestS2 = validLaps.length ? Math.min(...validLaps.map((d) => d.s2)) : Infinity;
-  const bestS3 = validLaps.length ? Math.min(...validLaps.map((d) => d.s3)) : Infinity;
-  const worstS1 = validLaps.length ? Math.max(...validLaps.map((d) => d.s1)) : -Infinity;
-  const worstS2 = validLaps.length ? Math.max(...validLaps.map((d) => d.s2)) : -Infinity;
-  const worstS3 = validLaps.length ? Math.max(...validLaps.map((d) => d.s3)) : -Infinity;
+  const bestS1 = validLaps.length
+    ? Math.min(...validLaps.map((d) => d.s1))
+    : Infinity;
+  const bestS2 = validLaps.length
+    ? Math.min(...validLaps.map((d) => d.s2))
+    : Infinity;
+  const bestS3 = validLaps.length
+    ? Math.min(...validLaps.map((d) => d.s3))
+    : Infinity;
+  const worstS1 = validLaps.length
+    ? Math.max(...validLaps.map((d) => d.s1))
+    : -Infinity;
+  const worstS2 = validLaps.length
+    ? Math.max(...validLaps.map((d) => d.s2))
+    : -Infinity;
+  const worstS3 = validLaps.length
+    ? Math.max(...validLaps.map((d) => d.s3))
+    : -Infinity;
 
   return (
     <div>
@@ -91,13 +116,18 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
 
       {/* Legend */}
       <div className="flex gap-4 mb-3 text-sm text-zinc-400">
-        {([
-          { color: PERF_COLORS.best, label: "Personal best" },
-          { color: PERF_COLORS.normal, label: "Normal" },
-          { color: PERF_COLORS.worst, label: "Worst" },
-        ] as const).map(({ color, label }) => (
+        {(
+          [
+            { color: PERF_COLORS.best, label: "Personal best" },
+            { color: PERF_COLORS.normal, label: "Normal" },
+            { color: PERF_COLORS.worst, label: "Worst" },
+          ] as const
+        ).map(({ color, label }) => (
           <span key={label} className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+            <span
+              className="inline-block w-2.5 h-2.5 rounded-sm"
+              style={{ backgroundColor: color }}
+            />
             {label}
           </span>
         ))}
@@ -105,10 +135,12 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
 
       <div className="space-y-2">
         {data.map((d) => {
-          const isBest = bestTime !== null && d.valid && Math.abs(d.total - bestTime) < 0.001;
-          const delta = bestTime !== null && d.valid
-            ? d.total - bestTime
-            : null;
+          const isBest =
+            bestTime !== null &&
+            d.valid &&
+            Math.abs(d.total - bestTime) < 0.001;
+          const delta =
+            bestTime !== null && d.valid ? d.total - bestTime : null;
 
           return (
             <div
@@ -178,19 +210,47 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
               {(hasDeploy || hasHarv) && (
                 <div className="flex items-center gap-3 mb-1 text-xs font-mono">
                   {hasDeploy && (
-                    <span className={cn("flex items-center gap-1", d.deployMj != null && d.deployMj > 0 ? "text-ahead" : "text-zinc-600")}>
-                      <span className="text-zinc-500 text-2xs uppercase tracking-wide">Dep</span>
-                      <span>{d.deployMj != null && d.deployMj > 0 ? `${d.deployMj.toFixed(1)} MJ` : "–"}</span>
+                    <span
+                      className={cn(
+                        "flex items-center gap-1",
+                        d.deployMj != null && d.deployMj > 0
+                          ? "text-ahead"
+                          : "text-zinc-600",
+                      )}
+                    >
+                      <span className="text-zinc-500 text-2xs uppercase tracking-wide">
+                        Dep
+                      </span>
+                      <span>
+                        {d.deployMj != null && d.deployMj > 0
+                          ? `${d.deployMj.toFixed(1)} MJ`
+                          : "–"}
+                      </span>
                     </span>
                   )}
                   {hasHarv && (
-                    <span className={cn("flex items-center gap-1", d.harvMj != null && d.harvMj > 0 ? "text-sky-400" : "text-zinc-600")}>
-                      <span className="text-zinc-500 text-2xs uppercase tracking-wide">Harv</span>
-                      <span>{d.harvMj != null && d.harvMj > 0 ? `${d.harvMj.toFixed(1)} MJ` : "–"}</span>
+                    <span
+                      className={cn(
+                        "flex items-center gap-1",
+                        d.harvMj != null && d.harvMj > 0
+                          ? "text-sky-400"
+                          : "text-zinc-600",
+                      )}
+                    >
+                      <span className="text-zinc-500 text-2xs uppercase tracking-wide">
+                        Harv
+                      </span>
+                      <span>
+                        {d.harvMj != null && d.harvMj > 0
+                          ? `${d.harvMj.toFixed(1)} MJ`
+                          : "–"}
+                      </span>
                     </span>
                   )}
                   {d.deployMj == null && d.harvMj == null && (
-                    <span className="text-zinc-600 text-2xs italic">no per-lap telemetry captured</span>
+                    <span className="text-zinc-600 text-2xs italic">
+                      no per-lap telemetry captured
+                    </span>
                   )}
                 </div>
               )}
@@ -201,10 +261,15 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
                   const sectorKey = key.toUpperCase() as "S1" | "S2" | "S3";
                   const time = d[key];
                   const widthPct = (time / maxTotal) * 100;
-                  const best = key === "s1" ? bestS1 : key === "s2" ? bestS2 : bestS3;
-                  const worst = key === "s1" ? worstS1 : key === "s2" ? worstS2 : worstS3;
+                  const best =
+                    key === "s1" ? bestS1 : key === "s2" ? bestS2 : bestS3;
+                  const worst =
+                    key === "s1" ? worstS1 : key === "s2" ? worstS2 : worstS3;
                   const isBestSector = d.valid && Math.abs(time - best) < 0.001;
-                  const isWorstSector = d.valid && validLaps.length > 1 && Math.abs(time - worst) < 0.001;
+                  const isWorstSector =
+                    d.valid &&
+                    validLaps.length > 1 &&
+                    Math.abs(time - worst) < 0.001;
 
                   let barColor: string;
                   if (!d.valid) barColor = PERF_COLORS.invalid;
@@ -225,7 +290,9 @@ export function SectorComparison({ laps, stints, perLapInfo }: SectorComparisonP
                       <span
                         className={cn(
                           "px-1 truncate",
-                          isBestSector ? "text-white font-bold" : "text-white/80",
+                          isBestSector
+                            ? "text-white font-bold"
+                            : "text-white/80",
                         )}
                       >
                         {sectorKey}: {msToSectorTime(time * 1000)}

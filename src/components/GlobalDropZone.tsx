@@ -34,9 +34,7 @@ export function GlobalDropZone() {
         await loadFiles(valid);
         navigate("/");
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load files",
-        );
+        setError(err instanceof Error ? err.message : "Failed to load files");
       }
     },
     [loadFiles, setShowUploadModal, navigate],
@@ -103,7 +101,10 @@ export function GlobalDropZone() {
               </>
             ) : (
               <>
-                <HStack justify="center" className="h-16 w-16 rounded-2xl border-2 border-dashed border-red-500/60 bg-red-500/10">
+                <HStack
+                  justify="center"
+                  className="h-16 w-16 rounded-2xl border-2 border-dashed border-red-500/60 bg-red-500/10"
+                >
                   <Upload className="h-7 w-7 text-behind" />
                 </HStack>
                 <div className="text-center">

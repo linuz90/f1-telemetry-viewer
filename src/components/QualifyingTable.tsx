@@ -1,6 +1,11 @@
 import type { TelemetrySession, DriverData } from "../types/telemetry";
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
-import { bestSectorTimeMs, msToLapTime, msToSectorTime, sectorTimeMs } from "../utils/format";
+import {
+  bestSectorTimeMs,
+  msToLapTime,
+  msToSectorTime,
+  sectorTimeMs,
+} from "../utils/format";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { getValidLaps } from "../utils/stats";
 import { cn } from "../utils/cn";
@@ -34,7 +39,10 @@ function hasOnlyInvalidLaps(driver: DriverData): boolean {
 /**
  * Qualifying results table: all drivers ranked by best valid lap.
  */
-export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTableProps) {
+export function QualifyingTable({
+  session,
+  focusedDriverIndex,
+}: QualifyingTableProps) {
   const [focusedOnly, toggleFocusedOnly] = usePlayerOnly();
   const drivers = session["classification-data"];
 
@@ -102,13 +110,18 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
                 i === 0
                   ? "–"
                   : row.bestTime === Infinity
-                    ? row.allInvalid ? "ALL INVALID" : "NO TIME"
+                    ? row.allInvalid
+                      ? "ALL INVALID"
+                      : "NO TIME"
                     : `+${((row.bestTime - p1Time) / 1000).toFixed(3)}`;
 
               return (
                 <tr
                   key={row.driver.index}
-                  className={cn(tableRowClass, isFocused && "bg-zinc-800/40 text-white font-medium")}
+                  className={cn(
+                    tableRowClass,
+                    isFocused && "bg-zinc-800/40 text-white font-medium",
+                  )}
                 >
                   <td className="py-1.5 px-2">{i + 1}</td>
                   <td className="py-1.5 px-2">
@@ -121,27 +134,57 @@ export function QualifyingTable({ session, focusedDriverIndex }: QualifyingTable
                   <td className="py-1.5 px-2 text-zinc-400">
                     {getTeamName(row.driver.team)}
                   </td>
-                  <td className={cn("py-1.5 px-2 text-right font-mono", row.bestLap && bestLapTime !== null && row.bestLap["lap-time-in-ms"] === bestLapTime && "text-best font-bold")}>
+                  <td
+                    className={cn(
+                      "py-1.5 px-2 text-right font-mono",
+                      row.bestLap &&
+                        bestLapTime !== null &&
+                        row.bestLap["lap-time-in-ms"] === bestLapTime &&
+                        "text-best font-bold",
+                    )}
+                  >
                     {row.bestLap
                       ? msToLapTime(row.bestLap["lap-time-in-ms"])
                       : "–"}
                   </td>
-                  <td className={cn("py-1.5 px-2 text-right font-mono", row.bestLap && bestS1 !== null && rowS1 === bestS1 ? "text-best font-bold" : "text-zinc-400")}>
-                    {row.bestLap
-                      ? msToSectorTime(rowS1)
-                      : "–"}
+                  <td
+                    className={cn(
+                      "py-1.5 px-2 text-right font-mono",
+                      row.bestLap && bestS1 !== null && rowS1 === bestS1
+                        ? "text-best font-bold"
+                        : "text-zinc-400",
+                    )}
+                  >
+                    {row.bestLap ? msToSectorTime(rowS1) : "–"}
                   </td>
-                  <td className={cn("py-1.5 px-2 text-right font-mono", row.bestLap && bestS2 !== null && rowS2 === bestS2 ? "text-best font-bold" : "text-zinc-400")}>
-                    {row.bestLap
-                      ? msToSectorTime(rowS2)
-                      : "–"}
+                  <td
+                    className={cn(
+                      "py-1.5 px-2 text-right font-mono",
+                      row.bestLap && bestS2 !== null && rowS2 === bestS2
+                        ? "text-best font-bold"
+                        : "text-zinc-400",
+                    )}
+                  >
+                    {row.bestLap ? msToSectorTime(rowS2) : "–"}
                   </td>
-                  <td className={cn("py-1.5 px-2 text-right font-mono", row.bestLap && bestS3 !== null && rowS3 === bestS3 ? "text-best font-bold" : "text-zinc-400")}>
-                    {row.bestLap
-                      ? msToSectorTime(rowS3)
-                      : "–"}
+                  <td
+                    className={cn(
+                      "py-1.5 px-2 text-right font-mono",
+                      row.bestLap && bestS3 !== null && rowS3 === bestS3
+                        ? "text-best font-bold"
+                        : "text-zinc-400",
+                    )}
+                  >
+                    {row.bestLap ? msToSectorTime(rowS3) : "–"}
                   </td>
-                  <td className={cn("py-1.5 px-2 text-right font-mono", row.allInvalid && "text-behind")}>{gap}</td>
+                  <td
+                    className={cn(
+                      "py-1.5 px-2 text-right font-mono",
+                      row.allInvalid && "text-behind",
+                    )}
+                  >
+                    {gap}
+                  </td>
                 </tr>
               );
             })}

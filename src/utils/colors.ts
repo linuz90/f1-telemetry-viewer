@@ -92,9 +92,9 @@ export const SC_FALLBACK = "#f59e0b";
 /** Sector ranking colors for qualifying / sector comparisons. Purple is the
  *  app-wide "session best" accent; green/yellow are the relative tiers below. */
 export const PERF_COLORS = {
-  best: "#7c3aed",      // purple-600
-  normal: "#16a34a",    // green-600
-  worst: "#ca8a04",     // yellow-600
+  best: "#7c3aed", // purple-600
+  normal: "#16a34a", // green-600
+  worst: "#ca8a04", // yellow-600
   invalid: "#52525b40", // zinc-600 @ 25% alpha
 } as const;
 
@@ -108,12 +108,12 @@ export const SECTOR_COLORS = {
 /** Per-component damage colors used in the damage timeline chart. */
 export const DAMAGE_COLORS = {
   frontWing: "#f97316", // orange-500
-  rearWing: "#eab308",  // yellow-500
-  floor: "#22d3ee",     // cyan-400
-  diffuser: "#a855f7",  // purple-500
-  sidepod: "#ec4899",   // pink-500
-  engine: "#ef4444",    // red-500
-  gearbox: "#10b981",   // emerald-500
+  rearWing: "#eab308", // yellow-500
+  floor: "#22d3ee", // cyan-400
+  diffuser: "#a855f7", // purple-500
+  sidepod: "#ec4899", // pink-500
+  engine: "#ef4444", // red-500
+  gearbox: "#10b981", // emerald-500
 } as const;
 
 /** Shared chart theme colors (zinc palette + semantic series tokens).
@@ -127,19 +127,19 @@ export const DAMAGE_COLORS = {
  *   - `harvest` → sky, ERS harvest line
  */
 export const CHART_THEME = {
-  grid: "#27272a",          // zinc-800
-  axis: "#71717a",          // zinc-500
-  tooltipBg: "#18181b",     // zinc-900
+  grid: "#27272a", // zinc-800
+  axis: "#71717a", // zinc-500
+  tooltipBg: "#18181b", // zinc-900
   tooltipBorder: "#27272a", // zinc-800
-  tooltipLabel: "#a1a1aa",  // zinc-400
-  muted: "#52525b",         // zinc-600
-  best: "#a855f7",          // purple-500
-  player: "#22d3ee",        // cyan-400
-  ahead: "#22c55e",         // green-500
-  behind: "#ef4444",        // red-500
-  rival: "#f97316",         // orange-500
-  harvest: "#38bdf8",       // sky-400
-  valid: "#10b981",         // emerald-500
+  tooltipLabel: "#a1a1aa", // zinc-400
+  muted: "#52525b", // zinc-600
+  best: "#a855f7", // purple-500
+  player: "#22d3ee", // cyan-400
+  ahead: "#22c55e", // green-500
+  behind: "#ef4444", // red-500
+  rival: "#f97316", // orange-500
+  harvest: "#38bdf8", // sky-400
+  valid: "#10b981", // emerald-500
 } as const;
 
 /** Reusable tooltip content style */

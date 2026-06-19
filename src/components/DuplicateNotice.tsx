@@ -20,7 +20,8 @@ export function DuplicateNotice({ count, isAutoSave }: DuplicateNoticeProps) {
       {count > 0 && (
         <HStack as="p" justify="center" className="gap-1.5">
           <Copy className="h-3 w-3" />
-          {count} duplicate {count === 1 ? "save" : "saves"} hidden (auto-saves & near-duplicates)
+          {count} duplicate {count === 1 ? "save" : "saves"} hidden (auto-saves
+          & near-duplicates)
         </HStack>
       )}
     </div>

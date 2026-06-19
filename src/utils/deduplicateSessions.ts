@@ -50,7 +50,9 @@ const DUPLICATE_WINDOW_MS = 30_000;
 
 type WithFileSize = SessionSummary & { fileSize: number };
 
-export function deduplicateSessions<T extends WithFileSize>(sessions: T[]): T[] {
+export function deduplicateSessions<T extends WithFileSize>(
+  sessions: T[],
+): T[] {
   // Shared state: which inputs are dropped, and how many drops "belong to"
   // each surviving session (so we can show "N duplicate saves hidden").
   const removed = new Set<T>();
@@ -114,7 +116,9 @@ function applyTimeWindowRule<T extends WithFileSize>(
     if (group.length < 2) continue;
     // Ascending so we can walk the timeline and merge chains
     // (A → B → C all within 30 s of each neighbour).
-    group.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    group.sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
 
     let keeper = group[0];
     for (let i = 1; i < group.length; i++) {
@@ -193,7 +197,9 @@ function applyAutoSaveDominanceRule<T extends WithFileSize>(
     // Newest first — useful both for the tiebreaker (we want the latest
     // auto-save to survive when there's no regular save) and so the loop
     // body has a natural "compare against everyone else newer or equal".
-    bucket.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    bucket.sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
 
     for (const candidate of bucket) {
       if (removed.has(candidate)) continue;
@@ -230,7 +236,9 @@ function applyAutoSaveDominanceRule<T extends WithFileSize>(
       let bestDistance = Number.POSITIVE_INFINITY;
       for (const other of bucket) {
         if (!isEligible(other)) continue;
-        const distance = Math.abs(new Date(other.date).getTime() - candidateTime);
+        const distance = Math.abs(
+          new Date(other.date).getTime() - candidateTime,
+        );
         if (distance < bestDistance) {
           bestDistance = distance;
           dominator = other;

@@ -1,5 +1,9 @@
 import type { LapHistoryEntry, TyreStint } from "../types/telemetry";
-import { filterOutlierLaps, getBestLapTime, medianLapTimeMs } from "../utils/stats";
+import {
+  filterOutlierLaps,
+  getBestLapTime,
+  medianLapTimeMs,
+} from "../utils/stats";
 import { msToLapTime } from "../utils/format";
 import { getCompoundColor } from "../utils/colors";
 import { tableHeadClass, tableRowClass } from "./ui/table";

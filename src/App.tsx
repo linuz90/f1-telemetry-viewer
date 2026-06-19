@@ -1,5 +1,12 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { Link, Navigate, Routes, Route, useLocation, useParams } from "react-router-dom";
+import {
+  Link,
+  Navigate,
+  Routes,
+  Route,
+  useLocation,
+  useParams,
+} from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { Layout } from "./components/Layout";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -12,13 +19,18 @@ import { PNG_VERSION_TITLE_PREFIX } from "./config/branding";
 import { dashboardPath, replaceFormulaScopeInPath } from "./utils/routes";
 
 const UiDebugPage = import.meta.env.DEV
-  ? lazy(() => import("./pages/UiDebugPage").then((module) => ({ default: module.UiDebugPage })))
+  ? lazy(() =>
+      import("./pages/UiDebugPage").then((module) => ({
+        default: module.UiDebugPage,
+      })),
+    )
   : null;
 
 function AppRoutes() {
   const { mode, sessions, sessionsLoading, showUploadModal } = useTelemetry();
   const location = useLocation();
-  const isUiDebugRoute = import.meta.env.DEV && location.pathname === "/ui-debug";
+  const isUiDebugRoute =
+    import.meta.env.DEV && location.pathname === "/ui-debug";
 
   if (!isUiDebugRoute && (mode === "detecting" || sessionsLoading)) {
     return (
@@ -28,7 +40,8 @@ function AppRoutes() {
     );
   }
 
-  const needsData = !isUiDebugRoute && mode === "upload" && sessions.length === 0;
+  const needsData =
+    !isUiDebugRoute && mode === "upload" && sessions.length === 0;
 
   return (
     <>
@@ -103,7 +116,9 @@ function ScopedFormulaRoute({ children }: { children: ReactNode }) {
   const { formulaKey } = useParams<{ formulaKey: string }>();
   const location = useLocation();
   const { activeFormulaKey, formulaOptions } = useTelemetry();
-  const matchedFormula = formulaOptions.find((option) => option.key === formulaKey);
+  const matchedFormula = formulaOptions.find(
+    (option) => option.key === formulaKey,
+  );
 
   if (formulaKey && activeFormulaKey && formulaKey !== activeFormulaKey) {
     return (
@@ -177,7 +192,8 @@ function EmptyRouteState({
 }
 
 const analyticsEnabled = import.meta.env.VITE_DISABLE_ANALYTICS !== "true";
-const appVersion = (window as Window & { __PNG_VERSION__?: string }).__PNG_VERSION__;
+const appVersion = (window as Window & { __PNG_VERSION__?: string })
+  .__PNG_VERSION__;
 if (appVersion) {
   document.title = `${PNG_VERSION_TITLE_PREFIX} v${appVersion}`;
 }

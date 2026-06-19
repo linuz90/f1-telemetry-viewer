@@ -46,12 +46,14 @@ Conductor shared repo settings live in `.conductor/settings.toml`; personal over
 **Stack:** React 19 + TypeScript + Vite 7 + Tailwind CSS 4 + Recharts 3 + React Router 7
 
 **Custom Vite plugin** (`src/plugin/telemetry-server.ts`) acts as the backend during development:
+
 - `GET /api/sessions` — lists all sessions (date from filename; track, session type, and formula from JSON when available)
 - `GET /api/sessions/:relativePath` — returns raw session JSON
 
 Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_ss.json`. The plugin parses filenames for stable dates/slugs, then prefers `session-info` fields from the JSON for display metadata because filenames may include modifiers like `Manual` or numbered sessions like `Race_2`.
 
 **Routing** (defined in `src/App.tsx`):
+
 - `/` — Entry point that redirects to the newest available formula scope
 - `/:formulaKey` — Formula-scoped dashboard, e.g. `/f1-26`
 - `/:formulaKey/sessions/*` — Formula-scoped session detail
@@ -60,6 +62,7 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 **Data flow:** Pages use custom hooks (`useSessionList`, `useSession`) → `TelemetryContext` → Vite plugin endpoints (dev) or static demo files (prod) or in-memory store (upload).
 
 **Key directories:**
+
 - `src/components/` — Chart components (LapTimeChart, PositionChart, TyreWearChart, StintTimeline, SectorComparison) and data tables
 - `src/pages/` — Route-level components
 - `src/utils/` — Formatting (lap times, sectors), statistics (best laps, consistency, tyre wear rates), team/compound color mappings
@@ -85,11 +88,13 @@ When the user references a session by URL, or when you're testing in the browser
 **This only works in local dev mode (`pnpm dev`)**, where sessions are served from the `TELEMETRY_DIR` directory. For shared repro files, `pnpm dev:telemetry <folder>` starts the same local API against a supplied folder. It won't work for uploaded sessions (JSON/zip via drag-and-drop) or when running `dev:prod` / production, since those sessions live in-memory in the browser.
 
 **How the slug-to-file mapping works:**
+
 - Filenames follow: `Race_Baku_Manual_2026_02_21_16_39_26.json` (with date subdirs like `2026_02_21/race-info/`)
 - `toSlug()` in `src/utils/parseFilename.ts` lowercases the basename and replaces `_` with `-` → `race-baku-manual-2026-02-21-16-39-26`
 - To reverse: replace `-` with `_` and search case-insensitively under `TELEMETRY_DIR`
 
 **Use the helper script to find the file:**
+
 ```bash
 pnpm find-session race-baku-manual-2026-02-21-16-39-26
 # → /Users/.../data/2026_02_21/race-info/Race_Baku_Manual_2026_02_21_16_39_26.json

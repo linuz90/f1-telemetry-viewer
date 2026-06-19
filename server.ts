@@ -123,7 +123,8 @@ function buildSessionList() {
       try {
         const raw = readFileSync(join(TELEMETRY_DIR, relativePath), "utf-8");
         const json = JSON.parse(raw) as TelemetrySession;
-        return buildSessionSummary(relativePath, json, Buffer.byteLength(raw)).summary;
+        return buildSessionSummary(relativePath, json, Buffer.byteLength(raw))
+          .summary;
       } catch {
         // If we can't parse the file, include the session with 0 valid laps (filtered below)
         return buildSessionSummary(relativePath).summary;

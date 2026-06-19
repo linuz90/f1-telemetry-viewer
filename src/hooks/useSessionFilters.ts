@@ -24,16 +24,21 @@ const DEFAULT_FILTERS_SNAPSHOT = JSON.stringify(DEFAULT_FILTERS);
 
 let memoryFilters = DEFAULT_FILTERS;
 
-function normalizeFilters(value: Partial<SessionListFilters> | null | undefined): SessionListFilters {
+function normalizeFilters(
+  value: Partial<SessionListFilters> | null | undefined,
+): SessionListFilters {
   return {
-    type: value?.type === "race" || value?.type === "quali" ? value.type : "all",
+    type:
+      value?.type === "race" || value?.type === "quali" ? value.type : "all",
     mode: value?.mode === "online" || value?.mode === "ai" ? value.mode : "all",
   };
 }
 
 function parseSnapshot(snapshot: string): SessionListFilters {
   try {
-    return normalizeFilters(JSON.parse(snapshot) as Partial<SessionListFilters>);
+    return normalizeFilters(
+      JSON.parse(snapshot) as Partial<SessionListFilters>,
+    );
   } catch {
     return DEFAULT_FILTERS;
   }
@@ -45,7 +50,9 @@ function readSessionFilters(): SessionListFilters {
   try {
     const raw = window.sessionStorage.getItem(FILTERS_STORAGE_KEY);
     if (!raw) return memoryFilters;
-    const filters = normalizeFilters(JSON.parse(raw) as Partial<SessionListFilters>);
+    const filters = normalizeFilters(
+      JSON.parse(raw) as Partial<SessionListFilters>,
+    );
     memoryFilters = filters;
     return filters;
   } catch {
@@ -103,15 +110,20 @@ export function useSessionFilters(): readonly [
 }
 
 export function areSessionFiltersDefault(filters: SessionListFilters): boolean {
-  return filters.type === DEFAULT_FILTERS.type && filters.mode === DEFAULT_FILTERS.mode;
+  return (
+    filters.type === DEFAULT_FILTERS.type &&
+    filters.mode === DEFAULT_FILTERS.mode
+  );
 }
 
 export function matchesSessionFilters(
   session: SessionSummary,
   filters: SessionListFilters,
 ): boolean {
-  if (filters.type === "race" && !isRaceSessionType(session.sessionType)) return false;
-  if (filters.type === "quali" && !isQualifyingSessionType(session.sessionType)) return false;
+  if (filters.type === "race" && !isRaceSessionType(session.sessionType))
+    return false;
+  if (filters.type === "quali" && !isQualifyingSessionType(session.sessionType))
+    return false;
   if (filters.mode === "online" && session.isOnline !== true) return false;
   if (
     filters.mode === "ai" &&

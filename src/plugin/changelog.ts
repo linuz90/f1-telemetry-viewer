@@ -15,10 +15,10 @@ const RESOLVED_ID = "\0" + VIRTUAL_ID;
 
 function getChangelog(): ChangelogEntry[] {
   try {
-    const raw = execSync(
-      'git log --format="%H|%aI|%s" --no-merges',
-      { encoding: "utf-8", maxBuffer: 1024 * 1024 },
-    );
+    const raw = execSync('git log --format="%H|%aI|%s" --no-merges', {
+      encoding: "utf-8",
+      maxBuffer: 1024 * 1024,
+    });
 
     return raw
       .trim()

@@ -51,8 +51,7 @@ export function StintComparisonTable({
           </thead>
           <tbody>
             {stints.map((stint, i) => {
-              const compound =
-                stint["tyre-set-data"]["visual-tyre-compound"];
+              const compound = stint["tyre-set-data"]["visual-tyre-compound"];
               const playerRate = stintWearRate(stint);
               const best = getBestDriverOnCompound(
                 others,
@@ -93,10 +92,7 @@ export function StintComparisonTable({
                 playerDrop !== 0 && bestDrop !== 0 ? playerDrop - bestDrop : 0;
 
               return (
-                <tr
-                  key={i}
-                  className={tableRowClass}
-                >
+                <tr key={i} className={tableRowClass}>
                   <td className="py-1.5 px-2 font-medium text-zinc-300">
                     {i + 1}
                   </td>

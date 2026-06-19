@@ -38,7 +38,9 @@ export const KEY_RACE_CONTROL_TYPES = new Set([
   "CHEQUERED_FLAG",
 ]);
 
-export function getRaceControlEvents(session: TelemetrySession): RaceControlEvent[] {
+export function getRaceControlEvents(
+  session: TelemetrySession,
+): RaceControlEvent[] {
   const topLevel = session["race-control"];
   if (topLevel?.length) return sortRaceControlEvents(topLevel);
 
@@ -52,7 +54,9 @@ export function getRaceControlEvents(session: TelemetrySession): RaceControlEven
   return sortRaceControlEvents([...deduped.values()]);
 }
 
-export function sortRaceControlEvents(events: RaceControlEvent[]): RaceControlEvent[] {
+export function sortRaceControlEvents(
+  events: RaceControlEvent[],
+): RaceControlEvent[] {
   return [...events].sort((a, b) => {
     const timestampDelta = (a.timestamp ?? 0) - (b.timestamp ?? 0);
     if (timestampDelta !== 0) return timestampDelta;
@@ -80,9 +84,7 @@ export function isDriverInvolvedInRaceControlEvent(
   if (event["involved-drivers"]?.includes(driver.index)) return true;
 
   const driverInfos = getRaceControlDriverInfos(event);
-  return driverInfos.some(
-    (info) => info.name === driver["driver-name"],
-  );
+  return driverInfos.some((info) => info.name === driver["driver-name"]);
 }
 
 export function eventMatchesRaceControlFocus(
@@ -90,7 +92,10 @@ export function eventMatchesRaceControlFocus(
   driver: DriverData | undefined,
 ): boolean {
   if (!driver) return true;
-  return isGlobalRaceControlEvent(event) || isDriverInvolvedInRaceControlEvent(event, driver);
+  return (
+    isGlobalRaceControlEvent(event) ||
+    isDriverInvolvedInRaceControlEvent(event, driver)
+  );
 }
 
 export function raceControlEventsToOvertakes(
@@ -105,14 +110,16 @@ export function raceControlEventsToOvertakes(
       return [];
     }
 
-    return [{
-      "overtake-id": event.id,
-      "overtaking-driver-name": overtaker.name,
-      "overtaken-driver-name": overtaken.name,
-      "overtaking-driver-lap": lap,
-      "overtaking-driver-index": event["overtaker-index"],
-      "overtaken-driver-index": event["overtaken-index"],
-    }];
+    return [
+      {
+        "overtake-id": event.id,
+        "overtaking-driver-name": overtaker.name,
+        "overtaken-driver-name": overtaken.name,
+        "overtaking-driver-lap": lap,
+        "overtaking-driver-index": event["overtaker-index"],
+        "overtaken-driver-index": event["overtaken-index"],
+      },
+    ];
   });
 }
 
@@ -209,7 +216,9 @@ export function getRaceControlDriverInfos(
   });
 }
 
-export function getUnknownRaceControlDetails(event: RaceControlEvent): string[] {
+export function getUnknownRaceControlDetails(
+  event: RaceControlEvent,
+): string[] {
   return Object.entries(event)
     .filter(([key, value]) => {
       if (BASE_DETAIL_KEYS.has(key) || NESTED_INFO_KEYS.has(key)) return false;
@@ -238,7 +247,9 @@ function formatPenaltyEvent(event: RaceControlEvent): string {
     infringement ? `for ${infringement}` : null,
     otherDriver ? `with ${otherDriver}` : null,
     time,
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function formatPenaltyTime(time: number | undefined): string | null {
@@ -259,7 +270,10 @@ function formatDamagedPart(part: string | undefined): string {
 }
 
 function formatDamageChange(event: RaceControlEvent): string {
-  if (typeof event["old-value"] !== "number" || typeof event["new-value"] !== "number") {
+  if (
+    typeof event["old-value"] !== "number" ||
+    typeof event["new-value"] !== "number"
+  ) {
     return "";
   }
   return ` (${event["old-value"]}% -> ${event["new-value"]}%)`;

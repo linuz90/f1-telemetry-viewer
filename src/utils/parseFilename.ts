@@ -81,7 +81,11 @@ export function parseFilename(filename: string) {
  */
 export function resolveSessionMeta(
   filename: string,
-  sessionInfo?: { "track-id"?: unknown; "session-type"?: unknown; formula?: unknown },
+  sessionInfo?: {
+    "track-id"?: unknown;
+    "session-type"?: unknown;
+    formula?: unknown;
+  },
 ): { sessionType: string; track: string; formula?: string; date: string } {
   const parsed = parseFilename(filename);
   const rawTrack = sessionInfo?.["track-id"];
@@ -91,7 +95,10 @@ export function resolveSessionMeta(
       ? rawTrack.replace(/_/g, " ")
       : parsed.track;
   const sessionType =
-    typeof rawType === "string" && rawType.length > 0 ? rawType : parsed.sessionType;
-  const formula = typeof sessionInfo?.formula === "string" ? sessionInfo.formula : undefined;
+    typeof rawType === "string" && rawType.length > 0
+      ? rawType
+      : parsed.sessionType;
+  const formula =
+    typeof sessionInfo?.formula === "string" ? sessionInfo.formula : undefined;
   return { sessionType, track, formula, date: parsed.date };
 }

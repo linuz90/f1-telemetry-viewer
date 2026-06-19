@@ -10,7 +10,10 @@ const LAYOUTS = import.meta.glob("../assets/tracks/*.svg", {
 
 const lookup: Record<string, string> = Object.fromEntries(
   Object.entries(LAYOUTS).map(([path, svg]) => {
-    const name = path.split("/").pop()!.replace(/\.svg$/, "");
+    const name = path
+      .split("/")
+      .pop()!
+      .replace(/\.svg$/, "");
     return [name, svg];
   }),
 );

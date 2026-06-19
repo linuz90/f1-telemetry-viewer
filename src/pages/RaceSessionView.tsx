@@ -27,7 +27,10 @@ import { DamageTimeline } from "../components/DamageTimeline";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
 import { DuplicateNotice } from "../components/DuplicateNotice";
-import { getRaceControlEvents, raceControlEventsToOvertakes } from "../utils/raceControl";
+import {
+  getRaceControlEvents,
+  raceControlEventsToOvertakes,
+} from "../utils/raceControl";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { Badge } from "../components/ui/Badge";
 import { PillSelect } from "../components/ui/PillSelect";
@@ -64,7 +67,9 @@ function SpectatorDriverPicker({
 }) {
   if (drivers.length === 0) return null;
 
-  const focusedDriver = drivers.find((driver) => driver.index === focusedDriverIndex);
+  const focusedDriver = drivers.find(
+    (driver) => driver.index === focusedDriverIndex,
+  );
   const driverOptions = drivers.map((driver) => {
     const position = driver["final-classification"]?.position;
     return {
@@ -88,9 +93,16 @@ function SpectatorDriverPicker({
   );
 }
 
-export function RaceSessionView({ session, slug }: { session: TelemetrySession; slug: string }) {
+export function RaceSessionView({
+  session,
+  slug,
+}: {
+  session: TelemetrySession;
+  slug: string;
+}) {
   const drivers = session["classification-data"] ?? [];
-  const isSpectator = drivers.length > 0 && !drivers.some((driver) => driver["is-player"]);
+  const isSpectator =
+    drivers.length > 0 && !drivers.some((driver) => driver["is-player"]);
   const selectableDrivers = useMemo(() => timedRaceDrivers(drivers), [drivers]);
   const defaultFocused = isSpectator
     ? selectableDrivers[0]
@@ -106,7 +118,8 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   // Reset when session data actually changes (handles cached fast-resolve)
   useEffect(() => {
     setFocusedDriverIndex(
-      (isSpectator ? selectableDrivers[0] : findFocusedDriver(session))?.index ?? 0,
+      (isSpectator ? selectableDrivers[0] : findFocusedDriver(session))
+        ?.index ?? 0,
     );
     setSelectedRivalIndex(null);
   }, [session, isSpectator, selectableDrivers]);
@@ -136,7 +149,12 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     [allSessions, slug],
   );
   const trackName = sessionMeta?.track ?? info["track-id"];
-  const { pbs } = useTrackHistory(trackName, slug, info.formula, session["game-year"]);
+  const { pbs } = useTrackHistory(
+    trackName,
+    slug,
+    info.formula,
+    session["game-year"],
+  );
 
   const stints = getCompletedStints(
     focusedDriver ? getDriverStints(focusedDriver) : [],
@@ -159,8 +177,11 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
   );
   const filteredOvertakes = useMemo(
     () =>
-      (raceControlOvertakes.length > 0 ? raceControlOvertakes : session.overtakes?.records)
-        ?.filter((ot) => !pitAffectedLaps.has(ot["overtaking-driver-lap"])) ?? [],
+      (raceControlOvertakes.length > 0
+        ? raceControlOvertakes
+        : session.overtakes?.records
+      )?.filter((ot) => !pitAffectedLaps.has(ot["overtaking-driver-lap"])) ??
+      [],
     [pitAffectedLaps, raceControlOvertakes, session.overtakes?.records],
   );
 
@@ -173,9 +194,7 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     [isSpectator, selectedRivalIndex, drivers],
   );
 
-  const rivalStints = getCompletedStints(
-    rival ? getDriverStints(rival) : [],
-  );
+  const rivalStints = getCompletedStints(rival ? getDriverStints(rival) : []);
   const rivalLaps = rival?.["session-history"]["lap-history-data"] ?? [];
   const rivalPitLaps = rivalStints.slice(1).map((s) => s["start-lap"]);
 
@@ -192,7 +211,10 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     // Fuel and historical PB insights are only relevant when NOT comparing h2h
     if (!rival) {
       base.push(
-        ...generateFuelInsights(focusedDriver, session["session-info"]["total-laps"]),
+        ...generateFuelInsights(
+          focusedDriver,
+          session["session-info"]["total-laps"],
+        ),
       );
       if (pbs) {
         base.push(...generateRaceHistoryInsights(focusedDriver, pbs));
@@ -214,12 +236,14 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
     () => curateSessionInsights(session, [...summaryInsights, ...insights]),
     [insights, session, summaryInsights],
   );
-  const insightsHint = useMemo(() => buildSessionInsightsHint(session), [session]);
+  const insightsHint = useMemo(
+    () => buildSessionInsightsHint(session),
+    [session],
+  );
 
   // Show car setup only for the actual player with valid setup data
   const showSetup =
-    focusedDriver?.["is-player"] &&
-    focusedDriver["car-setup"]?.["is-valid"];
+    focusedDriver?.["is-player"] && focusedDriver["car-setup"]?.["is-valid"];
 
   // Compute laps where damage increased
   const damageLaps = useMemo(() => {
@@ -238,7 +262,10 @@ export function RaceSessionView({ session, slug }: { session: TelemetrySession; 
         "gear-box-damage",
       ] as const;
       for (const f of fields) {
-        if (((curr as unknown as Record<string, number>)[f] ?? 0) > ((prev as unknown as Record<string, number>)[f] ?? 0)) {
+        if (
+          ((curr as unknown as Record<string, number>)[f] ?? 0) >
+          ((prev as unknown as Record<string, number>)[f] ?? 0)
+        ) {
           result.push(perLapInfo[i]["lap-number"]);
           break;
         }

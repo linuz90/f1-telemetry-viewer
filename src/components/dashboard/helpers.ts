@@ -1,9 +1,5 @@
 import { Medal, Trophy, type LucideIcon } from "lucide-react";
-import {
-  ACCENT_TOKENS,
-  type AccentColor,
-  accentCardClass,
-} from "../Card";
+import { ACCENT_TOKENS, type AccentColor, accentCardClass } from "../Card";
 import type { SessionSummary } from "../../types/telemetry";
 import {
   getFormulaComparisonKey,
@@ -103,7 +99,11 @@ function sessionTimestamp(session: SessionSummary): number {
 }
 
 function bestLapRecord(session: SessionSummary): TrackLapRecord | undefined {
-  if (!session.bestLapTime || !session.bestLapTimeMs || session.bestLapTimeMs <= 0) {
+  if (
+    !session.bestLapTime ||
+    !session.bestLapTimeMs ||
+    session.bestLapTimeMs <= 0
+  ) {
     return undefined;
   }
 
@@ -114,7 +114,9 @@ function bestLapRecord(session: SessionSummary): TrackLapRecord | undefined {
   };
 }
 
-function pickBestLapRecord(sessions: SessionSummary[]): TrackLapRecord | undefined {
+function pickBestLapRecord(
+  sessions: SessionSummary[],
+): TrackLapRecord | undefined {
   return sessions
     .map(bestLapRecord)
     .filter((record): record is TrackLapRecord => Boolean(record))
@@ -133,7 +135,9 @@ function raceRecord(session: SessionSummary): TrackRaceRecord | undefined {
     session,
     position: result.position,
     status: result.status,
-    gridGain: result.gridPosition ? result.gridPosition - result.position : undefined,
+    gridGain: result.gridPosition
+      ? result.gridPosition - result.position
+      : undefined,
   };
 }
 
@@ -142,7 +146,10 @@ function actualOnlineDriverCount(session: SessionSummary): number {
 }
 
 function isActualOnlineRace(record: TrackRaceRecord): boolean {
-  return record.session.isOnline === true && actualOnlineDriverCount(record.session) > 3;
+  return (
+    record.session.isOnline === true &&
+    actualOnlineDriverCount(record.session) > 3
+  );
 }
 
 function compareRaceRecords(a: TrackRaceRecord, b: TrackRaceRecord): number {
@@ -166,11 +173,15 @@ function compareRaceRecords(a: TrackRaceRecord, b: TrackRaceRecord): number {
   return sessionTimestamp(b.session) - sessionTimestamp(a.session);
 }
 
-function bestRaceWithinTier(records: TrackRaceRecord[]): TrackRaceRecord | undefined {
+function bestRaceWithinTier(
+  records: TrackRaceRecord[],
+): TrackRaceRecord | undefined {
   return [...records].sort(compareRaceRecords)[0];
 }
 
-function pickBestRaceRecord(sessions: SessionSummary[]): TrackRaceRecord | undefined {
+function pickBestRaceRecord(
+  sessions: SessionSummary[],
+): TrackRaceRecord | undefined {
   const records = sessions
     .map(raceRecord)
     .filter((record): record is TrackRaceRecord => Boolean(record));
@@ -195,11 +206,15 @@ export function buildTrackRecords(sessions: SessionSummary[]): TrackRecords {
   // Spectator saves are useful history entries, but their fallback focused
   // driver is not the user. Keep them out of compact PB/result records so
   // dashboard and track cards don't present someone else's lap as "your" best.
-  const playerSessions = sessions.filter((session) => session.isSpectator !== true);
+  const playerSessions = sessions.filter(
+    (session) => session.isSpectator !== true,
+  );
 
   return {
     race: pickBestRaceRecord(
-      playerSessions.filter((session) => isRaceSessionType(session.sessionType)),
+      playerSessions.filter((session) =>
+        isRaceSessionType(session.sessionType),
+      ),
     ),
     onlineQualifying: pickBestLapRecord(
       playerSessions.filter(
@@ -216,7 +231,9 @@ export function buildTrackRecords(sessions: SessionSummary[]): TrackRecords {
       ),
     ),
     timeTrial: pickBestLapRecord(
-      playerSessions.filter((session) => isTimeTrialSessionType(session.sessionType)),
+      playerSessions.filter((session) =>
+        isTimeTrialSessionType(session.sessionType),
+      ),
     ),
   };
 }
@@ -228,11 +245,15 @@ export function buildTrackRecords(sessions: SessionSummary[]): TrackRecords {
 // to insight cards / stint cards / best-lap highlights.
 export function positionBadgeClasses(position: number | undefined): string {
   const accent: AccentColor | null =
-    position === 1 ? "amber"
-    : position === 2 ? "zinc"
-    : position === 3 ? "orange"
-    : null;
-  if (accent) return `${accentCardClass(accent)} ${ACCENT_TOKENS[accent].accent}`;
+    position === 1
+      ? "amber"
+      : position === 2
+        ? "zinc"
+        : position === 3
+          ? "orange"
+          : null;
+  if (accent)
+    return `${accentCardClass(accent)} ${ACCENT_TOKENS[accent].accent}`;
   return "ring-1 ring-inset ring-white/[0.06] bg-zinc-900/70 text-zinc-100";
 }
 

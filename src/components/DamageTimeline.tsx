@@ -78,11 +78,26 @@ interface FaultEvent {
   label: string;
 }
 
-const FAULT_CHECKS: { key: keyof PerLapInfo["car-damage-data"]; label: string }[] = [
-  { key: "drs-fault" as keyof PerLapInfo["car-damage-data"], label: "DRS Fault" },
-  { key: "ers-fault" as keyof PerLapInfo["car-damage-data"], label: "ERS Fault" },
-  { key: "engine-blown" as keyof PerLapInfo["car-damage-data"], label: "Engine Blown" },
-  { key: "engine-seized" as keyof PerLapInfo["car-damage-data"], label: "Engine Seized" },
+const FAULT_CHECKS: {
+  key: keyof PerLapInfo["car-damage-data"];
+  label: string;
+}[] = [
+  {
+    key: "drs-fault" as keyof PerLapInfo["car-damage-data"],
+    label: "DRS Fault",
+  },
+  {
+    key: "ers-fault" as keyof PerLapInfo["car-damage-data"],
+    label: "ERS Fault",
+  },
+  {
+    key: "engine-blown" as keyof PerLapInfo["car-damage-data"],
+    label: "Engine Blown",
+  },
+  {
+    key: "engine-seized" as keyof PerLapInfo["car-damage-data"],
+    label: "Engine Seized",
+  },
 ];
 
 export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
@@ -130,13 +145,22 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
     <div>
       <h3 className="text-sm font-semibold text-zinc-300 mb-2">Damage</h3>
       <ResponsiveContainer width="100%" height={200}>
-        <AreaChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+        <AreaChart
+          data={data}
+          margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
           <XAxis
             dataKey="lap"
             stroke={CHART_THEME.axis}
             fontSize={11}
-            label={{ value: "Lap", position: "insideBottom", offset: -2, fill: CHART_THEME.axis, fontSize: 11 }}
+            label={{
+              value: "Lap",
+              position: "insideBottom",
+              offset: -2,
+              fill: CHART_THEME.axis,
+              fontSize: 11,
+            }}
           />
           <YAxis
             stroke={CHART_THEME.axis}
@@ -149,7 +173,10 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
           <Tooltip
             {...TOOLTIP_STYLE}
             labelFormatter={(lap) => `Lap ${lap}`}
-            formatter={(value: number | undefined, name: string | undefined) => [value != null ? `${value.toFixed(0)}%` : "–", name ?? ""]}
+            formatter={(
+              value: number | undefined,
+              name: string | undefined,
+            ) => [value != null ? `${value.toFixed(0)}%` : "–", name ?? ""]}
           />
           {activeFields.map((field) => (
             <Area

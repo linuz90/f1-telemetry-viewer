@@ -11,7 +11,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { PerLapInfo, TyreStint } from "../types/telemetry";
-import { CHART_THEME, TOOLTIP_STYLE, SC_COLORS, SC_FALLBACK } from "../utils/colors";
+import {
+  CHART_THEME,
+  TOOLTIP_STYLE,
+  SC_COLORS,
+  SC_FALLBACK,
+} from "../utils/colors";
 import { getWorstWheelWear } from "../utils/stats";
 import { EmptyState } from "./EmptyState";
 
@@ -43,12 +48,20 @@ export function TyreWearChart({
   }
 
   // Player data: worst wheel per lap, with gaps between stints
-  const playerData: { lap: number; wear: number | undefined; compound: string }[] = [];
+  const playerData: {
+    lap: number;
+    wear: number | undefined;
+    compound: string;
+  }[] = [];
   stints.forEach((stint, i) => {
     const wearHistory = stint["tyre-wear-history"];
     if (i > 0 && wearHistory.length > 0) {
       // Insert gap to break the line at pit stops
-      playerData.push({ lap: wearHistory[0]["lap-number"] - 0.5, wear: undefined, compound: "" });
+      playerData.push({
+        lap: wearHistory[0]["lap-number"] - 0.5,
+        wear: undefined,
+        compound: "",
+      });
     }
     for (const w of wearHistory) {
       playerData.push({
@@ -81,7 +94,9 @@ export function TyreWearChart({
   const hasRival = rivalStints && rivalStints.length > 0;
 
   // Explicit integer ticks for x-axis (every lap)
-  const lapTicks = data.filter((d) => Number.isInteger(d.lap)).map((d) => d.lap);
+  const lapTicks = data
+    .filter((d) => Number.isInteger(d.lap))
+    .map((d) => d.lap);
 
   // SC status lookup by lap number
   const scStatusMap = new Map<number, string>();
@@ -99,7 +114,10 @@ export function TyreWearChart({
   if (perLapInfo) {
     for (const lap of perLapInfo) {
       const status = lap["max-safety-car-status"] ?? "NO_SAFETY_CAR";
-      const isSC = status === "SAFETY_CAR" || status === "FULL_SAFETY_CAR" || status === "VIRTUAL_SAFETY_CAR";
+      const isSC =
+        status === "SAFETY_CAR" ||
+        status === "FULL_SAFETY_CAR" ||
+        status === "VIRTUAL_SAFETY_CAR";
       if (isSC) {
         const lapNum = lap["lap-number"];
         const prev = scRanges[scRanges.length - 1];
@@ -173,10 +191,10 @@ export function TyreWearChart({
           />
           <Tooltip
             {...TOOLTIP_STYLE}
-            formatter={(value: number | undefined, name: string | undefined) => [
-              `${value ?? 0}%`,
-              name ?? "Max wear",
-            ]}
+            formatter={(
+              value: number | undefined,
+              name: string | undefined,
+            ) => [`${value ?? 0}%`, name ?? "Max wear"]}
             labelFormatter={(lap) => {
               const entry = data.find((d) => d.lap === lap);
               const sc = scStatusMap.get(lap as number);
@@ -247,7 +265,6 @@ export function TyreWearChart({
           )}
         </LineChart>
       </ResponsiveContainer>
-
     </div>
   );
 }

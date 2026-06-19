@@ -15,7 +15,12 @@ import {
   isRaceSessionType,
   isTimeTrialSessionType,
 } from "./sessionTypes";
-import { isAutoSaveFilename, parseFilename, resolveSessionMeta, toSlug } from "./parseFilename";
+import {
+  isAutoSaveFilename,
+  parseFilename,
+  resolveSessionMeta,
+  toSlug,
+} from "./parseFilename";
 import { getCleanRaceLapSamples, medianLapTimeMs } from "./stats";
 
 export interface BuiltSessionSummary {
@@ -28,14 +33,17 @@ function getDrivers(session: TelemetrySession | undefined): DriverData[] {
 }
 
 function getTimedLapCount(driver: DriverData): number {
-  return driver["session-history"]?.["lap-history-data"]?.filter(
-    (lap) => lap["lap-time-in-ms"] > 0,
-  ).length ?? 0;
+  return (
+    driver["session-history"]?.["lap-history-data"]?.filter(
+      (lap) => lap["lap-time-in-ms"] > 0,
+    ).length ?? 0
+  );
 }
 
-function findFocusDriver(
-  drivers: DriverData[],
-): { driver: DriverData | undefined; isSpectator: boolean } {
+function findFocusDriver(drivers: DriverData[]): {
+  driver: DriverData | undefined;
+  isSpectator: boolean;
+} {
   const player = drivers.find((driver) => driver["is-player"]);
   if (player) return { driver: player, isSpectator: false };
 
@@ -52,7 +60,9 @@ function findFocusDriver(
   return { driver: fallback, isSpectator: fallback != null };
 }
 
-function isOnlineParticipant(participant: ParticipantData | undefined): boolean {
+function isOnlineParticipant(
+  participant: ParticipantData | undefined,
+): boolean {
   if (!participant) return false;
 
   // Online exports can mark disconnected human slots as AI-controlled later,
@@ -65,16 +75,27 @@ function isOnlineParticipant(participant: ParticipantData | undefined): boolean 
   );
 }
 
-function getOnlineDriverCount(drivers: DriverData[], isOnline: boolean): number {
+function getOnlineDriverCount(
+  drivers: DriverData[],
+  isOnline: boolean,
+): number {
   if (!isOnline) return 0;
-  return drivers.filter((driver) => isOnlineParticipant(driver["participant-data"])).length;
+  return drivers.filter((driver) =>
+    isOnlineParticipant(driver["participant-data"]),
+  ).length;
 }
 
-function getActiveHumanDriverCount(drivers: DriverData[], isOnline: boolean): number {
+function getActiveHumanDriverCount(
+  drivers: DriverData[],
+  isOnline: boolean,
+): number {
   if (!isOnline) return 0;
   return drivers.filter((driver) => {
     const participant = driver["participant-data"];
-    return isOnlineParticipant(participant) && participant?.["ai-controlled"] === false;
+    return (
+      isOnlineParticipant(participant) &&
+      participant?.["ai-controlled"] === false
+    );
   }).length;
 }
 
@@ -82,11 +103,16 @@ function getClassifiedDriverCount(
   drivers: DriverData[],
   stintHistory: TyreStintHistoryV2Entry[] | undefined,
 ): number {
-  const finalClassified = drivers.filter((driver) => driver["final-classification"]).length;
+  const finalClassified = drivers.filter(
+    (driver) => driver["final-classification"],
+  ).length;
   return finalClassified || stintHistory?.length || drivers.length;
 }
 
-function getTotalLaps(session: TelemetrySession, drivers: DriverData[]): number | undefined {
+function getTotalLaps(
+  session: TelemetrySession,
+  drivers: DriverData[],
+): number | undefined {
   const sessionTotal = session["session-info"]?.["total-laps"];
   if (typeof sessionTotal === "number" && sessionTotal > 0) return sessionTotal;
 
@@ -104,7 +130,9 @@ function getBestLapMs(classification: FinalClassification): number | undefined {
   return olderField > 0 ? olderField : undefined;
 }
 
-function getSessionUid(session: TelemetrySession | undefined): string | undefined {
+function getSessionUid(
+  session: TelemetrySession | undefined,
+): string | undefined {
   const uid = session?.debug?.["session-uid"];
   if (uid == null) return undefined;
   // Some exported UIDs exceed JS's safe integer range; we only need a stable
@@ -121,7 +149,11 @@ interface RaceTelemetryExtras {
   overtakesMade?: number;
   overtakesTaken?: number;
   playerTeam?: string;
-  playerLapStats?: { meanLapMs: number; stddevLapMs: number; validLapCount: number };
+  playerLapStats?: {
+    meanLapMs: number;
+    stddevLapMs: number;
+    validLapCount: number;
+  };
   rivals?: RivalEntry[];
 }
 
@@ -160,7 +192,9 @@ function computeLapStats(driver: DriverData): {
   };
 }
 
-function cleanLapsByCompound(driver: DriverData): Map<string, LapHistoryEntry[]> {
+function cleanLapsByCompound(
+  driver: DriverData,
+): Map<string, LapHistoryEntry[]> {
   const byCompound = new Map<string, LapHistoryEntry[]>();
   for (const sample of getCleanRaceLapSamples(driver)) {
     if (!sample.compound) continue;
@@ -391,9 +425,12 @@ function buildRaceTelemetryExtras(
   const trap = session["speed-trap-records"] ?? [];
   if (trap.length > 0) {
     const sorted = [...trap].sort(
-      (a, b) => (b["speed-trap-record-kmph"] ?? 0) - (a["speed-trap-record-kmph"] ?? 0),
+      (a, b) =>
+        (b["speed-trap-record-kmph"] ?? 0) - (a["speed-trap-record-kmph"] ?? 0),
     );
-    const idx = sorted.findIndex((entry) => entry.name === player["driver-name"]);
+    const idx = sorted.findIndex(
+      (entry) => entry.name === player["driver-name"],
+    );
     if (idx >= 0) {
       extras.topSpeedTrapRank = idx + 1;
       extras.topSpeedTrapTotal = sorted.length;
@@ -463,7 +500,9 @@ function buildQualifyingExtras(
   }
 
   const drivers = session["classification-data"] ?? [];
-  const classifiedDrivers = drivers.filter((d) => d["final-classification"]).length;
+  const classifiedDrivers = drivers.filter(
+    (d) => d["final-classification"],
+  ).length;
   if (classifiedDrivers > 0) {
     extras.qualifyingFieldSize = classifiedDrivers;
   }
@@ -499,13 +538,17 @@ function buildPlayerRaceResult(
   player: DriverData | undefined,
   fieldSize: number,
 ): PlayerRaceResult | undefined {
-  if (!player || !isRaceSessionType(session["session-info"]?.["session-type"])) {
+  if (
+    !player ||
+    !isRaceSessionType(session["session-info"]?.["session-type"])
+  ) {
     return undefined;
   }
 
   const classification = player["final-classification"];
   const stintResult = session["tyre-stint-history-v2"]?.find(
-    (entry) => entry.index === player.index || entry.name === player["driver-name"],
+    (entry) =>
+      entry.index === player.index || entry.name === player["driver-name"],
   );
   const position = classification?.position ?? stintResult?.position;
   if (!position) return undefined;
@@ -515,12 +558,17 @@ function buildPlayerRaceResult(
     classification?.["num-laps"] ??
     player["session-history"]?.["num-laps"] ??
     getTimedLapCount(player);
-  const lapRatio = totalLaps && totalLaps > 0 ? playerLaps / totalLaps : undefined;
+  const lapRatio =
+    totalLaps && totalLaps > 0 ? playerLaps / totalLaps : undefined;
 
   return {
     position,
-    gridPosition: classification?.["grid-position"] ?? stintResult?.["grid-position"],
-    status: classification?.["result-status"] || stintResult?.["result-status"] || undefined,
+    gridPosition:
+      classification?.["grid-position"] ?? stintResult?.["grid-position"],
+    status:
+      classification?.["result-status"] ||
+      stintResult?.["result-status"] ||
+      undefined,
     points: classification?.points,
     penaltiesTime: classification?.["penalties-time"],
     penaltyCount: classification?.["num-penalties"],
@@ -558,14 +606,18 @@ export function buildSessionSummary(
   // Records carry the fastest lap of the session — if its driver-index matches the
   // player slot, the player set the fastest lap. For uploads/older exports without
   // records, this stays undefined and Fastest Lap King simply excludes the session.
-  const fastestLapDriverIndex = session?.records?.fastest?.lap?.["driver-index"];
+  const fastestLapDriverIndex =
+    session?.records?.fastest?.lap?.["driver-index"];
   const playerSetFastestLap =
     focusDriver != null && typeof fastestLapDriverIndex === "number"
       ? fastestLapDriverIndex === focusDriver.index
       : undefined;
 
   const raceExtras =
-    session && focusDriver && !isSpectator && isRaceSessionType(parsed.sessionType)
+    session &&
+    focusDriver &&
+    !isSpectator &&
+    isRaceSessionType(parsed.sessionType)
       ? buildRaceTelemetryExtras(session, focusDriver, isOnline)
       : {};
 
@@ -627,12 +679,16 @@ export function buildSessionSummary(
   }
 
   const qualifyingExtras =
-    session && focusDriver && !isSpectator && isQualifyingSessionType(parsed.sessionType)
+    session &&
+    focusDriver &&
+    !isSpectator &&
+    isQualifyingSessionType(parsed.sessionType)
       ? buildQualifyingExtras(session, focusDriver)
       : {};
-  const playerRaceResult = session && !isSpectator
-    ? buildPlayerRaceResult(session, focusDriver, classifiedDriverCount)
-    : undefined;
+  const playerRaceResult =
+    session && !isSpectator
+      ? buildPlayerRaceResult(session, focusDriver, classifiedDriverCount)
+      : undefined;
   const valid = validLapCount > 0 || playerRaceResult != null;
 
   return {
@@ -640,8 +696,14 @@ export function buildSessionSummary(
       relativePath,
       slug,
       ...parsed,
-      gameYear: typeof session?.["game-year"] === "number" ? session["game-year"] : undefined,
-      packetFormat: typeof session?.["packet-format"] === "number" ? session["packet-format"] : undefined,
+      gameYear:
+        typeof session?.["game-year"] === "number"
+          ? session["game-year"]
+          : undefined,
+      packetFormat:
+        typeof session?.["packet-format"] === "number"
+          ? session["packet-format"]
+          : undefined,
       sessionUid,
       validLapCount,
       lapIndicators,

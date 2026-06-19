@@ -18,12 +18,8 @@ export function SessionPage() {
   const slug = params["*"] ?? "";
 
   const { session, loading, error } = useSession(slug);
-  const {
-    mode,
-    sessions,
-    setShowUploadModal,
-    activeFormulaKey,
-  } = useTelemetry();
+  const { mode, sessions, setShowUploadModal, activeFormulaKey } =
+    useTelemetry();
   const backToDashboardPath = dashboardPath(activeFormulaKey);
 
   if (loading) {
@@ -47,7 +43,10 @@ export function SessionPage() {
       return (
         <div className="flex items-center justify-center h-full px-6">
           <VStack align="center" className="max-w-md text-center">
-            <HStack justify="center" className="h-12 w-12 rounded-full bg-zinc-900">
+            <HStack
+              justify="center"
+              className="h-12 w-12 rounded-full bg-zinc-900"
+            >
               <Upload className="h-5 w-5 text-zinc-500" />
             </HStack>
             <div>
@@ -82,7 +81,10 @@ export function SessionPage() {
     return (
       <div className="flex items-center justify-center h-full">
         <VStack align="center" className="max-w-sm text-center">
-          <HStack justify="center" className="h-12 w-12 rounded-full bg-zinc-900">
+          <HStack
+            justify="center"
+            className="h-12 w-12 rounded-full bg-zinc-900"
+          >
             {isUploadWithNoData ? (
               <Upload className="h-5 w-5 text-zinc-500" />
             ) : (

@@ -77,7 +77,9 @@ function resolveTelemetryDir(folderPath: string): string {
   }
 
   if (!fs.statSync(telemetryDir).isDirectory()) {
-    throw new Error(`dev:telemetry only accepts a folder. Put repro JSON files in a folder and pass that path: ${telemetryDir}`);
+    throw new Error(
+      `dev:telemetry only accepts a folder. Put repro JSON files in a folder and pass that path: ${telemetryDir}`,
+    );
   }
 
   return telemetryDir;
@@ -98,7 +100,10 @@ function main() {
   if (!args.folderPath) printUsage(1);
 
   const telemetryDir = resolveTelemetryDir(args.folderPath);
-  const env: NodeJS.ProcessEnv = { ...process.env, TELEMETRY_DIR: telemetryDir };
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    TELEMETRY_DIR: telemetryDir,
+  };
   delete env.VITE_SKIP_API;
 
   console.log(`Starting Vite with TELEMETRY_DIR=${telemetryDir}`);

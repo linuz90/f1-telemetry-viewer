@@ -45,7 +45,8 @@ export function useTrackHistory(
     (s) =>
       s.track === trackName &&
       s.slug !== currentSlug &&
-      getFormulaComparisonKey(s.formula, s.gameYear) === getFormulaComparisonKey(formula, gameYear),
+      getFormulaComparisonKey(s.formula, s.gameYear) ===
+        getFormulaComparisonKey(formula, gameYear),
   );
   const trackSessionKey = trackSessions.map((s) => s.slug).join("|");
 

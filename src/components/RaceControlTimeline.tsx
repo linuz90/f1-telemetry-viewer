@@ -140,7 +140,10 @@ const EVENT_STYLES: Record<string, EventStyle> = {
   },
 };
 
-export function RaceControlTimeline({ events, focusedDriver }: RaceControlTimelineProps) {
+export function RaceControlTimeline({
+  events,
+  focusedDriver,
+}: RaceControlTimelineProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("key");
   const [focusOnly, setFocusOnly] = useState(false);
 
@@ -164,11 +167,16 @@ export function RaceControlTimeline({ events, focusedDriver }: RaceControlTimeli
   );
 
   const groups = useMemo(() => {
-    const grouped: { key: string; label: string; events: RaceControlEvent[] }[] = [];
+    const grouped: {
+      key: string;
+      label: string;
+      events: RaceControlEvent[];
+    }[] = [];
     const indexByKey = new Map<string, number>();
 
     for (const event of visibleEvents) {
-      const key = event["lap-number"] == null ? "session" : `lap-${event["lap-number"]}`;
+      const key =
+        event["lap-number"] == null ? "session" : `lap-${event["lap-number"]}`;
       let index = indexByKey.get(key);
       if (index == null) {
         index = grouped.length;
@@ -189,7 +197,8 @@ export function RaceControlTimeline({ events, focusedDriver }: RaceControlTimeli
         <div>
           <h3 className="text-sm font-semibold text-zinc-300">Race Control</h3>
           <p className="mt-0.5 text-xs text-zinc-500">
-            {keyEventCount} key event{keyEventCount === 1 ? "" : "s"} / {events.length} total
+            {keyEventCount} key event{keyEventCount === 1 ? "" : "s"} /{" "}
+            {events.length} total
           </p>
         </div>
 
@@ -220,10 +229,16 @@ export function RaceControlTimeline({ events, focusedDriver }: RaceControlTimeli
                 role="switch"
                 aria-checked={focusOnly}
                 onClick={() => setFocusOnly((value) => !value)}
-                className={cn("relative inline-flex h-4 w-7 items-center rounded-full transition-colors", focusOnly ? "bg-cyan-600" : "bg-zinc-800")}
+                className={cn(
+                  "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
+                  focusOnly ? "bg-cyan-600" : "bg-zinc-800",
+                )}
               >
                 <span
-                  className={cn("inline-block h-3 w-3 rounded-full bg-white transition-transform", focusOnly ? "translate-x-3.5" : "translate-x-0.5")}
+                  className={cn(
+                    "inline-block h-3 w-3 rounded-full bg-white transition-transform",
+                    focusOnly ? "translate-x-3.5" : "translate-x-0.5",
+                  )}
                 />
               </button>
             </label>
@@ -237,7 +252,13 @@ export function RaceControlTimeline({ events, focusedDriver }: RaceControlTimeli
           message="No race-control events match this view."
         />
       ) : (
-        <div className={visibleEvents.length > 8 ? "scroll-mask-down-[1.5rem] max-h-[560px] overflow-y-auto pr-2 -mr-2" : ""}>
+        <div
+          className={
+            visibleEvents.length > 8
+              ? "scroll-mask-down-[1.5rem] max-h-[560px] overflow-y-auto pr-2 -mr-2"
+              : ""
+          }
+        >
           <div className="space-y-5 pb-0.5">
             {groups.map((group) => (
               <section key={group.key} className="space-y-2">
@@ -287,13 +308,25 @@ function RaceControlEventRow({
   return (
     <div className="rounded-md border border-zinc-800/80 bg-zinc-950/60 px-3 py-2.5 shadow-sm shadow-black/10">
       <div className="flex gap-3">
-        <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg", style.iconClass)}>
+        <span
+          className={cn(
+            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
+            style.iconClass,
+          )}
+        >
           <Icon className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-sm leading-snug text-zinc-200">{formatRaceControlEvent(event)}</span>
-            <span className={cn("rounded px-1.5 py-0.5 text-2xs font-semibold", style.badgeClass)}>
+            <span className="text-sm leading-snug text-zinc-200">
+              {formatRaceControlEvent(event)}
+            </span>
+            <span
+              className={cn(
+                "rounded px-1.5 py-0.5 text-2xs font-semibold",
+                style.badgeClass,
+              )}
+            >
               {style.label}
             </span>
             {clock && (
@@ -306,7 +339,9 @@ function RaceControlEventRow({
                 className="inline-block size-1.5 rounded-full"
                 style={{ backgroundColor: getTeamColor(primaryDriver.team) }}
               />
-              <span>{primaryDriver.name} - {getTeamName(primaryDriver.team)}</span>
+              <span>
+                {primaryDriver.name} - {getTeamName(primaryDriver.team)}
+              </span>
             </p>
           )}
           {details.length > 0 && (

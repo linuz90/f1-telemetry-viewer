@@ -9,7 +9,11 @@ import {
   YAxis,
 } from "recharts";
 import type { PaceEvolutionPoint, RaceContext } from "../../utils/stats";
-import { CHART_THEME, TOOLTIP_STYLE, getCompoundColor } from "../../utils/colors";
+import {
+  CHART_THEME,
+  TOOLTIP_STYLE,
+  getCompoundColor,
+} from "../../utils/colors";
 import { msToLapTime } from "../../utils/format";
 import { cardClass } from "../Card";
 import { SegmentedControl } from "../ui/SegmentedControl";
@@ -110,7 +114,6 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
         }
       />
 
-
       {filtered.length === 0 ? (
         <div className="py-12 text-center text-sm text-zinc-500">
           No races match this filter.
@@ -154,7 +157,13 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
                       color: "#e4e4e7",
                     }}
                   >
-                    <div style={{ color: "#a1a1aa", marginBottom: 2, fontSize: 11 }}>
+                    <div
+                      style={{
+                        color: "#a1a1aa",
+                        marginBottom: 2,
+                        fontSize: 11,
+                      }}
+                    >
                       {row.date} · {row.label}
                     </div>
                     {point && (

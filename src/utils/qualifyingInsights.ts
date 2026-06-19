@@ -145,7 +145,8 @@ export function buildTrackQualifyingInsights(
         playerBestOnlineMs > 0 ? bestPoleMs - playerBestOnlineMs : 0;
       const beatenSessionCount = onlineBucket.reduce(
         (acc, s) =>
-          acc + (s.qualifyingPosition != null && s.qualifyingPosition > 1 ? 1 : 0),
+          acc +
+          (s.qualifyingPosition != null && s.qualifyingPosition > 1 ? 1 : 0),
         0,
       );
       const playerSweptPoles =

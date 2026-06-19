@@ -54,7 +54,11 @@ export function telemetryServer(telemetryDir?: string): Plugin {
                   "utf-8",
                 );
                 const json = JSON.parse(raw) as TelemetrySession;
-                return buildSessionSummary(relativePath, json, Buffer.byteLength(raw));
+                return buildSessionSummary(
+                  relativePath,
+                  json,
+                  Buffer.byteLength(raw),
+                );
               } catch {
                 // If we can't parse, include the session with 0
                 return buildSessionSummary(relativePath);

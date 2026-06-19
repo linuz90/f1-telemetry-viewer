@@ -32,12 +32,8 @@ function getInitialWidth(): number {
 }
 
 export function Layout() {
-  const {
-    mode,
-    setShowUploadModal,
-    formulaOptions,
-    activeFormulaKey,
-  } = useTelemetry();
+  const { mode, setShowUploadModal, formulaOptions, activeFormulaKey } =
+    useTelemetry();
   const [width, setWidth] = useState(getInitialWidth);
   const [showChangelog, setShowChangelog] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);

@@ -24,7 +24,11 @@ const SIZE_WIDTHS: Record<TrackFlagSize, { base: number; retina: number }> = {
   large: { base: 160, retina: 320 },
 };
 
-export function TrackFlag({ track, size = "small", className = "" }: TrackFlagProps) {
+export function TrackFlag({
+  track,
+  size = "small",
+  className = "",
+}: TrackFlagProps) {
   const code = getTrackCountryCode(track);
   if (!code) return null;
 
@@ -38,7 +42,11 @@ export function TrackFlag({ track, size = "small", className = "" }: TrackFlagPr
       srcSet={srcSet}
       alt=""
       loading="lazy"
-      className={cn("inline-block rounded-[2px] object-cover", SIZE_CLASSES[size], className)}
+      className={cn(
+        "inline-block rounded-[2px] object-cover",
+        SIZE_CLASSES[size],
+        className,
+      )}
     />
   );
 }

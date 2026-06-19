@@ -17,7 +17,9 @@ export function findPlayer(session: TelemetrySession): DriverData | undefined {
 }
 
 /** Find the default focused driver: player > P1 finisher > driver with most laps */
-export function findFocusedDriver(session: TelemetrySession): DriverData | undefined {
+export function findFocusedDriver(
+  session: TelemetrySession,
+): DriverData | undefined {
   const drivers = session["classification-data"] ?? [];
 
   // 1. Player
@@ -32,8 +34,9 @@ export function findFocusedDriver(session: TelemetrySession): DriverData | undef
   let best: DriverData | undefined;
   let maxLaps = 0;
   for (const d of drivers) {
-    const count = d["session-history"]["lap-history-data"]
-      .filter((l) => l["lap-time-in-ms"] > 0).length;
+    const count = d["session-history"]["lap-history-data"].filter(
+      (l) => l["lap-time-in-ms"] > 0,
+    ).length;
     if (count > maxLaps) {
       maxLaps = count;
       best = d;
@@ -152,7 +155,7 @@ function getPitLapNumbers(d: DriverData): Set<number> {
   const pitLaps = new Set<number>();
   for (let i = 0; i < stints.length - 1; i++) {
     const endLap = stints[i]["end-lap"];
-    pitLaps.add(endLap);     // pit-in lap (slow entry into pits)
+    pitLaps.add(endLap); // pit-in lap (slow entry into pits)
     pitLaps.add(endLap + 1); // pit-out lap (slow exit from pits)
   }
   return pitLaps;
@@ -422,14 +425,16 @@ export function getBestDriverOnCompound(
   compound: string,
   lapStart: number,
   lapEnd: number,
-): {
-  driver: DriverData;
-  stint: TyreStint;
-  wearRate: number;
-  paceMs: number;
-  lapStart: number;
-  lapEnd: number;
-} | undefined {
+):
+  | {
+      driver: DriverData;
+      stint: TyreStint;
+      wearRate: number;
+      paceMs: number;
+      lapStart: number;
+      lapEnd: number;
+    }
+  | undefined {
   let best:
     | {
         driver: DriverData;
@@ -555,7 +560,15 @@ export function calculateCumulativeDeltas(
 // --- Insight generation ---
 
 export interface StrategyInsight {
-  type: "tyre" | "sector" | "pit" | "pace" | "history" | "fuel" | "speed" | "ers";
+  type:
+    | "tyre"
+    | "sector"
+    | "pit"
+    | "pace"
+    | "history"
+    | "fuel"
+    | "speed"
+    | "ers";
   /** Short label shown above the value */
   label: string;
   /** The big prominent value (e.g. "3rd", "1:42.891", "+0.8%/lap") */
@@ -606,9 +619,11 @@ export function driverTopSpeed(d: DriverData): number {
   const median = sorted[Math.floor(sorted.length / 2)];
   const cap = median * 1.15;
   const clean = lapSpeeds.filter((s) => s <= cap);
-  const bestLapSpeed = clean.length > 0 ? Math.max(...clean) : Math.max(...lapSpeeds);
+  const bestLapSpeed =
+    clean.length > 0 ? Math.max(...clean) : Math.max(...lapSpeeds);
   // Also cap the session-level field against the same threshold
-  const safeSessionSpeed = sessionSpeed > 0 && sessionSpeed <= cap ? sessionSpeed : 0;
+  const safeSessionSpeed =
+    sessionSpeed > 0 && sessionSpeed <= cap ? sessionSpeed : 0;
   return Math.max(bestLapSpeed, safeSessionSpeed);
 }
 
@@ -644,17 +659,20 @@ export function generateInsights(
     const rivalClean = getCleanRaceLaps(rival);
     if (playerClean.length > 0 && rivalClean.length > 0) {
       const playerAvg =
-        playerClean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / playerClean.length;
+        playerClean.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
+        playerClean.length;
       const rivalAvg =
-        rivalClean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / rivalClean.length;
+        rivalClean.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
+        rivalClean.length;
       const delta = (playerAvg - rivalAvg) / 1000;
       insights.push({
         type: "pace",
         label: "Race Pace",
         value: `${delta <= 0 ? "" : "+"}${delta.toFixed(3)}s`,
-        detail: delta <= 0
-          ? `faster per lap on average vs ${rivalName}`
-          : `slower per lap on average vs ${rivalName}`,
+        detail:
+          delta <= 0
+            ? `faster per lap on average vs ${rivalName}`
+            : `slower per lap on average vs ${rivalName}`,
         tooltip: RACE_PACE_TOOLTIP,
       });
     }
@@ -667,16 +685,19 @@ export function generateInsights(
       .map((s) => stintWearRate(s))
       .filter((r) => r > 0);
     if (playerRates.length > 0 && rivalRates.length > 0) {
-      const playerAvgRate = playerRates.reduce((a, b) => a + b, 0) / playerRates.length;
-      const rivalAvgRate = rivalRates.reduce((a, b) => a + b, 0) / rivalRates.length;
+      const playerAvgRate =
+        playerRates.reduce((a, b) => a + b, 0) / playerRates.length;
+      const rivalAvgRate =
+        rivalRates.reduce((a, b) => a + b, 0) / rivalRates.length;
       const diff = playerAvgRate - rivalAvgRate;
       insights.push({
         type: "tyre",
         label: "Tyre Management",
         value: `${diff <= 0 ? "" : "+"}${diff.toFixed(1)}%/lap`,
-        detail: diff <= 0
-          ? `less wear per lap vs ${rivalName}`
-          : `more wear per lap vs ${rivalName}`,
+        detail:
+          diff <= 0
+            ? `less wear per lap vs ${rivalName}`
+            : `more wear per lap vs ${rivalName}`,
       });
     }
 
@@ -695,8 +716,12 @@ export function generateInsights(
       let gains = 0;
       let losses = 0;
       for (const { sector, label } of sectorKeys) {
-        const pAvg = playerCleanLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) / playerCleanLaps.length;
-        const rAvg = rivalCleanLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) / rivalCleanLaps.length;
+        const pAvg =
+          playerCleanLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) /
+          playerCleanLaps.length;
+        const rAvg =
+          rivalCleanLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) /
+          rivalCleanLaps.length;
         const d = (pAvg - rAvg) / 1000;
         netDelta += d;
         const delta = `${d <= 0 ? "" : "+"}${d.toFixed(3)}s`;
@@ -710,13 +735,14 @@ export function generateInsights(
         type: "sector",
         label: "Sector Analysis",
         value: `${netDelta <= 0 ? "" : "+"}${netDelta.toFixed(3)}s`,
-        detail: gains > 0 && losses > 0
-          ? `${gains} sectors faster · ${losses} slower vs ${rivalName}`
-          : gains === 3
-            ? `faster in all sectors vs ${rivalName}`
-            : losses === 3
-              ? `slower in all sectors vs ${rivalName}`
-              : `even by sector vs ${rivalName}`,
+        detail:
+          gains > 0 && losses > 0
+            ? `${gains} sectors faster · ${losses} slower vs ${rivalName}`
+            : gains === 3
+              ? `faster in all sectors vs ${rivalName}`
+              : losses === 3
+                ? `slower in all sectors vs ${rivalName}`
+                : `even by sector vs ${rivalName}`,
         extraDetails: sectorRows,
       });
     }
@@ -730,11 +756,12 @@ export function generateInsights(
         type: "speed",
         label: "Top Speed",
         value: `${delta <= 0 ? "" : "+"}${delta} km/h`,
-        detail: delta < 0
-          ? `slower than ${rivalName} (${Math.round(playerTopSpeed)} vs ${Math.round(rivalTopSpeed)})`
-          : delta > 0
-            ? `faster than ${rivalName} (${Math.round(playerTopSpeed)} vs ${Math.round(rivalTopSpeed)})`
-            : `same as ${rivalName} (${Math.round(playerTopSpeed)} km/h)`,
+        detail:
+          delta < 0
+            ? `slower than ${rivalName} (${Math.round(playerTopSpeed)} vs ${Math.round(rivalTopSpeed)})`
+            : delta > 0
+              ? `faster than ${rivalName} (${Math.round(playerTopSpeed)} vs ${Math.round(rivalTopSpeed)})`
+              : `same as ${rivalName} (${Math.round(playerTopSpeed)} km/h)`,
       });
     }
 
@@ -780,7 +807,9 @@ export function generateInsights(
       paceRanking.push({ driver: d, avgPace: avg });
     }
     paceRanking.sort((a, b) => a.avgPace - b.avgPace);
-    const pacePos = paceRanking.findIndex((r) => r.driver.index === player.index);
+    const pacePos = paceRanking.findIndex(
+      (r) => r.driver.index === player.index,
+    );
     if (pacePos >= 0 && paceRanking.length > 1) {
       const delta = paceRanking[pacePos].avgPace - paceRanking[0].avgPace;
       insights.push({
@@ -849,8 +878,7 @@ export function generateInsights(
           delta < 1
             ? `of ${speedRanking.length} — ${Math.round(playerSpd)} km/h`
             : `of ${speedRanking.length} — ${Math.round(playerSpd)} km/h (${Math.round(delta)} off P1)`,
-        tooltip:
-          "Session top speed ranking across all drivers",
+        tooltip: "Session top speed ranking across all drivers",
         rank: speedPos,
         rankTotal: speedRanking.length,
       });
@@ -863,9 +891,7 @@ export function generateInsights(
       if (avg > 0) ersRanking.push({ driver: d, avgErs: avg });
     }
     ersRanking.sort((a, b) => b.avgErs - a.avgErs); // highest first
-    const ersPos = ersRanking.findIndex(
-      (r) => r.driver.index === player.index,
-    );
+    const ersPos = ersRanking.findIndex((r) => r.driver.index === player.index);
     if (ersPos >= 0 && ersRanking.length > 1) {
       const playerErs = ersRanking[ersPos].avgErs;
       insights.push({
@@ -929,7 +955,8 @@ export function generateInsights(
           const clean = getCleanRaceLaps(d);
           if (!clean.length) continue;
           const avg =
-            clean.reduce((s, l) => s + sectorTimeMs(l, sector), 0) / clean.length;
+            clean.reduce((s, l) => s + sectorTimeMs(l, sector), 0) /
+            clean.length;
           if (avg > 0) ranking.push({ driver: d, avg });
         }
         ranking.sort((a, b) => a.avg - b.avg);
@@ -943,7 +970,8 @@ export function generateInsights(
             delta: ranking[pos].avg - ranking[0].avg,
             bestDriver: ranking[0].driver["driver-name"],
             deltaToP2: ranking.length > 1 ? ranking[1].avg - ranking[0].avg : 0,
-            p2Driver: ranking.length > 1 ? ranking[1].driver["driver-name"] : "",
+            p2Driver:
+              ranking.length > 1 ? ranking[1].driver["driver-name"] : "",
           });
         }
       }
@@ -1018,7 +1046,9 @@ export const PUNCTURE_THRESHOLD = 75;
 
 /** Estimate max tyre life (laps) before hitting puncture threshold */
 export function estimateMaxLife(wearRatePerLap: number): number {
-  return wearRatePerLap > 0 ? Math.round(PUNCTURE_THRESHOLD / wearRatePerLap) : 0;
+  return wearRatePerLap > 0
+    ? Math.round(PUNCTURE_THRESHOLD / wearRatePerLap)
+    : 0;
 }
 
 // ─── Fuel safety knobs ───────────────────────────────────────────────────────
@@ -1095,7 +1125,11 @@ function collectGreenFlagBurnDeltas(player: DriverData): number[] {
 
 /** ERS energy deployed on a lap, preferring Pits n' Giggles' saved lap aggregate. */
 export function ersDeployJForLap(lap: PerLapInfo): number {
-  return lap["ers-stats"]?.["ers-deployed-j"] ?? lap["car-status-data"]?.["ers-deployed-this-lap"] ?? 0;
+  return (
+    lap["ers-stats"]?.["ers-deployed-j"] ??
+    lap["car-status-data"]?.["ers-deployed-this-lap"] ??
+    0
+  );
 }
 
 export function ersDeployMjForLap(lap: PerLapInfo): number {
@@ -1108,7 +1142,10 @@ export function ersDeployMjForLap(lap: PerLapInfo): number {
  *  efficiency in F1 26, where harvested energy isn't deploy-capped. */
 export function ersHarvestJForLap(lap: PerLapInfo): number {
   const stats = lap["ers-stats"];
-  if (stats?.["ers-harv-mguk-j"] != null || stats?.["ers-harv-mguh-j"] != null) {
+  if (
+    stats?.["ers-harv-mguk-j"] != null ||
+    stats?.["ers-harv-mguh-j"] != null
+  ) {
     return (stats["ers-harv-mguk-j"] ?? 0) + (stats["ers-harv-mguh-j"] ?? 0);
   }
   const car = lap["car-status-data"];
@@ -1161,9 +1198,7 @@ export function avgErsHarvestMj(d: DriverData): number {
 /** Calculate fuel burn rate and related metrics for a player in a race.
  *  Uses the median of per-lap fuel deltas (green-flag laps only) for a burn
  *  rate that's robust against outliers and not skewed by SC/VSC/formation laps. */
-export function calculateBurnRate(
-  player: DriverData,
-): FuelCalcResult | null {
+export function calculateBurnRate(player: DriverData): FuelCalcResult | null {
   const perLap = player["per-lap-info"];
   if (!perLap?.length) return null;
 
@@ -1215,12 +1250,13 @@ export function generateFuelInsights(
   // Not enough data — show placeholder rows explaining why
   if (!result) {
     const perLap = player["per-lap-info"];
-    const lapsWithFuel = perLap?.filter(
-      (l) => l["car-status-data"]?.["fuel-in-tank"] > 0,
-    ).length ?? 0;
-    const detail = lapsWithFuel < 6
-      ? `need 6+ laps with fuel data, got ${lapsWithFuel}`
-      : "need 3+ green-flag lap pairs";
+    const lapsWithFuel =
+      perLap?.filter((l) => l["car-status-data"]?.["fuel-in-tank"] > 0)
+        .length ?? 0;
+    const detail =
+      lapsWithFuel < 6
+        ? `need 6+ laps with fuel data, got ${lapsWithFuel}`
+        : "need 3+ green-flag lap pairs";
     return [
       { type: "fuel", label: "Initial Fuel", value: "—", detail },
       { type: "fuel", label: "Recommended Fuel", value: "—", detail },
@@ -1335,15 +1371,16 @@ export function generateQualiInsights(
         delta < 1
           ? `of ${qualiSpeedRanking.length} — ${Math.round(playerSpd)} km/h`
           : `of ${qualiSpeedRanking.length} — ${Math.round(playerSpd)} km/h (${Math.round(delta)} off P1)`,
-      tooltip:
-        "Session top speed ranking across all drivers",
+      tooltip: "Session top speed ranking across all drivers",
       rank: qualiSpeedPos,
       rankTotal: qualiSpeedRanking.length,
     });
   }
 
   // 3. Sector rankings
-  const playerValid = getValidLaps(player["session-history"]["lap-history-data"]);
+  const playerValid = getValidLaps(
+    player["session-history"]["lap-history-data"],
+  );
   if (playerValid.length > 0) {
     const sectorKeys = [
       { sector: 1, label: "S1" },
@@ -1427,8 +1464,16 @@ export function generateQualiInsights(
     const bestS2 = bestSectorTimeMs(playerValid, 2);
     const bestS3 = bestSectorTimeMs(playerValid, 3);
     const theoretical = bestS1 + bestS2 + bestS3;
-    const actualBest = getBestLapTime(player["session-history"]["lap-history-data"]);
-    if (bestS1 > 0 && bestS2 > 0 && bestS3 > 0 && actualBest > 0 && theoretical < actualBest) {
+    const actualBest = getBestLapTime(
+      player["session-history"]["lap-history-data"],
+    );
+    if (
+      bestS1 > 0 &&
+      bestS2 > 0 &&
+      bestS3 > 0 &&
+      actualBest > 0 &&
+      theoretical < actualBest
+    ) {
       const gap = actualBest - theoretical;
       if (gap >= 10) {
         insights.push({
@@ -1587,7 +1632,8 @@ export function generateQualiHistoryInsights(
     } else {
       // All sectors matched or beat PB
       const totalGain =
-        (pbs.bestS1Ms - currentS1) +
+        pbs.bestS1Ms -
+        currentS1 +
         (pbs.bestS2Ms - currentS2) +
         (pbs.bestS3Ms - currentS3);
       if (totalGain > 0) {
@@ -1690,7 +1736,10 @@ const MIN_STINT_LAPS = 3;
 export function aggregateCompoundLife(
   sessions: TelemetrySession[],
 ): CompoundLifeStats[] {
-  const byCompound: Record<string, { rates: number[]; lengths: number[]; bestLapMs: number }> = {};
+  const byCompound: Record<
+    string,
+    { rates: number[]; lengths: number[]; bestLapMs: number }
+  > = {};
 
   for (const session of sessions) {
     if (!isRaceSession(session)) continue;
@@ -1706,7 +1755,8 @@ export function aggregateCompoundLife(
       const rate = stintWearRate(stint);
       if (rate <= 0) continue;
 
-      if (!byCompound[compound]) byCompound[compound] = { rates: [], lengths: [], bestLapMs: 0 };
+      if (!byCompound[compound])
+        byCompound[compound] = { rates: [], lengths: [], bestLapMs: 0 };
       byCompound[compound].rates.push(rate);
       byCompound[compound].lengths.push(stint["stint-length"]);
 
@@ -1716,7 +1766,10 @@ export function aggregateCompoundLife(
         if (l["lap-time-in-ms"] > 0) {
           lapNum++;
           if (lapNum >= stint["start-lap"] && lapNum <= stint["end-lap"]) {
-            if (isLapValid(l["lap-valid-bit-flags"]) && l["lap-time-in-ms"] > 0) {
+            if (
+              isLapValid(l["lap-valid-bit-flags"]) &&
+              l["lap-time-in-ms"] > 0
+            ) {
               const cur = byCompound[compound].bestLapMs;
               if (cur === 0 || l["lap-time-in-ms"] < cur) {
                 byCompound[compound].bestLapMs = l["lap-time-in-ms"];
@@ -1728,19 +1781,21 @@ export function aggregateCompoundLife(
     }
   }
 
-  return Object.entries(byCompound).map(([compound, { rates, lengths, bestLapMs }]) => {
-    const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
-    const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-    return {
-      compound,
-      avgWearRatePerLap: avgRate,
-      estMaxLife: estimateMaxLife(avgRate),
-      avgStintLength: Math.round(avgLength),
-      longestStint: Math.max(...lengths),
-      stintCount: rates.length,
-      bestLapMs,
-    };
-  });
+  return Object.entries(byCompound).map(
+    ([compound, { rates, lengths, bestLapMs }]) => {
+      const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+      const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+      return {
+        compound,
+        avgWearRatePerLap: avgRate,
+        estMaxLife: estimateMaxLife(avgRate),
+        avgStintLength: Math.round(avgLength),
+        longestStint: Math.max(...lengths),
+        stintCount: rates.length,
+        bestLapMs,
+      };
+    },
+  );
 }
 
 /** Fuel stats aggregated across race sessions at a track */
@@ -1796,9 +1851,8 @@ export function aggregateFuelData(
     if (!(totalLaps > 0)) continue;
 
     const perLap = player["per-lap-info"];
-    const lapsWithFuel = perLap?.filter(
-      (l) => l["car-status-data"]?.["fuel-in-tank"] > 0,
-    ) ?? [];
+    const lapsWithFuel =
+      perLap?.filter((l) => l["car-status-data"]?.["fuel-in-tank"] > 0) ?? [];
     if (lapsWithFuel.length < 6) continue;
 
     pooledDeltas.push(...collectGreenFlagBurnDeltas(player));
@@ -1834,8 +1888,7 @@ export function aggregateFuelData(
   // calculator bakes into its "Conservative" strategy.
   const safetyMarginLaps = fuelSafetyMarginLaps(pooledBurnRateKg);
   const recommendedPerRace = perRace.map(
-    (r, i) =>
-      r.startFuelRemaining - (excessAtFinish[i]! - safetyMarginLaps),
+    (r, i) => r.startFuelRemaining - (excessAtFinish[i]! - safetyMarginLaps),
   );
   // The recommendation collapses to "fuel for totalLaps + safetyMargin" at the
   // pooled burn rate — that's the kg figure the player would set in PnG.
@@ -1926,7 +1979,10 @@ export interface TrackRaceRecommendation {
 }
 
 /** A race counts as "near full distance" when the player completed >= totalLaps - 1 laps */
-function isNearFullDistanceRace(session: TelemetrySession, player: DriverData): boolean {
+function isNearFullDistanceRace(
+  session: TelemetrySession,
+  player: DriverData,
+): boolean {
   const totalLaps = session["session-info"]["total-laps"];
   if (!Number.isFinite(totalLaps) || totalLaps <= 0) return false;
   const lapsCompleted = player["session-history"]["num-laps"] ?? 0;
@@ -2039,7 +2095,8 @@ function rankDryCompoundsByPace(
   compoundLifeStats: CompoundLifeStats[],
 ): CompoundLifeStats[] {
   const dry = compoundLifeStats.filter(
-    (c) => isDryCompound(c.compound) && c.stintCount > 0 && c.avgWearRatePerLap > 0,
+    (c) =>
+      isDryCompound(c.compound) && c.stintCount > 0 && c.avgWearRatePerLap > 0,
   );
   return dry.sort((a, b) => {
     const aPri = DRY_COMPOUND_PRIORITY[a.compound] ?? Number.POSITIVE_INFINITY;
@@ -2255,7 +2312,9 @@ interface BestCleanRaceLap {
   compound: string | null;
 }
 
-function bestCleanRaceLapWithCompound(entries: BucketRaceEntry[]): BestCleanRaceLap | null {
+function bestCleanRaceLapWithCompound(
+  entries: BucketRaceEntry[],
+): BestCleanRaceLap | null {
   let best: BestCleanRaceLap | null = null;
   for (const entry of entries) {
     const samples = getCleanRaceLapSamples(entry.player);
@@ -2360,8 +2419,7 @@ export function buildTrackRaceRecommendation(
     sinceLastRace = {
       bestLapDeltaMs:
         latestBest > 0 && prevBest > 0 ? latestBest - prevBest : 0,
-      wearRateDelta:
-        latestWear > 0 && prevWear > 0 ? latestWear - prevWear : 0,
+      wearRateDelta: latestWear > 0 && prevWear > 0 ? latestWear - prevWear : 0,
     };
   }
 
@@ -2444,7 +2502,11 @@ export function classifyRaceContext(session: TelemetrySession): RaceContext {
   // grid (the AI/online setup actually creates traffic); the in-between band
   // is real but rare in this app's data.
   const kind: RaceContextKind =
-    driverCount <= 3 ? "clean-air" : driverCount >= 10 ? "full-grid" : "small-field";
+    driverCount <= 3
+      ? "clean-air"
+      : driverCount >= 10
+        ? "full-grid"
+        : "small-field";
   return { kind, driverCount, isOnline, leaderShare: 0 };
 }
 
@@ -2520,15 +2582,15 @@ export function buildPaceEvolution(
         positionedLaps++;
         if (pos === 1) leaderLaps++;
       }
-      const leaderShare =
-        positionedLaps > 0 ? leaderLaps / positionedLaps : 0;
+      const leaderShare = positionedLaps > 0 ? leaderLaps / positionedLaps : 0;
 
       const baseContext = classifyRaceContext(session);
       const context: RaceContext = {
         ...baseContext,
         leaderShare,
         kind:
-          leaderShare >= LEADER_SHARE_OVERRIDE && baseContext.kind !== "clean-air"
+          leaderShare >= LEADER_SHARE_OVERRIDE &&
+          baseContext.kind !== "clean-air"
             ? "clean-air"
             : baseContext.kind,
       };

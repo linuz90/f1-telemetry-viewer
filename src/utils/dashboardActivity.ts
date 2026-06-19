@@ -78,7 +78,8 @@ function raceCompletion(session: SessionSummary): number {
 
 function pickRaceRepresentative(sessions: SessionSummary[]): SessionSummary {
   return [...sessions].sort((a, b) => {
-    const cleanDiff = Number(isCleanRaceFinish(b)) - Number(isCleanRaceFinish(a));
+    const cleanDiff =
+      Number(isCleanRaceFinish(b)) - Number(isCleanRaceFinish(a));
     if (cleanDiff !== 0) return cleanDiff;
 
     const lapDiff = raceCompletion(b) - raceCompletion(a);

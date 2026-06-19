@@ -5,15 +5,23 @@ import type { TelemetrySession } from "../types/telemetry";
 import { getBestLapTime } from "../utils/stats";
 import { formatSessionType } from "../utils/format";
 import { getTeamColor, getTeamName } from "../utils/colors";
-import { getFormulaComparisonKey, getFormulaLabel, shouldShowFormulaLabel } from "../utils/sessionTypes";
+import {
+  getFormulaComparisonKey,
+  getFormulaLabel,
+  shouldShowFormulaLabel,
+} from "../utils/sessionTypes";
 import { trackPath, trackTabForSessionType } from "../utils/routes";
 import { TrackFlag } from "./TrackFlag";
 import { TrackLayout } from "./TrackLayout";
 import { PillSelect, type PillSelectOption } from "./ui/PillSelect";
 import { HStack } from "./ui/Stack";
 
-const EXT_LINK_TEMPLATE = import.meta.env.VITE_EXTERNAL_LINK_TEMPLATE as string | undefined;
-const EXT_LINK_LABEL = import.meta.env.VITE_EXTERNAL_LINK_LABEL as string | undefined;
+const EXT_LINK_TEMPLATE = import.meta.env.VITE_EXTERNAL_LINK_TEMPLATE as
+  | string
+  | undefined;
+const EXT_LINK_LABEL = import.meta.env.VITE_EXTERNAL_LINK_LABEL as
+  | string
+  | undefined;
 
 const SESSION_ICONS: Record<string, typeof Flag> = {
   Race: Flag,
@@ -50,9 +58,16 @@ export function SessionHeader({
   const focusedDriver = drivers.find((d) => d.index === focusedDriverIndex);
 
   const sessionType = formatSessionType(info["session-type"], info.formula);
-  const TypeIcon = SESSION_ICONS[info["session-type"]] ?? SESSION_ICONS[sessionType] ?? Flag;
-  const formulaKey = getFormulaComparisonKey(info.formula, session["game-year"]);
-  const showFormula = shouldShowFormulaLabel(info.formula, session["game-year"]);
+  const TypeIcon =
+    SESSION_ICONS[info["session-type"]] ?? SESSION_ICONS[sessionType] ?? Flag;
+  const formulaKey = getFormulaComparisonKey(
+    info.formula,
+    session["game-year"],
+  );
+  const showFormula = shouldShowFormulaLabel(
+    info.formula,
+    session["game-year"],
+  );
   const trackTab = trackTabForSessionType(info["session-type"]);
 
   // Keep no-lap classified drivers selectable so terminal-damage DNFs can still
@@ -124,7 +139,9 @@ export function SessionHeader({
               onChange={(value) => onFocusedDriverChange(Number(value))}
               options={driverOptions}
               ariaLabel="Focused driver"
-              dotColor={focusedDriver ? getTeamColor(focusedDriver.team) : undefined}
+              dotColor={
+                focusedDriver ? getTeamColor(focusedDriver.team) : undefined
+              }
               width="session"
             />
           )}

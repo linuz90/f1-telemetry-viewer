@@ -41,7 +41,11 @@ export interface SessionSummary {
   /** Player's team identifier for this session (raw value from JSON — Ferrari, "211", etc.). */
   playerTeam?: string;
   /** Per-driver lap stats for the player (mean + stddev of valid laps) — race sessions only. */
-  playerLapStats?: { meanLapMs: number; stddevLapMs: number; validLapCount: number };
+  playerLapStats?: {
+    meanLapMs: number;
+    stddevLapMs: number;
+    validLapCount: number;
+  };
   /**
    * Slim roster of non-player drivers from this race, used by the Rivals & Teammates
    * section. Only emitted for online race sessions. See {@link RivalEntry}.
@@ -240,7 +244,7 @@ export interface CarSetup {
   "rear-right-tyre-pressure": number;
   "front-left-tyre-pressure": number;
   "front-right-tyre-pressure": number;
-  "ballast": number;
+  ballast: number;
   "fuel-load": number;
   "is-valid": boolean;
 }

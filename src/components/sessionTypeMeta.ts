@@ -1,6 +1,9 @@
 import { Flag, Gauge, Target, Timer, type LucideIcon } from "lucide-react";
 import type { BadgeTone } from "./ui/Badge";
-import { isQualifyingSessionType, isRaceSessionType } from "../utils/sessionTypes";
+import {
+  isQualifyingSessionType,
+  isRaceSessionType,
+} from "../utils/sessionTypes";
 
 /**
  * Single source of truth for how a session type is shown across surfaces
@@ -27,14 +30,46 @@ const META: Record<string, SessionTypeMeta> = {
   Race: { icon: Flag, color: "text-red-400/70", badgeTone: "red" },
   Sprint: { icon: Flag, color: "text-red-400/70", badgeTone: "red" },
   "Feature Race": { icon: Flag, color: "text-red-400/70", badgeTone: "red" },
-  "Short Qualifying": { icon: Timer, color: "text-yellow-500/70", badgeTone: "yellow" },
-  "Short Quali": { icon: Timer, color: "text-yellow-500/70", badgeTone: "yellow" },
-  "Short Sprint Shootout": { icon: Timer, color: "text-yellow-500/70", badgeTone: "yellow" },
-  "Sprint Shootout": { icon: Timer, color: "text-yellow-500/70", badgeTone: "yellow" },
-  "Short Session Shootout": { icon: Timer, color: "text-yellow-500/70", badgeTone: "yellow" },
-  "Session Shootout": { icon: Timer, color: "text-yellow-500/70", badgeTone: "yellow" },
-  "One Shot Qualifying": { icon: Target, color: "text-purple-400/70", badgeTone: "purple" },
-  "One-Shot Quali": { icon: Target, color: "text-purple-400/70", badgeTone: "purple" },
+  "Short Qualifying": {
+    icon: Timer,
+    color: "text-yellow-500/70",
+    badgeTone: "yellow",
+  },
+  "Short Quali": {
+    icon: Timer,
+    color: "text-yellow-500/70",
+    badgeTone: "yellow",
+  },
+  "Short Sprint Shootout": {
+    icon: Timer,
+    color: "text-yellow-500/70",
+    badgeTone: "yellow",
+  },
+  "Sprint Shootout": {
+    icon: Timer,
+    color: "text-yellow-500/70",
+    badgeTone: "yellow",
+  },
+  "Short Session Shootout": {
+    icon: Timer,
+    color: "text-yellow-500/70",
+    badgeTone: "yellow",
+  },
+  "Session Shootout": {
+    icon: Timer,
+    color: "text-yellow-500/70",
+    badgeTone: "yellow",
+  },
+  "One Shot Qualifying": {
+    icon: Target,
+    color: "text-purple-400/70",
+    badgeTone: "purple",
+  },
+  "One-Shot Quali": {
+    icon: Target,
+    color: "text-purple-400/70",
+    badgeTone: "purple",
+  },
   "Time Trial": { icon: Gauge, color: "text-cyan-400/70", badgeTone: "sky" },
 };
 

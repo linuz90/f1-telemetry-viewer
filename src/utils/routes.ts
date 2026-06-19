@@ -32,11 +32,15 @@ export function dashboardPath(formulaKey?: string | null): string {
   return formulaKey ? `/${encodeURIComponent(formulaKey)}` : "/";
 }
 
-export function isTrackSessionTab(value: string | null | undefined): value is TrackSessionTab {
+export function isTrackSessionTab(
+  value: string | null | undefined,
+): value is TrackSessionTab {
   return TRACK_SESSION_TABS.has(value as TrackSessionTab);
 }
 
-export function trackTabForSessionType(sessionType: string | undefined): TrackSessionTab {
+export function trackTabForSessionType(
+  sessionType: string | undefined,
+): TrackSessionTab {
   if (isRaceSessionType(sessionType)) return "race";
   if (isTimeTrialSessionType(sessionType)) return "time-trial";
   if (isQualifyingSessionType(sessionType)) return "qualifying";
@@ -49,7 +53,9 @@ export function trackPath(
   tab?: TrackSessionTab,
 ): string {
   const path = `/${encodeURIComponent(formulaKey)}/${TRACKS_ROUTE_SEGMENT}/${toTrackSlug(track)}`;
-  return tab ? `${path}?${TRACK_TAB_QUERY_PARAM}=${encodeURIComponent(tab)}` : path;
+  return tab
+    ? `${path}?${TRACK_TAB_QUERY_PARAM}=${encodeURIComponent(tab)}`
+    : path;
 }
 
 export function sessionPath(formulaKey: string, slug: string): string {
@@ -71,12 +77,17 @@ export function isRootPath(pathname: string): boolean {
  * deliberate split keeps routing flexible: future route models can change
  * validation rules in one place without every component learning URL grammar.
  */
-export function getFormulaScopeCandidateFromPath(pathname: string): string | null {
+export function getFormulaScopeCandidateFromPath(
+  pathname: string,
+): string | null {
   const [formulaKey] = pathname.split("/").filter(Boolean);
   return formulaKey ?? null;
 }
 
-export function replaceFormulaScopeInPath(pathname: string, nextFormulaKey: string): string {
+export function replaceFormulaScopeInPath(
+  pathname: string,
+  nextFormulaKey: string,
+): string {
   const parts = pathname.split("/").filter(Boolean);
   if (parts.length === 0) return dashboardPath(nextFormulaKey);
   parts[0] = encodeURIComponent(nextFormulaKey);
