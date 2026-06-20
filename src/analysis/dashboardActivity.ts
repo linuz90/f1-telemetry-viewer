@@ -1,10 +1,19 @@
 import type { SessionSummary } from "../types/telemetry";
-import { isCleanRaceFinish } from "./dashboardStats";
+import { isCleanRaceFinish } from "./dashboardResultStats";
 import {
   isQualifyingSessionType,
   isRaceSessionType,
   isTimeTrialSessionType,
 } from "../utils/sessionTypes";
+
+/**
+ * Recent-activity grouping for the dashboard.
+ *
+ * The sidebar lists literal saved files. The dashboard needs a calmer recap, so
+ * repeated same-day attempts are grouped and represented by the most useful
+ * attempt for that session kind. This module owns that editorial grouping
+ * policy; result/rival analytics stay in their own analysis modules.
+ */
 
 export type DashboardActivityKind =
   | "race"
@@ -62,6 +71,8 @@ function isSameActivityGroup(
 }
 
 function pickBestLapRepresentative(sessions: SessionSummary[]): SessionSummary {
+  // For quali/time-trial bursts the fastest valid lap is the story; recency is
+  // only a tie-breaker so a slower auto-save does not hide the better attempt.
   return [...sessions].sort((a, b) => {
     const lapDiff =
       (a.bestLapTimeMs ?? Number.POSITIVE_INFINITY) -
@@ -77,6 +88,9 @@ function raceCompletion(session: SessionSummary): number {
 }
 
 function pickRaceRepresentative(sessions: SessionSummary[]): SessionSummary {
+  // Race recaps should prefer completed, representative runs over partial
+  // saves. Lap count and lap ratio cover older summaries that may miss one of
+  // those fields.
   return [...sessions].sort((a, b) => {
     const cleanDiff =
       Number(isCleanRaceFinish(b)) - Number(isCleanRaceFinish(a));
@@ -114,8 +128,7 @@ function hasDashboardActivity(session: SessionSummary): boolean {
  * representative row. We intentionally keep the collapse to one day at a time:
  * hiding today's rough race behind yesterday's cleaner result would make the
  * dashboard feel stale instead of honest. Keeping that rule here makes the
- * product distinction easy to revisit without touching race-result analytics in
- * `dashboardStats.ts`.
+ * product distinction easy to revisit without touching race-result analytics.
  */
 export function buildDashboardActivity(
   sessions: SessionSummary[],

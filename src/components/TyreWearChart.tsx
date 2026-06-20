@@ -17,7 +17,7 @@ import {
   TOOLTIP_STYLE,
   SC_COLORS,
   SC_FALLBACK,
-} from "../utils/colors";
+} from "../constants/colors";
 import { EmptyState } from "./EmptyState";
 import { SectionHeader } from "./ui/SectionHeader";
 

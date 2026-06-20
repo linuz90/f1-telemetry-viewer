@@ -51,6 +51,9 @@ export interface DashboardResultStats {
 }
 
 export function isRepresentativeOnlineRace(session: SessionSummary): boolean {
+  // Representative online races are the dashboard's best signal for real form:
+  // enough human-grid data, not spectator mode, and at least one player lap.
+  // Smaller online lobbies fall back to the broader online bucket.
   const result = session.playerRaceResult;
   return (
     Boolean(result) &&
@@ -95,6 +98,9 @@ export function isCleanRaceFinish(session: SessionSummary): boolean {
   if (!isFinishedStatus(result.status)) return false;
 
   if (result.totalLaps && result.totalLaps > 0) {
+    // Some exports miss the final lap or classify the player one lap down.
+    // Treat a finish within two laps / 90% race distance as usable for average
+    // finish stats, while the status gate above still keeps DNFs out.
     return (
       result.playerLaps >= result.totalLaps - 2 || (result.lapRatio ?? 0) >= 0.9
     );
@@ -144,6 +150,9 @@ function chooseResultSessions(scopedSessions: SessionSummary[]): {
   mode: ResultDataMode;
   sessions: SessionSummary[];
 } {
+  // Prefer the most comparable result pool, then gracefully widen the data.
+  // This keeps mature online-race histories honest without making new/offline
+  // scopes look empty.
   const raceResults = scopedSessions.filter(isRaceWithResult);
   const representativeOnline = raceResults.filter(isRepresentativeOnlineRace);
   if (representativeOnline.length > 0) {

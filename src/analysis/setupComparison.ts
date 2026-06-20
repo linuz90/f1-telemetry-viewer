@@ -46,6 +46,10 @@ const SETUP_FINGERPRINT_KEYS: readonly SetupFingerprintKey[] = [
   "ballast",
 ];
 
+// Fuel load is excluded from identity on purpose: it is a race-plan variable,
+// not a mechanical setup. Validity is also excluded because it describes the
+// export, not the car.
+
 export type RaceSetupStrengthKind =
   | "most-promising"
   | "fastest-lap"
@@ -425,6 +429,9 @@ function applyFairCompoundComparison(
   comparableField: ComparableMetricField,
   strengthKind: RaceSetupStrengthKind,
 ): RaceSetupCandidate[] {
+  // Fair comparisons happen within compound buckets. A medium stint and hard
+  // stint can both be useful, but ranking them directly would mostly compare
+  // tyre choice and fuel phase instead of setup quality.
   const nextCandidates = candidates.map((candidate) => ({
     ...candidate,
     strengths: [...candidate.strengths],
@@ -600,6 +607,9 @@ function withComparisonMetadata(
       hasFairWin(candidate, "best-stint"),
   );
 
+  // Only elevate a "most promising" setup when one candidate clearly wins the
+  // speed-sensitive evidence. If there is a tie, keep individual strengths
+  // visible without over-claiming a single recommendation.
   if (mostPromising && bestRankedCandidates.length === 1) {
     nextCandidates = nextCandidates.map((candidate) => ({
       ...candidate,

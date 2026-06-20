@@ -13,6 +13,15 @@ import {
   type SafetyCarRange,
 } from "./safetyCar";
 
+/**
+ * Lap chart/table data model.
+ *
+ * This is the densest per-lap projection in the app: it joins lap history,
+ * optional per-lap telemetry, stints, rival laps, pit markers, fuel burn, ERS,
+ * tyre wear, and safety-car state into one model. UI components should not
+ * repeat those joins, because each export source has slightly different gaps.
+ */
+
 export interface LapAnalysisRow {
   lap: number;
   timeMs: number;
@@ -117,6 +126,8 @@ function median(values: readonly number[]): number | undefined {
 function buildPerLapInfoMap(perLapInfo: readonly PerLapInfo[] | undefined) {
   const map = new Map<number, PerLapInfo>();
   for (const info of perLapInfo ?? []) {
+    // `per-lap-info` is already numbered by the exporter, unlike lap-history
+    // arrays where we infer displayed lap numbers from timed entries.
     map.set(info["lap-number"], info);
   }
   return map;
@@ -171,6 +182,8 @@ function buildRivalLapMap(rivalLaps: readonly LapHistoryEntry[] | undefined) {
   let lapNumber = 0;
   for (const lap of rivalLaps ?? []) {
     if (lap["lap-time-in-ms"] > 0) {
+      // Rival histories can include zero-time placeholders; count only timed
+      // laps so player/rival overlays stay aligned by completed lap.
       lapNumber++;
       map.set(lapNumber, lap["lap-time-in-ms"] / 1000);
     }
@@ -205,6 +218,8 @@ function buildPitOutlierLaps({
   const outliers = new Set<number>();
   const addPitOutlierLaps = (stopLaps: readonly number[] | undefined) => {
     for (const lap of stopLaps ?? []) {
+      // Mark both pit-in and pit-out laps. Either one can dominate chart scale
+      // and hide the actual green-flag lap-time spread.
       if (lap > 1) outliers.add(lap - 1);
       outliers.add(lap);
     }
@@ -278,6 +293,8 @@ export function buildLapAnalysis({
           (row) => !pitOutlierLaps.has(row.lap) && !row.isSC && !row.isVSC,
         )
       : rows;
+  // If a very short/chaotic race has no clean rows, fall back to all laps so
+  // the chart never disappears just because the filter did its job too well.
   const chartRows = cleanRows.length > 0 ? cleanRows : rows;
 
   const allTimes = [
@@ -337,6 +354,8 @@ export function buildLapAnalysis({
             .map((row) => row.topSpeed!),
         )
       : 0,
+    // `chartBestTime` respects Clean Laps, while `tableBestTime` always marks
+    // the absolute best valid lap in the full table.
     chartBestTime: minOrZero(validChartRows.map((row) => row.timeSec)),
     tableBestTime: minOrZero(validTableRows.map((row) => row.timeSec)),
     bestS1: minOrZero(validTableRows.map((row) => row.s1)),

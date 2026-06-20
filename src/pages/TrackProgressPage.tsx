@@ -56,30 +56,30 @@ import {
 import { buildTrackRivalBenchmark } from "../analysis/rivalStats";
 import type { SessionSummary } from "../types/telemetry";
 import { cn } from "../utils/cn";
-import { CHART_THEME, SECTOR_COLORS, TOOLTIP_STYLE } from "../utils/colors";
+import { CHART_THEME, SECTOR_COLORS, TOOLTIP_STYLE } from "../constants/colors";
 import { getSessionFormulaScopeKey } from "../utils/formulaScope";
 import {
   formatDate,
   formatSessionType,
   formatTime,
   getSessionIcon,
-  isTrackSlugMatch,
   msToLapTime,
   msToSectorTime,
 } from "../utils/format";
+import { isTrackSlugMatch } from "../utils/tracks";
 import {
   dashboardPath,
   isTrackSessionTab,
   sessionSummaryPath,
-  TRACK_TAB_QUERY_PARAM,
   trackPath,
 } from "../utils/routes";
+import { TRACK_TAB_QUERY_PARAM } from "../constants/routes";
 import {
   aggregateCompoundLife,
   aggregateFuelData,
-  buildPaceEvolution,
-  buildTrackRaceRecommendation,
-} from "../utils/stats/track";
+} from "../utils/stats/trackAggregates";
+import { buildPaceEvolution } from "../utils/stats/trackPaceEvolution";
+import { buildTrackRaceRecommendation } from "../utils/stats/trackStrategy";
 import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
 
 const TRACK_TAB_LABELS: Record<TrackSessionKind, string> = {

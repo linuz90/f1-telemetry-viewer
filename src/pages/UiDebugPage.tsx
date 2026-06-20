@@ -46,11 +46,11 @@ import type {
 import { cn } from "../utils/cn";
 import { msToLapTime, msToSectorTime } from "../utils/format";
 import type { TrackRivalBenchmark } from "../analysis/rivalStats";
-import type { SessionInsight } from "../analysis/sessionInsights";
+import type { SessionInsight } from "../analysis/sessionInsightSummary";
 import type {
   TrackRaceRecommendation,
   TrackStrategySuggestion,
-} from "../utils/stats/track";
+} from "../utils/stats/trackStrategy";
 import type { CumulativeDelta } from "../utils/stats/laps";
 
 const COMPOUNDS = [

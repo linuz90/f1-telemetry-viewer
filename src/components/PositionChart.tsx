@@ -10,7 +10,8 @@ import {
 } from "recharts";
 import { buildPositionChartModel } from "../analysis/positionAnalysis";
 import type { OvertakeRecord, PositionHistoryEntry } from "../types/telemetry";
-import { getTeamColor, CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
+import { CHART_THEME, TOOLTIP_STYLE } from "../constants/colors";
+import { getTeamColor } from "../utils/colors";
 import { EmptyState } from "./EmptyState";
 import { SectionHeader } from "./ui/SectionHeader";
 

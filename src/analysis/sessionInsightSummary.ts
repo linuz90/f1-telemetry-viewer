@@ -153,6 +153,9 @@ function getDriverResult(
   const classification = driver["final-classification"];
   const stintResult = matchingStintResult(session, driver);
   const totalLaps = getTotalLaps(session, drivers);
+  // Race results can be represented in either final-classification or stint
+  // history, depending on export vintage. Merge both so session insight cards
+  // survive older/debug telemetry without special cases in the UI.
   const laps =
     classification?.["num-laps"] ??
     driver["session-history"]?.["num-laps"] ??
@@ -303,6 +306,8 @@ function buildQualifyingResultInsight(
     }))
     .filter((entry) => entry.bestLapMs > 0)
     .sort((a, b) => a.bestLapMs - b.bestLapMs);
+  // Classification position is preferred when present, but lap-time ranking is
+  // a useful fallback for incomplete qualifying exports.
   const positionFromLap =
     ranking.findIndex((entry) => entry.driver.index === driver.index) + 1 ||
     undefined;
@@ -355,6 +360,8 @@ function buildBestLapInsight(
     sessionBest != null &&
     (sessionBest.driverIndex === driver.index ||
       Math.abs(bestLapMs - sessionBest.timeMs) < 1);
+  // A 1ms tolerance avoids treating rounded records and raw lap history as
+  // different laps when they describe the same session-best lap.
   const detail =
     sessionBest && sessionBest.timeMs > 0
       ? isSessionBest
@@ -491,6 +498,8 @@ function buildSafetyCarInsight(driver: DriverData): SessionInsight | null {
 function buildDamageInsight(driver: DriverData): SessionInsight | null {
   let peak = 0;
   let peakLabel = "";
+  // Final damage alone can miss transient damage/faults from partial debug
+  // saves, so scan both final and per-lap damage snapshots.
   const samples = [
     driver["car-damage"],
     ...(driver["per-lap-info"] ?? []).map((lap) => lap["car-damage-data"]),
@@ -618,6 +627,8 @@ export function buildSessionInsightsHint(session: TelemetrySession): string {
   const info = session["session-info"];
   const parts: string[] = [];
   const rawTs = session.debug.timestamp.replace(/\s+[A-Z].*$/, "");
+  // Pits n' Giggles timestamps may include a trailing timezone label that dayjs
+  // does not consistently parse in all environments.
   const date = dayjs(rawTs);
   if (date.isValid()) {
     parts.push(`${date.format("ddd, D MMM YYYY")} · ${date.format("HH:mm")}`);

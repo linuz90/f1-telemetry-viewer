@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { CumulativeDelta } from "../utils/stats/laps";
-import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
+import { CHART_THEME, TOOLTIP_STYLE } from "../constants/colors";
 import { cn } from "../utils/cn";
 import { SectionHeader } from "./ui/SectionHeader";
 

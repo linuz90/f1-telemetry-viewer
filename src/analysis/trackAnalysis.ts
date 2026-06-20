@@ -5,7 +5,7 @@ import type {
 } from "../types/telemetry";
 import type { RaceSetupCandidate, RaceSetupRunInput } from "./setupComparison";
 import { buildRaceSetupComparison } from "./setupComparison";
-import type { TrackSessionTab } from "../utils/routes";
+import type { TrackSessionTab } from "../constants/routes";
 import { findPlayer, isRaceSession } from "../utils/stats/drivers";
 import {
   getBestLapTime,
@@ -15,7 +15,7 @@ import {
 import {
   aggregateCompoundLife,
   type CompoundLifeStats,
-} from "../utils/stats/track";
+} from "../utils/stats/trackAggregates";
 import { avgWearRate } from "../utils/stats/tyres";
 import {
   bestSectorTimeMs,
@@ -28,6 +28,15 @@ import {
   buildTrackQualifyingInsights,
   type TrackQualifyingInsights,
 } from "./trackQualifyingInsights";
+
+/**
+ * Track-page analysis pipeline.
+ *
+ * A track page combines many saved sessions into progress charts, race strategy
+ * evidence, qualifying insights, setup candidates, and history rows. This file
+ * owns the cross-session aggregation rules so `TrackProgressPage` can stay a
+ * page composer instead of a telemetry analyst.
+ */
 
 export interface LapPoint {
   timeSec: number;
@@ -183,6 +192,8 @@ export function buildTrackSessionData(
     allLaps: laps
       .filter((lap) => lap["lap-time-in-ms"] > 0)
       .map((lap, index) => ({
+        // Track trend charts only need timed laps; zero-time placeholders from
+        // aborted exports would otherwise compress the scatter scale.
         timeSec: lap["lap-time-in-ms"] / 1000,
         valid: isLapValid(lap["lap-valid-bit-flags"]),
         lapNum: index + 1,
@@ -287,6 +298,8 @@ export function buildRaceSetupCandidates(
 export function buildRaceAnalysisBuckets(
   races: readonly TrackSessionData[],
 ): RaceAnalysisBucket[] {
+  // Race strategy evidence is only comparable within the same distance. A
+  // 5-lap sprint and a 33-lap race should not share tyre-life/setup buckets.
   const byTotalLaps = new Map<number, TrackSessionData[]>();
 
   for (const race of races) {
@@ -462,6 +475,8 @@ function buildLapScatterSeries(
 function buildPaceAnalysis(
   sessions: readonly TrackSessionData[],
 ): TrackPaceAnalysis {
+  // Theoretical best is intentionally cross-session: it answers "what have I
+  // already proven possible at this track if I join my best sectors?"
   const theoreticalS1 = minPositive(sessions.map((session) => session.bestS1));
   const theoreticalS2 = minPositive(sessions.map((session) => session.bestS2));
   const theoreticalS3 = minPositive(sessions.map((session) => session.bestS3));
@@ -535,6 +550,8 @@ export function buildTrackAnalysisData(
     bestRaceLapMs: minPositive(raceData.map((session) => session.bestLapMs)),
     sessionHistory: [...sessions].reverse(),
     availableTabs: [
+      // Keep the visible tab order stable even when the data arrives from file
+      // scanning in a different order.
       ...(qualifyingSessions.length > 0 ? (["qualifying"] as const) : []),
       ...(raceData.length > 0 ? (["race"] as const) : []),
       ...(timeTrialSessions.length > 0 ? (["time-trial"] as const) : []),

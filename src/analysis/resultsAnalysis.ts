@@ -27,6 +27,15 @@ import {
   stintWearRate,
 } from "../utils/stats/tyres";
 
+/**
+ * Session-result and comparison table models.
+ *
+ * These helpers turn raw classification, stint, lap, ERS, and penalty telemetry
+ * into sortable rows for race/quali tables. They intentionally return plain
+ * data only; display formatting stays in components so table styling can evolve
+ * without changing race intelligence.
+ */
+
 export type RaceResultSortKey =
   | "pos"
   | "bestLap"
@@ -122,6 +131,8 @@ export function buildRaceDriverStats(
           cleanRaceLaps.length
         : 0;
 
+    // Race pace deliberately uses clean race laps, not all valid laps, because
+    // pit in/out and neutralized laps are valid telemetry but poor pace samples.
     map.set(driver["driver-name"], {
       bestLap,
       racePace,
@@ -157,6 +168,8 @@ export function buildPenaltiesByDriver(
     }
 
     const driverName = event["driver-info"].name;
+    // Keep the full event objects; the table may need more than a count for
+    // tooltips or future steward-context UI.
     const penalties = map.get(driverName) ?? [];
     penalties.push(event);
     map.set(driverName, penalties);
@@ -221,6 +234,8 @@ export function sortRaceStintHistoryRows({
         comparison = (statsB?.ersHarv || 0) - (statsA?.ersHarv || 0);
         break;
       case "gap":
+        // Gap comes from the exporter summary and may be a final-classification
+        // delta, so keep it separate from lap-derived pace metrics.
         comparison = compareRaceGap(a, b);
         break;
     }
@@ -357,6 +372,8 @@ function groupCleanLapsByCompound({
 
   for (const stint of stints) {
     const compound = stint["tyre-set-data"]["visual-tyre-compound"];
+    // Same-compound comparisons should describe actual running pace, not the
+    // artificial time loss from stops or obvious outliers.
     const cleanLaps = filterOutlierLaps(getLapsForStint(laps, stint));
     const existing = byCompound.get(compound) ?? [];
     byCompound.set(compound, [...existing, ...cleanLaps]);

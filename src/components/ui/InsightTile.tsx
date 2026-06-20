@@ -1,13 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { ACCENT_TOKENS, type AccentColor } from "../../constants/accents";
 import { cn } from "../../utils/cn";
-import {
-  ACCENT_TOKENS,
-  accentCardClass,
-  cardHighlight,
-  type AccentColor,
-} from "../Card";
+import { accentCardClass, cardHighlight } from "../Card";
 import { Eyebrow } from "./Eyebrow";
 import { HStack } from "./Stack";
 

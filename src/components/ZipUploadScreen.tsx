@@ -17,7 +17,7 @@ import {
   AUTHOR_NAME,
   AUTHOR_SITE_URL,
   REPO_URL,
-} from "../utils/links";
+} from "../constants/links";
 import { AppBrand } from "./AppBrand";
 import { Modal } from "./ui/Modal";
 import { HStack, VStack } from "./ui/Stack";

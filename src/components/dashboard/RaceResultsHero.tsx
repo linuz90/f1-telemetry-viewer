@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../../utils/cn";
-import type { DashboardResultStats } from "../../analysis/dashboardStats";
+import type { DashboardResultStats } from "../../analysis/dashboardResultStats";
 import { Card } from "../Card";
 import { Eyebrow } from "../ui/Eyebrow";
 import { InsightDetail, InsightValue } from "../ui/InsightText";

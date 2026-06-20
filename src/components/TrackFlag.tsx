@@ -1,5 +1,5 @@
 import { cn } from "../utils/cn";
-import { getTrackCountryCode } from "../utils/format";
+import { getTrackCountryCode } from "../utils/tracks";
 
 type TrackFlagSize = "tiny" | "small" | "medium" | "large";
 

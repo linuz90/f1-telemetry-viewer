@@ -684,7 +684,9 @@ function buildNetOvertakesInsight(
   };
 }
 
-// Ranking tiebreaker — when two insights have equal sampleSize, keep this stable order.
+// Ranking tiebreaker - when two insights have equal sampleSize, keep this
+// stable editorial order. A best/toughest track or comeback is more actionable
+// on the dashboard than another mild trend, even if both have similar depth.
 const INSIGHT_KIND_PRIORITY: Record<InsightKind, number> = {
   "best-track": 0,
   "toughest-track": 1,
@@ -712,6 +714,9 @@ const MAX_INSIGHTS = 9;
 export function buildTrackInsights(
   stats: DashboardResultStats,
 ): TrackInsight[] {
+  // Build a wide candidate set first, then cap it. Keeping each threshold
+  // inside its builder makes one insight tunable without accidentally changing
+  // the ranking contract for every other card.
   const raceScope = getRaceInsightScope(stats.mode);
   const insights: TrackInsight[] = [];
 
@@ -784,8 +789,9 @@ export function buildTrackInsights(
   const overtakes = buildNetOvertakesInsight(stats.resultSessions, raceScope);
   if (overtakes) insights.push(overtakes);
 
-  // Rank by data depth, then by kind priority for stable tiebreaks, then cap at MAX_INSIGHTS.
-  // Keeps strong-data insights visible when many qualify; weaker ones drop off the bottom.
+  // Rank by data depth, then by kind priority for stable tiebreaks, then cap at
+  // MAX_INSIGHTS. Keeps strong-data insights visible when many qualify; weaker
+  // ones drop off the bottom instead of making the dashboard feel noisy.
   return insights
     .sort((a, b) => {
       if (b.sampleSize !== a.sampleSize) return b.sampleSize - a.sampleSize;

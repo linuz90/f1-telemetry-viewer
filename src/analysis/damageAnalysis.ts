@@ -1,5 +1,15 @@
 import type { PerLapInfo } from "../types/telemetry";
 
+/**
+ * Damage telemetry normalization for race/session charts.
+ *
+ * Raw exports split car damage across many component-specific percentages and
+ * boolean faults. The UI needs two simpler views: continuous series for the
+ * damage chart, and sparse "something got worse here" lap markers for the lap
+ * chart. Keeping both projections here prevents chart components from each
+ * deciding their own incident semantics.
+ */
+
 export interface DamageSeriesField {
   key: string;
   label: string;
@@ -21,6 +31,8 @@ export const DAMAGE_SERIES_FIELDS: DamageSeriesField[] = [
   {
     key: "frontWing",
     label: "Front Wing",
+    // The game reports front wing damage per side, but the chart is a single
+    // readable component. Max side damage best matches what the driver feels.
     getValue: (lap) =>
       Math.max(
         lap["car-damage-data"]["front-left-wing-damage"] ?? 0,
@@ -76,6 +88,8 @@ export function detectDamageFaults(
   const seen = new Set<string>();
   for (const lap of perLapInfo) {
     for (const { key, label } of FAULT_CHECKS) {
+      // Fault booleans remain true once triggered. Emit only the first lap so
+      // the timeline reads like an event log, not a repeated state dump.
       if (lap["car-damage-data"][key] && !seen.has(key)) {
         seen.add(key);
         faults.push({ lap: lap["lap-number"], label });
@@ -98,6 +112,8 @@ export function buildDamageAnalysis(
 
   return {
     data,
+    // Hide flat zero-percent series: they add legend clutter while saying
+    // "no damage", which the empty chart state already communicates.
     activeFieldKeys: DAMAGE_SERIES_FIELDS.filter((field) =>
       data.some((row) => row[field.key] > 0),
     ).map((field) => field.key),

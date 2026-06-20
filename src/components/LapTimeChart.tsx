@@ -12,6 +12,10 @@ import {
   YAxis,
 } from "recharts";
 import { buildLapAnalysis, type LapAnalysisRow } from "../analysis/lapAnalysis";
+import {
+  LAP_CHART_BATTERY_VISIBILITY_STORAGE_KEY,
+  LAP_CHART_CLEAN_LAPS_STORAGE_KEY,
+} from "../constants/storage";
 import type {
   LapHistoryEntry,
   PerLapInfo,
@@ -23,7 +27,7 @@ import {
   COMPOUND_COLORS,
   SC_COLORS,
   SC_FALLBACK,
-} from "../utils/colors";
+} from "../constants/colors";
 import { msToLapTime, msToSectorTime } from "../utils/format";
 import { readStoredBoolean, writeStoredBoolean } from "../utils/storage";
 import { Tooltip as HoverTooltip } from "./Tooltip";
@@ -68,9 +72,6 @@ interface LapTimeChartProps {
   stints?: TyreStint[];
 }
 
-const BATTERY_VISIBILITY_STORAGE_KEY = "f1.lapTimeChart.showBattery";
-const CLEAN_LAPS_STORAGE_KEY = "f1.lapTimeChart.cleanLaps";
-
 /**
  * Line chart showing lap time progression.
  * Invalid laps shown in red, valid laps in cyan.
@@ -88,10 +89,10 @@ export function LapTimeChart({
   stints,
 }: LapTimeChartProps) {
   const [showBattery, setShowBattery] = useState(() =>
-    readStoredBoolean(BATTERY_VISIBILITY_STORAGE_KEY),
+    readStoredBoolean(LAP_CHART_BATTERY_VISIBILITY_STORAGE_KEY),
   );
   const [showCleanLaps, setShowCleanLaps] = useState(() =>
-    readStoredBoolean(CLEAN_LAPS_STORAGE_KEY),
+    readStoredBoolean(LAP_CHART_CLEAN_LAPS_STORAGE_KEY),
   );
 
   if (!laps.length) {
@@ -101,7 +102,7 @@ export function LapTimeChart({
   const toggleBatteryVisibility = () => {
     setShowBattery((prev) => {
       const next = !prev;
-      writeStoredBoolean(BATTERY_VISIBILITY_STORAGE_KEY, next);
+      writeStoredBoolean(LAP_CHART_BATTERY_VISIBILITY_STORAGE_KEY, next);
       return next;
     });
   };
@@ -109,7 +110,7 @@ export function LapTimeChart({
   const toggleCleanLaps = () => {
     setShowCleanLaps((prev) => {
       const next = !prev;
-      writeStoredBoolean(CLEAN_LAPS_STORAGE_KEY, next);
+      writeStoredBoolean(LAP_CHART_CLEAN_LAPS_STORAGE_KEY, next);
       return next;
     });
   };

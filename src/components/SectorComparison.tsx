@@ -6,7 +6,7 @@ import type {
 import { buildSectorBreakdownModel } from "../analysis/sectorAnalysis";
 import { msToLapTime, msToSectorTime } from "../utils/format";
 import { cn } from "../utils/cn";
-import { PERF_COLORS } from "../utils/colors";
+import { PERF_COLORS } from "../constants/colors";
 import { accentCardClass, neutralCardClass } from "./Card";
 import { CompoundSwatchLabel } from "./ui/CompoundSwatchLabel";
 import { Eyebrow } from "./ui/Eyebrow";

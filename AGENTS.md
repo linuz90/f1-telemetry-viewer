@@ -63,9 +63,10 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 
 **Key directories:**
 
-- `src/components/` — Chart components (LapTimeChart, PositionChart, TyreWearChart, StintTimeline, SectorComparison) and data tables
+- `src/components/` — UI renderers: chart components (LapTimeChart, PositionChart, TyreWearChart, StintTimeline, SectorComparison), data tables, cards, and controls
+- `src/analysis/` — UI-ready telemetry intelligence: session insight extraction/curation, dashboard aggregates, rival analysis, track aggregation, setup comparison, lap/sector/stint/damage/tyre models
 - `src/pages/` — Route-level components
-- `src/utils/` — Formatting (lap times, sectors), statistics (best laps, consistency, tyre wear rates), team/compound color mappings
+- `src/utils/` — Formatting, routes, formula scopes, storage helpers, team/compound color mappings, and low-level reusable stat primitives under `src/utils/stats/`
 - `src/types/telemetry.ts` — All TypeScript types for the telemetry data model
 - `src/plugin/` — Vite plugin (has its own tsconfig: `tsconfig.node.json`)
 - `scripts/` — `generate-demo-data.ts` creates trimmed demo files; `find-session.sh` resolves session slugs/URLs to file paths
@@ -77,7 +78,9 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 
 **ERS handling:** Pits n' Giggles F1 26 saved sessions can deploy more than the 4 MJ battery capacity per lap because the 2026 ruleset has no fixed deploy limit. Display ERS deployment as energy (`MJ/lap`), preferring `per-lap-info[].ers-stats["ers-deployed-j"]` and falling back to `car-status-data["ers-deployed-this-lap"]` for older exports. Keep battery-store values as percentages only when explicitly showing remaining store.
 
-**Rivals roster:** Online race summaries carry a slim per-driver roster (`SessionSummary.rivals`) with each opponent's normalized name, team, lap stats, same-compound clean-median pace delta when available, overtake counts, average per-lap position gap to the player, and a fastest-lap flag. Identity key is the normalized `driver-name` (the only field stable across sessions). The dashboard's Rivals & Teammates section aggregates this across the active formula scope via `src/utils/rivalStats.ts` — see that module for thresholds. Quali and offline-AI sessions skip the roster to keep the summary slim.
+**Analysis layer:** Calculation-heavy telemetry logic belongs in `src/analysis/`, not route/page or chart components. Keep analysis modules returning plain typed models that UI components render. Shared generic math/telemetry primitives belong in `src/utils/stats/`; product-specific ranking, curation, bucketing, and insight thresholds belong in `src/analysis/`. Add concise comments around exporter quirks, thresholds, and comparison policies so future UI changes do not silently change telemetry semantics.
+
+**Rivals roster:** Online race summaries carry a slim per-driver roster (`SessionSummary.rivals`) with each opponent's normalized name, team, lap stats, same-compound clean-median pace delta when available, overtake counts, average per-lap position gap to the player, and a fastest-lap flag. Identity key is the normalized `driver-name` (the only field stable across sessions). The dashboard's Rivals & Teammates section aggregates this across the active formula scope via `src/analysis/rivalStats.ts` — see that module for thresholds. Quali and offline-AI sessions skip the roster to keep the summary slim.
 
 **Styling:** Dark theme (slate-950 background). All styling via Tailwind utility classes.
 

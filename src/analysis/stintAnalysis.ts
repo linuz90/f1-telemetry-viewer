@@ -6,6 +6,14 @@ import {
   stintWearRate,
 } from "../utils/stats/tyres";
 
+/**
+ * Stint timeline/detail models for race-session views.
+ *
+ * Stints mix two very different concepts: race structure (compound blocks) and
+ * performance evidence (pace/wear inside each block). This module prepares both
+ * so timeline/table components do not need to know pit-lap caveats.
+ */
+
 export interface StintTimelineSegment {
   stint: TyreStint;
   compound: string;
@@ -40,6 +48,9 @@ export function buildStintTimelineSegments(
       effectiveTotal > 0 ? (stint["stint-length"] / effectiveTotal) * 100 : 0,
     isFirst: index === 0,
     isLast: index === stints.length - 1,
+    // In-progress or early-ended sessions leave the final stint shorter than
+    // the configured race distance; flag it so the UI can avoid implying it was
+    // a planned stop.
     isLastUnfinished:
       index === stints.length - 1 && stint["end-lap"] < totalLaps,
   }));

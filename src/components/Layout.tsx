@@ -2,13 +2,14 @@ import { Bell, ChevronRight, FolderUp, Menu, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import changelog from "virtual:changelog";
+import {
+  CHANGELOG_SEEN_STORAGE_KEY,
+  SIDEBAR_WIDTH_STORAGE_KEY,
+} from "../constants/storage";
+import { SESSIONS_ROUTE_SEGMENT } from "../constants/routes";
 import { useTelemetry } from "../context/TelemetryContext";
 import { cn } from "../utils/cn";
-import {
-  dashboardPath,
-  replaceFormulaScopeInPath,
-  SESSIONS_ROUTE_SEGMENT,
-} from "../utils/routes";
+import { dashboardPath, replaceFormulaScopeInPath } from "../utils/routes";
 import {
   readStoredNumber,
   readStoredString,
@@ -24,14 +25,12 @@ import { SegmentedControl } from "./ui/SegmentedControl";
 const MIN_WIDTH = 250;
 const MAX_WIDTH = 480;
 const DEFAULT_WIDTH = 288; // 72 * 4 (w-72)
-const STORAGE_KEY = "sidebar-width";
-const CHANGELOG_SEEN_KEY = "changelog-last-seen";
 
 export function Layout() {
   const { mode, setShowUploadModal, formulaOptions, activeFormulaKey } =
     useTelemetry();
   const [width, setWidth] = useState(() =>
-    readStoredNumber(STORAGE_KEY, {
+    readStoredNumber(SIDEBAR_WIDTH_STORAGE_KEY, {
       fallback: DEFAULT_WIDTH,
       min: MIN_WIDTH,
       max: MAX_WIDTH,
@@ -44,7 +43,8 @@ export function Layout() {
   const latestHash = changelog[0]?.hash ?? "";
   const [hasUnseen, setHasUnseen] = useState(
     () =>
-      latestHash !== "" && readStoredString(CHANGELOG_SEEN_KEY) !== latestHash,
+      latestHash !== "" &&
+      readStoredString(CHANGELOG_SEEN_STORAGE_KEY) !== latestHash,
   );
   const dragging = useRef(false);
 
@@ -56,7 +56,7 @@ export function Layout() {
   const openChangelog = useCallback(() => {
     setShowChangelog(true);
     if (latestHash) {
-      writeStoredString(CHANGELOG_SEEN_KEY, latestHash);
+      writeStoredString(CHANGELOG_SEEN_STORAGE_KEY, latestHash);
       setHasUnseen(false);
     }
   }, [latestHash]);
@@ -74,7 +74,7 @@ export function Layout() {
     const onMouseUp = (e: MouseEvent) => {
       dragging.current = false;
       const finalWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
-      writeStoredString(STORAGE_KEY, String(finalWidth));
+      writeStoredString(SIDEBAR_WIDTH_STORAGE_KEY, String(finalWidth));
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.cursor = "";

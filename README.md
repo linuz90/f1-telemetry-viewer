@@ -142,11 +142,12 @@ React 19, TypeScript, Vite 7, Tailwind CSS 4, Recharts 3, React Router 7, JSZip,
 ```txt
 src/
   components/    Layout, charts, tables, upload UI, dashboard sections
+  analysis/      UI-ready telemetry models, insight curation, track/session/rival/setup analysis
   context/       TelemetryProvider and browser zip/json loader
   hooks/         Session list, session detail, and track history hooks
   pages/         Dashboard, session detail, and track progress routes
   plugin/        Vite local API for reading telemetry JSON from disk
-  utils/         Formatting, formula scopes, statistics, summaries, routes
+  utils/         Formatting, formula scopes, storage, summaries, routes, low-level stats
   types/         TypeScript telemetry model
 ```
 
@@ -159,3 +160,5 @@ The `TelemetryProvider` uses one data-access path for every screen:
 That keeps dashboard cards, track pages, and session pages working the same way whether the app is reading your local folder, serving demo data, or parsing files dropped into the browser.
 
 Formula/game scope is part of the route, not a query parameter. The root path redirects to the latest scope with data; all analysis screens live under `/:formulaKey` so dashboard cards, sidebar sessions, track history, PBs, tyre life, and setup comparisons always describe the same game generation.
+
+Telemetry calculations are split into two layers. `src/utils/stats/` contains small reusable primitives such as lap filtering, ERS energy, tyre wear, and pace helpers. `src/analysis/` contains product-facing models and policies such as session insight cards, dashboard result aggregates, rival cards, track progress buckets, setup comparison, and chart-ready lap/sector/stint/damage/tyre models. UI components should render those models rather than reimplementing telemetry rules inline.

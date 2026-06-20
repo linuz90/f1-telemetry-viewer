@@ -21,8 +21,8 @@ import type {
   SessionInsight,
   SessionInsightTone,
   SessionInsightType,
-} from "../analysis/sessionInsights";
-import { ACCENT_TOKENS, type AccentColor } from "./Card";
+} from "../analysis/sessionInsightSummary";
+import { ACCENT_TOKENS, type AccentColor } from "../constants/accents";
 import { Tooltip } from "./Tooltip";
 import { podiumIcon, positionTone } from "./dashboard/helpers";
 import { CompoundBadge } from "./ui/CompoundBadge";

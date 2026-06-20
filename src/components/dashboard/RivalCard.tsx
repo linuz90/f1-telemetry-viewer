@@ -17,7 +17,7 @@ import type {
   RivalCard as RivalCardData,
   RivalCardKind,
 } from "../../analysis/rivalStats";
-import { type AccentColor } from "../Card";
+import type { AccentColor } from "../../constants/accents";
 import { InsightDetail, InsightValue } from "../ui/InsightText";
 import { InsightTile } from "../ui/InsightTile";
 

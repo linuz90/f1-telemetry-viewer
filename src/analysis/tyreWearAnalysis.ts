@@ -5,6 +5,14 @@ import {
   type SafetyCarRange,
 } from "./safetyCar";
 
+/**
+ * Tyre-wear chart model.
+ *
+ * Wear telemetry is stint-scoped, while the chart is lap-scoped. This module
+ * flattens stint histories, overlays optional rival wear, and adds pit/SC
+ * markers so the chart does not invent continuity where the car changed tyres.
+ */
+
 export interface TyreWearPoint {
   lap: number;
   wear: number | undefined;

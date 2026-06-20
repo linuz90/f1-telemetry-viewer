@@ -9,7 +9,7 @@ import {
   pluralize,
 } from "../../utils/format";
 import type { TrackRivalBenchmark } from "../../analysis/rivalStats";
-import type { TrackRaceRecommendation } from "../../utils/stats/track";
+import type { TrackRaceRecommendation } from "../../utils/stats/trackStrategy";
 import { CompoundBadge } from "../ui/CompoundBadge";
 import { highlightDetailValues } from "../ui/HighlightedDetailText";
 import { InsightDetail, InsightValue } from "../ui/InsightText";

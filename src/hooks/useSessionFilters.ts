@@ -1,4 +1,8 @@
 import { useCallback, useSyncExternalStore } from "react";
+import {
+  SESSION_FILTERS_CHANGED_EVENT,
+  SESSION_FILTERS_STORAGE_KEY,
+} from "../constants/storage";
 import type { SessionSummary } from "../types/telemetry";
 import {
   isQualifyingSessionType,
@@ -19,8 +23,6 @@ export const DEFAULT_FILTERS: SessionListFilters = {
   mode: "all",
 };
 
-const FILTERS_STORAGE_KEY = "session-list-filters";
-const FILTERS_CHANGED_EVENT = "session-list-filters-changed";
 const DEFAULT_FILTERS_SNAPSHOT = JSON.stringify(DEFAULT_FILTERS);
 
 let memoryFilters = DEFAULT_FILTERS;
@@ -49,7 +51,7 @@ function readSessionFilters(): SessionListFilters {
   if (typeof window === "undefined") return memoryFilters;
 
   try {
-    const raw = readStoredString(FILTERS_STORAGE_KEY, "session");
+    const raw = readStoredString(SESSION_FILTERS_STORAGE_KEY, "session");
     if (!raw) return memoryFilters;
     const filters = normalizeFilters(
       JSON.parse(raw) as Partial<SessionListFilters>,
@@ -69,14 +71,14 @@ function subscribe(callback: () => void): () => void {
   if (typeof window === "undefined") return () => {};
 
   const onStorage = (event: StorageEvent) => {
-    if (event.key === FILTERS_STORAGE_KEY) callback();
+    if (event.key === SESSION_FILTERS_STORAGE_KEY) callback();
   };
   window.addEventListener("storage", onStorage);
-  window.addEventListener(FILTERS_CHANGED_EVENT, callback);
+  window.addEventListener(SESSION_FILTERS_CHANGED_EVENT, callback);
 
   return () => {
     window.removeEventListener("storage", onStorage);
-    window.removeEventListener(FILTERS_CHANGED_EVENT, callback);
+    window.removeEventListener(SESSION_FILTERS_CHANGED_EVENT, callback);
   };
 }
 
@@ -86,8 +88,12 @@ function writeSessionFilters(next: SessionListFilters): void {
 
   if (typeof window === "undefined") return;
 
-  writeStoredString(FILTERS_STORAGE_KEY, JSON.stringify(filters), "session");
-  window.dispatchEvent(new Event(FILTERS_CHANGED_EVENT));
+  writeStoredString(
+    SESSION_FILTERS_STORAGE_KEY,
+    JSON.stringify(filters),
+    "session",
+  );
+  window.dispatchEvent(new Event(SESSION_FILTERS_CHANGED_EVENT));
 }
 
 export function useSessionFilters(): readonly [

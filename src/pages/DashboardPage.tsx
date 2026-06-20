@@ -18,10 +18,8 @@ import {
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { useTelemetry } from "../context/TelemetryContext";
 import { buildDashboardActivity } from "../analysis/dashboardActivity";
-import {
-  buildTrackInsights,
-  getDashboardResultStats,
-} from "../analysis/dashboardStats";
+import { buildTrackInsights } from "../analysis/dashboardInsights";
+import { getDashboardResultStats } from "../analysis/dashboardResultStats";
 import { buildRivalStats } from "../analysis/rivalStats";
 import {
   areSessionFiltersDefault,
@@ -32,7 +30,8 @@ import {
 import { useSessionList } from "../hooks/useSessionList";
 import { cn } from "../utils/cn";
 import { getSessionFormulaScopeKey } from "../utils/formulaScope";
-import { formatRelativeDate, sortTracksByCalendar } from "../utils/format";
+import { formatRelativeDate } from "../utils/format";
+import { sortTracksByCalendar } from "../utils/tracks";
 import { isRaceSessionType } from "../utils/sessionTypes";
 
 const RECENT_ACTIVITY_COLLAPSED = 3;

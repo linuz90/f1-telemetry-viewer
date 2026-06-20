@@ -142,6 +142,8 @@ function mergeBestLapInsight(
   if (!bestLap) return theoreticalBest;
   if (!theoreticalBest) return bestLap;
 
+  // Theoretical best is useful context but too similar to Best Lap to spend a
+  // full card on. Merge it so the primary lap story stays compact.
   return {
     ...bestLap,
     extraDetails: uniqueLines([
@@ -160,6 +162,9 @@ function mergeFuelInsights(
   if (!primary) return undefined;
 
   const hasRecommendation = recommended && recommended.value !== "—";
+  // Recommended fuel is the actionable value; current load is supporting
+  // context. If recommendation is missing, keep the tile visible as a data-gap
+  // signal rather than pretending the loaded fuel is a plan.
   return {
     type: "fuel",
     label: "Fuel Plan",
@@ -205,6 +210,8 @@ function mergeSectorInsights(
 
   const primary = strongest ?? weakest;
   if (!primary) return sectorInsights[0];
+  // Weakest sector gets the headline because it is the actionable loss. The
+  // strongest sector remains as context so the driver still sees what worked.
   const primarySector = extractSectorLabel(primary.label);
   const weakestSector = weakest ? extractSectorLabel(weakest.label) : undefined;
   const weakestDelta = weakest ? extractTimeDelta(weakest.detail) : undefined;
@@ -240,6 +247,9 @@ function mergePowerInsights(
   if (!primary) return undefined;
 
   if (!speed) {
+    // Qualifying/time-trial exports sometimes have ERS but no reliable speed
+    // sample; keep the power tile rather than dropping useful deploy/harvest
+    // data.
     return {
       ...primary,
       label: deploy && harvest ? "ERS Usage" : primary.label,
@@ -390,6 +400,8 @@ export function curateSessionInsights(
     session["session-info"]["session-type"],
   );
   const remaining = insights.filter(
+    // Lap Quality was clear as a debug metric but noisy as a card; result/best
+    // lap already explain whether the run produced useful timed laps.
     (insight) => insight.label !== "Lap Quality",
   );
   const result =
@@ -438,8 +450,12 @@ export function curateSessionInsights(
     appendIfPresent(curated, sectors);
     appendIfPresent(curated, power);
     appendIfPresent(curated, firstPit);
+    // Race screens already have many tactical cards, so history only earns a
+    // slot when it is actually notable (PB/matched PB/new best style signals).
     if (isHighValueHistory(history)) appendIfPresent(curated, history);
   } else if (isTimeTrial) {
+    // Time Trial is lap-first by nature; start with lap/history instead of a
+    // "result" tile that would only repeat timed-lap metadata.
     curated.length = 0;
     appendIfPresent(curated, lap);
     appendIfPresent(curated, history);

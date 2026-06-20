@@ -8,12 +8,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { PaceEvolutionPoint, RaceContext } from "../../utils/stats/track";
-import {
-  CHART_THEME,
-  TOOLTIP_STYLE,
-  getCompoundColor,
-} from "../../utils/colors";
+import type {
+  PaceEvolutionPoint,
+  RaceContext,
+} from "../../utils/stats/trackPaceEvolution";
+import { CHART_THEME, TOOLTIP_STYLE } from "../../constants/colors";
+import { getCompoundColor } from "../../utils/colors";
 import { msToLapTime } from "../../utils/format";
 import { cardClass } from "../Card";
 import { SegmentedControl } from "../ui/SegmentedControl";

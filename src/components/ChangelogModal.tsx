@@ -7,8 +7,8 @@ import {
   AUTHOR_TWITTER_HANDLE,
   AUTHOR_TWITTER_URL,
   REPO_URL,
-  pullRequestUrl,
-} from "../utils/links";
+} from "../constants/links";
+import { pullRequestUrl } from "../utils/links";
 import { cn } from "../utils/cn";
 
 const TYPE_CONFIG: Record<

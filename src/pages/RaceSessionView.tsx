@@ -1,49 +1,48 @@
-import { useState, useMemo, useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { buildDamageIncreaseLaps } from "../analysis/damageAnalysis";
-import type { DriverData, TelemetrySession } from "../types/telemetry";
-import { findFocusedDriver } from "../utils/stats/drivers";
-import { generateFuelInsights } from "../utils/stats/energy";
-import { calculateCumulativeDeltas } from "../utils/stats/laps";
+import { curateSessionInsights } from "../analysis/sessionInsightCuration";
 import {
-  generateInsights,
-  generateRaceHistoryInsights,
-} from "../utils/stats/sessionInsights";
-import { getCompletedStints, getDriverStints } from "../utils/stats/tyres";
-import { useTrackHistory } from "../hooks/useTrackHistory";
-import { useSessionList } from "../hooks/useSessionList";
-import { SessionHeader } from "../components/SessionHeader";
-import { SessionDriverSelect } from "../components/SessionDriverSelect";
-import { DriverComparisonPicker } from "../components/DriverComparisonPicker";
-import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
-import { StintTimeline, StintDetailCards } from "../components/StintTimeline";
-import { TyreWearChart } from "../components/TyreWearChart";
-import { StintComparisonTable } from "../components/StintComparisonTable";
-import { LapTimeChart } from "../components/LapTimeChart";
-import { CompoundLapComparison } from "../components/CompoundLapComparison";
-import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
-import { PositionChart } from "../components/PositionChart";
-import { RaceResultsTable } from "../components/RaceResultsTable";
-import { RaceControlTimeline } from "../components/RaceControlTimeline";
-import { DamageTimeline } from "../components/DamageTimeline";
+  buildSessionInsightsHint,
+  buildSessionSummaryInsights,
+} from "../analysis/sessionInsightSummary";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
+import { CompoundLapComparison } from "../components/CompoundLapComparison";
+import { DamageTimeline } from "../components/DamageTimeline";
+import { DriverComparisonPicker } from "../components/DriverComparisonPicker";
 import { DuplicateNotice } from "../components/DuplicateNotice";
-import {
-  getRaceControlEvents,
-  raceControlEventsToOvertakes,
-} from "../utils/raceControl";
-import { getTeamColor, getTeamName } from "../utils/colors";
+import { LapTimeChart } from "../components/LapTimeChart";
+import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
+import { PositionChart } from "../components/PositionChart";
+import { RaceControlTimeline } from "../components/RaceControlTimeline";
+import { RaceResultsTable } from "../components/RaceResultsTable";
+import { SessionDriverSelect } from "../components/SessionDriverSelect";
+import { SessionHeader } from "../components/SessionHeader";
+import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
+import { StintComparisonTable } from "../components/StintComparisonTable";
+import { StintDetailCards, StintTimeline } from "../components/StintTimeline";
+import { TyreWearChart } from "../components/TyreWearChart";
 import { Badge } from "../components/ui/Badge";
 import {
   PillSelect,
   type PillSelectSize,
   type PillSelectWidth,
 } from "../components/ui/PillSelect";
+import { HStack, VStack } from "../components/ui/Stack";
+import { useSessionList } from "../hooks/useSessionList";
+import { useTrackHistory } from "../hooks/useTrackHistory";
+import type { DriverData, TelemetrySession } from "../types/telemetry";
+import { getTeamColor, getTeamName } from "../utils/colors";
 import {
-  buildSessionInsightsHint,
-  buildSessionSummaryInsights,
-  curateSessionInsights,
-} from "../analysis/sessionInsights";
+  getRaceControlEvents,
+  raceControlEventsToOvertakes,
+} from "../utils/raceControl";
+import { findFocusedDriver } from "../utils/stats/drivers";
+import { generateFuelInsights } from "../utils/stats/energy";
+import { generateRaceHistoryInsights } from "../utils/stats/historyInsights";
+import { calculateCumulativeDeltas } from "../utils/stats/laps";
+import { generateInsights } from "../utils/stats/raceInsights";
+import { getCompletedStints, getDriverStints } from "../utils/stats/tyres";
 
 function timedRaceDrivers(drivers: DriverData[]): DriverData[] {
   return [...drivers]
@@ -105,12 +104,10 @@ function SpectatorDriverPicker({
 
 function StickySessionContextBar({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky top-0 z-30 -mx-1 !-mt-2 py-2 sm:!-mt-4">
-      <div className="flex min-w-0 justify-end">
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 rounded-lg border border-zinc-800/70 bg-zinc-950/85 p-1.5 shadow-lg shadow-black/25 backdrop-blur-md">
-          {children}
-        </div>
-      </div>
+    <div className="sticky top-0 z-30 -mx-4 border-b border-zinc-900/80 bg-canvas/90 px-4 py-3 shadow-lg shadow-black/20 backdrop-blur-md sm:-mx-6 sm:px-6">
+      <HStack align="center" wrap={false} className="gap-2">
+        {children}
+      </HStack>
     </div>
   );
 }
@@ -272,7 +269,7 @@ export function RaceSessionView({
       drivers={selectableDrivers}
       focusedDriverIndex={focusedDriverIndex}
       onFocusedDriverChange={handleFocusedDriverChange}
-      size="sm"
+      size="md"
       width="compact"
     />
   ) : (
@@ -281,7 +278,7 @@ export function RaceSessionView({
         session={session}
         focusedDriverIndex={focusedDriverIndex}
         onFocusedDriverChange={handleFocusedDriverChange}
-        size="sm"
+        size="md"
         width="compact"
       />
       <DriverComparisonPicker
@@ -289,7 +286,7 @@ export function RaceSessionView({
         selectedIndex={selectedRivalIndex}
         onSelect={setSelectedRivalIndex}
         focusedDriverIndex={focusedDriverIndex}
-        size="sm"
+        size="md"
         width="compact"
       />
     </>
@@ -301,123 +298,126 @@ export function RaceSessionView({
   );
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6 sm:space-y-8">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <SessionHeader
         session={session}
         focusedDriverIndex={focusedDriverIndex}
         onFocusedDriverChange={handleFocusedDriverChange}
         slug={slug}
         showDriverSelector={false}
+        showTrackLayout={false}
       />
       <StickySessionContextBar>
         {sessionContextControls}
       </StickySessionContextBar>
 
-      <SessionInsightsGrid insights={sessionInsights} hint={insightsHint} />
+      <VStack className="mt-6 gap-6 sm:gap-8">
+        <SessionInsightsGrid insights={sessionInsights} hint={insightsHint} />
 
-      {/* Stint strategy + tyre wear */}
-      {stints.length > 0 && (
-        <Card as="section" className="space-y-4">
-          <StintTimeline stints={stints} totalLaps={info["total-laps"]} />
-          <TyreWearChart
-            stints={stints}
-            rivalStints={rival ? rivalStints : undefined}
+        {/* Stint strategy + tyre wear */}
+        {stints.length > 0 && (
+          <Card as="section" className="space-y-4">
+            <StintTimeline stints={stints} totalLaps={info["total-laps"]} />
+            <TyreWearChart
+              stints={stints}
+              rivalStints={rival ? rivalStints : undefined}
+              rivalName={rival?.["driver-name"]}
+              perLapInfo={perLapInfo}
+            />
+            <StintDetailCards stints={stints} laps={laps} />
+          </Card>
+        )}
+
+        {/* Stint comparison table */}
+        {focusedDriver && stints.length > 0 && (
+          <Card as="section">
+            <StintComparisonTable player={focusedDriver} allDrivers={drivers} />
+          </Card>
+        )}
+
+        {/* Lap times */}
+        <Card as="section">
+          <LapTimeChart
+            laps={laps}
+            pitLaps={pitLaps}
+            rivalPitLaps={rival ? rivalPitLaps : undefined}
+            rivalLaps={rival ? rivalLaps : undefined}
             rivalName={rival?.["driver-name"]}
             perLapInfo={perLapInfo}
+            damageLaps={damageLaps}
+            stints={stints}
           />
-          <StintDetailCards stints={stints} laps={laps} />
         </Card>
-      )}
 
-      {/* Stint comparison table */}
-      {focusedDriver && stints.length > 0 && (
+        {/* Car setup */}
+        {showSetup && focusedDriver["car-setup"] && (
+          <Card as="section">
+            <CarSetupCard setup={focusedDriver["car-setup"]} />
+          </Card>
+        )}
+
+        {/* Damage timeline */}
         <Card as="section">
-          <StintComparisonTable player={focusedDriver} allDrivers={drivers} />
+          <DamageTimeline perLapInfo={perLapInfo} />
         </Card>
-      )}
 
-      {/* Lap times */}
-      <Card as="section">
-        <LapTimeChart
-          laps={laps}
-          pitLaps={pitLaps}
-          rivalPitLaps={rival ? rivalPitLaps : undefined}
-          rivalLaps={rival ? rivalLaps : undefined}
-          rivalName={rival?.["driver-name"]}
-          perLapInfo={perLapInfo}
-          damageLaps={damageLaps}
-          stints={stints}
+        {/* Compound comparison (only when rival selected) */}
+        {rival && (
+          <Card as="section">
+            <CompoundLapComparison
+              playerStints={stints}
+              playerLaps={laps}
+              rivalStints={rivalStints}
+              rivalLaps={rivalLaps}
+              rivalName={rival["driver-name"]}
+            />
+          </Card>
+        )}
+
+        {/* Performance delta (only when rival selected) */}
+        {rival && deltas.length > 0 && (
+          <Card as="section">
+            <PerformanceDeltaChart
+              deltas={deltas}
+              rivalName={rival["driver-name"]}
+            />
+          </Card>
+        )}
+
+        {/* Position changes */}
+        <Card as="section">
+          <PositionChart
+            positionHistory={session["position-history"] ?? []}
+            playerName={focusedDriver?.["driver-name"] ?? ""}
+            rivalName={rival?.["driver-name"]}
+            overtakes={filteredOvertakes}
+          />
+        </Card>
+
+        {/* Race control */}
+        {raceControlEvents.length > 0 && (
+          <Card as="section">
+            <RaceControlTimeline
+              events={raceControlEvents}
+              focusedDriver={focusedDriver}
+            />
+          </Card>
+        )}
+
+        {/* Results table */}
+        <Card as="section">
+          <RaceResultsTable
+            session={session}
+            focusedDriverIndex={focusedDriverIndex}
+            raceControlEvents={raceControlEvents}
+          />
+        </Card>
+
+        <DuplicateNotice
+          count={sessionMeta?.duplicateCount ?? 0}
+          isAutoSave={sessionMeta?.isAutoSave}
         />
-      </Card>
-
-      {/* Car setup */}
-      {showSetup && focusedDriver["car-setup"] && (
-        <Card as="section">
-          <CarSetupCard setup={focusedDriver["car-setup"]} />
-        </Card>
-      )}
-
-      {/* Damage timeline */}
-      <Card as="section">
-        <DamageTimeline perLapInfo={perLapInfo} />
-      </Card>
-
-      {/* Compound comparison (only when rival selected) */}
-      {rival && (
-        <Card as="section">
-          <CompoundLapComparison
-            playerStints={stints}
-            playerLaps={laps}
-            rivalStints={rivalStints}
-            rivalLaps={rivalLaps}
-            rivalName={rival["driver-name"]}
-          />
-        </Card>
-      )}
-
-      {/* Performance delta (only when rival selected) */}
-      {rival && deltas.length > 0 && (
-        <Card as="section">
-          <PerformanceDeltaChart
-            deltas={deltas}
-            rivalName={rival["driver-name"]}
-          />
-        </Card>
-      )}
-
-      {/* Position changes */}
-      <Card as="section">
-        <PositionChart
-          positionHistory={session["position-history"] ?? []}
-          playerName={focusedDriver?.["driver-name"] ?? ""}
-          rivalName={rival?.["driver-name"]}
-          overtakes={filteredOvertakes}
-        />
-      </Card>
-
-      {/* Race control */}
-      {raceControlEvents.length > 0 && (
-        <Card as="section">
-          <RaceControlTimeline
-            events={raceControlEvents}
-            focusedDriver={focusedDriver}
-          />
-        </Card>
-      )}
-
-      {/* Results table */}
-      <Card as="section">
-        <RaceResultsTable
-          session={session}
-          focusedDriverIndex={focusedDriverIndex}
-          raceControlEvents={raceControlEvents}
-        />
-      </Card>
-
-      <DuplicateNotice
-        count={sessionMeta?.duplicateCount ?? 0}
-        isAutoSave={sessionMeta?.isAutoSave}
-      />
+      </VStack>
     </div>
   );
 }

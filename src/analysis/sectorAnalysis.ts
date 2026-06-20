@@ -8,6 +8,15 @@ import { bestSectorTimeMs, isLapValid, sectorTimeMs } from "../utils/format";
 import { ersDeployMjForLap, ersHarvestMjForLap } from "../utils/stats/energy";
 import { getValidLaps } from "../utils/stats/laps";
 
+/**
+ * Sector-level analysis for qualifying/session detail views.
+ *
+ * Sector views compare a driver's lap execution against both their own laps
+ * and the session benchmark. The raw telemetry does not provide a ready-made
+ * "best sector by driver" table, so this module performs those scans once and
+ * gives the UI a stable model.
+ */
+
 export type SectorKey = "s1" | "s2" | "s3";
 
 export interface SectorBreakdownLap {
@@ -70,6 +79,8 @@ function buildLapCompoundMap(stints: readonly TyreStintBasic[] | undefined) {
     for (let lap = startLap; lap <= stint["end-lap"]; lap++) {
       map.set(lap, compound);
     }
+    // Basic stint exports only store each stint end lap. Carry the next start
+    // forward so lap-backed compound chips remain aligned.
     startLap = stint["end-lap"] + 1;
   }
   return map;
@@ -183,6 +194,8 @@ export function buildSectorVsBestModel({
   let sessionBestLap = Infinity;
   let sessionBestLapDriver = "";
   let sessionBestLapTeam = "";
+  // Scan all valid laps instead of trusting classification order. Some debug
+  // exports have partial final classification but complete lap histories.
   for (const driver of drivers) {
     for (const lap of getValidLaps(
       driver["session-history"]["lap-history-data"],

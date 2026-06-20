@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { SESSION_LIST_TAB_STORAGE_KEY } from "../constants/storage";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useSessionList } from "../hooks/useSessionList";
 import type { SessionSummary } from "../types/telemetry";
@@ -7,8 +8,8 @@ import {
   formatRelativeDate,
   formatSessionType,
   formatTime,
-  sortTracksByCalendar,
 } from "../utils/format";
+import { sortTracksByCalendar } from "../utils/tracks";
 import {
   isQualifyingSessionType,
   isTimeTrialSessionType,
@@ -77,7 +78,6 @@ function groupModeLabel(sessions: SessionSummary[]): string | null {
 }
 
 const PAGE_SIZE = 50;
-const TAB_STORAGE_KEY = "session-list-tab";
 
 type SidebarTab = "sessions" | "tracks";
 
@@ -91,7 +91,7 @@ export function SessionList() {
   const { sessions, loading, error } = useSessionList();
   const { activeFormulaKey, formulaOptions } = useTelemetry();
   const [tab, setTab] = useState<SidebarTab>(() =>
-    readStoredString(TAB_STORAGE_KEY, "session") === "tracks"
+    readStoredString(SESSION_LIST_TAB_STORAGE_KEY, "session") === "tracks"
       ? "tracks"
       : "sessions",
   );
@@ -101,7 +101,7 @@ export function SessionList() {
   // Persist the active tab across reloads within the same tab session. Filters
   // use a shared browser store so the dashboard and sidebar react together.
   useEffect(() => {
-    writeStoredString(TAB_STORAGE_KEY, tab, "session");
+    writeStoredString(SESSION_LIST_TAB_STORAGE_KEY, tab, "session");
   }, [tab]);
 
   useEffect(() => {

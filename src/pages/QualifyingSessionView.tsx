@@ -1,25 +1,23 @@
-import { useState, useMemo, useEffect } from "react";
-import type { TelemetrySession } from "../types/telemetry";
-import { findFocusedDriver } from "../utils/stats/drivers";
-import {
-  generateQualiInsights,
-  generateQualiHistoryInsights,
-} from "../utils/stats/sessionInsights";
-import { useTrackHistory } from "../hooks/useTrackHistory";
-import { useSessionList } from "../hooks/useSessionList";
-import { SessionHeader } from "../components/SessionHeader";
-import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
-import { QualifyingTable } from "../components/QualifyingTable";
-import { SectorComparison } from "../components/SectorComparison";
-import { SectorVsBest } from "../components/SectorVsBest";
-import { CarSetupCard } from "../components/CarSetupCard";
-import { Card } from "../components/Card";
-import { DuplicateNotice } from "../components/DuplicateNotice";
+import { useEffect, useMemo, useState } from "react";
+import { curateSessionInsights } from "../analysis/sessionInsightCuration";
 import {
   buildSessionInsightsHint,
   buildSessionSummaryInsights,
-  curateSessionInsights,
-} from "../analysis/sessionInsights";
+} from "../analysis/sessionInsightSummary";
+import { CarSetupCard } from "../components/CarSetupCard";
+import { Card } from "../components/Card";
+import { DuplicateNotice } from "../components/DuplicateNotice";
+import { QualifyingTable } from "../components/QualifyingTable";
+import { SectorComparison } from "../components/SectorComparison";
+import { SectorVsBest } from "../components/SectorVsBest";
+import { SessionHeader } from "../components/SessionHeader";
+import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
+import { useSessionList } from "../hooks/useSessionList";
+import { useTrackHistory } from "../hooks/useTrackHistory";
+import type { TelemetrySession } from "../types/telemetry";
+import { findFocusedDriver } from "../utils/stats/drivers";
+import { generateQualiHistoryInsights } from "../utils/stats/historyInsights";
+import { generateQualiInsights } from "../utils/stats/qualifyingInsights";
 
 export function QualifyingSessionView({
   session,

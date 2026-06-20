@@ -1,5 +1,13 @@
 import type { PositionHistoryEntry } from "../types/telemetry";
 
+/**
+ * Position-history projection for the race chart.
+ *
+ * Raw position history is stored per driver. Recharts wants one row per lap,
+ * and the UI only wants a handful of story-relevant drivers. Keeping both
+ * transformations here makes the chart a renderer, not a race-story arbiter.
+ */
+
 export interface PositionChartModel {
   maxPoints: number;
   maxLaps: number;
@@ -40,6 +48,8 @@ export function buildPositionChartModel({
 
   const data: Record<string, number>[] = [];
   for (let lap = 0; lap <= maxLaps; lap++) {
+    // Lap 0 represents the grid/start position in Pits n' Giggles exports, so
+    // keep it in the series; removing it would erase launch/lap-one context.
     const entry: Record<string, number> = { lap };
     for (const driver of positionHistory) {
       const position = driver["driver-position-history"].find(

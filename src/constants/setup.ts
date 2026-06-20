@@ -1,0 +1,23 @@
+/** Min/max ranges for F1 setup parameters. */
+export const CAR_SETUP_RANGES: Record<string, [number, number]> = {
+  "front-wing": [0, 50],
+  "rear-wing": [0, 50],
+  "on-throttle": [50, 100],
+  "off-throttle": [50, 100],
+  "front-camber": [-3.5, -2.5],
+  "rear-camber": [-2.0, -1.0],
+  "front-toe": [0.0, 0.5],
+  "rear-toe": [0.0, 0.5],
+  "front-suspension": [1, 41],
+  "rear-suspension": [1, 41],
+  "front-anti-roll-bar": [1, 21],
+  "rear-anti-roll-bar": [1, 21],
+  "front-suspension-height": [1, 50],
+  "rear-suspension-height": [1, 75],
+  "brake-pressure": [80, 100],
+  "brake-bias": [50, 70],
+  "front-left-tyre-pressure": [21.0, 30.0],
+  "front-right-tyre-pressure": [21.0, 30.0],
+  "rear-left-tyre-pressure": [19.5, 27.0],
+  "rear-right-tyre-pressure": [19.5, 27.0],
+};

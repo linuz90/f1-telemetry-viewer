@@ -4,7 +4,7 @@ import { usePlayerOnly } from "../hooks/usePlayerOnly";
 import { msToLapTime, msToSectorTime } from "../utils/format";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { cn } from "../utils/cn";
-import { formatQualifyingTableTitle } from "../analysis/sessionInsights";
+import { formatQualifyingTableTitle } from "../analysis/sessionInsightSummary";
 import { FocusToggle } from "./ui/FocusToggle";
 import { SectionHeader } from "./ui/SectionHeader";
 import {

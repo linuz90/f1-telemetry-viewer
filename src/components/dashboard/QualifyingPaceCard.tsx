@@ -8,7 +8,7 @@ import {
   YAxis,
 } from "recharts";
 import { cn } from "../../utils/cn";
-import { CHART_THEME } from "../../utils/colors";
+import { CHART_THEME } from "../../constants/colors";
 import { msToLapTime } from "../../utils/format";
 import { cardClassCompact } from "../Card";
 import { TrackFlag } from "../TrackFlag";

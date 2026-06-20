@@ -1,5 +1,6 @@
 import { Medal, Trophy, type LucideIcon } from "lucide-react";
-import { ACCENT_TOKENS, type AccentColor, accentCardClass } from "../Card";
+import { ACCENT_TOKENS, type AccentColor } from "../../constants/accents";
+import { accentCardClass } from "../Card";
 import type { SessionSummary } from "../../types/telemetry";
 import {
   getFormulaComparisonKey,

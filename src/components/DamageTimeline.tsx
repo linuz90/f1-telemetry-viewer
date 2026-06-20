@@ -14,8 +14,7 @@ import {
 } from "../analysis/damageAnalysis";
 import type { PerLapInfo } from "../types/telemetry";
 import { Badge } from "./ui/Badge";
-import { DAMAGE_COLORS } from "../utils/colors";
-import { CHART_THEME, TOOLTIP_STYLE } from "../utils/colors";
+import { CHART_THEME, DAMAGE_COLORS, TOOLTIP_STYLE } from "../constants/colors";
 import { EmptyState } from "./EmptyState";
 import { SectionHeader } from "./ui/SectionHeader";
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ExternalLink, Flag, Gauge, Target, Timer } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { TelemetrySession } from "../types/telemetry";
 import { formatSessionType } from "../utils/format";
@@ -12,6 +12,7 @@ import { trackPath, trackTabForSessionType } from "../utils/routes";
 import { TrackFlag } from "./TrackFlag";
 import { TrackLayout } from "./TrackLayout";
 import { SessionDriverSelect } from "./SessionDriverSelect";
+import { getSessionTypeMeta } from "./sessionTypeMeta";
 import { HStack } from "./ui/Stack";
 
 const EXT_LINK_TEMPLATE = import.meta.env.VITE_EXTERNAL_LINK_TEMPLATE as
@@ -21,19 +22,6 @@ const EXT_LINK_LABEL = import.meta.env.VITE_EXTERNAL_LINK_LABEL as
   | string
   | undefined;
 
-const SESSION_ICONS: Record<string, typeof Flag> = {
-  Race: Flag,
-  "Short Qualifying": Timer,
-  "Short Quali": Timer,
-  "Short Sprint Shootout": Timer,
-  "Sprint Shootout": Timer,
-  "Short Session Shootout": Timer,
-  "Session Shootout": Timer,
-  "One Shot Qualifying": Target,
-  "One-Shot Quali": Target,
-  "Time Trial": Gauge,
-};
-
 interface SessionHeaderProps {
   session: TelemetrySession;
   focusedDriverIndex: number;
@@ -41,6 +29,7 @@ interface SessionHeaderProps {
   controls?: ReactNode;
   slug?: string;
   showDriverSelector?: boolean;
+  showTrackLayout?: boolean;
 }
 
 export function SessionHeader({
@@ -50,12 +39,12 @@ export function SessionHeader({
   controls,
   slug,
   showDriverSelector = true,
+  showTrackLayout = true,
 }: SessionHeaderProps) {
   const info = session["session-info"];
 
   const sessionType = formatSessionType(info["session-type"], info.formula);
-  const TypeIcon =
-    SESSION_ICONS[info["session-type"]] ?? SESSION_ICONS[sessionType] ?? Flag;
+  const TypeIcon = getSessionTypeMeta(sessionType).icon;
   const formulaKey = getFormulaComparisonKey(
     info.formula,
     session["game-year"],
@@ -115,10 +104,12 @@ export function SessionHeader({
           {controls && <div className="contents">{controls}</div>}
         </div>
       </div>
-      <TrackLayout
-        track={info["track-id"]}
-        className="hidden sm:block size-20 shrink-0 text-zinc-600 [&>svg]:size-full"
-      />
+      {showTrackLayout && (
+        <TrackLayout
+          track={info["track-id"]}
+          className="hidden sm:block size-20 shrink-0 text-zinc-600 [&>svg]:size-full"
+        />
+      )}
     </HStack>
   );
 }

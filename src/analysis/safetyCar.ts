@@ -1,5 +1,13 @@
 import type { PerLapInfo } from "../types/telemetry";
 
+/**
+ * Shared Safety Car / VSC helpers.
+ *
+ * Several charts need the same interpretation of race-neutralization state.
+ * Centralizing the status checks and range collapse keeps highlights aligned
+ * across lap time, tyre wear, and any future per-lap view.
+ */
+
 export interface SafetyCarRange {
   x1: number;
   x2: number;

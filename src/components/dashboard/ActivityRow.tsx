@@ -1,5 +1,6 @@
 import { cn } from "../../utils/cn";
-import { ACCENT_TOKENS, type AccentColor, accentCardClass } from "../Card";
+import { ACCENT_TOKENS, type AccentColor } from "../../constants/accents";
+import { accentCardClass } from "../Card";
 import { TrackFlag } from "../TrackFlag";
 import { Badge } from "../ui/Badge";
 import { SessionRow } from "../SessionRow";

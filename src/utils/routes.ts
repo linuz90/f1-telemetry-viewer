@@ -1,23 +1,18 @@
 import type { SessionSummary } from "../types/telemetry";
+import {
+  SESSIONS_ROUTE_SEGMENT,
+  TRACK_SESSION_TABS,
+  TRACK_TAB_QUERY_PARAM,
+  TRACKS_ROUTE_SEGMENT,
+  type TrackSessionTab,
+} from "../constants/routes";
 import { getSessionFormulaScopeKey } from "./formulaScope";
-import { toTrackSlug } from "./format";
+import { toTrackSlug } from "./tracks";
 import {
   isQualifyingSessionType,
   isRaceSessionType,
   isTimeTrialSessionType,
 } from "./sessionTypes";
-
-export const TRACKS_ROUTE_SEGMENT = "tracks";
-export const SESSIONS_ROUTE_SEGMENT = "sessions";
-export const TRACK_TAB_QUERY_PARAM = "tab";
-
-export type TrackSessionTab = "qualifying" | "race" | "time-trial";
-
-const TRACK_SESSION_TABS = new Set<TrackSessionTab>([
-  "qualifying",
-  "race",
-  "time-trial",
-]);
 
 /**
  * Canonical app routes are scoped by game/formula as the first path segment:
@@ -35,7 +30,7 @@ export function dashboardPath(formulaKey?: string | null): string {
 export function isTrackSessionTab(
   value: string | null | undefined,
 ): value is TrackSessionTab {
-  return TRACK_SESSION_TABS.has(value as TrackSessionTab);
+  return TRACK_SESSION_TABS.includes(value as TrackSessionTab);
 }
 
 export function trackTabForSessionType(

@@ -24,9 +24,9 @@ import type {
   InsightKind,
   InsightScope,
   TrackInsight,
-} from "../../analysis/dashboardStats";
+} from "../../analysis/dashboardInsights";
 import { sessionPath } from "../../utils/routes";
-import { ACCENT_TOKENS, type AccentColor } from "../Card";
+import { ACCENT_TOKENS, type AccentColor } from "../../constants/accents";
 import { TrackFlag } from "../TrackFlag";
 import { TrackLayout } from "../TrackLayout";
 import { Badge } from "../ui/Badge";

@@ -1,9 +1,10 @@
 import type { SessionInfo, TelemetrySession } from "../types/telemetry";
-
-const PRIMARY_FORMULA_KEY = "f1";
-const F1_25_COMPARISON_KEY = "f1-25";
-const F1_26_COMPARISON_KEY = "f1-26";
-const LEGACY_F1_MODERN_ALIAS = "f1-modern";
+import {
+  F1_25_COMPARISON_KEY,
+  F1_26_COMPARISON_KEY,
+  LEGACY_F1_MODERN_ALIAS,
+  PRIMARY_FORMULA_KEY,
+} from "../constants/formulas";
 
 function getFormulaGenerationRank(formulaKey: string): number {
   return Number(formulaKey.match(/-(\d{2})$/)?.[1] ?? 0);
