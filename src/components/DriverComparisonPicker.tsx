@@ -5,7 +5,7 @@ import {
   findClosestRival,
   findFastestLapDriver,
   findRaceWinner,
-} from "../utils/stats";
+} from "../utils/stats/drivers";
 import {
   PillSelect,
   type PillSelectOption,

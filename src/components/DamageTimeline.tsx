@@ -7,6 +7,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import {
+  buildDamageAnalysis,
+  DAMAGE_SERIES_FIELDS,
+  type DamageFault,
+} from "../analysis/damageAnalysis";
 import type { PerLapInfo } from "../types/telemetry";
 import { Badge } from "./ui/Badge";
 import { DAMAGE_COLORS } from "../utils/colors";
@@ -18,88 +23,15 @@ interface DamageTimelineProps {
   perLapInfo: PerLapInfo[];
 }
 
-interface DamageField {
-  key: string;
-  label: string;
-  color: string;
-  getValue: (d: PerLapInfo) => number;
-}
-
-const DAMAGE_FIELDS: DamageField[] = [
-  {
-    key: "frontWing",
-    label: "Front Wing",
-    color: DAMAGE_COLORS.frontWing,
-    getValue: (d) =>
-      Math.max(
-        d["car-damage-data"]["front-left-wing-damage"] ?? 0,
-        d["car-damage-data"]["front-right-wing-damage"] ?? 0,
-      ),
-  },
-  {
-    key: "rearWing",
-    label: "Rear Wing",
-    color: DAMAGE_COLORS.rearWing,
-    getValue: (d) => d["car-damage-data"]["rear-wing-damage"] ?? 0,
-  },
-  {
-    key: "floor",
-    label: "Floor",
-    color: DAMAGE_COLORS.floor,
-    getValue: (d) => d["car-damage-data"]["floor-damage"] ?? 0,
-  },
-  {
-    key: "diffuser",
-    label: "Diffuser",
-    color: DAMAGE_COLORS.diffuser,
-    getValue: (d) => d["car-damage-data"]["diffuser-damage"] ?? 0,
-  },
-  {
-    key: "sidepod",
-    label: "Sidepod",
-    color: DAMAGE_COLORS.sidepod,
-    getValue: (d) => d["car-damage-data"]["sidepod-damage"] ?? 0,
-  },
-  {
-    key: "engine",
-    label: "Engine",
-    color: DAMAGE_COLORS.engine,
-    getValue: (d) => d["car-damage-data"]["engine-damage"] ?? 0,
-  },
-  {
-    key: "gearbox",
-    label: "Gearbox",
-    color: DAMAGE_COLORS.gearbox,
-    getValue: (d) => d["car-damage-data"]["gear-box-damage"] ?? 0,
-  },
-];
-
-interface FaultEvent {
-  lap: number;
-  label: string;
-}
-
-const FAULT_CHECKS: {
-  key: keyof PerLapInfo["car-damage-data"];
-  label: string;
-}[] = [
-  {
-    key: "drs-fault" as keyof PerLapInfo["car-damage-data"],
-    label: "DRS Fault",
-  },
-  {
-    key: "ers-fault" as keyof PerLapInfo["car-damage-data"],
-    label: "ERS Fault",
-  },
-  {
-    key: "engine-blown" as keyof PerLapInfo["car-damage-data"],
-    label: "Engine Blown",
-  },
-  {
-    key: "engine-seized" as keyof PerLapInfo["car-damage-data"],
-    label: "Engine Seized",
-  },
-];
+const DAMAGE_FIELD_COLORS: Record<string, string> = {
+  frontWing: DAMAGE_COLORS.frontWing,
+  rearWing: DAMAGE_COLORS.rearWing,
+  floor: DAMAGE_COLORS.floor,
+  diffuser: DAMAGE_COLORS.diffuser,
+  sidepod: DAMAGE_COLORS.sidepod,
+  engine: DAMAGE_COLORS.engine,
+  gearbox: DAMAGE_COLORS.gearbox,
+};
 
 export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
   // Need at least 2 data points to draw a meaningful timeline
@@ -112,42 +44,29 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
     );
   }
 
-  // Build chart data
-  const data = perLapInfo.map((lap) => {
-    const entry: Record<string, number> = { lap: lap["lap-number"] };
-    for (const field of DAMAGE_FIELDS) {
-      entry[field.key] = field.getValue(lap);
-    }
-    return entry;
-  });
-
-  // Determine which fields have non-zero values
-  const activeFields = DAMAGE_FIELDS.filter((field) =>
-    data.some((d) => d[field.key] > 0),
+  const analysis = buildDamageAnalysis(perLapInfo);
+  const activeFields = DAMAGE_SERIES_FIELDS.filter((field) =>
+    analysis.activeFieldKeys.includes(field.key),
   );
 
   // Check if any damage occurred at all
   if (activeFields.length === 0) {
-    // Also check for boolean faults
-    const faults = detectFaults(perLapInfo);
-    if (faults.length === 0) return null;
+    if (analysis.faults.length === 0) return null;
     // Only faults, no damage chart needed — just show badges
     return (
       <div>
         <SectionHeader size="sm" title="Damage" />
-        <FaultBadges faults={faults} />
+        <FaultBadges faults={analysis.faults} />
       </div>
     );
   }
-
-  const faults = detectFaults(perLapInfo);
 
   return (
     <div>
       <SectionHeader size="sm" title="Damage" />
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart
-          data={data}
+          data={analysis.data}
           margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
@@ -185,35 +104,20 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
               type="monotone"
               dataKey={field.key}
               name={field.label}
-              stroke={field.color}
-              fill={field.color}
+              stroke={DAMAGE_FIELD_COLORS[field.key]}
+              fill={DAMAGE_FIELD_COLORS[field.key]}
               fillOpacity={0.1}
               strokeWidth={1.5}
             />
           ))}
         </AreaChart>
       </ResponsiveContainer>
-      {faults.length > 0 && <FaultBadges faults={faults} />}
+      {analysis.faults.length > 0 && <FaultBadges faults={analysis.faults} />}
     </div>
   );
 }
 
-function detectFaults(perLapInfo: PerLapInfo[]): FaultEvent[] {
-  const faults: FaultEvent[] = [];
-  const seen = new Set<string>();
-  for (const lap of perLapInfo) {
-    for (const { key, label } of FAULT_CHECKS) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((lap["car-damage-data"] as any)[key] && !seen.has(key)) {
-        seen.add(key);
-        faults.push({ lap: lap["lap-number"], label });
-      }
-    }
-  }
-  return faults;
-}
-
-function FaultBadges({ faults }: { faults: FaultEvent[] }) {
+function FaultBadges({ faults }: { faults: DamageFault[] }) {
   return (
     <div className="flex flex-wrap gap-2 mt-2">
       {faults.map((fault, i) => (

@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { buildLapAnalysis, type LapAnalysisRow } from "../analysis/lapAnalysis";
 import type {
   LapHistoryEntry,
   PerLapInfo,
@@ -23,17 +24,8 @@ import {
   SC_COLORS,
   SC_FALLBACK,
 } from "../utils/colors";
-import {
-  isLapValid,
-  msToLapTime,
-  msToSectorTime,
-  sectorTimeMs,
-} from "../utils/format";
-import {
-  ersDeployMjForLap,
-  ersHarvestMjForLap,
-  getWorstWheelWear,
-} from "../utils/stats";
+import { msToLapTime, msToSectorTime } from "../utils/format";
+import { readStoredBoolean, writeStoredBoolean } from "../utils/storage";
 import { Tooltip as HoverTooltip } from "./Tooltip";
 import { Badge } from "./ui/Badge";
 import { FocusToggle } from "./ui/FocusToggle";
@@ -79,51 +71,6 @@ interface LapTimeChartProps {
 const BATTERY_VISIBILITY_STORAGE_KEY = "f1.lapTimeChart.showBattery";
 const CLEAN_LAPS_STORAGE_KEY = "f1.lapTimeChart.cleanLaps";
 
-function minOrZero(values: number[]): number {
-  return values.length > 0 ? Math.min(...values) : 0;
-}
-
-function maxOrZero(values: number[]): number {
-  return values.length > 0 ? Math.max(...values) : 0;
-}
-
-function buildLapTicks(maxLap: number): number[] {
-  if (maxLap <= 1) return [1];
-  const step =
-    maxLap <= 12
-      ? 1
-      : maxLap <= 24
-        ? 2
-        : maxLap <= 40
-          ? 4
-          : maxLap <= 60
-            ? 5
-            : 10;
-  const ticks = [1];
-  for (let lap = 1 + step; lap < maxLap; lap += step) {
-    ticks.push(lap);
-  }
-  if (ticks[ticks.length - 1] !== maxLap) ticks.push(maxLap);
-  return ticks;
-}
-
-function readPersistedBoolean(key: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(key) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function persistBoolean(key: string, value: boolean) {
-  try {
-    window.localStorage.setItem(key, String(value));
-  } catch {
-    // A blocked storage write should not make chart toggles feel broken.
-  }
-}
-
 /**
  * Line chart showing lap time progression.
  * Invalid laps shown in red, valid laps in cyan.
@@ -141,10 +88,10 @@ export function LapTimeChart({
   stints,
 }: LapTimeChartProps) {
   const [showBattery, setShowBattery] = useState(() =>
-    readPersistedBoolean(BATTERY_VISIBILITY_STORAGE_KEY),
+    readStoredBoolean(BATTERY_VISIBILITY_STORAGE_KEY),
   );
   const [showCleanLaps, setShowCleanLaps] = useState(() =>
-    readPersistedBoolean(CLEAN_LAPS_STORAGE_KEY),
+    readStoredBoolean(CLEAN_LAPS_STORAGE_KEY),
   );
 
   if (!laps.length) {
@@ -154,7 +101,7 @@ export function LapTimeChart({
   const toggleBatteryVisibility = () => {
     setShowBattery((prev) => {
       const next = !prev;
-      persistBoolean(BATTERY_VISIBILITY_STORAGE_KEY, next);
+      writeStoredBoolean(BATTERY_VISIBILITY_STORAGE_KEY, next);
       return next;
     });
   };
@@ -162,177 +109,47 @@ export function LapTimeChart({
   const toggleCleanLaps = () => {
     setShowCleanLaps((prev) => {
       const next = !prev;
-      persistBoolean(CLEAN_LAPS_STORAGE_KEY, next);
+      writeStoredBoolean(CLEAN_LAPS_STORAGE_KEY, next);
       return next;
     });
   };
 
-  // Build per-lap-info lookup by lap number
-  const lapInfoMap = new Map<number, PerLapInfo>();
-  if (perLapInfo) {
-    for (const info of perLapInfo) {
-      lapInfoMap.set(info["lap-number"], info);
-    }
+  const analysis = buildLapAnalysis({
+    laps,
+    pitLaps,
+    rivalPitLaps,
+    rivalLaps,
+    perLapInfo,
+    stints,
+    showCleanLaps,
+  });
+  if (!analysis.rows.length) {
+    return <p className="text-sm text-zinc-500">No lap data.</p>;
   }
 
-  // Per-lap fuel burn (kg) = prev lap's tank − this lap's tank. First lap has
-  // no prior reading, so it stays absent. We also track the green-flag median
-  // to classify each lap as push (above) vs. saving (below) in the table.
-  const fuelBurnMap = new Map<number, number>();
-  const greenFlagBurns: number[] = [];
-  if (perLapInfo && perLapInfo.length >= 2) {
-    const sortedFuel = [...perLapInfo]
-      .filter((l) => l["car-status-data"]?.["fuel-in-tank"] > 0)
-      .sort((a, b) => a["lap-number"] - b["lap-number"]);
-    for (let i = 1; i < sortedFuel.length; i++) {
-      const prev = sortedFuel[i - 1]!;
-      const curr = sortedFuel[i]!;
-      const burn =
-        prev["car-status-data"]["fuel-in-tank"] -
-        curr["car-status-data"]["fuel-in-tank"];
-      // Refuel-style negatives can show up in glitched/aborted sessions —
-      // ignore them rather than render a misleading "saving" lap.
-      if (burn <= 0) continue;
-      fuelBurnMap.set(curr["lap-number"], burn);
-      const prevGreen =
-        (prev["max-safety-car-status"] ?? "NO_SAFETY_CAR") === "NO_SAFETY_CAR";
-      const currGreen =
-        (curr["max-safety-car-status"] ?? "NO_SAFETY_CAR") === "NO_SAFETY_CAR";
-      if (prevGreen && currGreen) greenFlagBurns.push(burn);
-    }
-  }
-  const medianGreenBurn = (() => {
-    if (!greenFlagBurns.length) return undefined;
-    const sorted = [...greenFlagBurns].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0
-      ? (sorted[mid - 1]! + sorted[mid]!) / 2
-      : sorted[mid]!;
-  })();
-
-  // Build rival lookup by lap number
-  const rivalMap = new Map<number, number>();
-  if (rivalLaps) {
-    let lapNum = 0;
-    for (const l of rivalLaps) {
-      if (l["lap-time-in-ms"] > 0) {
-        lapNum++;
-        rivalMap.set(lapNum, l["lap-time-in-ms"] / 1000);
-      }
-    }
-  }
-
-  const data = laps
-    .filter((l) => l["lap-time-in-ms"] > 0)
-    .map((l, i) => {
-      const lapNum = i + 1;
-      const info = lapInfoMap.get(lapNum);
-      const scStatus = info?.["max-safety-car-status"] ?? "NO_SAFETY_CAR";
-      const ersMj = info ? ersDeployMjForLap(info) : undefined;
-      const ersHarvMj = info ? ersHarvestMjForLap(info) : undefined;
-
-      return {
-        lap: lapNum,
-        timeMs: l["lap-time-in-ms"],
-        timeStr: l["lap-time-str"],
-        timeSec: l["lap-time-in-ms"] / 1000,
-        valid: isLapValid(l["lap-valid-bit-flags"]),
-        s1: sectorTimeMs(l, 1) / 1000,
-        s2: sectorTimeMs(l, 2) / 1000,
-        s3: sectorTimeMs(l, 3) / 1000,
-        topSpeed: info?.["top-speed-kmph"] ?? undefined,
-        rivalTimeSec: rivalMap.get(lapNum) ?? undefined,
-        scStatus,
-        isSC: scStatus === "SAFETY_CAR" || scStatus === "FULL_SAFETY_CAR",
-        isVSC: scStatus === "VIRTUAL_SAFETY_CAR",
-        ersMj,
-        ersHarvMj,
-        fuelKg: fuelBurnMap.get(lapNum) ?? undefined,
-      };
-    });
-
-  const pitOutlierLaps = new Set<number>();
-  const addPitOutlierLaps = (pitStopLaps: number[]) => {
-    for (const lap of pitStopLaps) {
-      if (lap > 1) pitOutlierLaps.add(lap - 1);
-      pitOutlierLaps.add(lap);
-    }
-  };
-  if (stints && stints.length > 0) {
-    for (let i = 1; i < stints.length; i++) {
-      pitOutlierLaps.add(stints[i - 1]!["end-lap"]);
-      pitOutlierLaps.add(stints[i]!["start-lap"]);
-    }
-  } else {
-    addPitOutlierLaps(pitLaps);
-  }
-  addPitOutlierLaps(rivalPitLaps);
-  const hasPitOutliers = data.some((d) => pitOutlierLaps.has(d.lap));
-  const hasSafetyCarOutliers = data.some((d) => d.isSC || d.isVSC);
-  const hasCleanLapOutliers = hasPitOutliers || hasSafetyCarOutliers;
-  const cleanChartData =
-    hasCleanLapOutliers && showCleanLaps
-      ? data.filter((d) => !pitOutlierLaps.has(d.lap) && !d.isSC && !d.isVSC)
-      : data;
-  const chartData = cleanChartData.length > 0 ? cleanChartData : data;
-  const maxLap = maxOrZero(data.map((d) => d.lap)) || 1;
-  const lapTicks = buildLapTicks(maxLap);
-
-  // Y-axis domain: round to whole seconds for clean tick marks
-  const allTimes = [
-    ...chartData.map((d) => d.timeSec),
-    ...chartData
-      .filter((d) => d.rivalTimeSec != null)
-      .map((d) => d.rivalTimeSec!),
-  ];
-  const minTime = Math.min(...allTimes);
-  const maxTime = Math.max(...allTimes);
-  const yMin = Math.floor(minTime);
-  const yMax = Math.ceil(maxTime);
-
-  const hasRival = rivalLaps && rivalLaps.length > 0;
-  const hasErs = data.some((d) => d.ersMj != null && d.ersMj > 0);
-  const hasErsHarv = data.some((d) => d.ersHarvMj != null && d.ersHarvMj > 0);
-  const hasBattery = hasErs || hasErsHarv;
+  const data = analysis.rows;
+  const chartData = analysis.chartRows;
+  const maxLap = analysis.maxLap;
+  const lapTicks = analysis.lapTicks;
+  const yMin = analysis.yMin;
+  const yMax = analysis.yMax;
+  const hasRival = analysis.hasRival;
+  const hasErs = analysis.hasErs;
+  const hasErsHarv = analysis.hasErsHarv;
+  const hasBattery = analysis.hasBattery;
   const showBatteryDetails = hasBattery && showBattery;
-  const maxErsMj = hasBattery
-    ? Math.max(
-        0,
-        ...data.filter((d) => d.ersMj != null).map((d) => d.ersMj!),
-        ...data.filter((d) => d.ersHarvMj != null).map((d) => d.ersHarvMj!),
-      )
-    : 0;
-  const hasFuel = data.some((d) => d.fuelKg != null);
-  const hasTopSpeed = data.some((d) => d.topSpeed != null);
-  const bestTopSpeed = hasTopSpeed
-    ? maxOrZero(
-        data
-          .filter((d) => d.valid && d.topSpeed != null)
-          .map((d) => d.topSpeed!),
-      )
-    : 0;
-
-  // Chart display filters should not alter the full lap table highlights.
-  const validChartData = chartData.filter((d) => d.valid);
-  const validTableData = data.filter((d) => d.valid);
-  const chartBestTime = minOrZero(validChartData.map((d) => d.timeSec));
-  const tableBestTime = minOrZero(validTableData.map((d) => d.timeSec));
-  const bestS1 = minOrZero(validTableData.map((d) => d.s1));
-  const bestS2 = minOrZero(validTableData.map((d) => d.s2));
-  const bestS3 = minOrZero(validTableData.map((d) => d.s3));
-
-  // Collect SC/VSC ranges for reference areas
-  const scRanges: { x1: number; x2: number; status: string }[] = [];
-  for (const d of chartData) {
-    if (d.isSC || d.isVSC) {
-      const prev = scRanges[scRanges.length - 1];
-      if (prev && prev.status === d.scStatus && prev.x2 === d.lap - 1) {
-        prev.x2 = d.lap;
-      } else {
-        scRanges.push({ x1: d.lap, x2: d.lap, status: d.scStatus });
-      }
-    }
-  }
+  const maxErsMj = analysis.maxErsMj;
+  const hasFuel = analysis.hasFuel;
+  const hasTopSpeed = analysis.hasTopSpeed;
+  const bestTopSpeed = analysis.bestTopSpeed;
+  const hasCleanLapOutliers = analysis.hasCleanLapOutliers;
+  const chartBestTime = analysis.chartBestTime;
+  const tableBestTime = analysis.tableBestTime;
+  const bestS1 = analysis.bestS1;
+  const bestS2 = analysis.bestS2;
+  const bestS3 = analysis.bestS3;
+  const scRanges = analysis.scRanges;
+  const medianGreenBurn = analysis.medianGreenBurn;
   const renderLapTooltip = ({ active, label, payload }: LapTooltipProps) => {
     if (!active || !payload?.length) return null;
     const entry = chartData.find((d) => d.lap === Number(label));
@@ -668,24 +485,7 @@ export function LapTimeChart({
       {/* Lap table grouped by stint */}
       <div className="mt-3 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
         {(() => {
-          const hasWear =
-            stints?.some((s) => s["tyre-wear-history"]?.length > 0) ?? false;
-          // Build wear lookup: lap number → max/worst-wheel wear %
-          // Each stint's wear history starts with the pit-lap at 0% (fresh tyres),
-          // which would overwrite the previous stint's final wear. Keep the higher
-          // value so pit laps show the outgoing tyre wear, not the incoming 0%.
-          const wearMap = new Map<number, number>();
-          if (stints) {
-            for (const stint of stints) {
-              for (const entry of stint["tyre-wear-history"] ?? []) {
-                const worst = getWorstWheelWear(entry);
-                const existing = wearMap.get(entry["lap-number"]);
-                if (existing == null || worst > existing) {
-                  wearMap.set(entry["lap-number"], worst);
-                }
-              }
-            }
-          }
+          const hasWear = data.some((lap) => lap.wear != null);
 
           const colCount =
             5 +
@@ -757,7 +557,7 @@ export function LapTimeChart({
             </tr>
           );
 
-          const renderLapRow = (d: (typeof data)[number], rowKey: string) => {
+          const renderLapRow = (d: LapAnalysisRow, rowKey: string) => {
             const isBestLap =
               d.valid &&
               tableBestTime > 0 &&
@@ -768,7 +568,7 @@ export function LapTimeChart({
               d.valid && bestS2 > 0 && Math.abs(d.s2 - bestS2) < 0.001;
             const isBestS3 =
               d.valid && bestS3 > 0 && Math.abs(d.s3 - bestS3) < 0.001;
-            const wear = wearMap.get(d.lap);
+            const wear = d.wear;
             const scBg = d.isSC
               ? "bg-amber-500/10"
               : d.isVSC
@@ -947,21 +747,14 @@ export function LapTimeChart({
             );
           };
 
-          // Group laps by stint when stints are available
-          if (stints && stints.length > 0) {
+          if (analysis.stintGroups.length > 0) {
             return (
               <table className={cn(tableClass, "min-w-[500px]")}>
                 <thead className={tableHeadClass}>{headerRow}</thead>
                 <tbody>
-                  {stints.map((stint, si) => {
-                    const compound =
-                      stint["tyre-set-data"]["visual-tyre-compound"];
+                  {analysis.stintGroups.map((group, si) => {
+                    const { stint, compound } = group;
                     const color = COMPOUND_COLORS[compound] ?? "#a1a1aa";
-                    const stintLaps = data.filter(
-                      (d) =>
-                        d.lap >= stint["start-lap"] &&
-                        d.lap <= stint["end-lap"],
-                    );
                     return [
                       <tr key={`stint-${si}`}>
                         <td
@@ -983,7 +776,7 @@ export function LapTimeChart({
                           </div>
                         </td>
                       </tr>,
-                      ...stintLaps.map((lap, li) =>
+                      ...group.rows.map((lap, li) =>
                         renderLapRow(lap, `stint-${si}-lap-${lap.lap}-${li}`),
                       ),
                     ];

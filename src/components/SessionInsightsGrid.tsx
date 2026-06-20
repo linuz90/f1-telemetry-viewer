@@ -21,7 +21,7 @@ import type {
   SessionInsight,
   SessionInsightTone,
   SessionInsightType,
-} from "../utils/sessionInsights";
+} from "../analysis/sessionInsights";
 import { ACCENT_TOKENS, type AccentColor } from "./Card";
 import { Tooltip } from "./Tooltip";
 import { podiumIcon, positionTone } from "./dashboard/helpers";

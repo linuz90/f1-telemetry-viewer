@@ -1,15 +1,10 @@
-import type { TelemetrySession, DriverData } from "../types/telemetry";
+import { buildQualifyingTableModel } from "../analysis/resultsAnalysis";
+import type { TelemetrySession } from "../types/telemetry";
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
-import {
-  bestSectorTimeMs,
-  msToLapTime,
-  msToSectorTime,
-  sectorTimeMs,
-} from "../utils/format";
+import { msToLapTime, msToSectorTime } from "../utils/format";
 import { getTeamColor, getTeamName } from "../utils/colors";
-import { getValidLaps } from "../utils/stats";
 import { cn } from "../utils/cn";
-import { formatQualifyingTableTitle } from "../utils/sessionInsights";
+import { formatQualifyingTableTitle } from "../analysis/sessionInsights";
 import { FocusToggle } from "./ui/FocusToggle";
 import { SectionHeader } from "./ui/SectionHeader";
 import {
@@ -25,24 +20,6 @@ interface QualifyingTableProps {
   focusedDriverIndex: number;
 }
 
-/** Get the best lap entry for a driver */
-function driverBestLap(driver: DriverData) {
-  const laps = driver["session-history"]["lap-history-data"];
-  const valid = getValidLaps(laps);
-  if (!valid.length) return null;
-  return valid.reduce((best, l) =>
-    l["lap-time-in-ms"] < best["lap-time-in-ms"] ? l : best,
-  );
-}
-
-/** Check if driver has laps but all are invalid */
-function hasOnlyInvalidLaps(driver: DriverData): boolean {
-  const laps = driver["session-history"]["lap-history-data"];
-  const withTime = laps.filter((l) => l["lap-time-in-ms"] > 0);
-  if (!withTime.length) return false;
-  return getValidLaps(laps).length === 0;
-}
-
 /**
  * Qualifying results table: all drivers ranked by best valid lap.
  */
@@ -51,39 +28,11 @@ export function QualifyingTable({
   focusedDriverIndex,
 }: QualifyingTableProps) {
   const [focusedOnly, toggleFocusedOnly] = usePlayerOnly();
-  const drivers = session["classification-data"];
-
-  // Build rows with best lap data
-  const rows = drivers
-    .map((d) => {
-      const best = driverBestLap(d);
-      return {
-        driver: d,
-        bestLap: best,
-        bestTime: best?.["lap-time-in-ms"] ?? Infinity,
-        allInvalid: hasOnlyInvalidLaps(d),
-      };
-    })
-    .filter((r) => r.bestLap || r.allInvalid)
-    .filter((r) => !focusedOnly || r.driver.index === focusedDriverIndex)
-    .sort((a, b) => a.bestTime - b.bestTime);
-
-  const p1Time = rows[0]?.bestTime ?? 0;
-
-  // Compute overall best sector times and best lap for purple highlighting
-  const allBestLaps = rows.filter((r) => r.bestLap).map((r) => r.bestLap!);
-  const bestLapTime = allBestLaps.length
-    ? Math.min(...allBestLaps.map((l) => l["lap-time-in-ms"]))
-    : null;
-  const bestS1 = allBestLaps.length
-    ? bestSectorTimeMs(allBestLaps, 1) || null
-    : null;
-  const bestS2 = allBestLaps.length
-    ? bestSectorTimeMs(allBestLaps, 2) || null
-    : null;
-  const bestS3 = allBestLaps.length
-    ? bestSectorTimeMs(allBestLaps, 3) || null
-    : null;
+  const model = buildQualifyingTableModel({
+    session,
+    focusedOnly,
+    focusedDriverIndex,
+  });
 
   return (
     <div>
@@ -111,19 +60,17 @@ export function QualifyingTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => {
+            {model.rows.map((row) => {
               const isFocused = row.driver.index === focusedDriverIndex;
-              const rowS1 = row.bestLap ? sectorTimeMs(row.bestLap, 1) : 0;
-              const rowS2 = row.bestLap ? sectorTimeMs(row.bestLap, 2) : 0;
-              const rowS3 = row.bestLap ? sectorTimeMs(row.bestLap, 3) : 0;
+              const [rowS1, rowS2, rowS3] = row.sectorTimes;
               const gap =
-                i === 0
+                row.position === 1
                   ? "–"
                   : row.bestTime === Infinity
                     ? row.allInvalid
                       ? "ALL INVALID"
                       : "NO TIME"
-                    : `+${((row.bestTime - p1Time) / 1000).toFixed(3)}`;
+                    : `+${((row.bestTime - model.p1Time) / 1000).toFixed(3)}`;
 
               return (
                 <tr
@@ -133,7 +80,7 @@ export function QualifyingTable({
                     isFocused && "bg-zinc-800/40 text-white font-medium",
                   )}
                 >
-                  <td className={tableCellClass()}>{i + 1}</td>
+                  <td className={tableCellClass()}>{row.position}</td>
                   <td className={tableCellClass()}>
                     <span
                       className="inline-block w-1 h-3 rounded-sm mr-1.5 align-middle"
@@ -150,8 +97,8 @@ export function QualifyingTable({
                     className={cn(
                       tableCellClass({ align: "right", mono: true }),
                       row.bestLap &&
-                        bestLapTime !== null &&
-                        row.bestLap["lap-time-in-ms"] === bestLapTime &&
+                        model.bestLapTime !== null &&
+                        row.bestLap["lap-time-in-ms"] === model.bestLapTime &&
                         "text-best font-bold",
                     )}
                   >
@@ -162,7 +109,9 @@ export function QualifyingTable({
                   <td
                     className={cn(
                       tableCellClass({ align: "right", mono: true }),
-                      row.bestLap && bestS1 !== null && rowS1 === bestS1
+                      row.bestLap &&
+                        model.bestS1 !== null &&
+                        rowS1 === model.bestS1
                         ? "text-best font-bold"
                         : "text-zinc-400",
                     )}
@@ -172,7 +121,9 @@ export function QualifyingTable({
                   <td
                     className={cn(
                       tableCellClass({ align: "right", mono: true }),
-                      row.bestLap && bestS2 !== null && rowS2 === bestS2
+                      row.bestLap &&
+                        model.bestS2 !== null &&
+                        rowS2 === model.bestS2
                         ? "text-best font-bold"
                         : "text-zinc-400",
                     )}
@@ -182,7 +133,9 @@ export function QualifyingTable({
                   <td
                     className={cn(
                       tableCellClass({ align: "right", mono: true }),
-                      row.bestLap && bestS3 !== null && rowS3 === bestS3
+                      row.bestLap &&
+                        model.bestS3 !== null &&
+                        rowS3 === model.bestS3
                         ? "text-best font-bold"
                         : "text-zinc-400",
                     )}

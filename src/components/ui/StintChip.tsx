@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { getCompoundColor } from "../../utils/colors";
+import { getCompoundColor, hexToRgbTriplet } from "../../utils/colors";
 
 /**
  * Shared visual treatment for tyre-compound stint chips — the colored blocks
@@ -17,15 +17,6 @@ import { getCompoundColor } from "../../utils/colors";
  *  than white. Medium (#eab308) is yellow, Hard (#e5e7eb) is near-white, and
  *  the C1–C3 fallback aliases match those visually. */
 const LIGHT_BG_COMPOUNDS = new Set(["Medium", "Hard", "C1", "C2", "C3"]);
-
-/** Parse a `#rrggbb` color into an `r, g, b` triplet usable inside `rgba()`. */
-function hexToRgbTriplet(hex: string): string {
-  const value = hex.replace("#", "");
-  const r = parseInt(value.slice(0, 2), 16);
-  const g = parseInt(value.slice(2, 4), 16);
-  const b = parseInt(value.slice(4, 6), 16);
-  return `${r}, ${g}, ${b}`;
-}
 
 export function stintChipStyle(compound: string): CSSProperties {
   const color = getCompoundColor(compound);

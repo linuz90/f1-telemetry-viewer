@@ -1,12 +1,15 @@
 import { useCallback, useSyncExternalStore } from "react";
+import { readStoredBoolean, writeStoredBoolean } from "../utils/storage";
 
 const STORAGE_KEY = "player-only";
 
 function getSnapshot(): boolean {
-  return localStorage.getItem(STORAGE_KEY) === "true";
+  return readStoredBoolean(STORAGE_KEY);
 }
 
 function subscribe(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+
   const handler = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY) callback();
   };
@@ -25,7 +28,7 @@ export function usePlayerOnly(): [boolean, () => void] {
 
   const toggle = useCallback(() => {
     const next = !getSnapshot();
-    localStorage.setItem(STORAGE_KEY, String(next));
+    writeStoredBoolean(STORAGE_KEY, next);
     window.dispatchEvent(new Event("player-only-changed"));
   }, []);
 

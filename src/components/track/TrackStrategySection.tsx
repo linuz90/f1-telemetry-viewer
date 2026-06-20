@@ -1,7 +1,7 @@
 import { Award, Disc } from "lucide-react";
 import { cn } from "../../utils/cn";
-import type { TrackStrategySuggestion } from "../../utils/stats";
-import { PUNCTURE_THRESHOLD } from "../../utils/stats";
+import type { TrackStrategySuggestion } from "../../utils/stats/track";
+import { PUNCTURE_THRESHOLD } from "../../utils/stats/tyres";
 import { cardClass } from "../Card";
 import { SectionHeader } from "../ui/SectionHeader";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
@@ -13,7 +13,7 @@ import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
  * around the target pit lap.
  *
  * Both shapes come from the same wear-data synthesis (`synthesizeStrategies`
- * in `utils/stats.ts`) — the recommended row is the "fast start" pairing
+ * in `utils/stats/track.ts`) — the recommended row is the "fast start" pairing
  * (softer compound first, undercut bias) and the alternative is its mirror
  * (durable start, fast finish). The alternative row is hidden when the
  * mirror isn't feasible under the puncture-risk cap.

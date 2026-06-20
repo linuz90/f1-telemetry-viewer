@@ -4,6 +4,7 @@ import {
   isQualifyingSessionType,
   isRaceSessionType,
 } from "../utils/sessionTypes";
+import { readStoredString, writeStoredString } from "../utils/storage";
 
 export type SessionTypeFilter = "all" | "race" | "quali";
 export type SessionModeFilter = "all" | "online" | "ai";
@@ -48,7 +49,7 @@ function readSessionFilters(): SessionListFilters {
   if (typeof window === "undefined") return memoryFilters;
 
   try {
-    const raw = window.sessionStorage.getItem(FILTERS_STORAGE_KEY);
+    const raw = readStoredString(FILTERS_STORAGE_KEY, "session");
     if (!raw) return memoryFilters;
     const filters = normalizeFilters(
       JSON.parse(raw) as Partial<SessionListFilters>,
@@ -85,11 +86,7 @@ function writeSessionFilters(next: SessionListFilters): void {
 
   if (typeof window === "undefined") return;
 
-  try {
-    window.sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters));
-  } catch {
-    // Keep the in-memory copy so the current tab still updates if storage fails.
-  }
+  writeStoredString(FILTERS_STORAGE_KEY, JSON.stringify(filters), "session");
   window.dispatchEvent(new Event(FILTERS_CHANGED_EVENT));
 }
 

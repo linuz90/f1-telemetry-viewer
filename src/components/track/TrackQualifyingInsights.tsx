@@ -16,7 +16,7 @@ import {
   msToSectorTime,
   pluralize,
 } from "../../utils/format";
-import type { TrackQualifyingInsights as TrackQualifyingInsightsModel } from "../../utils/qualifyingInsights";
+import type { TrackQualifyingInsights as TrackQualifyingInsightsModel } from "../../analysis/trackQualifyingInsights";
 import { InsightDetail, InsightValue } from "../ui/InsightText";
 import { InsightTile } from "../ui/InsightTile";
 import { SectionHeader } from "../ui/SectionHeader";

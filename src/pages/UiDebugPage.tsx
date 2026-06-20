@@ -45,13 +45,13 @@ import type {
 } from "../types/telemetry";
 import { cn } from "../utils/cn";
 import { msToLapTime, msToSectorTime } from "../utils/format";
-import type { TrackRivalBenchmark } from "../utils/rivalStats";
-import type { SessionInsight } from "../utils/sessionInsights";
+import type { TrackRivalBenchmark } from "../analysis/rivalStats";
+import type { SessionInsight } from "../analysis/sessionInsights";
 import type {
-  CumulativeDelta,
   TrackRaceRecommendation,
   TrackStrategySuggestion,
-} from "../utils/stats";
+} from "../utils/stats/track";
+import type { CumulativeDelta } from "../utils/stats/laps";
 
 const COMPOUNDS = [
   "Soft",

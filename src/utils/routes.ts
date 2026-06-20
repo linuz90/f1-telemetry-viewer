@@ -1,5 +1,5 @@
 import type { SessionSummary } from "../types/telemetry";
-import { getSessionFormulaScopeKey } from "./dashboardStats";
+import { getSessionFormulaScopeKey } from "./formulaScope";
 import { toTrackSlug } from "./format";
 import {
   isQualifyingSessionType,

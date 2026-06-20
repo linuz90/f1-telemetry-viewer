@@ -42,58 +42,45 @@ import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { HStack, VStack } from "../components/ui/Stack";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useSessionList } from "../hooks/useSessionList";
-import type { SessionSummary, TelemetrySession } from "../types/telemetry";
+import {
+  buildRaceAnalysisBuckets,
+  buildRaceSetupCandidates,
+  buildTrackAnalysisData,
+  buildTrackSessionData,
+  deduplicateTrackRuns,
+  getDefaultRaceAnalysisBucket,
+  getPreferredTrackTab,
+  type TrackSessionData,
+  type TrackSessionKind,
+} from "../analysis/trackAnalysis";
+import { buildTrackRivalBenchmark } from "../analysis/rivalStats";
+import type { SessionSummary } from "../types/telemetry";
 import { cn } from "../utils/cn";
 import { CHART_THEME, SECTOR_COLORS, TOOLTIP_STYLE } from "../utils/colors";
-import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
+import { getSessionFormulaScopeKey } from "../utils/formulaScope";
 import {
-  bestSectorTimeMs,
   formatDate,
   formatSessionType,
   formatTime,
   getSessionIcon,
-  isLapValid,
   isTrackSlugMatch,
   msToLapTime,
   msToSectorTime,
 } from "../utils/format";
-import { buildTrackQualifyingInsights } from "../utils/qualifyingInsights";
-import { buildTrackRivalBenchmark } from "../utils/rivalStats";
 import {
   dashboardPath,
   isTrackSessionTab,
   sessionSummaryPath,
   TRACK_TAB_QUERY_PARAM,
   trackPath,
-  type TrackSessionTab,
 } from "../utils/routes";
-import type {
-  RaceSetupCandidate,
-  RaceSetupRunInput,
-} from "../utils/setupComparison";
-import { buildRaceSetupComparison } from "../utils/setupComparison";
-import type { CompoundLifeStats } from "../utils/stats";
 import {
   aggregateCompoundLife,
   aggregateFuelData,
-  avgWearRate,
   buildPaceEvolution,
   buildTrackRaceRecommendation,
-  findPlayer,
-  getBestLapTime,
-  getValidLaps,
-  isRaceSession,
-  lapTimeStdDev,
-  PUNCTURE_THRESHOLD,
-} from "../utils/stats";
-
-interface LapPoint {
-  timeSec: number;
-  valid: boolean;
-  lapNum: number;
-}
-
-type TrackSessionKind = TrackSessionTab;
+} from "../utils/stats/track";
+import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
 
 const TRACK_TAB_LABELS: Record<TrackSessionKind, string> = {
   qualifying: "Qualifying",
@@ -110,205 +97,6 @@ const TRACK_TAB_META_LABEL: Record<TrackSessionKind, string> = {
   race: "Race",
   "time-trial": "Time Trial",
 };
-
-interface TrackSessionData {
-  summary: SessionSummary;
-  session: TelemetrySession;
-  kind: TrackSessionKind;
-  isRace: boolean;
-  bestLapMs: number;
-  bestS1: number;
-  bestS2: number;
-  bestS3: number;
-  stdDevMs: number;
-  wearRate: number;
-  allLaps: LapPoint[];
-  weather: string;
-  trackTemp: number;
-  airTemp: number;
-  aiDifficulty: number;
-  topSpeed: number;
-  attemptCount: number;
-}
-
-interface RaceAnalysisBucket {
-  totalLaps: number;
-  value: string;
-  label: string;
-  raceData: TrackSessionData[];
-  sessions: TelemetrySession[];
-  compoundLifeStats: CompoundLifeStats[];
-  setupCandidates: RaceSetupCandidate[];
-  tyreEvidenceCount: number;
-  setupSampleCount: number;
-  raceCount: number;
-}
-
-function getTrackSessionKind(session: TelemetrySession): TrackSessionKind {
-  if (isRaceSession(session)) return "race";
-  if (session["session-info"]["session-type"] === "Time Trial") {
-    return "time-trial";
-  }
-  return "qualifying";
-}
-
-function getPreferredTrackTab(
-  availableTabs: TrackSessionKind[],
-): TrackSessionKind {
-  // Race is the deepest analysis on this page, so keep it as the default when
-  // available. Otherwise fall back to the first scoped data bucket that exists.
-  return availableTabs.includes("race")
-    ? "race"
-    : (availableTabs[0] ?? "qualifying");
-}
-
-/**
- * Detect consecutive qualifying sessions that share identical early laps
- * (from mid-session saves) and merge them, keeping the best-performing attempt.
- */
-function deduplicateRuns(sessions: TrackSessionData[]): TrackSessionData[] {
-  if (sessions.length === 0) return sessions;
-
-  const getLapTimesMs = (d: TrackSessionData): number[] => {
-    const player = findPlayer(d.session);
-    if (!player) return [];
-    return player["session-history"]["lap-history-data"]
-      .map((l) => l["lap-time-in-ms"])
-      .filter((ms) => ms > 0);
-  };
-
-  const isFromSameRun = (
-    earlier: TrackSessionData,
-    later: TrackSessionData,
-  ): boolean => {
-    // Only deduplicate qualifying attempts. Time Trial sessions are continuous
-    // lap programmes rather than mid-session qualifying snapshots, so merging
-    // them would hide useful practice volume.
-    if (earlier.kind !== "qualifying" || later.kind !== "qualifying")
-      return false;
-
-    const lapsA = getLapTimesMs(earlier);
-    const lapsB = getLapTimesMs(later);
-
-    if (lapsA.length < 1 || lapsB.length < 1) return false;
-
-    // The later session's early laps (all but last) must match the earlier session's corresponding laps
-    const prefixB = lapsB.slice(0, -1);
-    if (prefixB.length === 0) return false;
-    if (prefixB.length > lapsA.length) return false;
-
-    return prefixB.every((ms, i) => ms === lapsA[i]);
-  };
-
-  // Group consecutive sessions into runs
-  const groups: TrackSessionData[][] = [[sessions[0]]];
-
-  for (let i = 1; i < sessions.length; i++) {
-    const currentGroup = groups[groups.length - 1];
-    const prev = currentGroup[currentGroup.length - 1];
-
-    if (isFromSameRun(prev, sessions[i])) {
-      currentGroup.push(sessions[i]);
-    } else {
-      groups.push([sessions[i]]);
-    }
-  }
-
-  // For each group, pick the session with the best lap time
-  return groups.map((group) => {
-    if (group.length === 1) return group[0];
-
-    const withValidLaps = group.filter((d) => d.bestLapMs > 0);
-    const best =
-      withValidLaps.length > 0
-        ? withValidLaps.reduce((a, b) => (a.bestLapMs < b.bestLapMs ? a : b))
-        : group[group.length - 1]; // fallback: latest session
-
-    return { ...best, attemptCount: group.length };
-  });
-}
-
-function getRaceTotalLaps(session: TelemetrySession): number | null {
-  const totalLaps = session["session-info"]["total-laps"];
-  if (!Number.isFinite(totalLaps) || totalLaps <= 0) return null;
-  return Math.round(totalLaps);
-}
-
-function toRaceSetupRuns(races: TrackSessionData[]): RaceSetupRunInput[] {
-  return races.map((race) => ({
-    summary: race.summary,
-    session: race.session,
-  }));
-}
-
-function buildRaceAnalysisBuckets(
-  races: TrackSessionData[],
-): RaceAnalysisBucket[] {
-  const byTotalLaps = new Map<number, TrackSessionData[]>();
-
-  for (const race of races) {
-    const totalLaps = getRaceTotalLaps(race.session);
-    if (totalLaps === null) continue;
-
-    const bucket = byTotalLaps.get(totalLaps);
-    if (bucket) {
-      bucket.push(race);
-    } else {
-      byTotalLaps.set(totalLaps, [race]);
-    }
-  }
-
-  return [...byTotalLaps.entries()]
-    .map(([totalLaps, raceData]) => {
-      const sessions = raceData.map((race) => race.session);
-      const compoundLifeStats = aggregateCompoundLife(sessions);
-      const setupCandidates = buildRaceSetupComparison(
-        toRaceSetupRuns(raceData),
-      );
-      const tyreEvidenceCount = compoundLifeStats.reduce(
-        (sum, compound) => sum + compound.stintCount,
-        0,
-      );
-      const setupSampleCount = setupCandidates.reduce(
-        (sum, setup) => sum + setup.sampleCount,
-        0,
-      );
-
-      return {
-        totalLaps,
-        value: String(totalLaps),
-        label: `${totalLaps} laps`,
-        raceData,
-        sessions,
-        compoundLifeStats,
-        setupCandidates,
-        tyreEvidenceCount,
-        setupSampleCount,
-        raceCount: raceData.length,
-      } satisfies RaceAnalysisBucket;
-    })
-    .filter(
-      (bucket) => bucket.tyreEvidenceCount > 0 || bucket.setupSampleCount > 0,
-    )
-    .sort((a, b) => a.totalLaps - b.totalLaps);
-}
-
-function getDefaultRaceAnalysisBucket(
-  buckets: RaceAnalysisBucket[],
-): RaceAnalysisBucket | null {
-  return (
-    [...buckets].sort((a, b) => {
-      if (a.tyreEvidenceCount !== b.tyreEvidenceCount) {
-        return b.tyreEvidenceCount - a.tyreEvidenceCount;
-      }
-      if (a.setupSampleCount !== b.setupSampleCount) {
-        return b.setupSampleCount - a.setupSampleCount;
-      }
-      if (a.raceCount !== b.raceCount) return b.raceCount - a.raceCount;
-      return b.totalLaps - a.totalLaps;
-    })[0] ?? null
-  );
-}
 
 export function TrackProgressPage() {
   const { trackId } = useParams<{ trackId: string }>();
@@ -376,47 +164,7 @@ export function TrackProgressPage() {
       playerTrackSessions.map(async (s) => {
         try {
           const sessionData = await getSession(s.slug);
-          const player = findPlayer(sessionData);
-          if (!player) return null;
-
-          const laps = player["session-history"]["lap-history-data"];
-          const valid = getValidLaps(laps);
-
-          // Best sector times from valid laps
-          const bestS1 = bestSectorTimeMs(valid, 1);
-          const bestS2 = bestSectorTimeMs(valid, 2);
-          const bestS3 = bestSectorTimeMs(valid, 3);
-
-          const allLaps: LapPoint[] = laps
-            .filter((l) => l["lap-time-in-ms"] > 0)
-            .map((l, li) => ({
-              timeSec: l["lap-time-in-ms"] / 1000,
-              valid: isLapValid(l["lap-valid-bit-flags"]),
-              lapNum: li + 1,
-            }));
-
-          const info = sessionData["session-info"];
-          const kind = getTrackSessionKind(sessionData);
-
-          return {
-            summary: s,
-            session: sessionData,
-            kind,
-            isRace: kind === "race",
-            bestLapMs: getBestLapTime(laps),
-            bestS1,
-            bestS2,
-            bestS3,
-            stdDevMs: lapTimeStdDev(laps),
-            wearRate: avgWearRate(player),
-            allLaps,
-            weather: info.weather,
-            trackTemp: info["track-temperature"],
-            airTemp: info["air-temperature"],
-            aiDifficulty: info["ai-difficulty"],
-            topSpeed: player["top-speed-kmph"],
-            attemptCount: 1,
-          } satisfies TrackSessionData;
+          return buildTrackSessionData(s, sessionData);
         } catch {
           return null;
         }
@@ -429,7 +177,7 @@ export function TrackProgressPage() {
           new Date(b.summary.date).getTime(),
       );
       if (!cancelled) {
-        setData(deduplicateRuns(valid));
+        setData(deduplicateTrackRuns(valid));
         setLoading(false);
       }
     });
@@ -453,7 +201,7 @@ export function TrackProgressPage() {
     [raceSessions],
   );
   const allRaceSetupCandidates = useMemo(
-    () => buildRaceSetupComparison(toRaceSetupRuns(raceDataAll)),
+    () => buildRaceSetupCandidates(raceDataAll),
     [raceDataAll],
   );
   const raceAnalysisBuckets = useMemo(
@@ -704,200 +452,35 @@ export function TrackProgressPage() {
     );
   }
 
-  // Split into explicit analysis buckets. This is intentionally not
-  // "race vs everything else": Time Trial is pure pace practice and should
-  // never pollute qualifying history, theoretical sectors, or setup picks.
-  const qualiData = data.filter((d) => d.kind === "qualifying");
-  const raceData = raceDataAll;
-  const timeTrialData = data.filter((d) => d.kind === "time-trial");
-
-  // Theoretical best: best S1 + best S2 + best S3 across all qualifying sessions
-  const allBestS1 = qualiData.filter((d) => d.bestS1 > 0).map((d) => d.bestS1);
-  const allBestS2 = qualiData.filter((d) => d.bestS2 > 0).map((d) => d.bestS2);
-  const allBestS3 = qualiData.filter((d) => d.bestS3 > 0).map((d) => d.bestS3);
-  const theoreticalBestS1 = allBestS1.length ? Math.min(...allBestS1) : 0;
-  const theoreticalBestS2 = allBestS2.length ? Math.min(...allBestS2) : 0;
-  const theoreticalBestS3 = allBestS3.length ? Math.min(...allBestS3) : 0;
-  const theoreticalBestMs =
-    theoreticalBestS1 > 0 && theoreticalBestS2 > 0 && theoreticalBestS3 > 0
-      ? theoreticalBestS1 + theoreticalBestS2 + theoreticalBestS3
-      : 0;
-
-  const actualBestQualiMs = qualiData.some((d) => d.bestLapMs > 0)
-    ? Math.min(
-        ...qualiData.filter((d) => d.bestLapMs > 0).map((d) => d.bestLapMs),
-      )
-    : 0;
-
-  // Latest qualifying session for sector gap cards
-  const latestQuali = qualiData.length ? qualiData[qualiData.length - 1] : null;
-
-  // Headline tiles for the Qualifying tab — same family of "Key Insights"
-  // synthesis the Race tab uses, just scoped to quali. The scalar values above
-  // still feed the charts/reference lines below, so this only produces the
-  // tile-strip model.
-  const qualifyingInsights = buildTrackQualifyingInsights(
-    qualiData.map((d) => ({
-      bestLapMs: d.bestLapMs,
-      bestS1: d.bestS1,
-      bestS2: d.bestS2,
-      bestS3: d.bestS3,
-      date: d.summary.date,
-      isOnline: d.summary.isOnline,
-      poleLapTimeMs: d.summary.poleLapTimeMs,
-      qualifyingPosition: d.summary.qualifyingPosition,
-    })),
-  );
-
-  // Race stats
-  const bestRaceLapMs = raceData.some((d) => d.bestLapMs > 0)
-    ? Math.min(
-        ...raceData.filter((d) => d.bestLapMs > 0).map((d) => d.bestLapMs),
-      )
-    : 0;
-
-  // Find the session behind the all-time best qualifying lap (for setup display)
-  const bestQualiSession =
-    qualiData.find(
-      (d) => d.bestLapMs > 0 && d.bestLapMs === actualBestQualiMs,
-    ) ?? null;
-
-  // Extract valid setup from the best qualifying session
-  const bestQualiSetup = (() => {
-    if (!bestQualiSession) return null;
-    const player = findPlayer(bestQualiSession.session);
-    const setup = player?.["car-setup"];
-    return setup?.["is-valid"] ? setup : null;
-  })();
-
-  // Time Trial stats mirror qualifying pace metrics, but live in their own
-  // bucket because TT exports are single-driver hotlap practice sessions.
-  const allTimeTrialBestS1 = timeTrialData
-    .filter((d) => d.bestS1 > 0)
-    .map((d) => d.bestS1);
-  const allTimeTrialBestS2 = timeTrialData
-    .filter((d) => d.bestS2 > 0)
-    .map((d) => d.bestS2);
-  const allTimeTrialBestS3 = timeTrialData
-    .filter((d) => d.bestS3 > 0)
-    .map((d) => d.bestS3);
-  const theoreticalTimeTrialS1 = allTimeTrialBestS1.length
-    ? Math.min(...allTimeTrialBestS1)
-    : 0;
-  const theoreticalTimeTrialS2 = allTimeTrialBestS2.length
-    ? Math.min(...allTimeTrialBestS2)
-    : 0;
-  const theoreticalTimeTrialS3 = allTimeTrialBestS3.length
-    ? Math.min(...allTimeTrialBestS3)
-    : 0;
-  const theoreticalTimeTrialMs =
-    theoreticalTimeTrialS1 > 0 &&
-    theoreticalTimeTrialS2 > 0 &&
-    theoreticalTimeTrialS3 > 0
-      ? theoreticalTimeTrialS1 + theoreticalTimeTrialS2 + theoreticalTimeTrialS3
-      : 0;
-
-  const bestTimeTrialMs = timeTrialData.some((d) => d.bestLapMs > 0)
-    ? Math.min(
-        ...timeTrialData.filter((d) => d.bestLapMs > 0).map((d) => d.bestLapMs),
-      )
-    : 0;
-  const timeTrialGapMs =
-    bestTimeTrialMs > 0 && theoreticalTimeTrialMs > 0
-      ? bestTimeTrialMs - theoreticalTimeTrialMs
-      : 0;
-  const latestTimeTrial = timeTrialData.length
-    ? timeTrialData[timeTrialData.length - 1]
-    : null;
-  const bestTimeTrialSession =
-    timeTrialData.find(
-      (d) => d.bestLapMs > 0 && d.bestLapMs === bestTimeTrialMs,
-    ) ?? null;
-  const bestTimeTrialSetup = (() => {
-    if (!bestTimeTrialSession) return null;
-    const player = findPlayer(bestTimeTrialSession.session);
-    const setup = player?.["car-setup"];
-    return setup?.["is-valid"] ? setup : null;
-  })();
-
-  // Qualifying chart data — group by day, keep best lap per day
-  const lapTrend = (() => {
-    const byDay: Record<string, { bestLapMs: number; date: string }> = {};
-    for (const d of qualiData) {
-      if (d.bestLapMs <= 0) continue;
-      const dayKey = d.summary.date.split("T")[0];
-      const prev = byDay[dayKey];
-      if (!prev || d.bestLapMs < prev.bestLapMs) {
-        byDay[dayKey] = { bestLapMs: d.bestLapMs, date: d.summary.date };
-      }
-    }
-    return Object.entries(byDay)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([dayKey, { bestLapMs, date }]) => ({
-        day: new Date(dayKey).toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-        }),
-        bestLap: bestLapMs / 1000,
-        fullDate: formatDate(date),
-      }));
-  })();
-
-  const sectorTrend = qualiData
-    .filter((d) => d.bestS1 > 0)
-    .map((d, i) => ({
-      idx: i + 1,
-      S1: d.bestS1 / 1000,
-      S2: d.bestS2 / 1000,
-      S3: d.bestS3 / 1000,
-    }));
-
-  const consistencyTrend = qualiData
-    .filter((d) => d.stdDevMs > 0)
-    .map((d, i) => ({
-      idx: i + 1,
-      stdDev: +(d.stdDevMs / 1000).toFixed(3),
-      label: `${formatSessionType(d.summary.sessionType, d.summary.formula)} · ${formatTime(d.summary.date)}`,
-    }));
-
-  const timeTrialLapTrend = (() => {
-    const byDay: Record<string, { bestLapMs: number; date: string }> = {};
-    for (const d of timeTrialData) {
-      if (d.bestLapMs <= 0) continue;
-      const dayKey = d.summary.date.split("T")[0];
-      const prev = byDay[dayKey];
-      if (!prev || d.bestLapMs < prev.bestLapMs) {
-        byDay[dayKey] = { bestLapMs: d.bestLapMs, date: d.summary.date };
-      }
-    }
-    return Object.entries(byDay)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([dayKey, { bestLapMs, date }]) => ({
-        day: new Date(dayKey).toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-        }),
-        bestLap: bestLapMs / 1000,
-        fullDate: formatDate(date),
-      }));
-  })();
-
-  const timeTrialSectorTrend = timeTrialData
-    .filter((d) => d.bestS1 > 0)
-    .map((d, i) => ({
-      idx: i + 1,
-      S1: d.bestS1 / 1000,
-      S2: d.bestS2 / 1000,
-      S3: d.bestS3 / 1000,
-    }));
-
-  const timeTrialConsistencyTrend = timeTrialData
-    .filter((d) => d.stdDevMs > 0)
-    .map((d, i) => ({
-      idx: i + 1,
-      stdDev: +(d.stdDevMs / 1000).toFixed(3),
-      label: `${formatSessionType(d.summary.sessionType, d.summary.formula)} · ${formatTime(d.summary.date)}`,
-    }));
+  const trackAnalysis = buildTrackAnalysisData(data);
+  const qualiData = trackAnalysis.qualifying.sessions;
+  const raceData = trackAnalysis.raceData;
+  const timeTrialData = trackAnalysis.timeTrial.sessions;
+  const theoreticalBestS1 = trackAnalysis.qualifying.theoreticalS1;
+  const theoreticalBestMs = trackAnalysis.qualifying.theoreticalBestMs;
+  const actualBestQualiMs = trackAnalysis.qualifying.bestLapMs;
+  const latestQuali = trackAnalysis.qualifying.latest;
+  const qualifyingInsights = trackAnalysis.qualifyingInsights;
+  const bestRaceLapMs = trackAnalysis.bestRaceLapMs;
+  const bestQualiSession = trackAnalysis.qualifying.bestSession;
+  const bestQualiSetup = trackAnalysis.qualifying.bestSetup;
+  const theoreticalTimeTrialS1 = trackAnalysis.timeTrial.theoreticalS1;
+  const theoreticalTimeTrialMs = trackAnalysis.timeTrial.theoreticalBestMs;
+  const bestTimeTrialMs = trackAnalysis.timeTrial.bestLapMs;
+  const timeTrialGapMs = trackAnalysis.timeTrial.gapToTheoreticalMs;
+  const latestTimeTrial = trackAnalysis.timeTrial.latest;
+  const bestTimeTrialSession = trackAnalysis.timeTrial.bestSession;
+  const bestTimeTrialSetup = trackAnalysis.timeTrial.bestSetup;
+  const lapTrend = trackAnalysis.qualifying.lapTrend;
+  const sectorTrend = trackAnalysis.qualifying.sectorTrend;
+  const consistencyTrend = trackAnalysis.qualifying.consistencyTrend;
+  const timeTrialLapTrend = trackAnalysis.timeTrial.lapTrend;
+  const timeTrialSectorTrend = trackAnalysis.timeTrial.sectorTrend;
+  const timeTrialConsistencyTrend = trackAnalysis.timeTrial.consistencyTrend;
+  const sectorCards = trackAnalysis.qualifying.sectorCards;
+  const timeTrialSectorCards = trackAnalysis.timeTrial.sectorCards;
+  const qualifyingScatter = trackAnalysis.qualifying.scatter;
+  const timeTrialScatter = trackAnalysis.timeTrial.scatter;
 
   // Race-on-race median clean lap per compound — feeds the Pace Evolution
   // chart. Uses bucket-scoped sessions so a 5-lap repro doesn't get plotted
@@ -912,58 +495,8 @@ export function TrackProgressPage() {
 
   const tooltipStyle = TOOLTIP_STYLE;
 
-  // All three tiles use purple: each is the fastest the player has ever gone
-  // in that sector, and purple is the broadcast convention for "session/track
-  // best" (matches BestRaceLapTile + the LapTimeChart PB tint). Sector-identity
-  // blue/violet/pink would have been decorative here — no nearby legend keys
-  // it — and reads as "these mean different things" when they don't.
-  const sectorCards: { label: string; bestMs: number; latestMs: number }[] = [
-    {
-      label: "S1",
-      bestMs: theoreticalBestS1,
-      latestMs: latestQuali?.bestS1 ?? 0,
-    },
-    {
-      label: "S2",
-      bestMs: theoreticalBestS2,
-      latestMs: latestQuali?.bestS2 ?? 0,
-    },
-    {
-      label: "S3",
-      bestMs: theoreticalBestS3,
-      latestMs: latestQuali?.bestS3 ?? 0,
-    },
-  ];
-  const timeTrialSectorCards: {
-    label: string;
-    bestMs: number;
-    latestMs: number;
-  }[] = [
-    {
-      label: "S1",
-      bestMs: theoreticalTimeTrialS1,
-      latestMs: latestTimeTrial?.bestS1 ?? 0,
-    },
-    {
-      label: "S2",
-      bestMs: theoreticalTimeTrialS2,
-      latestMs: latestTimeTrial?.bestS2 ?? 0,
-    },
-    {
-      label: "S3",
-      bestMs: theoreticalTimeTrialS3,
-      latestMs: latestTimeTrial?.bestS3 ?? 0,
-    },
-  ];
-
-  // Session history sorted newest first
-  const sessionHistory = [...data].reverse();
-
-  const availableTabs: TrackSessionKind[] = [
-    ...(qualiData.length > 0 ? (["qualifying"] as const) : []),
-    ...(raceData.length > 0 ? (["race"] as const) : []),
-    ...(timeTrialData.length > 0 ? (["time-trial"] as const) : []),
-  ];
+  const sessionHistory = trackAnalysis.sessionHistory;
+  const availableTabs = trackAnalysis.availableTabs;
   const selectedTab = availableTabs.includes(activeTab)
     ? activeTab
     : getPreferredTrackTab(availableTabs);
@@ -1180,158 +713,112 @@ export function TrackProgressPage() {
           )}
 
           {/* All qualifying lap times scatter */}
-          {(() => {
-            const validPoints: {
-              idx: number;
-              timeSec: number;
-              label: string;
-            }[] = [];
-            const invalidPoints: {
-              idx: number;
-              timeSec: number;
-              label: string;
-            }[] = [];
-            const bestPoints: {
-              idx: number;
-              timeSec: number;
-              label: string;
-            }[] = [];
-
-            qualiData.forEach((d, i) => {
-              const sessionIdx = i + 1;
-              const sessionLabel = `${formatSessionType(d.summary.sessionType, d.summary.formula)} · ${formatTime(d.summary.date)}`;
-              const bestSec = d.bestLapMs > 0 ? d.bestLapMs / 1000 : null;
-
-              for (const lap of d.allLaps) {
-                const point = {
-                  idx: sessionIdx,
-                  timeSec: lap.timeSec,
-                  label: `${sessionLabel} Lap ${lap.lapNum}`,
-                };
-                if (lap.valid) {
-                  validPoints.push(point);
-                  if (
-                    bestSec !== null &&
-                    Math.abs(lap.timeSec - bestSec) < 0.001
-                  ) {
-                    bestPoints.push(point);
-                  }
-                } else {
-                  invalidPoints.push(point);
-                }
-              }
-            });
-
-            const allPoints = [...validPoints, ...invalidPoints];
-            if (allPoints.length < 2) return null;
-
-            return (
-              <section className={cardClass}>
-                <SectionHeader title="All Qualifying Lap Times" />
-                <ResponsiveContainer width="100%" height={260}>
-                  <ScatterChart
-                    margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke={CHART_THEME.grid}
-                    />
-                    <XAxis
-                      dataKey="idx"
-                      type="number"
-                      stroke={CHART_THEME.axis}
-                      fontSize={11}
-                      domain={[0.5, qualiData.length + 0.5]}
-                      ticks={Array.from(
-                        { length: qualiData.length },
-                        (_, i) => i + 1,
-                      )}
-                      label={{
-                        value: "Session",
-                        position: "insideBottom",
-                        offset: -2,
-                        fill: CHART_THEME.axis,
-                        fontSize: 11,
-                      }}
-                    />
-                    <YAxis
-                      dataKey="timeSec"
-                      type="number"
-                      stroke={CHART_THEME.axis}
-                      fontSize={11}
-                      tickFormatter={(v) => msToLapTime(v * 1000)}
-                      domain={["auto", "auto"]}
-                    />
-                    <ZAxis range={[60, 60]} />
-                    <Tooltip
-                      {...tooltipStyle}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null;
-                        const point = payload[0]?.payload as
-                          | { timeSec: number; label: string }
-                          | undefined;
-                        if (!point) return null;
-                        return (
+          {qualifyingScatter.allPoints.length >= 2 && (
+            <section className={cardClass}>
+              <SectionHeader title="All Qualifying Lap Times" />
+              <ResponsiveContainer width="100%" height={260}>
+                <ScatterChart
+                  margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={CHART_THEME.grid}
+                  />
+                  <XAxis
+                    dataKey="idx"
+                    type="number"
+                    stroke={CHART_THEME.axis}
+                    fontSize={11}
+                    domain={[0.5, qualiData.length + 0.5]}
+                    ticks={Array.from(
+                      { length: qualiData.length },
+                      (_, i) => i + 1,
+                    )}
+                    label={{
+                      value: "Session",
+                      position: "insideBottom",
+                      offset: -2,
+                      fill: CHART_THEME.axis,
+                      fontSize: 11,
+                    }}
+                  />
+                  <YAxis
+                    dataKey="timeSec"
+                    type="number"
+                    stroke={CHART_THEME.axis}
+                    fontSize={11}
+                    tickFormatter={(v) => msToLapTime(v * 1000)}
+                    domain={["auto", "auto"]}
+                  />
+                  <ZAxis range={[60, 60]} />
+                  <Tooltip
+                    {...tooltipStyle}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const point = payload[0]?.payload as
+                        | { timeSec: number; label: string }
+                        | undefined;
+                      if (!point) return null;
+                      return (
+                        <div
+                          style={{
+                            ...tooltipStyle.contentStyle,
+                            padding: "8px 12px",
+                            color: "#e4e4e7",
+                          }}
+                        >
                           <div
                             style={{
-                              ...tooltipStyle.contentStyle,
-                              padding: "8px 12px",
-                              color: "#e4e4e7",
+                              color: "#a1a1aa",
+                              marginBottom: 4,
+                              fontSize: 11,
                             }}
                           >
-                            <div
-                              style={{
-                                color: "#a1a1aa",
-                                marginBottom: 4,
-                                fontSize: 11,
-                              }}
-                            >
-                              {point.label}
-                            </div>
-                            <div style={{ fontFamily: "monospace" }}>
-                              {msToLapTime(point.timeSec * 1000)}
-                            </div>
+                            {point.label}
                           </div>
-                        );
-                      }}
-                    />
-                    <Scatter
-                      data={invalidPoints}
-                      fill={CHART_THEME.behind}
-                      fillOpacity={0.4}
-                      shape="circle"
-                    />
-                    <Scatter
-                      data={validPoints}
-                      fill={CHART_THEME.player}
-                      fillOpacity={0.6}
-                      shape="circle"
-                    />
-                    <Scatter
-                      data={bestPoints}
-                      fill={CHART_THEME.best}
-                      fillOpacity={1}
-                      shape="circle"
-                    />
-                  </ScatterChart>
-                </ResponsiveContainer>
-                <div className="flex gap-4 mt-2 text-xs text-zinc-500">
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400" />
-                    Valid lap
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500/50" />
-                    Invalid lap
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-3 rounded-full bg-purple-400" />
-                    Best per session
-                  </span>
-                </div>
-              </section>
-            );
-          })()}
+                          <div style={{ fontFamily: "monospace" }}>
+                            {msToLapTime(point.timeSec * 1000)}
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Scatter
+                    data={qualifyingScatter.invalidPoints}
+                    fill={CHART_THEME.behind}
+                    fillOpacity={0.4}
+                    shape="circle"
+                  />
+                  <Scatter
+                    data={qualifyingScatter.validPoints}
+                    fill={CHART_THEME.player}
+                    fillOpacity={0.6}
+                    shape="circle"
+                  />
+                  <Scatter
+                    data={qualifyingScatter.bestPoints}
+                    fill={CHART_THEME.best}
+                    fillOpacity={1}
+                    shape="circle"
+                  />
+                </ScatterChart>
+              </ResponsiveContainer>
+              <div className="flex gap-4 mt-2 text-xs text-zinc-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400" />
+                  Valid lap
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500/50" />
+                  Invalid lap
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded-full bg-purple-400" />
+                  Best per session
+                </span>
+              </div>
+            </section>
+          )}
 
           {/* Consistency trend */}
           {consistencyTrend.length > 1 && (
@@ -1575,158 +1062,112 @@ export function TrackProgressPage() {
             </section>
           )}
 
-          {(() => {
-            const validPoints: {
-              idx: number;
-              timeSec: number;
-              label: string;
-            }[] = [];
-            const invalidPoints: {
-              idx: number;
-              timeSec: number;
-              label: string;
-            }[] = [];
-            const bestPoints: {
-              idx: number;
-              timeSec: number;
-              label: string;
-            }[] = [];
-
-            timeTrialData.forEach((d, i) => {
-              const sessionIdx = i + 1;
-              const sessionLabel = `${formatSessionType(d.summary.sessionType, d.summary.formula)} · ${formatTime(d.summary.date)}`;
-              const bestSec = d.bestLapMs > 0 ? d.bestLapMs / 1000 : null;
-
-              for (const lap of d.allLaps) {
-                const point = {
-                  idx: sessionIdx,
-                  timeSec: lap.timeSec,
-                  label: `${sessionLabel} Lap ${lap.lapNum}`,
-                };
-                if (lap.valid) {
-                  validPoints.push(point);
-                  if (
-                    bestSec !== null &&
-                    Math.abs(lap.timeSec - bestSec) < 0.001
-                  ) {
-                    bestPoints.push(point);
-                  }
-                } else {
-                  invalidPoints.push(point);
-                }
-              }
-            });
-
-            const allPoints = [...validPoints, ...invalidPoints];
-            if (allPoints.length < 2) return null;
-
-            return (
-              <section className={cardClass}>
-                <SectionHeader title="All Time Trial Lap Times" />
-                <ResponsiveContainer width="100%" height={260}>
-                  <ScatterChart
-                    margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke={CHART_THEME.grid}
-                    />
-                    <XAxis
-                      dataKey="idx"
-                      type="number"
-                      stroke={CHART_THEME.axis}
-                      fontSize={11}
-                      domain={[0.5, timeTrialData.length + 0.5]}
-                      ticks={Array.from(
-                        { length: timeTrialData.length },
-                        (_, i) => i + 1,
-                      )}
-                      label={{
-                        value: "Attempt",
-                        position: "insideBottom",
-                        offset: -2,
-                        fill: CHART_THEME.axis,
-                        fontSize: 11,
-                      }}
-                    />
-                    <YAxis
-                      dataKey="timeSec"
-                      type="number"
-                      stroke={CHART_THEME.axis}
-                      fontSize={11}
-                      tickFormatter={(v) => msToLapTime(v * 1000)}
-                      domain={["auto", "auto"]}
-                    />
-                    <ZAxis range={[60, 60]} />
-                    <Tooltip
-                      {...tooltipStyle}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null;
-                        const point = payload[0]?.payload as
-                          | { timeSec: number; label: string }
-                          | undefined;
-                        if (!point) return null;
-                        return (
+          {timeTrialScatter.allPoints.length >= 2 && (
+            <section className={cardClass}>
+              <SectionHeader title="All Time Trial Lap Times" />
+              <ResponsiveContainer width="100%" height={260}>
+                <ScatterChart
+                  margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={CHART_THEME.grid}
+                  />
+                  <XAxis
+                    dataKey="idx"
+                    type="number"
+                    stroke={CHART_THEME.axis}
+                    fontSize={11}
+                    domain={[0.5, timeTrialData.length + 0.5]}
+                    ticks={Array.from(
+                      { length: timeTrialData.length },
+                      (_, i) => i + 1,
+                    )}
+                    label={{
+                      value: "Attempt",
+                      position: "insideBottom",
+                      offset: -2,
+                      fill: CHART_THEME.axis,
+                      fontSize: 11,
+                    }}
+                  />
+                  <YAxis
+                    dataKey="timeSec"
+                    type="number"
+                    stroke={CHART_THEME.axis}
+                    fontSize={11}
+                    tickFormatter={(v) => msToLapTime(v * 1000)}
+                    domain={["auto", "auto"]}
+                  />
+                  <ZAxis range={[60, 60]} />
+                  <Tooltip
+                    {...tooltipStyle}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const point = payload[0]?.payload as
+                        | { timeSec: number; label: string }
+                        | undefined;
+                      if (!point) return null;
+                      return (
+                        <div
+                          style={{
+                            ...tooltipStyle.contentStyle,
+                            padding: "8px 12px",
+                            color: "#e4e4e7",
+                          }}
+                        >
                           <div
                             style={{
-                              ...tooltipStyle.contentStyle,
-                              padding: "8px 12px",
-                              color: "#e4e4e7",
+                              color: "#a1a1aa",
+                              marginBottom: 4,
+                              fontSize: 11,
                             }}
                           >
-                            <div
-                              style={{
-                                color: "#a1a1aa",
-                                marginBottom: 4,
-                                fontSize: 11,
-                              }}
-                            >
-                              {point.label}
-                            </div>
-                            <div style={{ fontFamily: "monospace" }}>
-                              {msToLapTime(point.timeSec * 1000)}
-                            </div>
+                            {point.label}
                           </div>
-                        );
-                      }}
-                    />
-                    <Scatter
-                      data={invalidPoints}
-                      fill={CHART_THEME.behind}
-                      fillOpacity={0.4}
-                      shape="circle"
-                    />
-                    <Scatter
-                      data={validPoints}
-                      fill={CHART_THEME.player}
-                      fillOpacity={0.6}
-                      shape="circle"
-                    />
-                    <Scatter
-                      data={bestPoints}
-                      fill={CHART_THEME.best}
-                      fillOpacity={1}
-                      shape="circle"
-                    />
-                  </ScatterChart>
-                </ResponsiveContainer>
-                <div className="flex gap-4 mt-2 text-xs text-zinc-500">
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400" />
-                    Valid lap
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500/50" />
-                    Invalid lap
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-3 rounded-full bg-purple-400" />
-                    Best per attempt
-                  </span>
-                </div>
-              </section>
-            );
-          })()}
+                          <div style={{ fontFamily: "monospace" }}>
+                            {msToLapTime(point.timeSec * 1000)}
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Scatter
+                    data={timeTrialScatter.invalidPoints}
+                    fill={CHART_THEME.behind}
+                    fillOpacity={0.4}
+                    shape="circle"
+                  />
+                  <Scatter
+                    data={timeTrialScatter.validPoints}
+                    fill={CHART_THEME.player}
+                    fillOpacity={0.6}
+                    shape="circle"
+                  />
+                  <Scatter
+                    data={timeTrialScatter.bestPoints}
+                    fill={CHART_THEME.best}
+                    fillOpacity={1}
+                    shape="circle"
+                  />
+                </ScatterChart>
+              </ResponsiveContainer>
+              <div className="flex gap-4 mt-2 text-xs text-zinc-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400" />
+                  Valid lap
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500/50" />
+                  Invalid lap
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded-full bg-purple-400" />
+                  Best per attempt
+                </span>
+              </div>
+            </section>
+          )}
 
           {timeTrialConsistencyTrend.length > 1 && (
             <section className={cardClass}>

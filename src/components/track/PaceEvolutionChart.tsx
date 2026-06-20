@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { PaceEvolutionPoint, RaceContext } from "../../utils/stats";
+import type { PaceEvolutionPoint, RaceContext } from "../../utils/stats/track";
 import {
   CHART_THEME,
   TOOLTIP_STYLE,
@@ -29,7 +29,8 @@ import { SectionHeader } from "../ui/SectionHeader";
  * The metric is the average of the FASTEST 3 clean laps on that compound —
  * not the median across the whole stint, which would unfairly penalize long
  * stints whose median is dragged down by tyre-deg laps in the tail. See the
- * header comment on `buildPaceEvolution` in stats.ts for the rationale.
+ * header comment on `buildPaceEvolution` in `utils/stats/trackPaceEvolution`
+ * for the rationale.
  *
  * Compounds with < 3 clean laps in a session are gated out upstream so a
  * tiny stint doesn't yank a line around.
@@ -53,7 +54,8 @@ function contextLabel(ctx: RaceContext): string {
   const drivers = `${ctx.driverCount} driver${ctx.driverCount === 1 ? "" : "s"}`;
   // Surface the leader-share override so it's visible WHY a 20-car race is
   // sitting in the clean-air bucket. Threshold mirrors LEADER_SHARE_OVERRIDE
-  // in stats.ts; kept loose (≥ 0.5) so even sub-threshold leading shows up.
+  // in `utils/stats/trackPaceEvolution`; kept loose (≥ 0.5) so even
+  // sub-threshold leading shows up.
   const lead =
     ctx.leaderShare >= 0.5
       ? ` · led ${Math.round(ctx.leaderShare * 100)}% of clean laps`

@@ -2,7 +2,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { Upload, ArrowLeft } from "lucide-react";
 import { useSession } from "../hooks/useSession";
 import { useTelemetry } from "../context/TelemetryContext";
-import { isRaceSession } from "../utils/stats";
+import { isRaceSession } from "../utils/stats/drivers";
 import { dashboardPath, sessionPath } from "../utils/routes";
 import { getFormulaComparisonKey } from "../utils/sessionTypes";
 import { ActionEmptyState } from "../components/ActionEmptyState";

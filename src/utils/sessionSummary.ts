@@ -21,7 +21,7 @@ import {
   resolveSessionMeta,
   toSlug,
 } from "./parseFilename";
-import { getCleanRaceLapSamples, medianLapTimeMs } from "./stats";
+import { getCleanRaceLapSamples, medianLapTimeMs } from "./stats/laps";
 
 export interface BuiltSessionSummary {
   summary: SessionSummary & { fileSize: number };

@@ -8,7 +8,7 @@ import type {
   RaceSetupComparableMetric,
   RaceSetupStrength,
   RaceSetupStrengthKind,
-} from "../utils/setupComparison";
+} from "../analysis/setupComparison";
 import { cardClass } from "./Card";
 import { CarSetupCard } from "./CarSetupCard";
 import { SectionHeader } from "./ui/SectionHeader";

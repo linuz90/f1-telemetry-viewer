@@ -24,7 +24,7 @@ import type {
   InsightKind,
   InsightScope,
   TrackInsight,
-} from "../../utils/dashboardStats";
+} from "../../analysis/dashboardStats";
 import { sessionPath } from "../../utils/routes";
 import { ACCENT_TOKENS, type AccentColor } from "../Card";
 import { TrackFlag } from "../TrackFlag";

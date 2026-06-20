@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import type { TelemetrySession } from "../types/telemetry";
+import { findFocusedDriver } from "../utils/stats/drivers";
 import {
-  findFocusedDriver,
   generateQualiInsights,
   generateQualiHistoryInsights,
-} from "../utils/stats";
+} from "../utils/stats/sessionInsights";
 import { useTrackHistory } from "../hooks/useTrackHistory";
 import { useSessionList } from "../hooks/useSessionList";
 import { SessionHeader } from "../components/SessionHeader";
@@ -19,7 +19,7 @@ import {
   buildSessionInsightsHint,
   buildSessionSummaryInsights,
   curateSessionInsights,
-} from "../utils/sessionInsights";
+} from "../analysis/sessionInsights";
 
 export function QualifyingSessionView({
   session,

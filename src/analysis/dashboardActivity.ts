@@ -4,7 +4,7 @@ import {
   isQualifyingSessionType,
   isRaceSessionType,
   isTimeTrialSessionType,
-} from "./sessionTypes";
+} from "../utils/sessionTypes";
 
 export type DashboardActivityKind =
   | "race"

@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { useSessionList } from "./useSessionList";
 import { useTelemetry } from "../context/TelemetryContext";
+import { findPlayer, isRaceSession } from "../utils/stats/drivers";
 import {
-  findPlayer,
-  getValidLaps,
-  getCleanRaceLaps,
   getBestLapTime,
-  isRaceSession,
-} from "../utils/stats";
+  getCleanRaceLaps,
+  getValidLaps,
+} from "../utils/stats/laps";
 import { bestSectorTimeMs } from "../utils/format";
 import { getFormulaComparisonKey } from "../utils/sessionTypes";
 

@@ -1,5 +1,5 @@
 import type { SessionSummary } from "../types/telemetry";
-import { isRaceSessionType } from "./sessionTypes";
+import { isRaceSessionType } from "../utils/sessionTypes";
 
 /**
  * Per-race driver rosters live on each {@link SessionSummary} as `rivals[]`.

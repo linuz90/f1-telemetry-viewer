@@ -20,7 +20,7 @@ import {
   resolveFormulaScopeAlias,
   resolveFormulaScopeKey,
   type FormulaScopeOption,
-} from "../utils/dashboardStats";
+} from "../utils/formulaScope";
 import { getFormulaScopeCandidateFromPath, isRootPath } from "../utils/routes";
 
 type Mode = "detecting" | "api" | "demo" | "upload";

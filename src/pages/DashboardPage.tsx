@@ -17,6 +17,12 @@ import {
 } from "../components/dashboard/helpers";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { useTelemetry } from "../context/TelemetryContext";
+import { buildDashboardActivity } from "../analysis/dashboardActivity";
+import {
+  buildTrackInsights,
+  getDashboardResultStats,
+} from "../analysis/dashboardStats";
+import { buildRivalStats } from "../analysis/rivalStats";
 import {
   areSessionFiltersDefault,
   DEFAULT_FILTERS,
@@ -25,14 +31,8 @@ import {
 } from "../hooks/useSessionFilters";
 import { useSessionList } from "../hooks/useSessionList";
 import { cn } from "../utils/cn";
-import { buildDashboardActivity } from "../utils/dashboardActivity";
-import {
-  buildTrackInsights,
-  getDashboardResultStats,
-  getSessionFormulaScopeKey,
-} from "../utils/dashboardStats";
+import { getSessionFormulaScopeKey } from "../utils/formulaScope";
 import { formatRelativeDate, sortTracksByCalendar } from "../utils/format";
-import { buildRivalStats } from "../utils/rivalStats";
 import { isRaceSessionType } from "../utils/sessionTypes";
 
 const RECENT_ACTIVITY_COLLAPSED = 3;

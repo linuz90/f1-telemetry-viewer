@@ -13,8 +13,9 @@ import {
   isQualifyingSessionType,
   isTimeTrialSessionType,
 } from "../utils/sessionTypes";
-import { getSessionFormulaScopeKey } from "../utils/dashboardStats";
+import { getSessionFormulaScopeKey } from "../utils/formulaScope";
 import { sessionSummaryPath, trackPath } from "../utils/routes";
+import { readStoredString, writeStoredString } from "../utils/storage";
 import {
   DEFAULT_FILTERS,
   matchesSessionFilters,
@@ -80,16 +81,6 @@ const TAB_STORAGE_KEY = "session-list-tab";
 
 type SidebarTab = "sessions" | "tracks";
 
-function readPersistedTab(): SidebarTab {
-  if (typeof window === "undefined") return "sessions";
-  try {
-    const raw = window.sessionStorage.getItem(TAB_STORAGE_KEY);
-    return raw === "tracks" ? "tracks" : "sessions";
-  } catch {
-    return "sessions";
-  }
-}
-
 function representativeFormulaKey(
   sessions: SessionSummary[],
 ): string | undefined {
@@ -99,18 +90,18 @@ function representativeFormulaKey(
 export function SessionList() {
   const { sessions, loading, error } = useSessionList();
   const { activeFormulaKey, formulaOptions } = useTelemetry();
-  const [tab, setTab] = useState<SidebarTab>(readPersistedTab);
+  const [tab, setTab] = useState<SidebarTab>(() =>
+    readStoredString(TAB_STORAGE_KEY, "session") === "tracks"
+      ? "tracks"
+      : "sessions",
+  );
   const [filters, setFilters] = useSessionFilters();
   const [page, setPage] = useState(0);
 
   // Persist the active tab across reloads within the same tab session. Filters
   // use a shared browser store so the dashboard and sidebar react together.
   useEffect(() => {
-    try {
-      window.sessionStorage.setItem(TAB_STORAGE_KEY, tab);
-    } catch {
-      // Ignore storage failures (e.g. private mode quota limits).
-    }
+    writeStoredString(TAB_STORAGE_KEY, tab, "session");
   }, [tab]);
 
   useEffect(() => {

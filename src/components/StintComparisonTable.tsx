@@ -1,11 +1,5 @@
 import type { DriverData } from "../types/telemetry";
-import {
-  stintWearRate,
-  getBestDriverOnCompound,
-  medianPaceInRange,
-  paceDrop,
-  getDriverStints,
-} from "../utils/stats";
+import { buildStintComparisonRows } from "../analysis/resultsAnalysis";
 import { msToLapTime } from "../utils/format";
 import { cn } from "../utils/cn";
 import { CompoundSwatchLabel } from "./ui/CompoundSwatchLabel";
@@ -31,11 +25,8 @@ export function StintComparisonTable({
   player,
   allDrivers,
 }: StintComparisonTableProps) {
-  const stints = getDriverStints(player);
-  const playerLaps = player["session-history"]["lap-history-data"];
-  const others = allDrivers.filter((d) => d.index !== player.index);
-
-  if (!stints.length) return null;
+  const rows = buildStintComparisonRows({ player, allDrivers });
+  if (!rows.length) return null;
 
   return (
     <div>
@@ -64,58 +55,18 @@ export function StintComparisonTable({
             </tr>
           </thead>
           <tbody>
-            {stints.map((stint, i) => {
-              const compound = stint["tyre-set-data"]["visual-tyre-compound"];
-              const playerRate = stintWearRate(stint);
-              const best = getBestDriverOnCompound(
-                others,
-                compound,
-                stint["start-lap"],
-                stint["end-lap"],
-              );
-
-              const compareStartLap = best?.lapStart ?? stint["start-lap"];
-              const compareEndLap = best?.lapEnd ?? stint["end-lap"];
-              const playerPace = medianPaceInRange(
-                playerLaps,
-                compareStartLap,
-                compareEndLap,
-              );
-              const playerDrop = paceDrop(
-                playerLaps,
-                compareStartLap,
-                compareEndLap,
-              );
-
-              const bestPace = best?.paceMs ?? 0;
-              const bestDrop = best
-                ? paceDrop(
-                    best.driver["session-history"]["lap-history-data"],
-                    best.lapStart,
-                    best.lapEnd,
-                  )
-                : 0;
-
-              const wearDelta =
-                best && playerRate > 0 && best.wearRate > 0
-                  ? playerRate - best.wearRate
-                  : 0;
-              const paceDelta =
-                playerPace > 0 && bestPace > 0 ? playerPace - bestPace : 0;
-              const dropDelta =
-                playerDrop !== 0 && bestDrop !== 0 ? playerDrop - bestDrop : 0;
-
+            {rows.map((row) => {
               return (
-                <tr key={i} className={tableRowClass}>
+                <tr key={row.stintNumber} className={tableRowClass}>
                   <td
                     className={tableCellClass({
                       className: "font-medium text-zinc-300",
                     })}
                   >
-                    {i + 1}
+                    {row.stintNumber}
                   </td>
                   <td className={tableCellClass()}>
-                    <CompoundSwatchLabel compound={compound} />
+                    <CompoundSwatchLabel compound={row.compound} />
                   </td>
                   <td
                     className={tableCellClass({
@@ -124,36 +75,40 @@ export function StintComparisonTable({
                       className: "text-zinc-300",
                     })}
                   >
-                    {stint["stint-length"]}
+                    {row.stint["stint-length"]}
                   </td>
                   <td
                     className={tableCellClass({ align: "right", mono: true })}
                   >
                     <span className="text-zinc-300">
-                      {playerPace > 0 ? msToLapTime(playerPace) : "–"}
+                      {row.playerPace > 0 ? msToLapTime(row.playerPace) : "–"}
                     </span>
-                    {paceDelta !== 0 && (
-                      <Delta value={paceDelta} unit="s" factor={1000} />
+                    {row.paceDelta !== 0 && (
+                      <Delta value={row.paceDelta} unit="s" factor={1000} />
                     )}
                   </td>
                   <td
                     className={tableCellClass({ align: "right", mono: true })}
                   >
                     <span className="text-zinc-300">
-                      {playerRate > 0 ? `${playerRate.toFixed(1)}%` : "–"}
+                      {row.playerWearRate > 0
+                        ? `${row.playerWearRate.toFixed(1)}%`
+                        : "–"}
                     </span>
-                    {wearDelta !== 0 && <Delta value={wearDelta} unit="%" />}
+                    {row.wearDelta !== 0 && (
+                      <Delta value={row.wearDelta} unit="%" />
+                    )}
                   </td>
                   <td
                     className={tableCellClass({ align: "right", mono: true })}
                   >
                     <span className="text-zinc-300">
-                      {playerDrop !== 0
-                        ? `${playerDrop > 0 ? "+" : ""}${(playerDrop / 1000).toFixed(3)}s`
+                      {row.playerDrop !== 0
+                        ? `${row.playerDrop > 0 ? "+" : ""}${(row.playerDrop / 1000).toFixed(3)}s`
                         : "–"}
                     </span>
-                    {dropDelta !== 0 && (
-                      <Delta value={dropDelta} unit="s" factor={1000} />
+                    {row.dropDelta !== 0 && (
+                      <Delta value={row.dropDelta} unit="s" factor={1000} />
                     )}
                   </td>
                   <td
@@ -161,8 +116,8 @@ export function StintComparisonTable({
                       className: "text-2xs text-zinc-500",
                     })}
                   >
-                    {best
-                      ? `${best.driver["driver-name"]} L${best.lapStart}-${best.lapEnd}`
+                    {row.bestDriverName
+                      ? `${row.bestDriverName} L${row.bestLapStart}-${row.bestLapEnd}`
                       : "–"}
                   </td>
                 </tr>

@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect, type ReactNode } from "react";
+import { buildDamageIncreaseLaps } from "../analysis/damageAnalysis";
 import type { DriverData, TelemetrySession } from "../types/telemetry";
+import { findFocusedDriver } from "../utils/stats/drivers";
+import { generateFuelInsights } from "../utils/stats/energy";
+import { calculateCumulativeDeltas } from "../utils/stats/laps";
 import {
-  findFocusedDriver,
-  calculateCumulativeDeltas,
   generateInsights,
-  generateFuelInsights,
   generateRaceHistoryInsights,
-  getCompletedStints,
-  getDriverStints,
-} from "../utils/stats";
+} from "../utils/stats/sessionInsights";
+import { getCompletedStints, getDriverStints } from "../utils/stats/tyres";
 import { useTrackHistory } from "../hooks/useTrackHistory";
 import { useSessionList } from "../hooks/useSessionList";
 import { SessionHeader } from "../components/SessionHeader";
@@ -43,7 +43,7 @@ import {
   buildSessionInsightsHint,
   buildSessionSummaryInsights,
   curateSessionInsights,
-} from "../utils/sessionInsights";
+} from "../analysis/sessionInsights";
 
 function timedRaceDrivers(drivers: DriverData[]): DriverData[] {
   return [...drivers]
@@ -295,34 +295,10 @@ export function RaceSessionView({
     </>
   );
 
-  // Compute laps where damage increased
-  const damageLaps = useMemo(() => {
-    const result: number[] = [];
-    for (let i = 1; i < perLapInfo.length; i++) {
-      const prev = perLapInfo[i - 1]["car-damage-data"];
-      const curr = perLapInfo[i]["car-damage-data"];
-      const fields = [
-        "front-left-wing-damage",
-        "front-right-wing-damage",
-        "rear-wing-damage",
-        "floor-damage",
-        "diffuser-damage",
-        "sidepod-damage",
-        "engine-damage",
-        "gear-box-damage",
-      ] as const;
-      for (const f of fields) {
-        if (
-          ((curr as unknown as Record<string, number>)[f] ?? 0) >
-          ((prev as unknown as Record<string, number>)[f] ?? 0)
-        ) {
-          result.push(perLapInfo[i]["lap-number"]);
-          break;
-        }
-      }
-    }
-    return result;
-  }, [perLapInfo]);
+  const damageLaps = useMemo(
+    () => buildDamageIncreaseLaps(perLapInfo),
+    [perLapInfo],
+  );
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6 sm:space-y-8">

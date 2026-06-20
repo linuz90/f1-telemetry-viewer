@@ -10,6 +10,7 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
+import { buildTyreWearAnalysis } from "../analysis/tyreWearAnalysis";
 import type { PerLapInfo, TyreStint } from "../types/telemetry";
 import {
   CHART_THEME,
@@ -17,7 +18,6 @@ import {
   SC_COLORS,
   SC_FALLBACK,
 } from "../utils/colors";
-import { getWorstWheelWear } from "../utils/stats";
 import { EmptyState } from "./EmptyState";
 import { SectionHeader } from "./ui/SectionHeader";
 
@@ -38,8 +38,12 @@ export function TyreWearChart({
   rivalName,
   perLapInfo,
 }: TyreWearChartProps) {
-  const hasAnyWearData = stints.some((s) => s["tyre-wear-history"].length > 0);
-  if (!stints.length || !hasAnyWearData) {
+  const analysis = buildTyreWearAnalysis({
+    stints,
+    rivalStints,
+    perLapInfo,
+  });
+  if (!stints.length || !analysis.hasAnyWearData) {
     return (
       <EmptyState
         title="Tyre Wear"
@@ -48,94 +52,13 @@ export function TyreWearChart({
     );
   }
 
-  // Player data: worst wheel per lap, with gaps between stints
-  const playerData: {
-    lap: number;
-    wear: number | undefined;
-    compound: string;
-  }[] = [];
-  stints.forEach((stint, i) => {
-    const wearHistory = stint["tyre-wear-history"];
-    if (i > 0 && wearHistory.length > 0) {
-      // Insert gap to break the line at pit stops
-      playerData.push({
-        lap: wearHistory[0]["lap-number"] - 0.5,
-        wear: undefined,
-        compound: "",
-      });
-    }
-    for (const w of wearHistory) {
-      playerData.push({
-        lap: w["lap-number"],
-        wear: +getWorstWheelWear(w).toFixed(1),
-        compound: stint["tyre-set-data"]["visual-tyre-compound"],
-      });
-    }
-  });
-
-  // Rival data (if provided)
-  const rivalMap = new Map<number, number>();
-  if (rivalStints?.length) {
-    for (const stint of rivalStints) {
-      for (const w of stint["tyre-wear-history"]) {
-        rivalMap.set(w["lap-number"], +getWorstWheelWear(w).toFixed(1));
-      }
-    }
-  }
-
-  // Merge into single dataset
-  const data = playerData.map((d) => ({
-    ...d,
-    rivalWear: rivalMap.get(d.lap) ?? undefined,
-  }));
-
-  // Pit stop laps (transitions between stints)
-  const pitLaps = stints.slice(1).map((s) => s["start-lap"]);
-
-  const hasRival = rivalStints && rivalStints.length > 0;
-
-  // Explicit integer ticks for x-axis (every lap)
-  const lapTicks = data
-    .filter((d) => Number.isInteger(d.lap))
-    .map((d) => d.lap);
-
-  // SC status lookup by lap number
-  const scStatusMap = new Map<number, string>();
-  if (perLapInfo) {
-    for (const lap of perLapInfo) {
-      const status = lap["max-safety-car-status"] ?? "NO_SAFETY_CAR";
-      if (status !== "NO_SAFETY_CAR") {
-        scStatusMap.set(lap["lap-number"], status);
-      }
-    }
-  }
-
-  // SC/VSC ranges for background shading
-  const scRanges: { x1: number; x2: number; status: string }[] = [];
-  if (perLapInfo) {
-    for (const lap of perLapInfo) {
-      const status = lap["max-safety-car-status"] ?? "NO_SAFETY_CAR";
-      const isSC =
-        status === "SAFETY_CAR" ||
-        status === "FULL_SAFETY_CAR" ||
-        status === "VIRTUAL_SAFETY_CAR";
-      if (isSC) {
-        const lapNum = lap["lap-number"];
-        const prev = scRanges[scRanges.length - 1];
-        if (prev && prev.status === status && prev.x2 === lapNum - 1) {
-          prev.x2 = lapNum;
-        } else {
-          scRanges.push({ x1: lapNum, x2: lapNum, status });
-        }
-      }
-    }
-  }
-
   // Compute gradient stops based on actual data range
-  const maxWear = Math.max(...data.map((d) => d.wear ?? 0), 50);
   // Map wear thresholds to gradient offsets (0% = top/maxWear, 100% = bottom/0)
   const stopAt = (wearLevel: number) =>
-    `${Math.max(0, Math.min(100, ((maxWear - wearLevel) / maxWear) * 100))}%`;
+    `${Math.max(
+      0,
+      Math.min(100, ((analysis.maxWear - wearLevel) / analysis.maxWear) * 100),
+    )}%`;
 
   return (
     <div>
@@ -155,7 +78,7 @@ export function TyreWearChart({
       />
       <ResponsiveContainer width="100%" height={280}>
         <LineChart
-          data={data}
+          data={analysis.data}
           margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
         >
           <defs>
@@ -171,7 +94,7 @@ export function TyreWearChart({
           <XAxis
             dataKey="lap"
             type="number"
-            ticks={lapTicks}
+            ticks={analysis.lapTicks}
             domain={["dataMin", "dataMax"]}
             stroke={CHART_THEME.axis}
             fontSize={11}
@@ -202,8 +125,8 @@ export function TyreWearChart({
               name: string | undefined,
             ) => [`${value ?? 0}%`, name ?? "Max wear"]}
             labelFormatter={(lap) => {
-              const entry = data.find((d) => d.lap === lap);
-              const sc = scStatusMap.get(lap as number);
+              const entry = analysis.data.find((d) => d.lap === lap);
+              const sc = analysis.scStatusByLap.get(lap as number);
               const scLabel =
                 sc === "SAFETY_CAR" || sc === "FULL_SAFETY_CAR"
                   ? " [SC]"
@@ -221,7 +144,7 @@ export function TyreWearChart({
           />
 
           {/* SC/VSC background shading */}
-          {scRanges.map((range) => (
+          {analysis.scRanges.map((range) => (
             <ReferenceArea
               key={`sc-${range.x1}`}
               x1={range.x1 - 0.5}
@@ -232,7 +155,7 @@ export function TyreWearChart({
             />
           ))}
 
-          {pitLaps.map((lap, i) => (
+          {analysis.pitLaps.map((lap, i) => (
             <ReferenceLine
               key={`pit-${lap}-${i}`}
               x={lap}
@@ -256,7 +179,7 @@ export function TyreWearChart({
             dot={false}
           />
 
-          {hasRival && (
+          {analysis.hasRival && (
             <Line
               type="monotone"
               dataKey="rivalWear"

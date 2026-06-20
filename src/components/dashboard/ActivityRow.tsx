@@ -4,7 +4,7 @@ import { TrackFlag } from "../TrackFlag";
 import { Badge } from "../ui/Badge";
 import { SessionRow } from "../SessionRow";
 import { getSessionTypeMeta } from "../sessionTypeMeta";
-import type { DashboardActivityGroup } from "../../utils/dashboardActivity";
+import type { DashboardActivityGroup } from "../../analysis/dashboardActivity";
 import type { SessionSummary } from "../../types/telemetry";
 import { formatSessionType, formatTime } from "../../utils/format";
 import { sessionSummaryPath } from "../../utils/routes";

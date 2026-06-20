@@ -8,8 +8,8 @@ import {
   msToSectorTime,
   pluralize,
 } from "../../utils/format";
-import type { TrackRivalBenchmark } from "../../utils/rivalStats";
-import type { TrackRaceRecommendation } from "../../utils/stats";
+import type { TrackRivalBenchmark } from "../../analysis/rivalStats";
+import type { TrackRaceRecommendation } from "../../utils/stats/track";
 import { CompoundBadge } from "../ui/CompoundBadge";
 import { highlightDetailValues } from "../ui/HighlightedDetailText";
 import { InsightDetail, InsightValue } from "../ui/InsightText";

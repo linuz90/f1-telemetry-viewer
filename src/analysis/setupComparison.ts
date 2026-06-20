@@ -4,16 +4,20 @@ import type {
   SessionSummary,
   TelemetrySession,
 } from "../types/telemetry";
+import { findPlayer, isRaceSession } from "../utils/stats/drivers";
+import { getBestLapTime, getCleanRaceLapSamples } from "../utils/stats/laps";
+import { medianPaceInRange } from "../utils/stats/pace";
 import {
-  findPlayer,
-  getBestLapTime,
-  getCleanRaceLapSamples,
   getCompletedStints,
   getDriverStints,
-  isRaceSession,
-  medianPaceInRange,
   stintWearRate,
-} from "./stats";
+} from "../utils/stats/tyres";
+
+/**
+ * Race setup analysis groups sessions by identical mechanical setup, then ranks
+ * them on same-compound pace, stint pace, and degradation. UI components render
+ * the returned candidates; setup identity/scoring belongs here.
+ */
 
 type SetupFingerprintKey = Exclude<keyof CarSetup, "fuel-load" | "is-valid">;
 

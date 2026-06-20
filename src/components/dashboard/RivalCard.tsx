@@ -16,7 +16,7 @@ import { getTeamColor } from "../../utils/colors";
 import type {
   RivalCard as RivalCardData,
   RivalCardKind,
-} from "../../utils/rivalStats";
+} from "../../analysis/rivalStats";
 import { type AccentColor } from "../Card";
 import { InsightDetail, InsightValue } from "../ui/InsightText";
 import { InsightTile } from "../ui/InsightTile";

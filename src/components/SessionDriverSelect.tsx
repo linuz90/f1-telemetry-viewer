@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { TelemetrySession } from "../types/telemetry";
-import { getBestLapTime } from "../utils/stats";
+import { getBestLapTime } from "../utils/stats/laps";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import {
   PillSelect,

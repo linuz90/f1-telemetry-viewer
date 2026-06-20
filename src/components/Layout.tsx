@@ -3,18 +3,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import changelog from "virtual:changelog";
 import { useTelemetry } from "../context/TelemetryContext";
+import { cn } from "../utils/cn";
 import {
   dashboardPath,
   replaceFormulaScopeInPath,
   SESSIONS_ROUTE_SEGMENT,
 } from "../utils/routes";
+import {
+  readStoredNumber,
+  readStoredString,
+  writeStoredString,
+} from "../utils/storage";
 import { AppBrand } from "./AppBrand";
 import { BrandHomeLink } from "./BrandHomeLink";
 import { cardHighlight } from "./Card";
 import { ChangelogModal } from "./ChangelogModal";
 import { SessionList } from "./SessionList";
 import { SegmentedControl } from "./ui/SegmentedControl";
-import { cn } from "../utils/cn";
 
 const MIN_WIDTH = 250;
 const MAX_WIDTH = 480;
@@ -22,19 +27,16 @@ const DEFAULT_WIDTH = 288; // 72 * 4 (w-72)
 const STORAGE_KEY = "sidebar-width";
 const CHANGELOG_SEEN_KEY = "changelog-last-seen";
 
-function getInitialWidth(): number {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    const n = Number(stored);
-    if (n >= MIN_WIDTH && n <= MAX_WIDTH) return n;
-  }
-  return DEFAULT_WIDTH;
-}
-
 export function Layout() {
   const { mode, setShowUploadModal, formulaOptions, activeFormulaKey } =
     useTelemetry();
-  const [width, setWidth] = useState(getInitialWidth);
+  const [width, setWidth] = useState(() =>
+    readStoredNumber(STORAGE_KEY, {
+      fallback: DEFAULT_WIDTH,
+      min: MIN_WIDTH,
+      max: MAX_WIDTH,
+    }),
+  );
   const [showChangelog, setShowChangelog] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
@@ -42,8 +44,7 @@ export function Layout() {
   const latestHash = changelog[0]?.hash ?? "";
   const [hasUnseen, setHasUnseen] = useState(
     () =>
-      latestHash !== "" &&
-      localStorage.getItem(CHANGELOG_SEEN_KEY) !== latestHash,
+      latestHash !== "" && readStoredString(CHANGELOG_SEEN_KEY) !== latestHash,
   );
   const dragging = useRef(false);
 
@@ -55,7 +56,7 @@ export function Layout() {
   const openChangelog = useCallback(() => {
     setShowChangelog(true);
     if (latestHash) {
-      localStorage.setItem(CHANGELOG_SEEN_KEY, latestHash);
+      writeStoredString(CHANGELOG_SEEN_KEY, latestHash);
       setHasUnseen(false);
     }
   }, [latestHash]);
@@ -73,7 +74,7 @@ export function Layout() {
     const onMouseUp = (e: MouseEvent) => {
       dragging.current = false;
       const finalWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
-      localStorage.setItem(STORAGE_KEY, String(finalWidth));
+      writeStoredString(STORAGE_KEY, String(finalWidth));
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.cursor = "";

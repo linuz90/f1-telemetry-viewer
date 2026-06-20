@@ -1,16 +1,20 @@
 import { useState, useMemo } from "react";
+import {
+  buildFallbackRaceRows,
+  buildPenaltiesByDriver,
+  buildRaceDriverStats,
+  buildRaceResultHighlights,
+  formatRaceGap,
+  formatRaceStrategy,
+  sortRaceStintHistoryRows,
+  type RaceResultSortKey,
+  type SortDirection,
+} from "../analysis/resultsAnalysis";
 import type { RaceControlEvent, TelemetrySession } from "../types/telemetry";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { msToLapTime } from "../utils/format";
-import {
-  getCleanRaceLaps,
-  getBestLapTime,
-  driverTopSpeed,
-  avgErsDeployMj,
-  avgErsHarvestMj,
-  getCompletedStints,
-  RACE_PACE_TOOLTIP,
-} from "../utils/stats";
+import { driverTopSpeed } from "../utils/stats/drivers";
+import { RACE_PACE_TOOLTIP } from "../utils/stats/insightTypes";
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
 import { cn } from "../utils/cn";
 import { AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
@@ -33,25 +37,15 @@ interface RaceResultsTableProps {
   raceControlEvents?: RaceControlEvent[];
 }
 
-type SortKey =
-  | "pos"
-  | "bestLap"
-  | "racePace"
-  | "gap"
-  | "topSpeed"
-  | "ers"
-  | "ersHarv";
-type SortDir = "asc" | "desc";
-
 function SortIcon({
   column,
   sortKey,
   sortDir,
   side = "right",
 }: {
-  column: SortKey;
-  sortKey: SortKey;
-  sortDir: SortDir;
+  column: RaceResultSortKey;
+  sortKey: RaceResultSortKey;
+  sortDir: SortDirection;
   side?: "left" | "right";
 }) {
   const margin = side === "left" ? "mr-1" : "ml-1";
@@ -82,118 +76,33 @@ export function RaceResultsTable({
   raceControlEvents = [],
 }: RaceResultsTableProps) {
   const [focusedOnly, toggleFocusedOnly] = usePlayerOnly();
-  const [sortKey, setSortKey] = useState<SortKey>("pos");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortKey, setSortKey] = useState<RaceResultSortKey>("pos");
+  const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const stintHistory = session["tyre-stint-history-v2"];
   const drivers = session["classification-data"];
 
   const focusedDriver = drivers.find((d) => d.index === focusedDriverIndex);
   const focusedName = focusedDriver?.["driver-name"];
 
-  // Pre-compute race pace and best lap for each driver (by name)
-  const driverStats = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        bestLap: number;
-        racePace: number;
-        topSpeed: number;
-        ers: number;
-        ersHarv: number;
-      }
-    >();
-    for (const d of drivers) {
-      const laps = d["session-history"]["lap-history-data"];
-      const bestLap = getBestLapTime(laps);
-      const clean = getCleanRaceLaps(d);
-      const racePace =
-        clean.length > 0
-          ? clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / clean.length
-          : 0;
-      const topSpeed = driverTopSpeed(d);
-      const ers = avgErsDeployMj(d);
-      const ersHarv = avgErsHarvestMj(d);
-      map.set(d["driver-name"], { bestLap, racePace, topSpeed, ers, ersHarv });
-    }
-    return map;
-  }, [drivers]);
-
-  const penaltiesByDriver = useMemo(() => {
-    const map = new Map<string, RaceControlEvent[]>();
-    for (const event of raceControlEvents) {
-      if (event["message-type"] !== "PENALTY" || !event["driver-info"]?.name) {
-        continue;
-      }
-      const driverName = event["driver-info"].name;
-      const penalties = map.get(driverName) ?? [];
-      penalties.push(event);
-      map.set(driverName, penalties);
-    }
-    return map;
-  }, [raceControlEvents]);
-
-  const filteredStintHistory = useMemo(() => {
-    if (!stintHistory?.length) return [];
-    return focusedOnly
-      ? stintHistory.filter((entry) => entry.name === focusedName)
-      : stintHistory;
-  }, [focusedName, focusedOnly, stintHistory]);
+  const driverStats = useMemo(() => buildRaceDriverStats(drivers), [drivers]);
+  const penaltiesByDriver = useMemo(
+    () => buildPenaltiesByDriver(raceControlEvents),
+    [raceControlEvents],
+  );
 
   const sortedStintHistory = useMemo(() => {
-    const arr = [...filteredStintHistory];
-    arr.sort((a, b) => {
-      const statsA = driverStats.get(a.name);
-      const statsB = driverStats.get(b.name);
-      let cmp = 0;
-      switch (sortKey) {
-        case "pos":
-          cmp = (a.position ?? 99) - (b.position ?? 99);
-          break;
-        case "bestLap": {
-          const la = statsA?.bestLap || Infinity;
-          const lb = statsB?.bestLap || Infinity;
-          cmp = la - lb;
-          break;
-        }
-        case "racePace": {
-          const pa = statsA?.racePace || Infinity;
-          const pb = statsB?.racePace || Infinity;
-          cmp = pa - pb;
-          break;
-        }
-        case "topSpeed": {
-          const sa = statsA?.topSpeed || 0;
-          const sb = statsB?.topSpeed || 0;
-          cmp = sb - sa;
-          break;
-        }
-        case "ers": {
-          const ea = statsA?.ers || 0;
-          const eb = statsB?.ers || 0;
-          cmp = eb - ea;
-          break;
-        }
-        case "ersHarv": {
-          const ha = statsA?.ersHarv || 0;
-          const hb = statsB?.ersHarv || 0;
-          cmp = hb - ha;
-          break;
-        }
-        case "gap": {
-          const ga =
-            typeof a["delta-to-leader"] === "number" ? a["delta-to-leader"] : 0;
-          const gb =
-            typeof b["delta-to-leader"] === "number" ? b["delta-to-leader"] : 0;
-          cmp = ga - gb;
-          break;
-        }
-      }
-      return sortDir === "desc" ? -cmp : cmp;
+    if (!stintHistory?.length) return [];
+    return sortRaceStintHistoryRows({
+      entries: stintHistory,
+      focusedOnly,
+      focusedName,
+      sortKey,
+      sortDir,
+      driverStats,
     });
-    return arr;
-  }, [filteredStintHistory, sortKey, sortDir, driverStats]);
+  }, [driverStats, focusedName, focusedOnly, sortDir, sortKey, stintHistory]);
 
-  function toggleSort(key: SortKey) {
+  function toggleSort(key: RaceResultSortKey) {
     if (sortKey === key) {
       if (sortDir === "asc") {
         setSortDir("desc");
@@ -213,21 +122,7 @@ export function RaceResultsTable({
 
   // Use tyre-stint-history-v2 if available (has clean per-driver race results)
   if (stintHistory?.length) {
-    // Find best values for highlighting
-    const bestLapMs = Math.min(
-      ...[...driverStats.values()].map((s) => s.bestLap).filter((v) => v > 0),
-    );
-    const bestPaceMs = Math.min(
-      ...[...driverStats.values()].map((s) => s.racePace).filter((v) => v > 0),
-    );
-    const bestSpeedKmh = Math.max(
-      ...[...driverStats.values()].map((s) => s.topSpeed),
-    );
-    const bestErs = Math.max(...[...driverStats.values()].map((s) => s.ers));
-    const bestErsHarv = Math.max(
-      ...[...driverStats.values()].map((s) => s.ersHarv),
-    );
-    const hasErsHarv = [...driverStats.values()].some((s) => s.ersHarv > 0);
+    const highlights = buildRaceResultHighlights(driverStats);
 
     return (
       <div>
@@ -316,7 +211,7 @@ export function RaceResultsTable({
                     </span>
                   </Tooltip>
                 </th>
-                {hasErsHarv && (
+                {highlights.hasErsHarv && (
                   <th
                     className={thClass("right")}
                     onClick={() => toggleSort("ersHarv")}
@@ -342,25 +237,11 @@ export function RaceResultsTable({
             <tbody>
               {sortedStintHistory.map((entry) => {
                 const isFocused = entry.name === focusedName;
-                const gap = entry["delta-to-leader"];
                 const status = entry["result-status"];
-                const gapStr =
-                  status && status !== "FINISHED"
-                    ? status
-                    : gap == null || gap === 0 || gap === ""
-                      ? "Leader"
-                      : typeof gap === "number"
-                        ? `+${(gap / 1000).toFixed(3)}s`
-                        : String(gap);
-
-                const stints = getCompletedStints(
+                const gapStr = formatRaceGap(entry);
+                const stintStr = formatRaceStrategy(
                   entry["tyre-stint-history"] ?? [],
                 );
-                const stintStr = stints.length
-                  ? stints
-                      .map((s) => s["tyre-set-data"]["visual-tyre-compound"][0])
-                      .join("-")
-                  : "–";
 
                 const stats = driverStats.get(entry.name);
                 const bestLap = stats?.bestLap ?? 0;
@@ -369,14 +250,18 @@ export function RaceResultsTable({
                 const ers = stats?.ers ?? 0;
                 const ersHarv = stats?.ersHarv ?? 0;
                 const isBestLap =
-                  bestLap > 0 && Math.abs(bestLap - bestLapMs) < 1;
+                  bestLap > 0 && Math.abs(bestLap - highlights.bestLapMs) < 1;
                 const isBestPace =
-                  racePace > 0 && Math.abs(racePace - bestPaceMs) < 1;
+                  racePace > 0 &&
+                  Math.abs(racePace - highlights.bestPaceMs) < 1;
                 const isBestSpeed =
-                  topSpeed > 0 && Math.abs(topSpeed - bestSpeedKmh) < 1;
-                const isBestErs = ers > 0 && Math.abs(ers - bestErs) < 0.1;
+                  topSpeed > 0 &&
+                  Math.abs(topSpeed - highlights.bestSpeedKmh) < 1;
+                const isBestErs =
+                  ers > 0 && Math.abs(ers - highlights.bestErs) < 0.1;
                 const isBestErsHarv =
-                  ersHarv > 0 && Math.abs(ersHarv - bestErsHarv) < 0.1;
+                  ersHarv > 0 &&
+                  Math.abs(ersHarv - highlights.bestErsHarv) < 0.1;
                 const penalties = penaltiesByDriver.get(entry.name) ?? [];
 
                 return (
@@ -443,7 +328,7 @@ export function RaceResultsTable({
                     >
                       {ers > 0 ? ers.toFixed(1) : "–"}
                     </td>
-                    {hasErsHarv && (
+                    {highlights.hasErsHarv && (
                       <td
                         className={cn(
                           tableCellClass({ align: "right", mono: true }),
@@ -472,14 +357,11 @@ export function RaceResultsTable({
   }
 
   // Fallback: use classification-data with final-classification
-  const fallbackSorted = [...drivers]
-    .filter((d) => d["final-classification"])
-    .filter((d) => !focusedOnly || d.index === focusedDriverIndex)
-    .sort(
-      (a, b) =>
-        (a["final-classification"]?.position ?? 99) -
-        (b["final-classification"]?.position ?? 99),
-    );
+  const fallbackSorted = buildFallbackRaceRows({
+    drivers,
+    focusedOnly,
+    focusedDriverIndex,
+  });
 
   return (
     <div>
