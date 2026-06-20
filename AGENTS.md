@@ -72,6 +72,20 @@ Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_s
 - `scripts/` — `generate-demo-data.ts` creates trimmed demo files; `find-session.sh` resolves session slugs/URLs to file paths
 - `public/demo/` — Bundled demo sessions (committed, deployed as static assets)
 
+**Key code paths:**
+
+- `src/App.tsx` — route table, formula-scope guards, and the dev-only `/ui-debug` route
+- `src/context/TelemetryContext.tsx` and `src/context/zipLoader.ts` — app data source selection: local API, demo data, or uploaded zip/json files
+- `src/plugin/telemetry-server.ts` — local Vite API that scans `TELEMETRY_DIR`, builds session slugs, and serves raw telemetry JSON
+- `src/pages/DashboardPage.tsx`, `src/pages/RaceSessionView.tsx`, `src/pages/QualifyingSessionView.tsx`, `src/pages/TrackProgressPage.tsx` — main product surfaces
+- `src/components/Layout.tsx`, `src/components/SessionList.tsx`, `src/components/SessionHeader.tsx`, `src/components/SessionInsightsGrid.tsx` — shared navigation/session framing and the session insight card grid
+- `src/components/dashboard/`, `src/components/track/`, and `src/components/ui/` — dashboard cards, track-specific sections, and reusable primitives such as `InsightTile`, `StintChip`, `PillSelect`, and table recipes
+- `src/analysis/sessionInsightSummary.ts`, `src/analysis/sessionInsightCuration.ts`, `src/utils/stats/raceInsights.ts`, and `src/utils/stats/qualifyingInsights.ts` — session insight models and ranking/curation
+- `src/analysis/dashboardInsights.ts`, `src/analysis/dashboardResultStats.ts`, and `src/analysis/rivalStats.ts` — dashboard insight/result/rival aggregates
+- `src/analysis/trackAnalysis.ts`, `src/analysis/trackQualifyingInsights.ts`, `src/utils/stats/trackAggregates.ts`, `src/utils/stats/trackPaceEvolution.ts`, and `src/utils/stats/trackStrategy.ts` — track-page telemetry summaries and strategy models
+- `src/analysis/lapAnalysis.ts`, `src/analysis/sectorAnalysis.ts`, `src/analysis/stintAnalysis.ts`, `src/analysis/tyreWearAnalysis.ts`, `src/analysis/damageAnalysis.ts`, and `src/analysis/positionAnalysis.ts` — chart-ready models for the session detail views
+- `src/constants/` plus thin wrappers in `src/utils/colors.ts`, `src/utils/routes.ts`, `src/utils/tracks.ts`, and `src/utils/links.ts` — shared tokens and compatibility helpers used across UI and analysis
+
 **Mode detection:** On mount, `TelemetryContext` runs: `/api/sessions` → `/demo/sessions.json` → upload mode. `VITE_SKIP_API=true` skips the API step (used by `dev:prod`).
 
 **Formula handling:** F1 is the primary/default formula, but labels and PB/history comparisons are game-generation-aware. Pits n' Giggles' durable old-regs enum is `F1 Modern`; the app must canonicalize it to `f1-25` and display `F1 25` even when a lightweight summary is missing `game-year`, while `f1-modern` remains only a legacy alias that redirects to the canonical path. F2 exports with `game-year: 25` display as `F2 25`, and `F1 26` / 2026 Season Pack sessions compare under `f1-26`. The active formula scope is encoded as the first URL segment (`/f1-26`, `/f1-25`, `/f2-25`) and `TelemetryContext` derives app scope from that canonical path. The sidebar root selector is the only user-facing control for changing scope; it changes the first URL segment, preserves track slugs across scopes, and sends session pages back to the selected dashboard because sessions are atomic records. Dashboard, sidebar, track pages, PB/history comparisons, and race/setup analysis all consume that active scope. Do not add `?formula=` or generate legacy alias routes; scoped paths intentionally require exact formula keys so the URL always tells the truth. Track ordering is formula-scope-aware: pass the active formula key to `sortTracksByCalendar()` so F1 26 uses the 2026 calendar with Madrid/Madring between Monza and Baku, while older scopes keep the legacy order.
