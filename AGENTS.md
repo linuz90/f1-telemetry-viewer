@@ -1,141 +1,172 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI coding agents working in this repository.
 
 ## What This Is
 
-F1 Telemetry Viewer — a React app for visualizing telemetry JSON files exported by "Pits n' Giggles" (an F1 game telemetry tool). Local-only, no database — reads JSON files from disk.
+F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON exported by "Pits n' Giggles" (an F1 game telemetry tool).
+
+- No database.
+- Local dev reads telemetry JSON from disk.
+- Production/demo mode reads committed demo data or user-uploaded JSON/zip files.
+- No test runner or linter is configured.
 
 ## Commands
 
 ```bash
-pnpm dev            # Start dev server (default: http://localhost:5173)
-pnpm dev:telemetry <folder>  # Start dev server with a specific debug folder
-pnpm dev:debug      # Start dev server with DEBUG_TELEMETRY_DIR from .env
-pnpm dev:prod       # Dev server without local API (uses demo data, like production)
-pnpm build          # Type-check (tsc) + production build
-pnpm preview        # Preview production build
-pnpm generate-demo  # Regenerate trimmed demo data in public/demo/
-pnpm find-session <slug-or-url>  # Resolve a session URL/slug to its JSON file on disk
+pnpm dev                      # Start dev server, usually http://localhost:5173
+pnpm dev:telemetry <folder>   # Start dev server against one telemetry folder
+pnpm dev:debug                # Use DEBUG_TELEMETRY_DIR from .env
+pnpm dev:prod                 # Skip local API; use demo/upload mode
+pnpm build                    # Type-check (tsc) + production build
+pnpm preview                  # Preview production build
+pnpm generate-demo            # Regenerate public/demo/
+pnpm find-session <slug-or-url> # Resolve a session URL/slug to JSON on disk
 ```
 
-No test runner or linter is configured.
+## Local Data
 
-## Setup
+- Copy `.env.example` to `.env` and set `TELEMETRY_DIR` to the telemetry JSON folder.
+- For narrow repros, use `pnpm dev:telemetry <folder>` instead of editing `.env`.
+- Shared repro files live at `/Users/linuz90/PC Stuff/Pits & Giggles/debug data`.
+- `DEBUG_TELEMETRY_DIR` is optional; use `pnpm dev:debug` for broad QA only when that env var is set.
+- Never commit real telemetry files, `.env`, machine-specific paths, or debug corpus data.
 
-Copy `.env.example` to `.env` and set `TELEMETRY_DIR` to the directory containing telemetry JSON files. The app recursively scans this directory for `.json` files. For one-off debugging, put repro JSON files in a small folder and use `pnpm dev:telemetry <folder>` to point the dev server there without editing `.env`.
+When a user gives a localhost URL or screenshot, prefer the telemetry source that produced that exact page. Use `pnpm find-session <slug-or-url>` against the active source before guessing.
 
-Shared repro sessions for local debugging live in `/Users/linuz90/PC Stuff/Pits & Giggles/debug data`. Start the app against only those files with:
+## Worktrees
 
-```bash
-pnpm dev:telemetry "/Users/linuz90/PC Stuff/Pits & Giggles/debug data"
-```
-
-For broader local QA, first check whether `DEBUG_TELEMETRY_DIR` is set in the uncommitted `.env`. When present, `pnpm dev:debug` is a good default for smoke testing against generated/repro data instead of the user's full personal telemetry folder. Do not blindly use it when the conversation points at specific sessions, screenshots, or localhost URLs, because those may come from the normal `TELEMETRY_DIR` server or a one-off `pnpm dev:telemetry <folder>` run. Let the user's current context decide which telemetry source to launch; use `pnpm find-session <slug-or-url>` against the active source when a link is involved. In Fabrizio's setup `DEBUG_TELEMETRY_DIR` may point at telemetry generated from the Pits n' Giggles integration runner (`poetry run python tests/integration_test/runner.py` in that repo). Treat it as optional local data: never commit real telemetry files or machine-specific paths.
-
-## Managed Worktree Setup
-
-Managed worktree tools use `.worktreeinclude` to copy ignored local env files (`.env`, `.env.local`, `.env.*.local`) from the source checkout. Keep real telemetry paths and debug corpus paths in those ignored files; never commit machine-specific paths or telemetry data.
-
-`./workspace-setup.sh init` is the shared setup entry point for Codex and Conductor worktrees. It resolves the target checkout, runs `pnpm install --frozen-lockfile`, and leaves local env values untouched. If no `.env` was copied, use `pnpm dev:prod` for demo/upload mode or create `.env` from `.env.example` before running the local telemetry API.
-
-Conductor shared repo settings live in `.conductor/settings.toml`; personal overrides belong in `.conductor/settings.local.toml`, which stays gitignored. Plain `git worktree add` checkouts can run `./workspace-setup.sh init` manually after creation.
+- `./workspace-setup.sh init` is the shared setup entry point for Codex/Conductor worktrees.
+- `.worktreeinclude` copies ignored local env files into managed worktrees.
+- Conductor shared settings: `.conductor/settings.toml`.
+- Personal Conductor overrides: `.conductor/settings.local.toml` (gitignored).
+- If no `.env` exists in a worktree, use `pnpm dev:prod` or create one from `.env.example`.
 
 ## Architecture
 
-**Stack:** React 19 + TypeScript + Vite 7 + Tailwind CSS 4 + Recharts 3 + React Router 7
+Stack: React 19, TypeScript, Vite 7, Tailwind CSS 4, Recharts 3, React Router 7.
 
-**Custom Vite plugin** (`src/plugin/telemetry-server.ts`) acts as the backend during development:
+Data flow:
 
-- `GET /api/sessions` — lists all sessions (date from filename; track, session type, and formula from JSON when available)
-- `GET /api/sessions/:relativePath` — returns raw session JSON
+- Pages/hooks -> `TelemetryContext`.
+- Dev: `src/plugin/telemetry-server.ts` serves `/api/sessions` and raw session JSON.
+- Production/demo: `public/demo/sessions.json`.
+- Upload mode: JSON/zip files parsed in-browser.
 
-Telemetry filenames follow the pattern `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_ss.json`. The plugin parses filenames for stable dates/slugs, then prefers `session-info` fields from the JSON for display metadata because filenames may include modifiers like `Manual` or numbered sessions like `Race_2`.
+Routes:
 
-**Routing** (defined in `src/App.tsx`):
+- `/` -> newest available formula scope.
+- `/:formulaKey` -> dashboard, e.g. `/f1-26`.
+- `/:formulaKey/sessions/*` -> session detail.
+- `/:formulaKey/tracks/:trackId` -> track progress.
+- `/ui-debug` -> dev-only UI fixture page.
 
-- `/` — Entry point that redirects to the newest available formula scope
-- `/:formulaKey` — Formula-scoped dashboard, e.g. `/f1-26`
-- `/:formulaKey/sessions/*` — Formula-scoped session detail
-- `/:formulaKey/tracks/:trackId` — Formula-scoped track progress, with hyphenated track slugs like `/f1-25/tracks/abu-dhabi`
+Telemetry filenames follow `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_ss.json`. Filename parsing gives stable dates/slugs; `session-info` wins for display metadata.
 
-**Data flow:** Pages use custom hooks (`useSessionList`, `useSession`) → `TelemetryContext` → Vite plugin endpoints (dev) or static demo files (prod) or in-memory store (upload).
+## Key Code Paths
 
-**Key directories:**
+Entry and data:
 
-- `src/components/` — UI renderers: chart components (LapTimeChart, PositionChart, TyreWearChart, StintTimeline, SectorComparison), data tables, cards, and controls
-- `src/analysis/` — UI-ready telemetry intelligence: session insight extraction/curation, dashboard aggregates, rival analysis, track aggregation, setup comparison, lap/sector/stint/damage/tyre models
-- `src/pages/` — Route-level components
-- `src/utils/` — Formatting, routes, formula scopes, storage helpers, team/compound color mappings, and low-level reusable stat primitives under `src/utils/stats/`
-- `src/types/telemetry.ts` — All TypeScript types for the telemetry data model
-- `src/plugin/` — Vite plugin (has its own tsconfig: `tsconfig.node.json`)
-- `scripts/` — `generate-demo-data.ts` creates trimmed demo files; `find-session.sh` resolves session slugs/URLs to file paths
-- `public/demo/` — Bundled demo sessions (committed, deployed as static assets)
+- `src/App.tsx` — routes, formula guards, `/ui-debug`.
+- `src/context/TelemetryContext.tsx` — data-source selection.
+- `src/context/zipLoader.ts` — uploaded JSON/zip parsing.
+- `src/plugin/telemetry-server.ts` — local telemetry API.
+- `src/utils/parseFilename.ts` — filename -> slug/date parsing.
 
-**Key code paths:**
+Product surfaces:
 
-- `src/App.tsx` — route table, formula-scope guards, and the dev-only `/ui-debug` route
-- `src/context/TelemetryContext.tsx` and `src/context/zipLoader.ts` — app data source selection: local API, demo data, or uploaded zip/json files
-- `src/plugin/telemetry-server.ts` — local Vite API that scans `TELEMETRY_DIR`, builds session slugs, and serves raw telemetry JSON
-- `src/pages/DashboardPage.tsx`, `src/pages/RaceSessionView.tsx`, `src/pages/QualifyingSessionView.tsx`, `src/pages/TrackProgressPage.tsx` — main product surfaces
-- `src/components/Layout.tsx`, `src/components/SessionList.tsx`, `src/components/SessionHeader.tsx`, `src/components/SessionInsightsGrid.tsx` — shared navigation/session framing and the session insight card grid
-- `src/components/dashboard/`, `src/components/track/`, and `src/components/ui/` — dashboard cards, track-specific sections, and reusable primitives such as `InsightTile`, `StintChip`, `PillSelect`, and table recipes
-- `src/analysis/sessionInsightSummary.ts`, `src/analysis/sessionInsightCuration.ts`, `src/utils/stats/raceInsights.ts`, and `src/utils/stats/qualifyingInsights.ts` — session insight models and ranking/curation
-- `src/analysis/dashboardInsights.ts`, `src/analysis/dashboardResultStats.ts`, and `src/analysis/rivalStats.ts` — dashboard insight/result/rival aggregates
-- `src/analysis/trackAnalysis.ts`, `src/analysis/trackQualifyingInsights.ts`, `src/utils/stats/trackAggregates.ts`, `src/utils/stats/trackPaceEvolution.ts`, and `src/utils/stats/trackStrategy.ts` — track-page telemetry summaries and strategy models
-- `src/analysis/lapAnalysis.ts`, `src/analysis/sectorAnalysis.ts`, `src/analysis/stintAnalysis.ts`, `src/analysis/tyreWearAnalysis.ts`, `src/analysis/damageAnalysis.ts`, and `src/analysis/positionAnalysis.ts` — chart-ready models for the session detail views
-- `src/constants/` plus thin wrappers in `src/utils/colors.ts`, `src/utils/routes.ts`, `src/utils/tracks.ts`, and `src/utils/links.ts` — shared tokens and compatibility helpers used across UI and analysis
+- `src/pages/DashboardPage.tsx`
+- `src/pages/RaceSessionView.tsx`
+- `src/pages/QualifyingSessionView.tsx`
+- `src/pages/TrackProgressPage.tsx`
+- `src/pages/UiDebugPage.tsx`
 
-**Mode detection:** On mount, `TelemetryContext` runs: `/api/sessions` → `/demo/sessions.json` → upload mode. `VITE_SKIP_API=true` skips the API step (used by `dev:prod`).
+Shared UI:
 
-**Formula handling:** F1 is the primary/default formula, but labels and PB/history comparisons are game-generation-aware. Pits n' Giggles' durable old-regs enum is `F1 Modern`; the app must canonicalize it to `f1-25` and display `F1 25` even when a lightweight summary is missing `game-year`, while `f1-modern` remains only a legacy alias that redirects to the canonical path. F2 exports with `game-year: 25` display as `F2 25`, and `F1 26` / 2026 Season Pack sessions compare under `f1-26`. The active formula scope is encoded as the first URL segment (`/f1-26`, `/f1-25`, `/f2-25`) and `TelemetryContext` derives app scope from that canonical path. The sidebar root selector is the only user-facing control for changing scope; it changes the first URL segment, preserves track slugs across scopes, and sends session pages back to the selected dashboard because sessions are atomic records. Dashboard, sidebar, track pages, PB/history comparisons, and race/setup analysis all consume that active scope. Do not add `?formula=` or generate legacy alias routes; scoped paths intentionally require exact formula keys so the URL always tells the truth. Track ordering is formula-scope-aware: pass the active formula key to `sortTracksByCalendar()` so F1 26 uses the 2026 calendar with Madrid/Madring between Monza and Baku, while older scopes keep the legacy order.
+- `src/components/Layout.tsx`
+- `src/components/SessionList.tsx`
+- `src/components/SessionHeader.tsx`
+- `src/components/SessionInsightsGrid.tsx`
+- `src/components/dashboard/`
+- `src/components/track/`
+- `src/components/ui/` (`InsightTile`, `StintChip`, `PillSelect`, table recipes, etc.)
 
-**ERS handling:** Pits n' Giggles F1 26 saved sessions can deploy more than the 4 MJ battery capacity per lap because the 2026 ruleset has no fixed deploy limit. Display ERS deployment as energy (`MJ/lap`), preferring `per-lap-info[].ers-stats["ers-deployed-j"]` and falling back to `car-status-data["ers-deployed-this-lap"]` for older exports. Keep battery-store values as percentages only when explicitly showing remaining store.
+Telemetry intelligence:
 
-**Analysis layer:** Calculation-heavy telemetry logic belongs in `src/analysis/`, not route/page or chart components. Keep analysis modules returning plain typed models that UI components render. Shared generic math/telemetry primitives belong in `src/utils/stats/`; product-specific ranking, curation, bucketing, and insight thresholds belong in `src/analysis/`. Add concise comments around exporter quirks, thresholds, and comparison policies so future UI changes do not silently change telemetry semantics.
+- `src/analysis/` — product-facing models, rankings, buckets, insight curation, chart-ready data.
+- `src/utils/stats/` — low-level reusable telemetry/math primitives.
+- `src/constants/` — shared tokens, routes, storage keys, setup ranges, track calendars.
+- Thin compatibility wrappers remain in `src/utils/colors.ts`, `src/utils/routes.ts`, `src/utils/tracks.ts`, and `src/utils/links.ts`.
 
-**Rivals roster:** Online race summaries carry a slim per-driver roster (`SessionSummary.rivals`) with each opponent's normalized name, team, lap stats, same-compound clean-median pace delta when available, overtake counts, average per-lap position gap to the player, and a fastest-lap flag. Identity key is the normalized `driver-name` (the only field stable across sessions). The dashboard's Rivals & Teammates section aggregates this across the active formula scope via `src/analysis/rivalStats.ts` — see that module for thresholds. Quali and offline-AI sessions skip the roster to keep the summary slim.
+## Telemetry Rules
 
-**Styling:** Dark theme (slate-950 background). All styling via Tailwind utility classes.
+Formula scope:
 
-## Reading Session Telemetry Data
+- The first URL segment is the active scope: `/f1-26`, `/f1-25`, `/f2-25`.
+- `F1 Modern` canonicalizes to `f1-25`; `f1-modern` is only a legacy redirect alias.
+- F2 exports with `game-year: 25` display as `F2 25`.
+- F1 26 / 2026 Season Pack sessions compare under `f1-26`.
+- Do not add `?formula=` or new legacy alias routes.
+- Pass the active formula key to `sortTracksByCalendar()` so F1 26 uses the Madrid/Madring calendar order.
 
-When the user references a session by URL, or when you're testing in the browser and land on a session page (e.g. `http://localhost:5173/f1-25/sessions/race-baku-manual-2026-02-21-16-39-26`), you can read the raw telemetry JSON to understand the data. The session slug maps to a file on disk under `TELEMETRY_DIR` (set in `.env`); the leading formula scope is route context and is not part of the filesystem lookup.
+ERS:
 
-**This only works in local dev mode (`pnpm dev`)**, where sessions are served from the `TELEMETRY_DIR` directory. For shared repro files, `pnpm dev:telemetry <folder>` starts the same local API against a supplied folder. It won't work for uploaded sessions (JSON/zip via drag-and-drop) or when running `dev:prod` / production, since those sessions live in-memory in the browser.
+- F1 26 can deploy more than 4 MJ/lap; show deployment as energy (`MJ/lap`), not battery percentage.
+- Prefer `per-lap-info[].ers-stats["ers-deployed-j"]`.
+- Fall back to `car-status-data["ers-deployed-this-lap"]` for older exports.
+- Show battery-store values as percentages only when explicitly displaying remaining store.
 
-**How the slug-to-file mapping works:**
+Analysis layer:
 
-- Filenames follow: `Race_Baku_Manual_2026_02_21_16_39_26.json` (with date subdirs like `2026_02_21/race-info/`)
-- `toSlug()` in `src/utils/parseFilename.ts` lowercases the basename and replaces `_` with `-` → `race-baku-manual-2026-02-21-16-39-26`
-- To reverse: replace `-` with `_` and search case-insensitively under `TELEMETRY_DIR`
+- Calculation-heavy logic belongs in `src/analysis/`, not page/chart components.
+- `src/analysis/` returns plain typed models that UI components render.
+- Generic primitives belong in `src/utils/stats/`.
+- Product-specific ranking, curation, bucketing, and insight thresholds belong in `src/analysis/`.
+- Add concise why-comments for exporter quirks, thresholds, and comparison policies.
 
-**Use the helper script to find the file:**
+Rivals roster:
+
+- Online race summaries may include `SessionSummary.rivals`.
+- Identity key: normalized `driver-name`.
+- Dashboard aggregation lives in `src/analysis/rivalStats.ts`.
+- Qualifying and offline-AI sessions skip the roster to keep summaries slim.
+
+Styling:
+
+- Dark Tailwind UI.
+- Reuse shared primitives before adding one-off styles.
+- Keep chart/card constants in `src/constants/` or shared UI modules.
+
+## Reading Raw Session Telemetry
+
+Only works for local dev API sessions, not uploaded files or `dev:prod`.
 
 ```bash
 pnpm find-session race-baku-manual-2026-02-21-16-39-26
-# → /Users/.../data/2026_02_21/race-info/Race_Baku_Manual_2026_02_21_16_39_26.json
-
 pnpm find-session http://localhost:5173/f1-25/sessions/race-baku-manual-2026-02-21-16-39-26
-# Same result — accepts full URLs too
 ```
 
-Then read the returned file path to inspect the raw telemetry JSON.
+Then open the returned JSON file.
 
-## Commit Message Guidelines
+Slug mapping:
 
-Commit messages feed a **user-facing changelog** (the "What's new" modal). A Vite plugin (`src/plugin/changelog.ts`) parses `git log` at build time, extracts the conventional commit type and subject, and displays them in the UI via `ChangelogModal.tsx`.
+- Filename: `Race_Baku_Manual_2026_02_21_16_39_26.json`.
+- Slug: `race-baku-manual-2026-02-21-16-39-26`.
+- Formula scope is URL context only; it is not part of the filesystem lookup.
 
-DO NOT commit until you're asked to.
+## Commit Messages
 
-**Rules:**
+Commits feed the user-facing "What's new" modal via `src/plugin/changelog.ts`.
 
-- Use conventional commits: `feat:`, `fix:`, `docs:`, etc.
-- The subject after the prefix is shown **verbatim** to users — write it as a user-facing change description, not a developer note.
-  - Good: `feat(ui): show tyre compounds in qualifying lap breakdown`
-  - Bad: `feat: refactor TyreChart to use compound map lookup`
-- Only `feat`, `fix`, and `docs` commits appear in the changelog. Other types (`chore`, `refactor`, `style`, etc.) are filtered out at build time.
-- Keep subjects concise and in imperative mood (matches conventional commit convention).
-- Internal-only changes should use `chore:` or `refactor:` so they stay out of the user-facing changelog. This includes: dev tooling (Vite config, linter setup), dependency updates, CI/CD, refactors, build config, and anything that doesn't change what the user sees or experiences in the app.
-  - Good: `chore(dev): auto-open browser on dev server start` (dev tooling, not user-facing)
-  - Bad: `feat(dev): auto-open browser on dev server start` (this would show up in the changelog)
+- Do not commit until asked.
+- Use conventional commits.
+- Only `feat`, `fix`, and `docs` appear in the changelog.
+- Use `chore:` or `refactor:` for internal-only work.
+- Write changelog-visible subjects as user-facing descriptions.
+- Keep the subject concise, imperative, and under 72 chars.
+- Never add AI attribution.
+
+Examples:
+
+- Good: `feat(ui): show tyre compounds in qualifying lap breakdown`
+- Bad: `feat: refactor TyreChart to use compound map lookup`
