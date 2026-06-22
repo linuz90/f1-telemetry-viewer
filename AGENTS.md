@@ -109,6 +109,15 @@ Formula scope:
 - Do not add `?formula=` or new legacy alias routes.
 - Pass the active formula key to `sortTracksByCalendar()` so F1 26 uses the Madrid/Madring calendar order.
 
+Start reaction:
+
+- Use `session-info["start-reaction-time"]` only; it is the player's exported reaction time as a float in seconds.
+- `0`, missing, non-finite, or negative values mean unavailable.
+- Current exports do not provide per-driver reaction times; do not build all-driver rankings unless a real per-driver field is added.
+- Use a compact `0.0s` to `0.5s` visual rail; values over `0.5s` should clamp and read as a severe/terrible start.
+- Do not estimate reaction time from session duration, system time, race-control events, packet timestamps, or lap-one movement.
+- This value depends on the telemetry format, not only formula scope: F1 25 and F2 sessions can include it when recorded with the 2026 format.
+
 ERS:
 
 - F1 26 can deploy more than 4 MJ/lap; show deployment as energy (`MJ/lap`), not battery percentage.

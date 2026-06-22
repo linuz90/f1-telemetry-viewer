@@ -16,6 +16,7 @@ import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
 import { PositionChart } from "../components/PositionChart";
 import { SectorComparison } from "../components/SectorComparison";
 import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
+import { StartReactionCard } from "../components/StartReactionCard";
 import { StintDetailCards, StintTimeline } from "../components/StintTimeline";
 import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
 import { TrackStrategySection } from "../components/track/TrackStrategySection";
@@ -47,6 +48,10 @@ import { cn } from "../utils/cn";
 import { msToLapTime, msToSectorTime } from "../utils/format";
 import type { TrackRivalBenchmark } from "../analysis/rivalStats";
 import type { SessionInsight } from "../analysis/sessionInsightSummary";
+import {
+  buildStartReactionModelFromSeconds,
+  type StartReactionModel,
+} from "../analysis/startReactionAnalysis";
 import type {
   TrackRaceRecommendation,
   TrackStrategySuggestion,
@@ -213,6 +218,13 @@ const trackRivalBenchmark: TrackRivalBenchmark = {
 
 const laps = buildLaps();
 const rivalLaps = buildLaps(350);
+const startReactionSamples = [
+  makeStartReactionModel(0.142),
+  makeStartReactionModel(0.205),
+  makeStartReactionModel(0.283),
+  makeStartReactionModel(0.392),
+  makeStartReactionModel(0.62),
+];
 const stints = [
   makeStint("Medium", 1, 6, 0, 8.2),
   makeStint("Hard", 7, 12, 0, 5.8),
@@ -328,6 +340,14 @@ export function UiDebugPage() {
           raceLengthLabel="27-lap"
           rivalBenchmark={trackRivalBenchmark}
         />
+      </DebugSection>
+
+      <DebugSection file="src/components/StartReactionCard.tsx">
+        <div className="space-y-4">
+          {startReactionSamples.map((model) => (
+            <StartReactionCard key={model.seconds} model={model} />
+          ))}
+        </div>
       </DebugSection>
 
       <DebugSection file="src/components/ui/InsightTile.tsx">
@@ -783,6 +803,12 @@ function DebugHero({
       <InsightDetail className="mt-1.5">{detail}</InsightDetail>
     </>
   );
+}
+
+function makeStartReactionModel(seconds: number): StartReactionModel {
+  const model = buildStartReactionModelFromSeconds(seconds);
+  if (!model) throw new Error(`Invalid start reaction fixture: ${seconds}`);
+  return model;
 }
 
 function buildLaps(offsetMs = 0): LapHistoryEntry[] {

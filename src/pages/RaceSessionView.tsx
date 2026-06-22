@@ -5,6 +5,7 @@ import {
   buildSessionInsightsHint,
   buildSessionSummaryInsights,
 } from "../analysis/sessionInsightSummary";
+import { buildStartReactionModel } from "../analysis/startReactionAnalysis";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
 import { CompoundLapComparison } from "../components/CompoundLapComparison";
@@ -21,6 +22,7 @@ import { SessionHeader } from "../components/SessionHeader";
 import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
 import { StintComparisonTable } from "../components/StintComparisonTable";
 import { StintDetailCards, StintTimeline } from "../components/StintTimeline";
+import { StartReactionCard } from "../components/StartReactionCard";
 import { TyreWearChart } from "../components/TyreWearChart";
 import { Badge } from "../components/ui/Badge";
 import {
@@ -259,6 +261,10 @@ export function RaceSessionView({
     () => buildSessionInsightsHint(session),
     [session],
   );
+  const startReaction = useMemo(
+    () => buildStartReactionModel(session, focusedDriver),
+    [session, focusedDriver],
+  );
 
   // Show car setup only for the actual player with valid setup data
   const showSetup =
@@ -313,6 +319,8 @@ export function RaceSessionView({
 
       <VStack className="mt-6 gap-6 sm:gap-8">
         <SessionInsightsGrid insights={sessionInsights} hint={insightsHint} />
+
+        {startReaction && <StartReactionCard model={startReaction} />}
 
         {/* Stint strategy + tyre wear */}
         {stints.length > 0 && (
