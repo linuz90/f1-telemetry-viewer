@@ -1,15 +1,14 @@
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../../utils/cn";
-import { FORM_CONTROL_SIZE_STYLES, type FormControlSize } from "./formControl";
+import {
+  FORM_CONTROL_CHROME_STYLES,
+  FORM_CONTROL_CONTAINER_STYLES,
+  FORM_CONTROL_SIZE_STYLES,
+  FORM_CONTROL_WIDTH_STYLES,
+  type FormControlSize,
+} from "./formControl";
 import type { PillSelectOption, PillSelectWidth } from "./PillSelect";
-
-const WIDTH: Record<PillSelectWidth, string> = {
-  auto: "w-auto",
-  compact: "w-[min(15rem,calc(100vw-3rem))]",
-  session: "w-[min(20rem,calc(100vw-3rem))]",
-  full: "w-full",
-};
 
 export function MultiPillSelect({
   value,
@@ -70,8 +69,8 @@ export function MultiPillSelect({
     <div
       ref={containerRef}
       className={cn(
-        "relative inline-flex min-w-0 max-w-full",
-        WIDTH[width],
+        FORM_CONTROL_CONTAINER_STYLES,
+        FORM_CONTROL_WIDTH_STYLES[width],
         className,
       )}
     >
@@ -81,7 +80,8 @@ export function MultiPillSelect({
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "flex w-full min-w-0 items-center justify-between gap-2 border border-zinc-800/80 bg-zinc-900/70 px-3 font-medium text-zinc-200 outline-none transition-colors hover:border-zinc-700 focus:ring-1 focus:ring-zinc-500/40",
+          FORM_CONTROL_CHROME_STYLES,
+          "flex items-center justify-between gap-2 px-3",
           styles.control,
         )}
       >

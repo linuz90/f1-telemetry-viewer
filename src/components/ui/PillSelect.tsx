@@ -1,6 +1,13 @@
 import { ChevronDown } from "lucide-react";
 import { cn } from "../../utils/cn";
-import { FORM_CONTROL_SIZE_STYLES, type FormControlSize } from "./formControl";
+import {
+  FORM_CONTROL_CHROME_STYLES,
+  FORM_CONTROL_CONTAINER_STYLES,
+  FORM_CONTROL_SIZE_STYLES,
+  FORM_CONTROL_WIDTH_STYLES,
+  type FormControlSize,
+  type FormControlWidth,
+} from "./formControl";
 
 export type PillSelectValue = string | number;
 
@@ -10,15 +17,8 @@ export interface PillSelectOption {
   disabled?: boolean;
 }
 
-export type PillSelectWidth = "auto" | "compact" | "session" | "full";
+export type PillSelectWidth = FormControlWidth;
 export type PillSelectSize = FormControlSize;
-
-const WIDTH: Record<PillSelectWidth, string> = {
-  auto: "w-auto",
-  compact: "w-[min(15rem,calc(100vw-3rem))]",
-  session: "w-[min(20rem,calc(100vw-3rem))]",
-  full: "w-full",
-};
 
 const SIZE: Record<
   PillSelectSize,
@@ -67,9 +67,10 @@ export function PillSelect({
   return (
     <span
       className={cn(
-        "relative inline-flex min-w-0 max-w-full items-center",
+        FORM_CONTROL_CONTAINER_STYLES,
+        "items-center",
         "text-zinc-200",
-        WIDTH[width],
+        FORM_CONTROL_WIDTH_STYLES[width],
         className,
       )}
     >
@@ -85,7 +86,8 @@ export function PillSelect({
         onChange={(event) => onChange(event.target.value)}
         aria-label={ariaLabel}
         className={cn(
-          "w-full min-w-0 appearance-none border border-zinc-800/80 bg-zinc-900/70 font-medium outline-none transition-colors hover:border-zinc-700 focus:ring-1 focus:ring-zinc-500/40",
+          FORM_CONTROL_CHROME_STYLES,
+          "appearance-none",
           styles.select,
         )}
       >
