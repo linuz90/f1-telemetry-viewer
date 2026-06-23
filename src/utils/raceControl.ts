@@ -39,6 +39,7 @@ export const KEY_RACE_CONTROL_TYPES = new Set([
   "FASTEST_LAP",
   "RACE_WINNER",
   "CHEQUERED_FLAG",
+  "OVERTAKE",
 ]);
 
 export function getRaceControlEvents(
