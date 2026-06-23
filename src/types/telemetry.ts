@@ -276,6 +276,15 @@ export interface RaceControlDriverInfo {
   "driver-number": number;
 }
 
+export type RaceControlSector = "S1" | "S2" | "S3";
+
+export interface RaceControlSegmentInfo {
+  type: "straight" | "corner" | "complex_corner" | string;
+  name?: string;
+  corner_number?: number;
+  corner_numbers?: number[];
+}
+
 export interface RaceControlEvent {
   id: number;
   "lap-number": number | null;
@@ -312,6 +321,9 @@ export interface RaceControlEvent {
   "old-tyre-index"?: number;
   "new-tyre-index"?: number;
   "num-lights"?: number;
+  "lap-distance"?: number | null;
+  sector?: RaceControlSector | null;
+  "segment-info"?: RaceControlSegmentInfo | null;
   [key: string]: unknown;
 }
 
@@ -407,6 +419,7 @@ export interface TyreWearEntry {
 export interface CarDamage {
   "tyres-wear": number[];
   "tyres-damage": number[];
+  "brakes-damage"?: number[];
   "front-left-wing-damage": number;
   "front-right-wing-damage": number;
   "rear-wing-damage": number;
@@ -414,6 +427,12 @@ export interface CarDamage {
   "diffuser-damage": number;
   "sidepod-damage": number;
   "engine-damage"?: number;
+  "engine-mguh-wear"?: number;
+  "engine-es-wear"?: number;
+  "engine-ce-wear"?: number;
+  "engine-ice-wear"?: number;
+  "engine-mguk-wear"?: number;
+  "engine-tc-wear"?: number;
   "gear-box-damage"?: number;
   "drs-fault"?: boolean;
   "ers-fault"?: boolean;

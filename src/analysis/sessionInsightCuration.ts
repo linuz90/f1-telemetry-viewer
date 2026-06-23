@@ -14,6 +14,36 @@ function compactMetricLine(prefix: string, insight: SessionInsight): string {
   return `${prefix}: ${insight.value}${insight.detail ? ` (${insight.detail})` : ""}`;
 }
 
+function compactEventLine(insight: SessionInsight): string {
+  const peak = insight.detail.match(/^(.+?) peak\b/);
+  if (insight.label === "Penalties") return insight.value;
+  if (insight.label === "Power Unit Wear" && peak) {
+    return `${peak[1]} wear: ${insight.value}`;
+  }
+  if (insight.label === "Race Incidents" && insight.detail) {
+    return `${insight.label}: ${insight.detail}`;
+  }
+  if (insight.label === "Car Damage" && peak) {
+    return `${insight.label}: ${insight.value} ${peak[1]} damage`;
+  }
+  return `${insight.label}: ${insight.value}`;
+}
+
+function compactEventItem(insight: SessionInsight): string {
+  const peak = insight.detail.match(/^(.+?) peak\b/);
+  if (insight.label === "Penalties") return insight.value;
+  if (insight.label === "Power Unit Wear" && peak) {
+    return `${insight.value} ${peak[1]} wear`;
+  }
+  if (insight.label === "Race Incidents" && insight.detail) {
+    return insight.detail;
+  }
+  if (insight.label === "Car Damage" && peak) {
+    return `${insight.value} ${peak[1]} damage`;
+  }
+  return insight.detail || `${insight.value} ${insight.label.toLowerCase()}`;
+}
+
 function uniqueLines(lines: (string | undefined)[]): string[] {
   return [...new Set(lines.filter((line): line is string => Boolean(line)))];
 }
@@ -338,7 +368,8 @@ function mergeEventInsights(events: SessionInsight[]): SessionInsight[] {
   const priority = [
     "Penalties",
     "Car Damage",
-    "Race Control",
+    "Power Unit Wear",
+    "Race Incidents",
     "Neutralized Laps",
     "Conditions",
   ];
@@ -356,19 +387,16 @@ function mergeEventInsights(events: SessionInsight[]): SessionInsight[] {
   return [
     {
       type: primary.type,
-      label: "Session Events",
+      label: primary.groupLabel ?? "Session Events",
+      groupLabel: primary.groupLabel,
       value: `${events.length} ${hasNegativeEvent ? "issues" : "notes"}`,
-      detail: sorted
-        .map((insight) => `${insight.label}: ${insight.value}`)
-        .join(" - "),
+      detail: sorted.map(compactEventLine).join(" - "),
       tooltip: primary.tooltip,
       tone: hasNegativeEvent ? "negative" : "warning",
       accent: sorted.some((insight) => insight.accent === "rose")
         ? "rose"
         : "amber",
-      extraDetails: sorted.map((insight) =>
-        compactMetricLine(insight.label, insight),
-      ),
+      extraDetails: sorted.map(compactEventItem),
     },
   ];
 }

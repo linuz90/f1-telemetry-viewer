@@ -80,7 +80,7 @@ export function SessionHeader({
           )}
         </HStack>
 
-        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-zinc-400">
+        <HStack wrap className="gap-2 text-xs text-zinc-400">
           {showDriverSelector && (
             <SessionDriverSelect
               session={session}
@@ -102,7 +102,7 @@ export function SessionHeader({
           )}
 
           {controls && <div className="contents">{controls}</div>}
-        </div>
+        </HStack>
       </div>
       {showTrackLayout && (
         <TrackLayout

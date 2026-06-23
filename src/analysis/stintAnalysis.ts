@@ -34,6 +34,11 @@ export interface StintDetail {
   averageDeviationMs: number;
 }
 
+export interface StintDetailComparison {
+  detail: StintDetail;
+  comparison?: StintDetail;
+}
+
 export function buildStintTimelineSegments(
   stints: readonly TyreStint[],
   totalLaps: number,
@@ -125,5 +130,56 @@ export function buildStintDetails(
             ) / effectiveTimes.length
           : 0,
     };
+  });
+}
+
+function stintLapOverlap(a: TyreStint, b: TyreStint): number {
+  return Math.max(
+    0,
+    Math.min(a["end-lap"], b["end-lap"]) -
+      Math.max(a["start-lap"], b["start-lap"]) +
+      1,
+  );
+}
+
+function stintLapDistance(a: TyreStint, b: TyreStint): number {
+  return (
+    Math.abs(a["start-lap"] - b["start-lap"]) +
+    Math.abs(a["end-lap"] - b["end-lap"]) +
+    Math.abs(a["stint-length"] - b["stint-length"])
+  );
+}
+
+export function pairStintDetailsByCompound({
+  details,
+  comparisonDetails,
+}: {
+  details: readonly StintDetail[];
+  comparisonDetails: readonly StintDetail[];
+}): StintDetailComparison[] {
+  const usedComparisonIndexes = new Set<number>();
+
+  return details.map((detail) => {
+    const candidates = comparisonDetails
+      .map((comparison, index) => ({
+        comparison,
+        index,
+        overlap: stintLapOverlap(detail.stint, comparison.stint),
+        distance: stintLapDistance(detail.stint, comparison.stint),
+      }))
+      .filter(
+        (candidate) =>
+          !usedComparisonIndexes.has(candidate.index) &&
+          candidate.comparison.compound === detail.compound,
+      )
+      .sort((a, b) => b.overlap - a.overlap || a.distance - b.distance);
+
+    const match = candidates[0];
+    if (!match) return { detail };
+
+    // Pair same-compound stints by lap overlap first; this keeps long-fuel and
+    // low-fuel runs from being compared just because they share a tyre label.
+    usedComparisonIndexes.add(match.index);
+    return { detail, comparison: match.comparison };
   });
 }

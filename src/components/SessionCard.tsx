@@ -1,5 +1,6 @@
-import { Eye, Globe } from "lucide-react";
+import { Eye } from "lucide-react";
 import { cn } from "../utils/cn";
+import { SESSION_MODE_META } from "./sessionModeMeta";
 import { TrackFlag } from "./TrackFlag";
 import { getSessionTypeMeta } from "./sessionTypeMeta";
 import { HStack } from "./ui/Stack";
@@ -38,6 +39,8 @@ export function SessionCard({
 }: SessionCardProps) {
   const typeMeta = getSessionTypeMeta(sessionType);
   const TypeIcon = typeMeta.icon;
+  const AiIcon = SESSION_MODE_META.ai.icon;
+  const OnlineIcon = SESSION_MODE_META.online.icon;
 
   return (
     <div className="min-w-0">
@@ -66,16 +69,26 @@ export function SessionCard({
         <HStack className="shrink-0 gap-1">
           <span className="text-xs text-zinc-500">{time}</span>
           {!hideMode && aiDifficulty != null && aiDifficulty > 0 && (
-            <span className="text-2xs font-medium text-zinc-600">
+            <HStack
+              as="span"
+              className={cn(
+                "gap-0.5 text-2xs font-medium",
+                SESSION_MODE_META.ai.color,
+              )}
+            >
+              <AiIcon className="size-3" />
               AI {aiDifficulty}
-            </span>
+            </HStack>
           )}
           {!hideMode && isOnline === true && (
             <HStack
               as="span"
-              className="gap-0.5 text-2xs font-medium text-sky-500/70"
+              className={cn(
+                "gap-0.5 text-2xs font-medium",
+                SESSION_MODE_META.online.color,
+              )}
             >
-              <Globe className="size-3" />
+              <OnlineIcon className="size-3" />
               Online
             </HStack>
           )}

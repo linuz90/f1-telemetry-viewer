@@ -73,6 +73,18 @@ const META: Record<string, SessionTypeMeta> = {
   "Time Trial": { icon: Gauge, color: "text-cyan-400/70", badgeTone: "sky" },
 };
 
+export const SESSION_TYPE_FILTER_META = {
+  race: { ...META.Race, label: "Race", buttonLabel: "Race filters" },
+  quali: {
+    ...META["Short Quali"],
+    label: "Quali",
+    buttonLabel: "Qualifying filters",
+  },
+} satisfies Record<
+  "race" | "quali",
+  SessionTypeMeta & { label: string; buttonLabel: string }
+>;
+
 export function getSessionTypeMeta(label: string): SessionTypeMeta {
   const explicit = META[label];
   if (explicit) return explicit;

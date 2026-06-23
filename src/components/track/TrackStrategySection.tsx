@@ -4,6 +4,7 @@ import type { TrackStrategySuggestion } from "../../utils/stats/trackStrategy";
 import { PUNCTURE_THRESHOLD } from "../../utils/stats/tyres";
 import { cardClass } from "../Card";
 import { SectionHeader } from "../ui/SectionHeader";
+import { HStack } from "../ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
 
 /**
@@ -95,7 +96,7 @@ function StrategyRow({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <HStack wrap className="gap-2">
         <span
           className={cn(
             "inline-flex items-center gap-1.5 font-mono text-xs font-medium uppercase tracking-wider",
@@ -106,7 +107,7 @@ function StrategyRow({
           {isRecommended ? "Recommended" : "Alternative"}
         </span>
         <span className="text-xs text-zinc-500">· {tagline}</span>
-      </div>
+      </HStack>
 
       <StintRibbon
         compounds={strategy.compounds}

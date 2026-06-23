@@ -89,7 +89,7 @@ function SpectatorDriverPicker({
   });
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
+    <HStack wrap className="gap-2">
       <PillSelect
         value={focusedDriverIndex}
         onChange={(value) => onFocusedDriverChange(Number(value))}
@@ -100,7 +100,7 @@ function SpectatorDriverPicker({
         width={width}
       />
       <Badge tone="zinc">Spectator save</Badge>
-    </div>
+    </HStack>
   );
 }
 
@@ -332,7 +332,14 @@ export function RaceSessionView({
               rivalName={rival?.["driver-name"]}
               perLapInfo={perLapInfo}
             />
-            <StintDetailCards stints={stints} laps={laps} />
+            <StintDetailCards
+              stints={stints}
+              laps={laps}
+              rivalStints={rival ? rivalStints : undefined}
+              rivalLaps={rival ? rivalLaps : undefined}
+              rivalName={rival?.["driver-name"]}
+              driverName={focusedDriver?.["driver-name"]}
+            />
           </Card>
         )}
 

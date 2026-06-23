@@ -1,8 +1,6 @@
 import {
   Crown,
-  Globe,
   History,
-  Monitor,
   Swords,
   Target,
   Timer,
@@ -17,6 +15,7 @@ import {
   pluralize,
 } from "../../utils/format";
 import type { TrackQualifyingInsights as TrackQualifyingInsightsModel } from "../../analysis/trackQualifyingInsights";
+import { SESSION_MODE_META } from "../sessionModeMeta";
 import { InsightDetail, InsightValue } from "../ui/InsightText";
 import { InsightTile } from "../ui/InsightTile";
 import { SectionHeader } from "../ui/SectionHeader";
@@ -67,6 +66,8 @@ export function TrackQualifyingInsights({
   // each ceiling independently. Otherwise we fall back to a single "best lap"
   // tile — splitting a single bucket into two would just leave one tile empty.
   const showSplitBests = online != null && offline != null;
+  const OnlineIcon = SESSION_MODE_META.online.icon;
+  const OfflineIcon = SESSION_MODE_META.offline.icon;
 
   return (
     <div>
@@ -77,12 +78,12 @@ export function TrackQualifyingInsights({
           <>
             <BestQualiTile
               title="Best Online Quali"
-              icon={Globe}
+              icon={OnlineIcon}
               bucket={online}
             />
             <BestQualiTile
               title="Best Offline Quali"
-              icon={Monitor}
+              icon={OfflineIcon}
               bucket={offline}
             />
           </>

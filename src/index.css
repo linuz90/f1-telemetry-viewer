@@ -80,6 +80,14 @@ body {
   line-height: var(--text-base--line-height);
 }
 
+@media (max-width: 639px) {
+  html {
+    /* Smaller size at the default browser root: a slight phone-density nudge while
+       still respecting user font scaling. */
+    font-size: 90%;
+  }
+}
+
 /* Focus */
 .recharts-wrapper:focus,
 .recharts-surface:focus {

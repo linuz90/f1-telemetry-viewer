@@ -14,6 +14,7 @@ import {
   type StartReactionRating,
 } from "../analysis/startReactionAnalysis";
 import { Card } from "./Card";
+import { Tooltip } from "./Tooltip";
 import { Badge, type BadgeTone } from "./ui/Badge";
 import { SectionHeader } from "./ui/SectionHeader";
 
@@ -72,6 +73,9 @@ const RATING_STYLES: Record<
   },
 };
 
+const RATING_TOOLTIP =
+  "Viewer benchmark bands, not official F1 or game thresholds: under 0.18s exceptional, under 0.23s optimal, under 0.30s good, up to 0.50s slow.";
+
 export function StartReactionCard({ model }: StartReactionCardProps) {
   const styles = RATING_STYLES[model.rating];
   const RatingIcon = styles.icon;
@@ -85,10 +89,12 @@ export function StartReactionCard({ model }: StartReactionCardProps) {
         size="sm"
         title="Your Start Reaction"
         action={
-          <Badge tone={styles.badgeTone} className="gap-1.5">
-            <RatingIcon className="size-3" aria-hidden="true" />
-            {model.label}
-          </Badge>
+          <Tooltip text={RATING_TOOLTIP}>
+            <Badge tone={styles.badgeTone} className="gap-1.5">
+              <RatingIcon className="size-3" aria-hidden="true" />
+              {model.label}
+            </Badge>
+          </Tooltip>
         }
       />
       <div className="grid gap-5 sm:grid-cols-[minmax(8rem,0.85fr)_minmax(0,2fr)] sm:items-end">

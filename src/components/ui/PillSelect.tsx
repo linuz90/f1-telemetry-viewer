@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { FORM_CONTROL_SIZE_STYLES, type FormControlSize } from "./formControl";
 
 export type PillSelectValue = string | number;
 
@@ -10,7 +11,7 @@ export interface PillSelectOption {
 }
 
 export type PillSelectWidth = "auto" | "compact" | "session" | "full";
-export type PillSelectSize = "sm" | "md";
+export type PillSelectSize = FormControlSize;
 
 const WIDTH: Record<PillSelectWidth, string> = {
   auto: "w-auto",
@@ -26,12 +27,20 @@ const SIZE: Record<
   sm: {
     dot: "left-2.5 size-1.5",
     icon: "right-2 size-3",
-    select: "h-6.5 rounded-md py-1 pl-6 pr-7 text-2xs",
+    select: cn(
+      FORM_CONTROL_SIZE_STYLES.sm.control,
+      FORM_CONTROL_SIZE_STYLES.sm.yPadding,
+      "pl-6 pr-7",
+    ),
   },
   md: {
     dot: "left-3 size-1.5",
     icon: "right-2.5 size-3",
-    select: "h-7.5 rounded-lg py-1.5 pl-6.5 pr-8 text-xs",
+    select: cn(
+      FORM_CONTROL_SIZE_STYLES.md.control,
+      FORM_CONTROL_SIZE_STYLES.md.yPadding,
+      "pl-6.5 pr-8",
+    ),
   },
 };
 

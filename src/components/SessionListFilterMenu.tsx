@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Bot, Flag, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { SlidersHorizontal, type LucideIcon } from "lucide-react";
 import {
   DEFAULT_FILTERS,
   type SessionListFilters,
@@ -8,6 +8,8 @@ import {
   type SessionTypeFilter,
 } from "../hooks/useSessionFilters";
 import { cn } from "../utils/cn";
+import { SESSION_MODE_META } from "./sessionModeMeta";
+import { SESSION_TYPE_FILTER_META } from "./sessionTypeMeta";
 import { SegmentedControl } from "./ui/SegmentedControl";
 import { HStack } from "./ui/Stack";
 
@@ -23,12 +25,32 @@ function countActive(value: SessionListFilters): number {
   return n;
 }
 
+function getButtonIcon(value: SessionListFilters): {
+  icon: LucideIcon;
+  label: string;
+} {
+  if (value.type !== "all") {
+    const meta = SESSION_TYPE_FILTER_META[value.type];
+    return { icon: meta.icon, label: meta.buttonLabel };
+  }
+  if (value.mode !== "all") {
+    const meta = SESSION_MODE_META[value.mode];
+    return { icon: meta.icon, label: meta.buttonLabel };
+  }
+  return { icon: SlidersHorizontal, label: "Filters" };
+}
+
+const SessionTypeIcon = SESSION_TYPE_FILTER_META.race.icon;
+const ModeIcon = SESSION_MODE_META.ai.icon;
+
 export function SessionListFilterMenu({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
 
   const activeCount = countActive(value);
+  const buttonIcon = getButtonIcon(value);
+  const ButtonIcon = buttonIcon.icon;
 
   // Close on outside click and Escape
   useEffect(() => {
@@ -61,7 +83,11 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Filters"
+        aria-label={
+          activeCount > 0
+            ? `${buttonIcon.label}, ${activeCount} active`
+            : buttonIcon.label
+        }
         aria-expanded={open}
         className={cn(
           "relative flex items-center justify-center rounded-md p-1.5 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600",
@@ -70,10 +96,7 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
             : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-300",
         )}
       >
-        <SlidersHorizontal className="h-3.5 w-3.5" />
-        {activeCount > 0 && (
-          <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-sky-400/80 ring-2 ring-zinc-900" />
-        )}
+        <ButtonIcon className="h-3.5 w-3.5" />
       </button>
 
       {open && (
@@ -82,28 +105,34 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
           aria-label="Session filters"
           className="absolute right-0 top-full z-20 mt-1.5 w-64 max-w-[calc(100vw-2rem)] rounded-xl bg-zinc-950 ring-1 ring-white/[0.06] shadow-xl divide-y divide-white/[0.05]"
         >
-          <Section label="Session type" icon={Flag}>
+          <Section label="Session type" icon={SessionTypeIcon}>
             <SegmentedControl<SessionTypeFilter>
               size="sm"
               fullWidth
               options={[
                 { value: "all", label: "All" },
-                { value: "race", label: "Race" },
-                { value: "quali", label: "Quali" },
+                {
+                  value: "race",
+                  label: SESSION_TYPE_FILTER_META.race.label,
+                },
+                {
+                  value: "quali",
+                  label: SESSION_TYPE_FILTER_META.quali.label,
+                },
               ]}
               value={value.type}
               onChange={(type) => onChange({ ...value, type })}
             />
           </Section>
 
-          <Section label="Mode" icon={Bot}>
+          <Section label="Mode" icon={ModeIcon}>
             <SegmentedControl<SessionModeFilter>
               size="sm"
               fullWidth
               options={[
                 { value: "all", label: "All" },
-                { value: "ai", label: "AI" },
-                { value: "online", label: "Online" },
+                { value: "ai", label: SESSION_MODE_META.ai.label },
+                { value: "online", label: SESSION_MODE_META.online.label },
               ]}
               value={value.mode}
               onChange={(mode) => onChange({ ...value, mode })}
