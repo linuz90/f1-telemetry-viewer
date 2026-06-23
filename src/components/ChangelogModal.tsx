@@ -3,6 +3,7 @@ import { FileText, Github, Sparkles, Wrench } from "lucide-react";
 import changelog from "virtual:changelog";
 import { XIcon } from "./ui/icons";
 import { Modal } from "./ui/Modal";
+import { ScrollArea } from "./ui/ScrollArea";
 import {
   AUTHOR_TWITTER_HANDLE,
   AUTHOR_TWITTER_URL,
@@ -70,7 +71,7 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Content */}
-      <div className="overflow-y-auto px-6 py-4 space-y-5">
+      <ScrollArea axis="y" className="px-6 py-4 space-y-5">
         {dates.length === 0 && (
           <p className="text-sm text-zinc-500">No changelog available.</p>
         )}
@@ -116,7 +117,7 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
             </ul>
           </div>
         ))}
-      </div>
+      </ScrollArea>
     </Modal>
   );
 }

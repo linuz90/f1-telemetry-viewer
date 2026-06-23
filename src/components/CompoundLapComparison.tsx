@@ -2,6 +2,7 @@ import type { LapHistoryEntry, TyreStint } from "../types/telemetry";
 import { buildCompoundLapComparisonRows } from "../analysis/resultsAnalysis";
 import { msToLapTime } from "../utils/format";
 import { CompoundSwatchLabel } from "./ui/CompoundSwatchLabel";
+import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
 import {
   tableCellClass,
@@ -42,7 +43,7 @@ export function CompoundLapComparison({
         title="Compound Comparison"
         hint={`vs ${rivalName}`}
       />
-      <div className="overflow-x-auto">
+      <ScrollArea axis="x">
         <table className={tableClass}>
           <thead className={tableHeadClass}>
             <tr>
@@ -138,7 +139,7 @@ export function CompoundLapComparison({
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollArea>
     </div>
   );
 }

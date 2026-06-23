@@ -44,7 +44,7 @@ When a user gives a localhost URL or screenshot, prefer the telemetry source tha
 
 ## Architecture
 
-Stack: React 19, TypeScript, Vite 7, Tailwind CSS 4, Recharts 3, React Router 7.
+Stack: React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts 3, React Router 7.
 
 Data flow:
 

@@ -21,6 +21,7 @@ import { AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { Badge } from "./ui/Badge";
 import { FocusToggle } from "./ui/FocusToggle";
+import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
 import {
   tableCellClass,
@@ -133,7 +134,7 @@ export function RaceResultsTable({
             <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
           }
         />
-        <div className="overflow-x-auto">
+        <ScrollArea axis="x">
           <table className={tableClass}>
             <thead className={tableHeadClass}>
               <tr>
@@ -351,7 +352,7 @@ export function RaceResultsTable({
               })}
             </tbody>
           </table>
-        </div>
+        </ScrollArea>
       </div>
     );
   }
@@ -372,7 +373,7 @@ export function RaceResultsTable({
           <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
         }
       />
-      <div className="overflow-x-auto">
+      <ScrollArea axis="x">
         <table className={tableClass}>
           <thead className={tableHeadClass}>
             <tr>
@@ -433,7 +434,7 @@ export function RaceResultsTable({
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollArea>
     </div>
   );
 }

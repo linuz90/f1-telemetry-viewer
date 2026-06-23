@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../../utils/cn";
+import { scrollAxisClass, scrollbarClass } from "./ScrollArea";
 
 export interface SegmentedOption<T extends string = string> {
   value: T;
@@ -48,7 +49,7 @@ export function SegmentedControl<T extends string>({
       className={cn(
         "flex rounded-lg bg-zinc-900/60",
         styles.container,
-        scrollable && "max-w-full overflow-x-auto",
+        scrollable && ["max-w-full", scrollAxisClass.x, scrollbarClass.subtle],
         className,
       )}
     >

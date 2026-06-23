@@ -33,6 +33,7 @@ import { readStoredBoolean, writeStoredBoolean } from "../utils/storage";
 import { Tooltip as HoverTooltip } from "./Tooltip";
 import { Badge } from "./ui/Badge";
 import { FocusToggle } from "./ui/FocusToggle";
+import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
 import {
   tableCellClass,
@@ -484,7 +485,7 @@ export function LapTimeChart({
       )}
 
       {/* Lap table grouped by stint */}
-      <div className="mt-3 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+      <ScrollArea axis="x" className="mt-3 -mx-4 px-4 sm:mx-0 sm:px-0">
         {(() => {
           const hasWear = data.some((lap) => lap.wear != null);
 
@@ -797,7 +798,7 @@ export function LapTimeChart({
             </table>
           );
         })()}
-      </div>
+      </ScrollArea>
     </div>
   );
 }

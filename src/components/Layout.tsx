@@ -20,6 +20,11 @@ import { BrandHomeLink } from "./BrandHomeLink";
 import { cardHighlight } from "./Card";
 import { ChangelogModal } from "./ChangelogModal";
 import { SessionList } from "./SessionList";
+import {
+  scrollAxisClass,
+  scrollbarClass,
+  scrollbarGutterClass,
+} from "./ui/ScrollArea";
 import { SegmentedControl } from "./ui/SegmentedControl";
 
 const MIN_WIDTH = 250;
@@ -132,7 +137,10 @@ export function Layout() {
           against the slightly lighter main canvas, without re-adding a hard border. */}
       <aside
         className={cn(
-          "sidebar-scroll fixed inset-y-0 left-0 z-30 bg-black overflow-y-auto transition-transform duration-200 ease-in-out md:relative md:z-0 md:translate-x-0 md:shrink-0",
+          "fixed inset-y-0 left-0 z-30 bg-black transition-transform duration-200 ease-in-out md:relative md:z-0 md:translate-x-0 md:shrink-0",
+          scrollAxisClass.y,
+          scrollbarClass.subtle,
+          scrollbarGutterClass.stable,
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
         style={{ width }}
@@ -198,7 +206,13 @@ export function Layout() {
       />
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto bg-canvas">
+      <main
+        className={cn(
+          "flex-1 bg-canvas",
+          scrollAxisClass.y,
+          scrollbarClass.default,
+        )}
+      >
         {/* Mobile top bar */}
         <div className="sticky top-0 z-10 flex items-center gap-3 bg-canvas/85 backdrop-blur px-4 py-3 md:hidden">
           <button

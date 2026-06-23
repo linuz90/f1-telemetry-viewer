@@ -23,16 +23,16 @@
     "start": "tsx server.ts"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.1.18",
+    "@tailwindcss/vite": "^4.3.1",
     "@types/node": "^25.2.0",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.2",
+    "@vitejs/plugin-react": "^6.0.3",
     "prettier": "3.8.4",
-    "tailwindcss": "^4.1.18",
+    "tailwindcss": "^4.3.1",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
-    "vite": "^7.2.4"
+    "vite": "^8.1.0"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",

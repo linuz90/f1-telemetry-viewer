@@ -3,6 +3,7 @@ import { buildStintComparisonRows } from "../analysis/resultsAnalysis";
 import { msToLapTime } from "../utils/format";
 import { cn } from "../utils/cn";
 import { CompoundSwatchLabel } from "./ui/CompoundSwatchLabel";
+import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
 import {
   tableCellClass,
@@ -35,7 +36,7 @@ export function StintComparisonTable({
         title="Stint Comparison"
         hint="vs best on compound"
       />
-      <div className="overflow-x-auto">
+      <ScrollArea axis="x">
         <table className={cn(tableClass, "min-w-[520px]")}>
           <thead className={tableHeadClass}>
             <tr>
@@ -125,7 +126,7 @@ export function StintComparisonTable({
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollArea>
     </div>
   );
 }

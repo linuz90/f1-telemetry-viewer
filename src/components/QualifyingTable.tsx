@@ -6,6 +6,7 @@ import { getTeamColor, getTeamName } from "../utils/colors";
 import { cn } from "../utils/cn";
 import { formatQualifyingTableTitle } from "../analysis/sessionInsightSummary";
 import { FocusToggle } from "./ui/FocusToggle";
+import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
 import {
   tableCellClass,
@@ -43,7 +44,7 @@ export function QualifyingTable({
           <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
         }
       />
-      <div className="overflow-x-auto">
+      <ScrollArea axis="x">
         <table className={tableClassLoose}>
           <thead className={tableHeadClass}>
             <tr>
@@ -155,7 +156,7 @@ export function QualifyingTable({
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollArea>
     </div>
   );
 }

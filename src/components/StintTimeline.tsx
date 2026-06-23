@@ -9,6 +9,7 @@ import { stintChipStyle, stintChipTextStyle } from "./ui/StintChip";
 import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
 import { msToLapTime } from "../utils/format";
 import { CompoundStatCard } from "./CompoundStatCard";
+import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
 
 interface StintTimelineProps {
@@ -102,8 +103,9 @@ export function StintDetailCards({
   return (
     <div>
       <SectionHeader size="sm" title="Stints" />
-      <div
-        className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid"
+      <ScrollArea
+        axis="x"
+        className="flex gap-2 pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid"
         style={{
           gridTemplateColumns: `repeat(${stints.length}, minmax(0, 1fr))`,
         }}
@@ -193,7 +195,7 @@ export function StintDetailCards({
             </CompoundStatCard>
           );
         })}
-      </div>
+      </ScrollArea>
       {hasAnyWear && (
         <p className="text-xs text-zinc-600 mt-1.5">
           Bar = worst-wheel wear.{" "}

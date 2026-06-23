@@ -11,6 +11,7 @@ import type {
 } from "../analysis/setupComparison";
 import { cardClass } from "./Card";
 import { CarSetupCard } from "./CarSetupCard";
+import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
 
 interface RaceSetupComparisonProps {
@@ -351,7 +352,7 @@ export function RaceSetupComparison({
         className="mb-4"
       />
 
-      <div className="-mx-1 overflow-x-auto px-1">
+      <ScrollArea axis="x" className="-mx-1 px-1">
         <div className="w-full min-w-[640px]">
           <div
             className={cn(
@@ -454,7 +455,7 @@ export function RaceSetupComparison({
             })}
           </div>
         </div>
-      </div>
+      </ScrollArea>
 
       <div className="mt-5 border-t border-white/[0.06] pt-5">
         <SectionHeader

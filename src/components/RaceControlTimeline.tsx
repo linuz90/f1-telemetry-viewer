@@ -28,6 +28,7 @@ import { EmptyState } from "./EmptyState";
 import { Badge } from "./ui/Badge";
 import { Eyebrow } from "./ui/Eyebrow";
 import { FocusToggle } from "./ui/FocusToggle";
+import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
 import { SegmentedControl } from "./ui/SegmentedControl";
 
@@ -234,10 +235,11 @@ export function RaceControlTimeline({
           message="No race-control events match this view."
         />
       ) : (
-        <div
+        <ScrollArea
+          axis="y"
           className={
             visibleEvents.length > 8
-              ? "scroll-mask-down-[1.5rem] max-h-[560px] overflow-y-auto pr-2 -mr-2"
+              ? "scroll-mask-down-[1.5rem] max-h-[560px] pr-2 -mr-2"
               : ""
           }
         >
@@ -260,7 +262,7 @@ export function RaceControlTimeline({
               </section>
             ))}
           </div>
-        </div>
+        </ScrollArea>
       )}
     </div>
   );

@@ -32,10 +32,9 @@ export function formatStartReactionTick(seconds: number): string {
   return `${seconds.toFixed(1)}s`;
 }
 
-function startReactionRating(seconds: number): Pick<
-  StartReactionModel,
-  "rating" | "label" | "detail"
-> {
+function startReactionRating(
+  seconds: number,
+): Pick<StartReactionModel, "rating" | "label" | "detail"> {
   if (seconds < 0.18) {
     return {
       rating: "exceptional",
