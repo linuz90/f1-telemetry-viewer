@@ -33,7 +33,8 @@ import { Button } from "./ui/Button";
 import { Eyebrow } from "./ui/Eyebrow";
 import { FocusToggle } from "./ui/FocusToggle";
 import { Input } from "./ui/Input";
-import { PillSelect, type PillSelectOption } from "./ui/PillSelect";
+import { MultiPillSelect } from "./ui/MultiPillSelect";
+import type { PillSelectOption } from "./ui/PillSelect";
 import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
 import { SegmentedControl } from "./ui/SegmentedControl";
@@ -169,7 +170,7 @@ export function RaceControlTimeline({
   const [viewMode, setViewMode] = useState<ViewMode>("key");
   const [focusOnly, setFocusOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [messageTypeFilter, setMessageTypeFilter] = useState(ALL_MESSAGE_TYPES);
+  const [messageTypeFilter, setMessageTypeFilter] = useState<string[]>([]);
   const [visiblePageCount, setVisiblePageCount] = useState(1);
 
   const keyEventCount = useMemo(
@@ -210,11 +211,13 @@ export function RaceControlTimeline({
   }, [baseEvents]);
 
   useEffect(() => {
-    if (
-      messageTypeFilter !== ALL_MESSAGE_TYPES &&
-      !messageTypeOptions.some((option) => option.value === messageTypeFilter)
-    ) {
-      setMessageTypeFilter(ALL_MESSAGE_TYPES);
+    if (messageTypeFilter.length === 0) return;
+    const validTypes = new Set(
+      messageTypeOptions.slice(1).map((o) => String(o.value)),
+    );
+    const filtered = messageTypeFilter.filter((type) => validTypes.has(type));
+    if (filtered.length !== messageTypeFilter.length) {
+      setMessageTypeFilter(filtered);
     }
   }, [messageTypeFilter, messageTypeOptions]);
 
@@ -226,8 +229,8 @@ export function RaceControlTimeline({
     () =>
       baseEvents.filter((event) => {
         if (
-          messageTypeFilter !== ALL_MESSAGE_TYPES &&
-          event["message-type"] !== messageTypeFilter
+          messageTypeFilter.length > 0 &&
+          !messageTypeFilter.includes(event["message-type"])
         ) {
           return false;
         }
@@ -310,7 +313,7 @@ export function RaceControlTimeline({
           aria-label="Search race-control events"
           leftAdornment={<Search aria-hidden="true" />}
         />
-        <PillSelect
+        <MultiPillSelect
           value={messageTypeFilter}
           onChange={setMessageTypeFilter}
           options={messageTypeOptions}
