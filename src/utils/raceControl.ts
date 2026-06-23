@@ -283,14 +283,23 @@ export function raceControlEventMatchesSearch(
   query: string,
   firstTimestamp: number | undefined,
 ): boolean {
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const terms = normalizeRaceControlSearchText(query)
+    .split(/\s+/)
+    .filter(Boolean);
   if (terms.length === 0) return true;
 
-  const haystack = getRaceControlSearchText(
-    event,
-    firstTimestamp,
-  ).toLowerCase();
+  const haystack = normalizeRaceControlSearchText(
+    getRaceControlSearchText(event, firstTimestamp),
+  );
   return terms.every((term) => haystack.includes(term));
+}
+
+function normalizeRaceControlSearchText(value: string): string {
+  return value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 export function humanizeRaceControlType(type: string): string {
