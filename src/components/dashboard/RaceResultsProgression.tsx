@@ -4,6 +4,7 @@ import { cn } from "../../utils/cn";
 import { formatShortDate } from "../../utils/format";
 import { sessionSummaryPath } from "../../utils/routes";
 import { TrackFlag } from "../TrackFlag";
+import { HStack } from "../ui/Stack";
 import { isProblemStatus } from "./helpers";
 
 // Race-by-race progression: two bars per online race (grid → finish).
@@ -65,7 +66,12 @@ export function RaceResultsProgression({
 
   return (
     <div className="mt-6 border-t border-zinc-800/60 pt-5">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+      <HStack
+        align="end"
+        justify="between"
+        wrap
+        className="mb-3 gap-x-4 gap-y-2"
+      >
         <div className="min-w-0">
           <div className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-500">
             Race-by-race
@@ -74,7 +80,10 @@ export function RaceResultsProgression({
             Grid (left) vs finish (right). Taller = higher up the order.
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-2xs tabular-nums text-zinc-500">
+        <HStack
+          wrap
+          className="gap-x-3 gap-y-1 font-mono text-2xs tabular-nums text-zinc-500"
+        >
           <ProgressionLegendSwatch className="bg-purple-500/80" label="Pole" />
           <ProgressionLegendSwatch
             className={RACE_TIER_CLASS.p1.race}
@@ -99,8 +108,8 @@ export function RaceResultsProgression({
           <span className="inline-flex items-center gap-1 text-behind">
             <span className="text-2xs leading-none">💥</span>DNF
           </span>
-        </div>
-      </div>
+        </HStack>
+      </HStack>
 
       <div className="flex items-end justify-between gap-1 sm:gap-1.5">
         {ordered.map((session) => (

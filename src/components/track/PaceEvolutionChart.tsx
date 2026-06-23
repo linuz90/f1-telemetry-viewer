@@ -18,6 +18,7 @@ import { msToLapTime } from "../../utils/format";
 import { cardClass } from "../Card";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { SectionHeader } from "../ui/SectionHeader";
+import { HStack } from "../ui/Stack";
 
 /**
  * Pace Evolution — race-on-race best 3-lap pace window by compound. Replaces
@@ -240,17 +241,17 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
         </ResponsiveContainer>
       )}
       {filtered.length > 0 && (
-        <div className="flex flex-wrap gap-3 mt-2 text-xs text-zinc-500">
+        <HStack wrap className="mt-2 gap-3 text-xs text-zinc-500">
           {compounds.map((c) => (
-            <span key={c} className="flex items-center gap-1.5">
+            <HStack as="span" key={c} className="gap-1.5">
               <span
                 className="inline-block w-2.5 h-2.5 rounded-sm"
                 style={{ backgroundColor: getCompoundColor(c) }}
               />
               {c}
-            </span>
+            </HStack>
           ))}
-        </div>
+        </HStack>
       )}
     </section>
   );

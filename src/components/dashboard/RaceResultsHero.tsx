@@ -2,8 +2,9 @@ import {
   AlertTriangle,
   ChevronsUp,
   Flag,
-  Globe,
+  Gauge,
   Star,
+  Timer,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -12,6 +13,7 @@ import type { DashboardResultStats } from "../../analysis/dashboardResultStats";
 import { Card } from "../Card";
 import { Eyebrow } from "../ui/Eyebrow";
 import { InsightDetail, InsightValue } from "../ui/InsightText";
+import { SESSION_MODE_META } from "../sessionModeMeta";
 import { HStack, VStack } from "../ui/Stack";
 import { GridGainGlyph } from "./GridGainGlyph";
 import { RaceResultsProgression } from "./RaceResultsProgression";
@@ -25,6 +27,10 @@ import {
   positionTone,
   signedNumber,
 } from "./helpers";
+
+function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
 
 function PodiumChip({
   position,
@@ -71,19 +77,37 @@ function MicroStat({
   return (
     <div className="min-w-0">
       <HStack className="gap-1.5">
-        {Icon && <Icon className="size-3" />}
+        {Icon && <Icon className="size-3 text-zinc-500" />}
         <Eyebrow>{label}</Eyebrow>
       </HStack>
       <InsightValue size="lg" tone={tone} className="mt-1">
         {value}
       </InsightValue>
       {detail && (
-        <InsightDetail size="sm" tone="text-zinc-500" className="mt-0.5">
+        <InsightDetail
+          size="sm"
+          tone="text-zinc-500"
+          className="mt-0.5 truncate whitespace-nowrap break-normal"
+        >
           {detail}
         </InsightDetail>
       )}
     </div>
   );
+}
+
+function paceTone(beatRate: number | undefined): string {
+  if (beatRate == null) return "text-zinc-300";
+  if (beatRate >= 0.65) return "text-ahead";
+  if (beatRate <= 0.4) return "text-behind";
+  return "text-zinc-100";
+}
+
+function averageQualifyingTone(position: number | undefined): string {
+  if (position == null) return "text-zinc-300";
+  if (position <= 2) return "text-ahead";
+  if (position <= 5) return "text-zinc-100";
+  return "text-behind";
 }
 
 export function RaceResultsHero({
@@ -113,6 +137,22 @@ export function RaceResultsHero({
     stats.gridStarts > 0
       ? Math.round((stats.frontRowStarts / stats.gridStarts) * 100)
       : 0;
+  const paceBeatRate =
+    stats.racePace != null
+      ? Math.round(stats.racePace.averageBeatRate * 100)
+      : undefined;
+  const OnlineIcon = SESSION_MODE_META.online.icon;
+  const averageQualifyingDetail =
+    stats.gridStarts > 0
+      ? [
+          pluralize(stats.gridStarts, "grid"),
+          stats.polePositions > 0
+            ? pluralize(stats.polePositions, "pole")
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : undefined;
 
   return (
     <Card as="section" className="overflow-hidden">
@@ -126,7 +166,7 @@ export function RaceResultsHero({
         <span className="inline-flex items-center gap-1.5 font-mono font-semibold uppercase tracking-wider text-zinc-400">
           {(stats.mode === "representative-online" ||
             stats.mode === "online") && (
-            <Globe className="size-3 text-zinc-500" />
+            <OnlineIcon className="size-3 text-zinc-500" />
           )}
           {stats.modeLabel}
         </span>
@@ -173,7 +213,29 @@ export function RaceResultsHero({
         </VStack>
       </VStack>
 
-      <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-white/[0.05] pt-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-white/[0.05] pt-5 sm:grid-cols-3 lg:grid-cols-6">
+        <MicroStat
+          label="Race pace"
+          value={
+            stats.racePace != null
+              ? averagePositionLabel(stats.racePace.averageRank)
+              : "—"
+          }
+          detail={
+            stats.racePace != null && paceBeatRate != null
+              ? `beats ${paceBeatRate}%`
+              : undefined
+          }
+          tone={paceTone(stats.racePace?.averageBeatRate)}
+          icon={Gauge}
+        />
+        <MicroStat
+          label="Avg quali"
+          value={averagePositionLabel(stats.averageGridPosition)}
+          detail={averageQualifyingDetail}
+          tone={averageQualifyingTone(stats.averageGridPosition)}
+          icon={Timer}
+        />
         <MicroStat
           label="Front row"
           value={stats.gridStarts > 0 ? `${frontRowRate}%` : "—"}

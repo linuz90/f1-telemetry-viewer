@@ -59,13 +59,13 @@ function startReactionRating(
   if (seconds <= START_REACTION_RAIL_MAX_SECONDS) {
     return {
       rating: "bad",
-      label: "Bad",
-      detail: "slower than the usual launch window",
+      label: "Slow",
+      detail: "slower than the benchmark launch window",
     };
   }
   return {
     rating: "terrible",
-    label: "Terrible",
+    label: "Very slow",
     detail: "over half a second after lights out",
   };
 }

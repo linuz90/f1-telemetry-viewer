@@ -24,6 +24,15 @@ export interface TrackResultSummary {
   averageGridGain?: number;
 }
 
+export interface DashboardRacePaceStats {
+  /** Average player rank by same-compound race pace, 1 = fastest in the matched set. */
+  averageRank: number;
+  /** Share of matched rivals the player was faster than, treating near-ties as half. */
+  averageBeatRate: number;
+  sessionCount: number;
+  comparisonCount: number;
+}
+
 export interface DashboardResultStats {
   scopedSessions: SessionSummary[];
   resultSessions: SessionSummary[];
@@ -48,6 +57,8 @@ export interface DashboardResultStats {
   gridStarts: number;
   averageFinish?: number;
   averageGridGain?: number;
+  averageGridPosition?: number;
+  racePace?: DashboardRacePaceStats;
 }
 
 export function isRepresentativeOnlineRace(session: SessionSummary): boolean {
@@ -112,6 +123,68 @@ export function isCleanRaceFinish(session: SessionSummary): boolean {
 function average(values: number[]): number | undefined {
   if (values.length === 0) return undefined;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+const MIN_RACE_PACE_RIVALS = 2;
+const MIN_RACE_PACE_LAP_EVIDENCE = 3;
+const RACE_PACE_TIE_MS = 50;
+
+function isConstructorPlaceholder(name: string): boolean {
+  return /\s#\d+\s*$/.test(name);
+}
+
+function buildRacePaceStats(
+  sessions: SessionSummary[],
+): DashboardRacePaceStats | undefined {
+  const sessionRanks: number[] = [];
+  const sessionBeatRates: number[] = [];
+  let comparisonCount = 0;
+
+  for (const session of sessions) {
+    const matchedRivals = (session.rivals ?? []).filter((rival) => {
+      const delta = rival.compoundMatchedPaceDeltaMs;
+      return (
+        rival.isAi !== true &&
+        !isConstructorPlaceholder(rival.name) &&
+        typeof delta === "number" &&
+        Number.isFinite(delta) &&
+        (rival.compoundMatchedPaceLapCount ?? 0) >= MIN_RACE_PACE_LAP_EVIDENCE
+      );
+    });
+
+    if (matchedRivals.length < MIN_RACE_PACE_RIVALS) continue;
+
+    let rivalsAhead = 0;
+    let rivalsLevel = 0;
+    let rivalsBehind = 0;
+
+    for (const rival of matchedRivals) {
+      const delta = rival.compoundMatchedPaceDeltaMs ?? 0;
+      if (delta < -RACE_PACE_TIE_MS) rivalsAhead += 1;
+      else if (delta > RACE_PACE_TIE_MS) rivalsBehind += 1;
+      else rivalsLevel += 1;
+    }
+
+    // `compoundMatchedPaceDeltaMs` is rival pace minus player pace. Convert
+    // that into a field-style rank so the dashboard can say "usually P2-ish"
+    // instead of exposing the sign convention.
+    sessionRanks.push(1 + rivalsAhead + rivalsLevel * 0.5);
+    sessionBeatRates.push(
+      (rivalsBehind + rivalsLevel * 0.5) / matchedRivals.length,
+    );
+    comparisonCount += matchedRivals.length;
+  }
+
+  const averageRank = average(sessionRanks);
+  const averageBeatRate = average(sessionBeatRates);
+  if (averageRank == null || averageBeatRate == null) return undefined;
+
+  return {
+    averageRank,
+    averageBeatRate,
+    sessionCount: sessionRanks.length,
+    comparisonCount,
+  };
 }
 
 export function getGridGain(session: SessionSummary): number | undefined {
@@ -272,5 +345,7 @@ export function getDashboardResultStats(
     gridStarts: gridPositions.length,
     averageFinish: average(cleanPositions),
     averageGridGain: average(gridGains),
+    averageGridPosition: average(gridPositions),
+    racePace: buildRacePaceStats(resultSessions),
   };
 }

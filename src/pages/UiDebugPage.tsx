@@ -5,6 +5,7 @@ import {
   Flag,
   Fuel,
   Gauge,
+  Search,
   Timer,
   Zap,
 } from "lucide-react";
@@ -26,11 +27,13 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { CompoundBadge } from "../components/ui/CompoundBadge";
 import { CompoundSwatchLabel } from "../components/ui/CompoundSwatchLabel";
+import { Input } from "../components/ui/Input";
 import { InsightDetail, InsightValue } from "../components/ui/InsightText";
 import { InsightTile } from "../components/ui/InsightTile";
 import { PillSelect } from "../components/ui/PillSelect";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { HStack } from "../components/ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../components/ui/StintChip";
 import type {
   CarDamage,
@@ -426,7 +429,7 @@ export function UiDebugPage() {
           <div>
             <DebugComponentLabel>Badge.tsx</DebugComponentLabel>
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
+              <HStack wrap className="gap-2">
                 <DebugVariantLabel>sm</DebugVariantLabel>
                 <Badge tone="zinc">Neutral</Badge>
                 <Badge tone="amber">Warning</Badge>
@@ -434,8 +437,8 @@ export function UiDebugPage() {
                 <Badge tone="rose">Penalty</Badge>
                 <Badge tone="purple">Best</Badge>
                 <Badge tone="sky">Online</Badge>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
+              </HStack>
+              <HStack wrap className="gap-2">
                 <DebugVariantLabel>xs</DebugVariantLabel>
                 <Badge tone="zinc" size="xs">
                   PIT
@@ -452,12 +455,12 @@ export function UiDebugPage() {
                 <Badge tone="purple" size="xs" shape="square">
                   BEST
                 </Badge>
-              </div>
+              </HStack>
             </div>
           </div>
           <div>
             <DebugComponentLabel>Button.tsx</DebugComponentLabel>
-            <div className="flex flex-wrap items-center gap-2">
+            <HStack wrap className="gap-2">
               <Button variant="primary">Primary</Button>
               <Button variant="secondary">Secondary</Button>
               <Button variant="subtle">Subtle</Button>
@@ -467,19 +470,19 @@ export function UiDebugPage() {
               <Button size="xs" variant="ghost">
                 Tiny
               </Button>
-            </div>
+            </HStack>
           </div>
           <div>
             <DebugComponentLabel>CompoundBadge.tsx</DebugComponentLabel>
-            <div className="flex flex-wrap gap-2">
+            <HStack align="stretch" wrap className="gap-2">
               {COMPOUNDS.map((compound) => (
                 <CompoundBadge key={compound} compound={compound} />
               ))}
-            </div>
+            </HStack>
           </div>
           <div>
             <DebugComponentLabel>CompoundSwatchLabel.tsx</DebugComponentLabel>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <HStack wrap className="gap-x-4 gap-y-2">
               {COMPOUNDS.slice(0, 5).map((compound) => (
                 <CompoundSwatchLabel key={compound} compound={compound} />
               ))}
@@ -488,7 +491,7 @@ export function UiDebugPage() {
                 size="xs"
                 labelClassName="text-zinc-500"
               />
-            </div>
+            </HStack>
           </div>
           <div>
             <DebugComponentLabel>InsightText.tsx</DebugComponentLabel>
@@ -521,6 +524,31 @@ export function UiDebugPage() {
                 <InsightDetail size="xs" tone="text-zinc-500" className="mt-1">
                   compact fallback
                 </InsightDetail>
+              </div>
+            </div>
+          </div>
+          <div>
+            <DebugComponentLabel>Input.tsx</DebugComponentLabel>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="space-y-1.5">
+                <DebugVariantLabel className="w-auto">sm</DebugVariantLabel>
+                <Input
+                  size="sm"
+                  aria-label="Small debug input"
+                  placeholder="Search sessions..."
+                  defaultValue="Madrid"
+                  leftAdornment={<Search aria-hidden="true" />}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <DebugVariantLabel className="w-auto">md</DebugVariantLabel>
+                <Input
+                  size="md"
+                  aria-label="Medium debug input"
+                  placeholder="Search sessions..."
+                  defaultValue="Catalunya"
+                  leftAdornment={<Search aria-hidden="true" />}
+                />
               </div>
             </div>
           </div>
@@ -603,16 +631,16 @@ export function UiDebugPage() {
           </div>
           <div>
             <DebugComponentLabel>TrackFlag.tsx</DebugComponentLabel>
-            <div className="flex flex-wrap items-end gap-6">
+            <HStack align="end" wrap className="gap-6">
               {(["tiny", "small", "medium", "large"] as const).map((size) => (
-                <div key={size} className="flex items-center gap-2">
+                <HStack key={size} className="gap-2">
                   <TrackFlag track="monza" size={size} />
                   <DebugVariantLabel className="w-auto">
                     {size}
                   </DebugVariantLabel>
-                </div>
+                </HStack>
               ))}
-            </div>
+            </HStack>
           </div>
           <div>
             <DebugComponentLabel>StintChip.tsx</DebugComponentLabel>
@@ -742,11 +770,11 @@ function DebugSection({
   return (
     <section className="space-y-4">
       {labels.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <HStack align="stretch" wrap className="gap-1.5">
           {labels.map((label) => (
             <DebugCodeChip key={label}>{label}</DebugCodeChip>
           ))}
-        </div>
+        </HStack>
       )}
       {children}
     </section>

@@ -13,6 +13,9 @@ const BASE_DETAIL_KEYS = new Set([
   "timestamp",
   "message-type",
   "involved-drivers",
+  "lap-distance",
+  "sector",
+  "segment-info",
 ]);
 
 const NESTED_INFO_KEYS = new Set([
@@ -140,6 +143,16 @@ export function formatRaceControlClock(
   return `+${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
+export function formatRaceControlLocation(
+  event: RaceControlEvent,
+): string | null {
+  if (!("lap-distance" in event)) return null;
+
+  const sectorLabel = formatRaceControlSector(event.sector);
+  const segmentLabel = formatRaceControlSegment(event["segment-info"]);
+  return segmentLabel ?? sectorLabel;
+}
+
 export function formatRaceControlEvent(event: RaceControlEvent): string {
   switch (event["message-type"]) {
     case "OVERTAKE":
@@ -228,6 +241,67 @@ export function getUnknownRaceControlDetails(
     .map(([key, value]) => `${humanizeRaceControlType(key)}: ${String(value)}`);
 }
 
+export function getRaceControlSearchText(
+  event: RaceControlEvent,
+  firstTimestamp: number | undefined,
+): string {
+  const driverInfos = getRaceControlDriverInfos(event);
+  const location = formatRaceControlLocation(event);
+  const segment = event["segment-info"];
+  const scalarDetails = Object.entries(event)
+    .filter(([key, value]) => {
+      if (BASE_DETAIL_KEYS.has(key) || NESTED_INFO_KEYS.has(key)) return false;
+      return ["string", "number", "boolean"].includes(typeof value);
+    })
+    .map(([, value]) => String(value));
+
+  return [
+    event.id,
+    event["message-type"],
+    humanizeRaceControlType(event["message-type"]),
+    formatRaceControlLap(event),
+    formatRaceControlClock(event, firstTimestamp),
+    formatRaceControlEvent(event),
+    location,
+    event.sector,
+    event["lap-distance"],
+    segment?.name,
+    formatRaceControlSegmentTurns(segment),
+    ...driverInfos.flatMap((info) => [
+      info.name,
+      info.team,
+      info["driver-number"],
+    ]),
+    ...scalarDetails,
+  ]
+    .filter((part) => part != null && part !== "")
+    .join(" ");
+}
+
+export function raceControlEventMatchesSearch(
+  event: RaceControlEvent,
+  query: string,
+  firstTimestamp: number | undefined,
+): boolean {
+  const terms = normalizeRaceControlSearchText(query)
+    .split(/\s+/)
+    .filter(Boolean);
+  if (terms.length === 0) return true;
+
+  const haystack = normalizeRaceControlSearchText(
+    getRaceControlSearchText(event, firstTimestamp),
+  );
+  return terms.every((term) => haystack.includes(term));
+}
+
+function normalizeRaceControlSearchText(value: string): string {
+  return value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 export function humanizeRaceControlType(type: string): string {
   return type
     .replace(/^m_/, "")
@@ -277,6 +351,47 @@ function formatDamageChange(event: RaceControlEvent): string {
     return "";
   }
   return ` (${event["old-value"]}% -> ${event["new-value"]}%)`;
+}
+
+function formatRaceControlSector(
+  sector: RaceControlEvent["sector"],
+): string | null {
+  if (!sector) return null;
+  const match = /^S([1-3])$/.exec(sector);
+  return match ? `Sector ${match[1]}` : sector;
+}
+
+function formatRaceControlSegment(
+  segment: RaceControlEvent["segment-info"],
+): string | null {
+  if (!segment) return null;
+
+  const name = typeof segment.name === "string" ? segment.name.trim() : "";
+  if (segment.type === "straight") return name || null;
+
+  const turns = formatRaceControlSegmentTurns(segment);
+  if (turns && name) return `${turns} - ${name}`;
+  return turns ?? (name || null);
+}
+
+function formatRaceControlSegmentTurns(
+  segment: RaceControlEvent["segment-info"],
+): string | null {
+  if (!segment) return null;
+
+  // PnG complex corners currently use `type: "corner"` too, so the corner
+  // number keys are the stable discriminator for single vs sequence labels.
+  if (typeof segment.corner_number === "number") {
+    return `T${segment.corner_number}`;
+  }
+
+  const corners = segment.corner_numbers?.filter((corner) =>
+    Number.isFinite(corner),
+  );
+  if (!corners?.length) return null;
+  const first = corners[0];
+  const last = corners[corners.length - 1];
+  return first === last ? `T${first}` : `T${first}-${last}`;
 }
 
 function driverName(info: RaceControlDriverInfo | undefined): string {

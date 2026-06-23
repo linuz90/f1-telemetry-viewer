@@ -51,7 +51,12 @@ function readSessionFilters(): SessionListFilters {
   if (typeof window === "undefined") return memoryFilters;
 
   try {
-    const raw = readStoredString(SESSION_FILTERS_STORAGE_KEY, "session");
+    // Filters are a browsing preference, not just temporary UI state. Read the
+    // old sessionStorage value as a migration path for tabs opened before this
+    // preference moved to localStorage.
+    const raw =
+      readStoredString(SESSION_FILTERS_STORAGE_KEY) ??
+      readStoredString(SESSION_FILTERS_STORAGE_KEY, "session");
     if (!raw) return memoryFilters;
     const filters = normalizeFilters(
       JSON.parse(raw) as Partial<SessionListFilters>,
@@ -88,11 +93,7 @@ function writeSessionFilters(next: SessionListFilters): void {
 
   if (typeof window === "undefined") return;
 
-  writeStoredString(
-    SESSION_FILTERS_STORAGE_KEY,
-    JSON.stringify(filters),
-    "session",
-  );
+  writeStoredString(SESSION_FILTERS_STORAGE_KEY, JSON.stringify(filters));
   window.dispatchEvent(new Event(SESSION_FILTERS_CHANGED_EVENT));
 }
 

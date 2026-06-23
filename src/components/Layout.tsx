@@ -2,11 +2,11 @@ import { Bell, ChevronRight, FolderUp, Menu, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import changelog from "virtual:changelog";
+import { SESSIONS_ROUTE_SEGMENT } from "../constants/routes";
 import {
   CHANGELOG_SEEN_STORAGE_KEY,
   SIDEBAR_WIDTH_STORAGE_KEY,
 } from "../constants/storage";
-import { SESSIONS_ROUTE_SEGMENT } from "../constants/routes";
 import { useTelemetry } from "../context/TelemetryContext";
 import { cn } from "../utils/cn";
 import { dashboardPath, replaceFormulaScopeInPath } from "../utils/routes";
@@ -128,7 +128,7 @@ export function Layout() {
       {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black/60 md:hidden"
+          className="fixed inset-0 z-40 bg-black/60 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -137,7 +137,7 @@ export function Layout() {
           against the slightly lighter main canvas, without re-adding a hard border. */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 bg-black transition-transform duration-200 ease-in-out md:relative md:z-0 md:translate-x-0 md:shrink-0",
+          "fixed inset-y-0 left-0 z-50 bg-black transition-transform duration-200 ease-in-out md:relative md:z-0 md:translate-x-0 md:shrink-0",
           scrollAxisClass.y,
           scrollbarClass.subtle,
           scrollbarGutterClass.stable,
@@ -208,7 +208,7 @@ export function Layout() {
       {/* Main content */}
       <main
         className={cn(
-          "flex-1 bg-canvas",
+          "min-w-0 flex-1 overflow-x-hidden bg-canvas",
           scrollAxisClass.y,
           scrollbarClass.default,
         )}

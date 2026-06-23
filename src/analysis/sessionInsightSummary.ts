@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
 import type {
+  CarDamage,
   DriverData,
   OvertakeRecord,
   RaceControlEvent,
@@ -56,6 +57,8 @@ export interface SessionInsight extends Omit<StrategyInsight, "type"> {
   type: SessionInsightType;
   tone?: SessionInsightTone;
   accent?: SessionInsightAccent;
+  /** Optional title for aggregate cards created by curation. */
+  groupLabel?: string;
   /** Visual tyre compound for lap-backed insights, when telemetry can map it reliably. */
   compound?: string;
 }
@@ -85,16 +88,60 @@ interface SessionBestLap {
   driverName?: string;
 }
 
-const DAMAGE_FIELDS = [
-  ["front-left-wing-damage", "front left wing"],
-  ["front-right-wing-damage", "front right wing"],
-  ["rear-wing-damage", "rear wing"],
-  ["floor-damage", "floor"],
-  ["diffuser-damage", "diffuser"],
-  ["sidepod-damage", "sidepod"],
-  ["engine-damage", "engine"],
-  ["gear-box-damage", "gearbox"],
-] as const;
+const CAR_DAMAGE_THRESHOLD = 15;
+const POWER_UNIT_WEAR_THRESHOLD = 25;
+
+interface DamageMetric {
+  label: string;
+  value: (damage: CarDamage) => number;
+}
+
+interface PeakDamageMetric {
+  value: number;
+  label: string;
+}
+
+function numericDamageField(field: keyof CarDamage) {
+  return (damage: CarDamage) => {
+    const value = damage[field];
+    return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  };
+}
+
+function peakDamageArray(field: keyof CarDamage) {
+  return (damage: CarDamage) => {
+    const value = damage[field];
+    if (!Array.isArray(value)) return 0;
+    return Math.max(0, ...value.filter((entry) => Number.isFinite(entry)));
+  };
+}
+
+const CAR_DAMAGE_FIELDS: DamageMetric[] = [
+  {
+    label: "front left wing",
+    value: numericDamageField("front-left-wing-damage"),
+  },
+  {
+    label: "front right wing",
+    value: numericDamageField("front-right-wing-damage"),
+  },
+  { label: "rear wing", value: numericDamageField("rear-wing-damage") },
+  { label: "floor", value: numericDamageField("floor-damage") },
+  { label: "diffuser", value: numericDamageField("diffuser-damage") },
+  { label: "sidepod", value: numericDamageField("sidepod-damage") },
+  { label: "brakes", value: peakDamageArray("brakes-damage") },
+];
+
+const POWER_UNIT_WEAR_FIELDS: DamageMetric[] = [
+  { label: "ICE", value: numericDamageField("engine-ice-wear") },
+  { label: "MGU-K", value: numericDamageField("engine-mguk-wear") },
+  { label: "MGU-H", value: numericDamageField("engine-mguh-wear") },
+  { label: "energy store", value: numericDamageField("engine-es-wear") },
+  { label: "control electronics", value: numericDamageField("engine-ce-wear") },
+  { label: "turbo", value: numericDamageField("engine-tc-wear") },
+  { label: "engine", value: numericDamageField("engine-damage") },
+  { label: "gearbox", value: numericDamageField("gear-box-damage") },
+];
 
 function signedNumber(n: number): string {
   return n > 0 ? `+${n}` : String(n);
@@ -451,23 +498,63 @@ function buildPenaltyInsight(
   raceControlEvents: RaceControlEvent[],
 ): SessionInsight | null {
   const result = getDriverResult(session, driver);
-  const raceControlPenalties = raceControlEvents.filter(
-    (event) =>
-      event["message-type"] === "PENALTY" &&
-      eventMatchesRaceControlFocus(event, driver),
+  const assignedPenaltyEvents = raceControlEvents.filter((event) =>
+    isPenaltyAssignedToDriver(event, driver),
+  );
+  const warningCount = assignedPenaltyEvents.filter((event) =>
+    /warning/i.test(String(event["penalty-type"] ?? "")),
   ).length;
-  const penaltyCount = Math.max(result.penaltyCount ?? 0, raceControlPenalties);
-  const penaltiesTime = result.penaltiesTime ?? 0;
-  if (penaltyCount <= 0 && penaltiesTime <= 0) return null;
+  const raceControlPenaltyCount = assignedPenaltyEvents.length - warningCount;
+  const raceControlPenaltySeconds = assignedPenaltyEvents.reduce(
+    (total, event) =>
+      typeof event.time === "number" && event.time > 0 && event.time !== 255
+        ? total + event.time
+        : total,
+    0,
+  );
+  const penaltyCount = Math.max(
+    result.penaltyCount ?? 0,
+    raceControlPenaltyCount,
+  );
+  const penaltiesTime = Math.max(
+    result.penaltiesTime ?? 0,
+    raceControlPenaltySeconds,
+  );
+  if (penaltyCount <= 0 && penaltiesTime <= 0 && warningCount <= 0) return null;
+
+  const parts = [
+    penaltyCount > 0
+      ? `${penaltyCount} penalt${penaltyCount === 1 ? "y" : "ies"}`
+      : null,
+    warningCount > 0
+      ? `${warningCount} warning${warningCount === 1 ? "" : "s"}`
+      : null,
+  ].filter(Boolean);
 
   return {
     type: "incident",
     label: "Penalties",
-    value: penaltiesTime > 0 ? `+${penaltiesTime}s` : String(penaltyCount),
-    detail: `${penaltyCount} penalt${penaltyCount === 1 ? "y" : "ies"} applied`,
+    value: penaltiesTime > 0 ? `+${penaltiesTime}s` : parts.join(", "),
+    detail: `${parts.join(", ")} ${penaltyCount > 0 ? "applied" : "issued"}`,
     tone: "warning",
     accent: "amber",
   };
+}
+
+function isPenaltyAssignedToDriver(
+  event: RaceControlEvent,
+  driver: DriverData,
+): boolean {
+  if (event["message-type"] !== "PENALTY") return false;
+
+  // Penalty events include both the penalized driver and the other involved
+  // driver. Count only the penalized/owner side here; collision involvement is
+  // already summarized by Race Incidents.
+  return (
+    event["vehicle-index"] === driver.index ||
+    event["driver-index"] === driver.index ||
+    event["driver-info"]?.name === driver["driver-name"]
+  );
 }
 
 function buildSafetyCarInsight(driver: DriverData): SessionInsight | null {
@@ -495,45 +582,99 @@ function buildSafetyCarInsight(driver: DriverData): SessionInsight | null {
   };
 }
 
-function buildDamageInsight(driver: DriverData): SessionInsight | null {
-  let peak = 0;
-  let peakLabel = "";
+function getDamageSamples(driver: DriverData): CarDamage[] {
   // Final damage alone can miss transient damage/faults from partial debug
   // saves, so scan both final and per-lap damage snapshots.
-  const samples = [
+  return [
     driver["car-damage"],
     ...(driver["per-lap-info"] ?? []).map((lap) => lap["car-damage-data"]),
-  ].filter(Boolean);
+  ].filter((damage): damage is CarDamage => Boolean(damage));
+}
+
+function findPeakDamageMetric(
+  samples: readonly CarDamage[],
+  fields: readonly DamageMetric[],
+): PeakDamageMetric {
+  let peak = 0;
+  let peakLabel = "";
 
   for (const damage of samples) {
-    for (const [field, label] of DAMAGE_FIELDS) {
-      const value = damage[field] ?? 0;
+    for (const field of fields) {
+      const value = field.value(damage);
       if (value > peak) {
         peak = value;
-        peakLabel = label;
+        peakLabel = field.label;
       }
     }
   }
+
+  return { value: peak, label: peakLabel };
+}
+
+function buildCarDamageInsight(driver: DriverData): SessionInsight | null {
+  const peak = findPeakDamageMetric(
+    getDamageSamples(driver),
+    CAR_DAMAGE_FIELDS,
+  );
 
   const finalDamage = driver["car-damage"];
   const faults = [
     finalDamage?.["drs-fault"] ? "DRS fault" : null,
     finalDamage?.["ers-fault"] ? "ERS fault" : null,
-    finalDamage?.["engine-blown"] ? "engine blown" : null,
-    finalDamage?.["engine-seized"] ? "engine seized" : null,
   ].filter(Boolean);
 
-  if (peak < 15 && faults.length === 0) return null;
+  if (peak.value < CAR_DAMAGE_THRESHOLD && faults.length === 0) return null;
 
   return {
     type: "incident",
     label: "Car Damage",
-    value: peak >= 15 ? `${Math.round(peak)}%` : "Fault",
-    detail: [peak >= 15 ? `${peakLabel} peak` : null, ...faults]
+    value:
+      peak.value >= CAR_DAMAGE_THRESHOLD
+        ? `${Math.round(peak.value)}%`
+        : "Fault",
+    detail: [
+      peak.value >= CAR_DAMAGE_THRESHOLD ? `${peak.label} peak` : null,
+      ...faults,
+    ]
       .filter(Boolean)
       .join(" - "),
     tone: "negative",
     accent: "rose",
+  };
+}
+
+function buildPowerUnitWearInsight(driver: DriverData): SessionInsight | null {
+  const peak = findPeakDamageMetric(
+    getDamageSamples(driver),
+    POWER_UNIT_WEAR_FIELDS,
+  );
+  const finalDamage = driver["car-damage"];
+  const failures = [
+    finalDamage?.["engine-blown"] ? "engine blown" : null,
+    finalDamage?.["engine-seized"] ? "engine seized" : null,
+  ].filter(Boolean);
+
+  // Engine and gearbox percentages are long-run wear signals in PnG exports,
+  // not crash damage. Keeping them separate avoids vague "Car Damage: 38%"
+  // cards when the actual story is ICE/MGU/gearbox wear.
+  if (peak.value < POWER_UNIT_WEAR_THRESHOLD && failures.length === 0) {
+    return null;
+  }
+
+  return {
+    type: "incident",
+    label: "Power Unit Wear",
+    value: failures.length > 0 ? "Failure" : `${Math.round(peak.value)}%`,
+    detail: [
+      peak.value >= POWER_UNIT_WEAR_THRESHOLD ? `${peak.label} peak` : null,
+      ...failures,
+    ]
+      .filter(Boolean)
+      .join(" - "),
+    tone: failures.length > 0 ? "negative" : "warning",
+    accent: failures.length > 0 ? "rose" : "amber",
+    tooltip:
+      "Engine and gearbox wear are exporter wear fields, separate from crash/body damage.",
   };
 }
 
@@ -583,7 +724,7 @@ function buildRaceControlIncidentInsight(
 
   return {
     type: "incident",
-    label: "Race Control",
+    label: "Race Incidents",
     value: String(total),
     detail: parts.join(" - "),
     tone: "negative",
@@ -598,6 +739,9 @@ export function buildSessionSummaryInsights({
   raceControlEvents = [],
 }: BuildSessionSummaryInsightsOptions): SessionInsight[] {
   if (!focusedDriver) return [];
+  const eventGroupLabel = focusedDriver["is-player"]
+    ? "Your Session Events"
+    : `${focusedDriver["driver-name"]} Events`;
 
   // Keep the "what happened?" story separate from the existing analytical
   // insight generators. Callers prepend these before pace/tyre/sector tiles.
@@ -612,15 +756,20 @@ export function buildSessionSummaryInsights({
     buildWeatherInsight(session),
     isRaceSession(session) ? buildSafetyCarInsight(focusedDriver) : null,
     buildPenaltyInsight(session, focusedDriver, raceControlEvents),
-    buildDamageInsight(focusedDriver),
+    buildCarDamageInsight(focusedDriver),
+    buildPowerUnitWearInsight(focusedDriver),
     isRaceSession(session)
       ? buildRaceControlIncidentInsight(focusedDriver, raceControlEvents)
       : null,
   ];
 
-  return insights.filter(
-    (insight): insight is SessionInsight => insight != null,
-  );
+  return insights
+    .filter((insight): insight is SessionInsight => insight != null)
+    .map((insight) =>
+      insight.type === "incident" || insight.type === "context"
+        ? { ...insight, groupLabel: eventGroupLabel }
+        : insight,
+    );
 }
 
 export function buildSessionInsightsHint(session: TelemetrySession): string {

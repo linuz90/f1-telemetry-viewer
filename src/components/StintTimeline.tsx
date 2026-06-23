@@ -2,19 +2,138 @@ import type { TyreStint, LapHistoryEntry } from "../types/telemetry";
 import {
   buildStintDetails,
   buildStintTimelineSegments,
+  pairStintDetailsByCompound,
+  type StintDetail,
 } from "../analysis/stintAnalysis";
 import { getCompoundColor } from "../utils/colors";
 import { cn } from "../utils/cn";
 import { stintChipStyle, stintChipTextStyle } from "./ui/StintChip";
 import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
 import { msToLapTime } from "../utils/format";
-import { CompoundStatCard } from "./CompoundStatCard";
+import { CompoundStatCard, type CompoundStatCardRow } from "./CompoundStatCard";
 import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
+import { HStack } from "./ui/Stack";
 
 interface StintTimelineProps {
   stints: TyreStint[];
   totalLaps: number;
+}
+
+function driverColumnLabel(name: string | undefined, fallback: string): string {
+  return name?.trim() || fallback;
+}
+
+function formatLapTimeOrDash(timeMs: number): string {
+  return timeMs > 0 ? msToLapTime(Math.round(timeMs)) : "–";
+}
+
+function formatBestLapOrDash(timeMs: number): string {
+  return timeMs > 0 ? msToLapTime(timeMs) : "–";
+}
+
+function formatConsistencyOrDash(deviationMs: number): string {
+  return deviationMs > 0 ? `±${(deviationMs / 1000).toFixed(3)}s` : "–";
+}
+
+function formatWearOrDash(wear: number): string {
+  return wear > 0 ? `${wear.toFixed(1)}%` : "–";
+}
+
+function formatWearRateOrDash(wearRate: number): string {
+  return wearRate > 0 ? `${wearRate.toFixed(1)}%/lap` : "–";
+}
+
+function formatEstimatedLifeOrDash(estimatedLife: number): string {
+  return estimatedLife > 0 ? `~${estimatedLife} laps` : "–";
+}
+
+function wearValueClass(wear: number): string {
+  return `font-mono ${
+    wear > 60 ? "text-behind" : wear > 40 ? "text-warning" : "text-zinc-300"
+  }`;
+}
+
+function comparisonWearValueClass(wear: number): string {
+  return `font-mono ${
+    wear > 60 ? "text-behind" : wear > 40 ? "text-warning" : "text-zinc-500"
+  }`;
+}
+
+function maybeComparisonValue(
+  comparison: StintDetail | undefined,
+  formatter: (detail: StintDetail) => string,
+): string | undefined {
+  return comparison ? formatter(comparison) : undefined;
+}
+
+function buildStintMetricRows(
+  detail: StintDetail,
+  comparison: StintDetail | undefined,
+): CompoundStatCardRow[] {
+  const rows: CompoundStatCardRow[] = [];
+
+  if (detail.averageTimeMs > 0 || (comparison?.averageTimeMs ?? 0) > 0) {
+    rows.push({
+      label: "Average",
+      value: formatLapTimeOrDash(detail.averageTimeMs),
+      comparisonValue: maybeComparisonValue(comparison, (item) =>
+        formatLapTimeOrDash(item.averageTimeMs),
+      ),
+      className: "font-mono text-zinc-300",
+    });
+  }
+
+  if (
+    detail.averageDeviationMs > 0 ||
+    (comparison?.averageDeviationMs ?? 0) > 0
+  ) {
+    rows.push({
+      label: "Consistency",
+      value: formatConsistencyOrDash(detail.averageDeviationMs),
+      comparisonValue: maybeComparisonValue(comparison, (item) =>
+        formatConsistencyOrDash(item.averageDeviationMs),
+      ),
+      className: "font-mono text-zinc-300",
+    });
+  }
+
+  if (detail.peakWear > 0 || (comparison?.peakWear ?? 0) > 0) {
+    rows.push({
+      label: "Peak wear",
+      value: formatWearOrDash(detail.peakWear),
+      comparisonValue: maybeComparisonValue(comparison, (item) =>
+        formatWearOrDash(item.peakWear),
+      ),
+      className: wearValueClass(detail.peakWear),
+      comparisonClassName: comparison
+        ? comparisonWearValueClass(comparison.peakWear)
+        : undefined,
+      divider: true,
+    });
+  }
+
+  if (detail.wearRate > 0 || (comparison?.wearRate ?? 0) > 0) {
+    rows.push({
+      label: "Wear rate",
+      value: formatWearRateOrDash(detail.wearRate),
+      comparisonValue: maybeComparisonValue(comparison, (item) =>
+        formatWearRateOrDash(item.wearRate),
+      ),
+    });
+  }
+
+  if (detail.estimatedLife > 0 || (comparison?.estimatedLife ?? 0) > 0) {
+    rows.push({
+      label: "Est. max life",
+      value: formatEstimatedLifeOrDash(detail.estimatedLife),
+      comparisonValue: maybeComparisonValue(comparison, (item) =>
+        formatEstimatedLifeOrDash(item.estimatedLife),
+      ),
+    });
+  }
+
+  return rows;
 }
 
 /**
@@ -64,9 +183,9 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
         })}
       </div>
       {/* Legend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-zinc-400">
+      <HStack wrap className="mt-2 gap-x-4 gap-y-1 text-xs text-zinc-400">
         {stints.map((stint, i) => (
-          <span key={i} className="flex items-center gap-1">
+          <HStack as="span" key={i} className="gap-1">
             <span
               className="inline-block w-2.5 h-2.5 rounded-sm"
               style={{
@@ -77,9 +196,9 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
             />
             {stint["tyre-set-data"]["visual-tyre-compound"]} (
             {stint["stint-length"]} laps)
-          </span>
+          </HStack>
         ))}
-      </div>
+      </HStack>
     </div>
   );
 }
@@ -91,14 +210,30 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
 export function StintDetailCards({
   stints,
   laps,
+  rivalStints,
+  rivalLaps,
+  rivalName,
+  driverName,
 }: {
   stints: TyreStint[];
   laps: LapHistoryEntry[];
+  rivalStints?: TyreStint[];
+  rivalLaps?: LapHistoryEntry[];
+  rivalName?: string;
+  driverName?: string;
 }) {
   if (stints.length === 0) return null;
 
   const details = buildStintDetails(stints, laps);
+  const rivalDetails =
+    rivalStints && rivalLaps ? buildStintDetails(rivalStints, rivalLaps) : [];
+  const pairedDetails = pairStintDetailsByCompound({
+    details,
+    comparisonDetails: rivalDetails,
+  });
   const hasAnyWear = details.some((detail) => detail.wearRate > 0);
+  const primaryLabel = driverColumnLabel(driverName, "Main");
+  const comparisonLabel = driverColumnLabel(rivalName, "Compare");
 
   return (
     <div>
@@ -110,61 +245,23 @@ export function StintDetailCards({
           gridTemplateColumns: `repeat(${stints.length}, minmax(0, 1fr))`,
         }}
       >
-        {details.map((detail, i) => {
+        {pairedDetails.map(({ detail, comparison }, i) => {
           const { stint, compound } = detail;
           const color = getCompoundColor(compound);
+          const hasComparison = Boolean(comparison);
 
           const hero =
-            detail.bestTimeMs > 0
-              ? { value: msToLapTime(detail.bestTimeMs), label: "Best lap" }
+            detail.bestTimeMs > 0 || (comparison?.bestTimeMs ?? 0) > 0
+              ? {
+                  value: formatBestLapOrDash(detail.bestTimeMs),
+                  label: "Best lap",
+                  comparisonValue: maybeComparisonValue(comparison, (item) =>
+                    formatBestLapOrDash(item.bestTimeMs),
+                  ),
+                }
               : undefined;
 
-          const rows = [
-            ...(detail.averageTimeMs > 0
-              ? [
-                  {
-                    label: "Average",
-                    value: msToLapTime(Math.round(detail.averageTimeMs)),
-                    className: "font-mono",
-                  },
-                ]
-              : []),
-            ...(detail.averageDeviationMs > 0
-              ? [
-                  {
-                    label: "Consistency",
-                    value: `±${(detail.averageDeviationMs / 1000).toFixed(3)}s`,
-                    className: "font-mono",
-                  },
-                ]
-              : []),
-            ...(detail.peakWear > 0
-              ? [
-                  {
-                    label: "Peak wear",
-                    value: `${detail.peakWear.toFixed(1)}%`,
-                    className: `font-mono ${detail.peakWear > 60 ? "text-behind" : detail.peakWear > 40 ? "text-warning" : "text-zinc-300"}`,
-                    divider: true,
-                  },
-                ]
-              : []),
-            ...(detail.wearRate > 0
-              ? [
-                  {
-                    label: "Wear rate",
-                    value: `${detail.wearRate.toFixed(1)}%/lap`,
-                  },
-                ]
-              : []),
-            ...(detail.estimatedLife > 0
-              ? [
-                  {
-                    label: "Est. max life",
-                    value: `~${detail.estimatedLife} laps`,
-                  },
-                ]
-              : []),
-          ];
+          const rows = buildStintMetricRows(detail, comparison);
 
           return (
             <CompoundStatCard
@@ -173,7 +270,13 @@ export function StintDetailCards({
               subtitle={`${stint["stint-length"]} laps`}
               hero={hero}
               rows={rows}
-              className="min-w-[200px] sm:min-w-0"
+              valueLabel={hasComparison ? primaryLabel : undefined}
+              comparisonLabel={hasComparison ? comparisonLabel : undefined}
+              className={cn(
+                hasComparison ? "min-w-[280px]" : "min-w-[200px]",
+                "sm:min-w-0",
+                details.length === 1 && "w-full flex-1",
+              )}
             >
               {/* Wear bar: 0–100% scale with puncture threshold marker */}
               {hasAnyWear && (

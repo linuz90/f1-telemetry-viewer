@@ -98,8 +98,8 @@ export function SessionList() {
   const [filters, setFilters] = useSessionFilters();
   const [page, setPage] = useState(0);
 
-  // Persist the active tab across reloads within the same tab session. Filters
-  // use a shared browser store so the dashboard and sidebar react together.
+  // Keep the active tab scoped to this browser tab; filters are a longer-lived
+  // preference shared with the dashboard via useSessionFilters().
   useEffect(() => {
     writeStoredString(SESSION_LIST_TAB_STORAGE_KEY, tab, "session");
   }, [tab]);

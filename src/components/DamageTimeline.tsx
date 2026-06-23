@@ -17,6 +17,7 @@ import { Badge } from "./ui/Badge";
 import { CHART_THEME, DAMAGE_COLORS, TOOLTIP_STYLE } from "../constants/colors";
 import { EmptyState } from "./EmptyState";
 import { SectionHeader } from "./ui/SectionHeader";
+import { HStack } from "./ui/Stack";
 
 interface DamageTimelineProps {
   perLapInfo: PerLapInfo[];
@@ -118,12 +119,12 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
 
 function FaultBadges({ faults }: { faults: DamageFault[] }) {
   return (
-    <div className="flex flex-wrap gap-2 mt-2">
+    <HStack align="stretch" wrap className="mt-2 gap-2">
       {faults.map((fault, i) => (
         <Badge key={i} tone="red">
           Lap {fault.lap}: {fault.label}
         </Badge>
       ))}
-    </div>
+    </HStack>
   );
 }

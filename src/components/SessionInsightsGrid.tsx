@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   ArrowUpDown,
   Battery,
+  Car,
   CheckCircle2,
   Circle,
   CircleHelp,
@@ -127,6 +128,60 @@ function podiumAccent(position: number | undefined): AccentColor | undefined {
   return undefined;
 }
 
+function sessionEventIcon(item: string): {
+  icon: LucideIcon;
+  className: string;
+} {
+  const normalized = item.toLowerCase();
+  if (/penalt/.test(normalized)) {
+    return {
+      icon: AlertTriangle,
+      className: "bg-amber-500/15 text-amber-300",
+    };
+  }
+  if (/collision|incident|retirement|wing change/.test(normalized)) {
+    return { icon: Car, className: "bg-rose-500/15 text-rose-300" };
+  }
+  if (/damage|fault/.test(normalized)) {
+    return { icon: Wrench, className: "bg-rose-500/15 text-rose-300" };
+  }
+  if (/wear|engine|ice|mgu|gearbox|turbo/.test(normalized)) {
+    return { icon: Gauge, className: "bg-amber-500/15 text-amber-300" };
+  }
+  if (/neutral|safety/.test(normalized)) {
+    return { icon: Flag, className: "bg-amber-500/15 text-amber-300" };
+  }
+  if (/rain|weather|condition/.test(normalized)) {
+    return { icon: Cloud, className: "bg-sky-500/15 text-sky-300" };
+  }
+  return { icon: AlertTriangle, className: "bg-zinc-800 text-zinc-300" };
+}
+
+function SessionEventItems({ items }: { items: string[] }) {
+  return (
+    <div className="mt-3 space-y-1.5">
+      {items.map((item) => {
+        const { icon: Icon, className } = sessionEventIcon(item);
+        return (
+          <div key={item} className="flex min-w-0 items-center gap-2 py-0.5">
+            <span
+              className={cn(
+                "flex size-5 shrink-0 items-center justify-center rounded-md",
+                className,
+              )}
+            >
+              <Icon className="size-3" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 truncate font-mono text-xs tabular-nums text-zinc-300">
+              {highlightDetailValues(item)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SessionInsightsGrid({
   insights,
   hint,
@@ -161,6 +216,10 @@ export function SessionInsightsGrid({
             insight.rank != null &&
             insight.rankTotal != null;
           const extraDetailsArePeerLines = insight.type === "sector";
+          const showSessionEventItems =
+            (insight.groupLabel != null ||
+              insight.label === "Session Events") &&
+            Boolean(insight.extraDetails?.length);
 
           return (
             <InsightTile
@@ -181,23 +240,31 @@ export function SessionInsightsGrid({
                   insight.value
                 )}
               </InsightValue>
-              {insight.detail && (
-                <InsightDetail className="mt-2">
-                  {highlightDetailValues(insight.detail)}
-                </InsightDetail>
+              {showSessionEventItems ? (
+                <SessionEventItems items={insight.extraDetails!} />
+              ) : (
+                <>
+                  {insight.detail && (
+                    <InsightDetail className="mt-2">
+                      {highlightDetailValues(insight.detail)}
+                    </InsightDetail>
+                  )}
+                  {insight.extraDetails?.map((detail) => (
+                    <InsightDetail
+                      key={detail}
+                      size={extraDetailsArePeerLines ? "md" : "sm"}
+                      tone={
+                        extraDetailsArePeerLines
+                          ? "text-zinc-400"
+                          : "text-zinc-500"
+                      }
+                      className={cn("mt-1")}
+                    >
+                      {highlightDetailValues(detail)}
+                    </InsightDetail>
+                  ))}
+                </>
               )}
-              {insight.extraDetails?.map((detail) => (
-                <InsightDetail
-                  key={detail}
-                  size={extraDetailsArePeerLines ? "md" : "sm"}
-                  tone={
-                    extraDetailsArePeerLines ? "text-zinc-400" : "text-zinc-500"
-                  }
-                  className={cn("mt-1")}
-                >
-                  {highlightDetailValues(detail)}
-                </InsightDetail>
-              ))}
               {showRankFooter && (
                 <div
                   className={cn(
