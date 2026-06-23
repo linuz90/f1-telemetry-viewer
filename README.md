@@ -127,7 +127,7 @@ Works on macOS, Linux, and Windows.
 
 ## Stack
 
-React 19, TypeScript, Vite 7, Tailwind CSS 4, Recharts 3, React Router 7, JSZip, Motion, and lucide-react.
+React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts 3, React Router 7, JSZip, Motion, and lucide-react.
 
 ## Supported Data
 
