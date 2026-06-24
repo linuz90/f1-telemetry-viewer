@@ -63,7 +63,7 @@ interface RivalAggregate {
    */
   bestLapDeltas: { deltaMs: number; weight: number }[];
   /**
-   * Per-race samples of same-compound clean median pace deltas. Preferred over
+   * Per-race samples of same-compound race-pace deltas. Preferred over
    * best-lap deltas for pace cards because it compares representative race pace
    * on tyres both drivers actually used.
    */
@@ -836,7 +836,7 @@ const RIVAL_CARD_ORDER: RivalCardKind[] = [
  * the player has faced at this specific track in the active formula scope.
  *
  * Sample sizes are tiny at a single track, so the function ranks by an
- * unweighted mean pace gap (compound-matched clean laps where available,
+ * unweighted mean pace gap (compound-matched race-pace laps where available,
  * best-lap fallback otherwise) and exposes the evidence count on the result
  * so the UI can render it honestly. Recency weighting from
  * {@link buildRivalStats} is deliberately dropped — at single-track scope
@@ -858,7 +858,7 @@ export interface TrackRivalBenchmark {
   /** Online races at this track shared with the rival. */
   raceCount: number;
   /**
-   * Total clean laps that contributed to the same-compound pace mean.
+   * Total race-pace laps that contributed to the same-compound pace mean.
    * Undefined for the best-lap fallback (one sample per race).
    */
   lapSamples?: number;
@@ -869,7 +869,7 @@ export interface TrackRivalBenchmark {
  * race to count toward the track benchmark. Three laps is enough to wash out
  * a single-lap fluke (in/out lap, slipstream tow) while still admitting short
  * races and lapped finishers — the harder thresholds belong on
- * `compoundMatchedPaceDeltaMs` which already gates on shared clean laps.
+ * `compoundMatchedPaceDeltaMs` which already gates on shared race-pace laps.
  */
 const MIN_TRACK_RIVAL_LAPS_PER_RACE = 3;
 

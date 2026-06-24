@@ -12,7 +12,7 @@ import { driverTopSpeed } from "../utils/stats/drivers";
 import {
   filterOutlierLaps,
   getBestLapTime,
-  getCleanRaceLaps,
+  getRacePaceLaps,
   getValidLaps,
   medianLapTimeMs,
 } from "../utils/stats/laps";
@@ -124,15 +124,15 @@ export function buildRaceDriverStats(
   for (const driver of drivers) {
     const laps = driver["session-history"]["lap-history-data"];
     const bestLap = getBestLapTime(laps);
-    const cleanRaceLaps = getCleanRaceLaps(driver);
+    const racePaceLaps = getRacePaceLaps(driver);
     const racePace =
-      cleanRaceLaps.length > 0
-        ? cleanRaceLaps.reduce((sum, lap) => sum + lap["lap-time-in-ms"], 0) /
-          cleanRaceLaps.length
+      racePaceLaps.length > 0
+        ? racePaceLaps.reduce((sum, lap) => sum + lap["lap-time-in-ms"], 0) /
+          racePaceLaps.length
         : 0;
 
-    // Race pace deliberately uses clean race laps, not all valid laps, because
-    // pit in/out and neutralized laps are valid telemetry but poor pace samples.
+    // Race pace uses eligible racing laps, not all valid laps, because pit
+    // transitions and neutralized laps are valid telemetry but poor pace samples.
     map.set(driver["driver-name"], {
       bestLap,
       racePace,

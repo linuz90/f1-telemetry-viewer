@@ -1,8 +1,4 @@
-import type {
-  CarDamage,
-  DriverData,
-  LapHistoryEntry,
-} from "../../types/telemetry";
+import type { DriverData, LapHistoryEntry } from "../../types/telemetry";
 import { isLapValid, sectorTimeMs } from "../format";
 import { median } from "./core";
 import { getDriverStints, getLapCompoundMap } from "./tyres";
@@ -49,66 +45,66 @@ function getPitLapNumbers(d: DriverData): Set<number> {
   return pitLaps;
 }
 
-export interface CleanRaceLapSample {
+function getLapStintKeyMap(d: DriverData): Map<number, string> {
+  const byLap = new Map<number, string>();
+  getDriverStints(d).forEach((stint, index) => {
+    for (let lap = stint["start-lap"]; lap <= stint["end-lap"]; lap++) {
+      byLap.set(lap, `stint-${index}`);
+    }
+  });
+  return byLap;
+}
+
+export interface RacePaceLapSample {
   lapNumber: number;
   lap: LapHistoryEntry;
   timeMs: number;
   compound?: string;
 }
 
-/**
- * Per-component damage thresholds (in % of full destruction) above which a lap
- * is considered "damaged" and dropped from race-pace samples.
- *
- * Damage is read from `per-lap-info[].car-damage-data`, which is the damage
- * state at the END of that lap. So a lap that BEGINS clean but ends with a
- * smashed front wing is excluded (the slow time came from the incident, not
- * driver pace), and the lap after — driven with the same damage if not
- * pitted — is also excluded (its slow pace reflects the broken car, not the
- * driver). A pit-stop repair clears the flag for subsequent laps.
- *
- * Thresholds are intentionally conservative — a couple of percent of front
- * wing damage barely shows up in lap time, so excluding those would throw
- * away good evidence. Floor / diffuser / sidepod have lower bars because
- * they affect aero across the whole lap. Engine / gearbox sit higher because
- * they degrade gradually over a race and routinely sit at 5–10% on a normal
- * stint without meaningfully slowing the car.
- */
-const LAP_DAMAGE_THRESHOLDS = {
-  frontWing: 15,
-  rearWing: 15,
-  floor: 5,
-  diffuser: 5,
-  sidepod: 5,
-  engine: 25,
-  gearbox: 25,
-} as const;
+const MAD_TO_STD_DEV = 1.4826;
+const RACE_PACE_MAD_MULTIPLIER = 3;
+const RACE_PACE_MIN_OUTLIER_DISTANCE_MS = 1_500;
 
-function isLapDamaged(damage: CarDamage | undefined): boolean {
-  if (!damage) return false;
-  if (damage["front-left-wing-damage"] > LAP_DAMAGE_THRESHOLDS.frontWing)
-    return true;
-  if (damage["front-right-wing-damage"] > LAP_DAMAGE_THRESHOLDS.frontWing)
-    return true;
-  if (damage["rear-wing-damage"] > LAP_DAMAGE_THRESHOLDS.rearWing) return true;
-  if (damage["floor-damage"] > LAP_DAMAGE_THRESHOLDS.floor) return true;
-  if (damage["diffuser-damage"] > LAP_DAMAGE_THRESHOLDS.diffuser) return true;
-  if (damage["sidepod-damage"] > LAP_DAMAGE_THRESHOLDS.sidepod) return true;
-  if (
-    damage["engine-damage"] != null &&
-    damage["engine-damage"] > LAP_DAMAGE_THRESHOLDS.engine
-  )
-    return true;
-  if (
-    damage["gear-box-damage"] != null &&
-    damage["gear-box-damage"] > LAP_DAMAGE_THRESHOLDS.gearbox
-  )
-    return true;
-  return false;
+function filterRacePaceOutliers(
+  samples: RacePaceLapSample[],
+  groupKey: (sample: RacePaceLapSample) => string,
+): RacePaceLapSample[] {
+  const groups = new Map<string, RacePaceLapSample[]>();
+  for (const sample of samples) {
+    const key = groupKey(sample);
+    const group = groups.get(key) ?? [];
+    group.push(sample);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()]
+    .flatMap((group) => filterRacePaceOutlierGroup(group))
+    .sort((a, b) => a.lapNumber - b.lapNumber);
+}
+
+function filterRacePaceOutlierGroup(
+  samples: RacePaceLapSample[],
+): RacePaceLapSample[] {
+  if (samples.length < 3) return samples;
+
+  const times = samples.map((sample) => sample.timeMs);
+  const baseline = median(times);
+  if (baseline == null) return samples;
+
+  const mad = median(times.map((time) => Math.abs(time - baseline))) ?? 0;
+  const robustSpread = mad * MAD_TO_STD_DEV;
+  const outlierDistance = Math.max(
+    robustSpread * RACE_PACE_MAD_MULTIPLIER,
+    RACE_PACE_MIN_OUTLIER_DISTANCE_MS,
+  );
+  const threshold = baseline + outlierDistance;
+
+  return samples.filter((sample) => sample.timeMs <= threshold);
 }
 
 /**
- * Get "clean" race laps for computing race pace.
+ * Get race-pace laps for computing representative race pace.
  *
  * Filtering strategy (chosen after comparing approaches on real data with
  * SC, VSC, and formation laps — see Zandvoort 2026-02-09 analysis):
@@ -120,34 +116,35 @@ function isLapDamaged(damage: CarDamage | undefined): boolean {
  *  3. Exclude pit in/out laps — identified from tyre stint boundaries.
  *     The pit-in lap (diving into pits) and pit-out lap (rejoining) both
  *     have artificially slow times that aren't representative of race pace.
- *  4. Exclude laps run with significant damage — per-lap damage state from
- *     `per-lap-info[].car-damage-data`. A lap with a broken front wing or
- *     ripped floor is not representative pace; including it would inflate
- *     pace deltas vs. healthier rivals (especially relevant for the
- *     same-compound rival benchmark on the Track page and the dashboard
- *     Rivals & Teammates cards).
- *  5. Apply 1.2× median safety net — catches unlabeled incidents (spins,
- *     off-tracks, rejoins) that the game still marks as green-flag. These
- *     have no telemetry flag, so statistical filtering is the only option
- *     (confirmed with ashwin_nat from Pits n' Giggles, 2026-02).
+ *  4. Apply a Median Absolute Deviation safety net — catches unlabeled
+ *     incidents (spins, off-tracks, rejoins) that the game still marks as
+ *     green-flag. These have no telemetry flag, so statistical filtering is
+ *     the only option (confirmed with ashwin_nat from Pits n' Giggles,
+ *     2026-06).
+ *     The MAD pass runs per stint so a slower compound is not judged against a
+ *     faster stint's median.
+ *
+ * Damage is intentionally not an eligibility gate. Persistent unrepaired wing
+ * damage and normal ICE/gearbox wear are part of the car's race state; only
+ * abnormal slow laps are removed so one incident doesn't erase the whole race
+ * pace column.
  *
  * Why not just use the median filter alone (previous approach)?
  *  - It included formation laps and "SC entry" laps that were close enough
  *    to the median to sneak through (e.g. 1:13.6 on a 1:12.8 median).
  *  - It included pit-in laps at long tracks where the pit entry time loss
  *    was under 20% of the median (e.g. Spa pit-in at 1:15 vs 1:12 median).
- *  - It included laps with light damage where pace dropped just enough to
- *    skew rival pace deltas without tripping the 20% safety net.
  *  - Rankings were noticeably different (and less accurate) compared to
  *    explicit SC/pit filtering on sessions with safety car periods.
  */
-export function getCleanRaceLapSamples(d: DriverData): CleanRaceLapSample[] {
+export function getRacePaceLapSamples(d: DriverData): RacePaceLapSample[] {
   const laps = d["session-history"]["lap-history-data"];
   const perLapInfo = d["per-lap-info"] ?? [];
   const pitLaps = getPitLapNumbers(d);
+  const stintByLap = getLapStintKeyMap(d);
   const compoundByLap = getLapCompoundMap(d);
 
-  const clean: CleanRaceLapSample[] = [];
+  const racePaceSamples: RacePaceLapSample[] = [];
   for (let i = 1; i < laps.length; i++) {
     const lap = laps[i];
     const lapNum = i + 1; // lap-history-data is 0-indexed, lap numbers are 1-indexed
@@ -164,12 +161,7 @@ export function getCleanRaceLapSamples(d: DriverData): CleanRaceLapSample[] {
     // Exclude pit in/out laps
     if (pitLaps.has(lapNum)) continue;
 
-    // Exclude laps where the car ended the lap with meaningful damage. This
-    // catches the incident lap itself AND any subsequent laps driven with
-    // the same damage (until a pit repair clears it).
-    if (isLapDamaged(pli?.["car-damage-data"])) continue;
-
-    clean.push({
+    racePaceSamples.push({
       lapNumber: lapNum,
       lap,
       timeMs: lap["lap-time-in-ms"],
@@ -177,17 +169,16 @@ export function getCleanRaceLapSamples(d: DriverData): CleanRaceLapSample[] {
     });
   }
 
-  if (clean.length < 3) return clean;
-
-  // Final safety net: 1.2× median catches unlabeled incidents (spins, off-tracks)
-  const baseline = median(clean.map((sample) => sample.timeMs));
-  if (baseline == null) return clean;
-  const threshold = baseline * 1.2;
-  return clean.filter((sample) => sample.timeMs <= threshold);
+  // MAD adapts to the actual race spread better than a flat 1.2x cap. Grouping
+  // by stint avoids treating a naturally slower compound as an outlier.
+  return filterRacePaceOutliers(
+    racePaceSamples,
+    (sample) => stintByLap.get(sample.lapNumber) ?? sample.compound ?? "race",
+  );
 }
 
-export function getCleanRaceLaps(d: DriverData): LapHistoryEntry[] {
-  return getCleanRaceLapSamples(d).map((sample) => sample.lap);
+export function getRacePaceLaps(d: DriverData): LapHistoryEntry[] {
+  return getRacePaceLapSamples(d).map((sample) => sample.lap);
 }
 
 /** Get the best lap time in ms from a set of laps */

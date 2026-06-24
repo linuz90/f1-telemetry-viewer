@@ -116,7 +116,7 @@ const sampleInsights: SessionInsight[] = [
     rank: 1,
     rankTotal: 22,
     tooltip:
-      "Average clean-lap pace excluding lap 1, pit laps, SC, and outliers.",
+      "Average race-pace lap excluding lap 1, pit laps, SC, and outliers.",
   },
   {
     type: "tyre",
@@ -511,7 +511,7 @@ export function UiDebugPage() {
                   Faster by 0.410s
                 </InsightValue>
                 <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
-                  same tyres · clean laps
+                  same tyres · race-pace laps
                 </InsightDetail>
               </div>
               <div>

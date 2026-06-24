@@ -85,7 +85,7 @@ function getMetricValue(
     case "medianPace":
       return getComparisonValue(
         candidate.comparablePace,
-        candidate.medianCleanPaceMs,
+        candidate.medianRacePaceMs,
       );
     case "bestStint":
       return getComparisonValue(
@@ -266,11 +266,11 @@ function getComparisonValue(
 
 function getPaceDetail(candidate: RaceSetupCandidate): string | undefined {
   if (candidate.comparablePace) {
-    return `${candidate.comparablePace.compound} · ${candidate.comparablePace.sampleCount} clean laps`;
+    return `${candidate.comparablePace.compound} · ${candidate.comparablePace.sampleCount} race-pace laps`;
   }
 
-  return candidate.cleanLapCount > 0
-    ? `${candidate.cleanLapCount} clean laps`
+  return candidate.racePaceLapCount > 0
+    ? `${candidate.racePaceLapCount} race-pace laps`
     : undefined;
 }
 

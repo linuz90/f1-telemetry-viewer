@@ -4,7 +4,7 @@ import { useTelemetry } from "../context/TelemetryContext";
 import { findPlayer, isRaceSession } from "../utils/stats/drivers";
 import {
   getBestLapTime,
-  getCleanRaceLaps,
+  getRacePaceLaps,
   getValidLaps,
 } from "../utils/stats/laps";
 import { bestSectorTimeMs } from "../utils/format";
@@ -108,12 +108,12 @@ export function useTrackHistory(
             if (best > 0 && (bestRaceLapMs === 0 || best < bestRaceLapMs)) {
               bestRaceLapMs = best;
             }
-            // Best average race pace (clean laps — SC/pit/incident excluded)
-            const clean = getCleanRaceLaps(player);
-            if (clean.length > 0) {
+            // Best average race pace (race-pace laps — SC/pit/outlier excluded)
+            const racePaceLaps = getRacePaceLaps(player);
+            if (racePaceLaps.length > 0) {
               const avg =
-                clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
-                clean.length;
+                racePaceLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
+                racePaceLaps.length;
               if (bestRacePaceMs === 0 || avg < bestRacePaceMs) {
                 bestRacePaceMs = avg;
               }

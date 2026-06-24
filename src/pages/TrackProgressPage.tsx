@@ -482,10 +482,10 @@ export function TrackProgressPage() {
   const qualifyingScatter = trackAnalysis.qualifying.scatter;
   const timeTrialScatter = trackAnalysis.timeTrial.scatter;
 
-  // Race-on-race median clean lap per compound — feeds the Pace Evolution
+  // Race-on-race representative pace per compound — feeds the Pace Evolution
   // chart. Uses bucket-scoped sessions so a 5-lap repro doesn't get plotted
-  // against a 30-lap stint median in the same line. The set identity match
-  // is by TelemetrySession reference, which is stable across renders here.
+  // against a 30-lap race in the same line. The set identity match is by
+  // TelemetrySession reference, which is stable across renders here.
   const selectedRaceSessionSet = new Set(selectedRaceSessions);
   const paceEvolutionData = buildPaceEvolution(
     raceData
@@ -1360,7 +1360,7 @@ export function TrackProgressPage() {
                 />
               )}
 
-              {/* Pace evolution (race-on-race median clean lap per compound) */}
+              {/* Pace evolution (race-on-race race-pace window per compound) */}
               {paceEvolutionData.length > 1 && (
                 <PaceEvolutionChart data={paceEvolutionData} />
               )}
