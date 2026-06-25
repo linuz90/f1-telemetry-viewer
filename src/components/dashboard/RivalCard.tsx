@@ -11,13 +11,13 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "../../utils/cn";
-import { getTeamColor } from "../../utils/colors";
 import type {
   RivalCard as RivalCardData,
   RivalCardKind,
 } from "../../analysis/rivalStats";
 import type { AccentColor } from "../../constants/accents";
+import { cn } from "../../utils/cn";
+import { getTeamColor } from "../../utils/colors";
 import { InsightDetail, InsightValue } from "../ui/InsightText";
 import { InsightTile } from "../ui/InsightTile";
 
@@ -121,7 +121,7 @@ export function RivalCard({ card }: { card: RivalCardData }) {
           indicator rather than the two-tone clash of accent-on-accent. */}
       <InsightValue
         size="xl"
-        className="mt-1 flex items-baseline font-bold leading-none tracking-tight"
+        className="mt-1 flex items-baseline leading-none tracking-tight"
       >
         {sign && (
           <span className={cn("text-3xl font-mono", signClass)}>{sign}</span>
