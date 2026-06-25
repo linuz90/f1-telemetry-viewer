@@ -21,7 +21,7 @@ import {
   resolveSessionMeta,
   toSlug,
 } from "./parseFilename";
-import { getCleanRaceLapSamples, medianLapTimeMs } from "./stats/laps";
+import { getRacePaceLapSamples, medianLapTimeMs } from "./stats/laps";
 
 export interface BuiltSessionSummary {
   summary: SessionSummary & { fileSize: number };
@@ -192,11 +192,11 @@ function computeLapStats(driver: DriverData): {
   };
 }
 
-function cleanLapsByCompound(
+function racePaceLapsByCompound(
   driver: DriverData,
 ): Map<string, LapHistoryEntry[]> {
   const byCompound = new Map<string, LapHistoryEntry[]>();
-  for (const sample of getCleanRaceLapSamples(driver)) {
+  for (const sample of getRacePaceLapSamples(driver)) {
     if (!sample.compound) continue;
     const laps = byCompound.get(sample.compound) ?? [];
     laps.push(sample.lap);
@@ -214,8 +214,8 @@ function compoundMatchedPaceDelta(
   | "compoundMatchedPaceLapCount"
   | "compoundMatchedPaceCompounds"
 > {
-  const playerByCompound = cleanLapsByCompound(player);
-  const rivalByCompound = cleanLapsByCompound(rival);
+  const playerByCompound = racePaceLapsByCompound(player);
+  const rivalByCompound = racePaceLapsByCompound(rival);
   const compounds = [...playerByCompound.keys()].filter((compound) =>
     rivalByCompound.has(compound),
   );

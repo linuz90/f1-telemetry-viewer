@@ -25,4 +25,4 @@ export interface StrategyInsight {
 }
 
 export const RACE_PACE_TOOLTIP =
-  "Average lap time excluding lap 1, pit in/out laps, safety car periods, and incident outliers";
+  "Average race-pace lap time: valid green-flag laps excluding lap 1, pit in/out laps, and abnormal outliers.";

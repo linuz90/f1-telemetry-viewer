@@ -3,7 +3,7 @@ import { bestSectorTimeMs } from "../format";
 import { msToLapTimeLocal } from "./core";
 import type { StrategyInsight } from "./insightTypes";
 import { RACE_PACE_TOOLTIP } from "./insightTypes";
-import { getBestLapTime, getCleanRaceLaps, getValidLaps } from "./laps";
+import { getBestLapTime, getRacePaceLaps, getValidLaps } from "./laps";
 
 /** Historical PB data for a track */
 export interface TrackPBData {
@@ -106,8 +106,8 @@ export function generateRaceHistoryInsights(
 ): StrategyInsight[] {
   const insights: StrategyInsight[] = [];
   const laps = player["session-history"]["lap-history-data"];
-  const clean = getCleanRaceLaps(player);
-  if (clean.length === 0) return insights;
+  const racePaceLaps = getRacePaceLaps(player);
+  if (racePaceLaps.length === 0) return insights;
 
   const bestRaceLap = getBestLapTime(laps);
 
@@ -134,10 +134,11 @@ export function generateRaceHistoryInsights(
     }
   }
 
-  // 2. Race pace vs best-ever race pace (clean laps only)
+  // 2. Race pace vs best-ever race pace (race-pace laps only)
   if (pbs.bestRacePaceMs > 0) {
     const avgPace =
-      clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / clean.length;
+      racePaceLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
+      racePaceLaps.length;
     const delta = avgPace - pbs.bestRacePaceMs;
     if (delta <= 0) {
       insights.push({

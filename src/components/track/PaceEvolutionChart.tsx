@@ -27,13 +27,13 @@ import { HStack } from "../ui/Stack";
  * split by compound, so the comparison is the one drivers actually care about
  * ("is my Hard pace improving here?").
  *
- * The metric is the average of the FASTEST 3 clean laps on that compound —
+ * The metric is the average of the FASTEST 3 race-pace laps on that compound —
  * not the median across the whole stint, which would unfairly penalize long
  * stints whose median is dragged down by tyre-deg laps in the tail. See the
  * header comment on `buildPaceEvolution` in `utils/stats/trackPaceEvolution`
  * for the rationale.
  *
- * Compounds with < 3 clean laps in a session are gated out upstream so a
+ * Compounds with < 3 race-pace laps in a session are gated out upstream so a
  * tiny stint doesn't yank a line around.
  *
  * Context filter: a 2-car online sparring session and a 20-car AI race are
@@ -59,7 +59,7 @@ function contextLabel(ctx: RaceContext): string {
   // sub-threshold leading shows up.
   const lead =
     ctx.leaderShare >= 0.5
-      ? ` · led ${Math.round(ctx.leaderShare * 100)}% of clean laps`
+      ? ` · led ${Math.round(ctx.leaderShare * 100)}% of race-pace laps`
       : "";
   return `${where} · ${drivers}${lead}`;
 }
@@ -104,7 +104,7 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
     <section className={cardClass}>
       <SectionHeader
         title="Pace Evolution"
-        hint="Avg. of fastest 3 clean laps by compound, race-on-race"
+        hint="Avg. of fastest 3 race-pace laps by compound, race-on-race"
         action={
           showFilter ? (
             <SegmentedControl<ContextFilter>

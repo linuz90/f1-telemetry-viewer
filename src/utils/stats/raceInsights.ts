@@ -5,7 +5,7 @@ import { driverTopSpeed } from "./drivers";
 import { avgErsDeployMj, avgErsHarvestMj } from "./energy";
 import type { StrategyInsight } from "./insightTypes";
 import { RACE_PACE_TOOLTIP } from "./insightTypes";
-import { getCleanRaceLaps } from "./laps";
+import { getRacePaceLaps } from "./laps";
 import { getCompletedStints, stintWearRate } from "./tyres";
 
 /** Generate strategy insights for the player (race) */
@@ -21,16 +21,16 @@ export function generateInsights(
     // --- Head-to-head mode ---
     const rivalName = rival["driver-name"];
 
-    // 1. Pace delta vs rival (clean laps — SC/pit/incident excluded)
-    const playerClean = getCleanRaceLaps(player);
-    const rivalClean = getCleanRaceLaps(rival);
-    if (playerClean.length > 0 && rivalClean.length > 0) {
+    // 1. Pace delta vs rival (race-pace laps — SC/pit/outlier excluded)
+    const playerRacePaceLaps = getRacePaceLaps(player);
+    const rivalRacePaceLaps = getRacePaceLaps(rival);
+    if (playerRacePaceLaps.length > 0 && rivalRacePaceLaps.length > 0) {
       const playerAvg =
-        playerClean.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
-        playerClean.length;
+        playerRacePaceLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
+        playerRacePaceLaps.length;
       const rivalAvg =
-        rivalClean.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
-        rivalClean.length;
+        rivalRacePaceLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
+        rivalRacePaceLaps.length;
       const delta = (playerAvg - rivalAvg) / 1000;
       insights.push({
         type: "pace",
@@ -68,10 +68,13 @@ export function generateInsights(
       });
     }
 
-    // 3. Sector deltas vs rival (all 3 sectors, clean laps only)
-    const playerCleanLaps = getCleanRaceLaps(player);
-    const rivalCleanLaps = getCleanRaceLaps(rival);
-    if (playerCleanLaps.length > 0 && rivalCleanLaps.length > 0) {
+    // 3. Sector deltas vs rival (all 3 sectors, race-pace laps only)
+    const playerRacePaceSectorLaps = getRacePaceLaps(player);
+    const rivalRacePaceSectorLaps = getRacePaceLaps(rival);
+    if (
+      playerRacePaceSectorLaps.length > 0 &&
+      rivalRacePaceSectorLaps.length > 0
+    ) {
       const sectorKeys = [
         { sector: 1, label: "S1" },
         { sector: 2, label: "S2" },
@@ -84,11 +87,15 @@ export function generateInsights(
       let losses = 0;
       for (const { sector, label } of sectorKeys) {
         const pAvg =
-          playerCleanLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) /
-          playerCleanLaps.length;
+          playerRacePaceSectorLaps.reduce(
+            (s, l) => s + sectorTimeMs(l, sector),
+            0,
+          ) / playerRacePaceSectorLaps.length;
         const rAvg =
-          rivalCleanLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) /
-          rivalCleanLaps.length;
+          rivalRacePaceSectorLaps.reduce(
+            (s, l) => s + sectorTimeMs(l, sector),
+            0,
+          ) / rivalRacePaceSectorLaps.length;
         const d = (pAvg - rAvg) / 1000;
         netDelta += d;
         const delta = `${d <= 0 ? "" : "+"}${d.toFixed(3)}s`;
@@ -164,13 +171,14 @@ export function generateInsights(
   } else {
     // --- Field ranking mode (original behavior) ---
 
-    // 1. Pace ranking (clean laps — SC/pit/incident excluded)
+    // 1. Pace ranking (race-pace laps — SC/pit/outlier excluded)
     const paceRanking: { driver: DriverData; avgPace: number }[] = [];
     for (const d of allDrivers) {
-      const clean = getCleanRaceLaps(d);
-      if (clean.length === 0) continue;
+      const racePaceLaps = getRacePaceLaps(d);
+      if (racePaceLaps.length === 0) continue;
       const avg =
-        clean.reduce((s, l) => s + l["lap-time-in-ms"], 0) / clean.length;
+        racePaceLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
+        racePaceLaps.length;
       paceRanking.push({ driver: d, avgPace: avg });
     }
     paceRanking.sort((a, b) => a.avgPace - b.avgPace);
@@ -297,9 +305,9 @@ export function generateInsights(
       });
     }
 
-    // 6. Weakest & strongest sector (avg vs avg across all drivers, clean laps)
-    const playerCleanLaps2 = getCleanRaceLaps(player);
-    if (playerCleanLaps2.length > 0) {
+    // 6. Weakest & strongest sector (avg vs avg across race-pace laps)
+    const playerRacePaceLapsForSectors = getRacePaceLaps(player);
+    if (playerRacePaceLapsForSectors.length > 0) {
       const sectorKeys = [
         { sector: 1, label: "S1" },
         { sector: 2, label: "S2" },
@@ -319,11 +327,11 @@ export function generateInsights(
       for (const { sector, label } of sectorKeys) {
         const ranking: { driver: DriverData; avg: number }[] = [];
         for (const d of allDrivers) {
-          const clean = getCleanRaceLaps(d);
-          if (!clean.length) continue;
+          const racePaceLaps = getRacePaceLaps(d);
+          if (!racePaceLaps.length) continue;
           const avg =
-            clean.reduce((s, l) => s + sectorTimeMs(l, sector), 0) /
-            clean.length;
+            racePaceLaps.reduce((s, l) => s + sectorTimeMs(l, sector), 0) /
+            racePaceLaps.length;
           if (avg > 0) ranking.push({ driver: d, avg });
         }
         ranking.sort((a, b) => a.avg - b.avg);

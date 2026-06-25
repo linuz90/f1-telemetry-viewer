@@ -1,6 +1,6 @@
 import type { TelemetrySession } from "../../types/telemetry";
 import { findPlayer } from "./drivers";
-import { getCleanRaceLapSamples } from "./laps";
+import { getRacePaceLapSamples } from "./laps";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Pace Evolution — race-on-race representative pace per compound at one track.
@@ -11,7 +11,7 @@ import { getCleanRaceLapSamples } from "./laps";
 //     faster than a 25-lap stint even when the long stint's best window is
 //     actually quicker. Unfair race-to-race comparison.
 //   • A single best lap is too sensitive to slipstream and one-off flyers.
-//   • Averaging the FASTEST N clean laps on that compound treats short and
+//   • Averaging the FASTEST N race-pace laps on that compound treats short and
 //     long stints fairly (both contribute their best N-lap window) and
 //     filters single-lap noise.
 //
@@ -19,7 +19,7 @@ import { getCleanRaceLapSamples } from "./laps";
 // "best representative pace" window: small enough that a 5-lap stint still
 // contributes meaningfully, large enough to defang single-flyer slipstream.
 //
-// Pit/SC/incident laps are already filtered by `getCleanRaceLapSamples`.
+// Pit/SC/incident outliers are already filtered by `getRacePaceLapSamples`.
 // `minLapsPerCompound` gates noisy single-lap samples (default 3).
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ const REPRESENTATIVE_PACE_WINDOW = 3;
  * as traffic.
  *
  * Driver count is the first signal; if the player led ≥ LEADER_SHARE_OVERRIDE
- * of their clean laps, the kind is upgraded to "clean-air" regardless of
+ * of their race-pace laps, the kind is upgraded to "clean-air" regardless of
  * field size (e.g. low-AI grand prix where the user practices in P1).
  */
 export type RaceContextKind = "clean-air" | "small-field" | "full-grid";
@@ -48,7 +48,7 @@ export interface RaceContext {
   driverCount: number;
   /** True when `network-game === 1`. */
   isOnline: boolean;
-  /** Share of player's clean laps spent in P1 (0..1). 0 when no position data. */
+  /** Share of player's race-pace laps spent in P1 (0..1). 0 when no position data. */
   leaderShare: number;
 }
 
@@ -85,12 +85,12 @@ export interface PaceEvolutionPoint {
   /** Session context (clean air / traffic / online vs offline). */
   context: RaceContext;
   /**
-   * Compound → average of the fastest N clean laps on that compound (ms),
+   * Compound → average of the fastest N race-pace laps on that compound (ms),
    * where N = REPRESENTATIVE_PACE_WINDOW (3). Only compounds with at least
-   * `minLapsPerCompound` clean laps are present.
+   * `minLapsPerCompound` race-pace laps are present.
    */
   paces: Record<string, number>;
-  /** Compound → total clean-lap count for that compound this session. */
+  /** Compound → total race-pace lap count for that compound this session. */
   counts: Record<string, number>;
 }
 
@@ -102,7 +102,7 @@ export function buildPaceEvolution(
     .map(({ session, date: rawDate }, i): PaceEvolutionPoint | null => {
       const player = findPlayer(session);
       if (!player) return null;
-      const samples = getCleanRaceLapSamples(player);
+      const samples = getRacePaceLapSamples(player);
       const groups = new Map<string, number[]>();
       for (const s of samples) {
         if (!s.compound) continue;
@@ -126,7 +126,7 @@ export function buildPaceEvolution(
       if (Object.keys(paces).length === 0) return null;
       const date = rawDate instanceof Date ? rawDate : new Date(rawDate);
 
-      // Compute leader share over the player's clean laps. A 20-car AI race
+      // Compute leader share over the player's race-pace laps. A 20-car AI race
       // where the user led the whole way is effectively clean air — same as a
       // 2-car sparring session. We override `kind` to "clean-air" when the
       // leader share crosses the threshold so the chart filter groups these

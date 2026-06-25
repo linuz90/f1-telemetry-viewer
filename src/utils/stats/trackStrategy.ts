@@ -3,21 +3,17 @@ import { bestSectorTimeMs } from "../format";
 import { findPlayer, isRaceSession } from "./drivers";
 import { avgErsDeployMj } from "./energy";
 import type { CompoundLifeStats, TrackFuelStats } from "./trackAggregates";
-import {
-  getBestLapTime,
-  getCleanRaceLapSamples,
-  getCleanRaceLaps,
-} from "./laps";
+import { getBestLapTime, getRacePaceLapSamples, getRacePaceLaps } from "./laps";
 import { avgWearRate, PUNCTURE_THRESHOLD } from "./tyres";
 
 // ─── Track-level Race "Key Insights" recommendation ──────────────────────────
 
 export interface TrackBestRaceLap {
-  /** Best clean race lap time in ms */
+  /** Best race-pace lap time in ms */
   bestLapMs: number;
   /** Visual compound the lap was set on, if known */
   compound: string | null;
-  /** Sum-of-best-sectors theoretical best from clean race laps */
+  /** Sum-of-best-sectors theoretical best from race-pace laps */
   theoreticalBestMs: number;
   /** Gap to theoretical best (bestLapMs - theoreticalBestMs); 0 if either side missing */
   gapToTheoreticalMs: number;
@@ -57,7 +53,7 @@ export interface TrackFuelTarget {
 }
 
 export interface TrackSinceLastRaceDelta {
-  /** Best clean lap delta vs. previous race here (ms). Negative = improvement. 0 if either side missing */
+  /** Best race-pace lap delta vs. previous race here (ms). Negative = improvement. 0 if either side missing */
   bestLapDeltaMs: number;
   /** Avg wear-rate delta (%/lap). Negative = gentler than before. 0 if either side missing */
   wearRateDelta: number;
@@ -392,17 +388,17 @@ function synthesizeStrategies(
   return { recommended: null, alternative: null };
 }
 
-/** Sum-of-best-sectors across the player's clean race laps in the bucket. */
-function theoreticalBestFromCleanLaps(entries: BucketRaceEntry[]): number {
+/** Sum-of-best-sectors across the player's race-pace laps in the bucket. */
+function theoreticalBestFromRacePaceLaps(entries: BucketRaceEntry[]): number {
   let bestS1 = 0;
   let bestS2 = 0;
   let bestS3 = 0;
   for (const entry of entries) {
-    const clean = getCleanRaceLaps(entry.player);
-    if (clean.length === 0) continue;
-    const s1 = bestSectorTimeMs(clean, 1);
-    const s2 = bestSectorTimeMs(clean, 2);
-    const s3 = bestSectorTimeMs(clean, 3);
+    const racePaceLaps = getRacePaceLaps(entry.player);
+    if (racePaceLaps.length === 0) continue;
+    const s1 = bestSectorTimeMs(racePaceLaps, 1);
+    const s2 = bestSectorTimeMs(racePaceLaps, 2);
+    const s3 = bestSectorTimeMs(racePaceLaps, 3);
     if (s1 > 0 && (bestS1 === 0 || s1 < bestS1)) bestS1 = s1;
     if (s2 > 0 && (bestS2 === 0 || s2 < bestS2)) bestS2 = s2;
     if (s3 > 0 && (bestS3 === 0 || s3 < bestS3)) bestS3 = s3;
@@ -410,17 +406,17 @@ function theoreticalBestFromCleanLaps(entries: BucketRaceEntry[]): number {
   return bestS1 > 0 && bestS2 > 0 && bestS3 > 0 ? bestS1 + bestS2 + bestS3 : 0;
 }
 
-interface BestCleanRaceLap {
+interface BestRacePaceLap {
   timeMs: number;
   compound: string | null;
 }
 
-function bestCleanRaceLapWithCompound(
+function bestRacePaceLapWithCompound(
   entries: BucketRaceEntry[],
-): BestCleanRaceLap | null {
-  let best: BestCleanRaceLap | null = null;
+): BestRacePaceLap | null {
+  let best: BestRacePaceLap | null = null;
   for (const entry of entries) {
-    const samples = getCleanRaceLapSamples(entry.player);
+    const samples = getRacePaceLapSamples(entry.player);
     for (const sample of samples) {
       if (sample.timeMs <= 0) continue;
       if (!best || sample.timeMs < best.timeMs) {
@@ -453,9 +449,9 @@ export function buildTrackRaceRecommendation(
   const totalLaps = entries[0].totalLaps;
   const fullDistanceEntries = entries.filter((e) => e.isFullDistance);
 
-  // ── Best clean race lap + compound + theoretical-best gap ───────────────
-  const bestLap = bestCleanRaceLapWithCompound(entries);
-  const theoreticalBestMs = theoreticalBestFromCleanLaps(entries);
+  // ── Best race-pace lap + compound + theoretical-best gap ────────────────
+  const bestLap = bestRacePaceLapWithCompound(entries);
+  const theoreticalBestMs = theoreticalBestFromRacePaceLaps(entries);
   const bestRaceLap: TrackBestRaceLap | null = bestLap
     ? {
         bestLapMs: bestLap.timeMs,
@@ -515,8 +511,8 @@ export function buildTrackRaceRecommendation(
     // entries follow input order (sessions are already date-sorted from the page).
     const latest = entries[entries.length - 1];
     const previous = entries[entries.length - 2];
-    const latestBest = getBestLapTime(getCleanRaceLaps(latest.player));
-    const prevBest = getBestLapTime(getCleanRaceLaps(previous.player));
+    const latestBest = getBestLapTime(getRacePaceLaps(latest.player));
+    const prevBest = getBestLapTime(getRacePaceLaps(previous.player));
     const latestWear = avgWearRate(latest.player);
     const prevWear = avgWearRate(previous.player);
     sinceLastRace = {

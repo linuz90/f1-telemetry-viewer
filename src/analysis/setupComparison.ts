@@ -5,7 +5,7 @@ import type {
   TelemetrySession,
 } from "../types/telemetry";
 import { findPlayer, isRaceSession } from "../utils/stats/drivers";
-import { getBestLapTime, getCleanRaceLapSamples } from "../utils/stats/laps";
+import { getBestLapTime, getRacePaceLapSamples } from "../utils/stats/laps";
 import { medianPaceInRange } from "../utils/stats/pace";
 import {
   getCompletedStints,
@@ -93,13 +93,13 @@ export interface RaceSetupCandidate {
   setup: CarSetup;
   setupSummary: string;
   sampleCount: number;
-  cleanLapCount: number;
+  racePaceLapCount: number;
   bestLapMs: number | null;
-  medianCleanPaceMs: number | null;
+  medianRacePaceMs: number | null;
   bestStintPaceMs: number | null;
   bestStintLabel: string | null;
   avgWearRatePerLap: number | null;
-  medianCleanPaceByCompound: RaceSetupCompoundMetric[];
+  medianRacePaceByCompound: RaceSetupCompoundMetric[];
   bestStintPaceByCompound: RaceSetupCompoundMetric[];
   wearRateByCompound: RaceSetupCompoundMetric[];
   comparablePace: RaceSetupComparableMetric | null;
@@ -118,11 +118,11 @@ interface RaceSetupAccumulator {
   setup: CarSetup;
   setupSummary: string;
   sampleCount: number;
-  cleanLapCount: number;
+  racePaceLapCount: number;
   bestLapMs: number | null;
   bestLapSource: RaceSetupRunSource | null;
-  cleanPaceSamples: number[];
-  cleanPaceSamplesByCompound: Map<string, number[]>;
+  racePaceSamples: number[];
+  racePaceSamplesByCompound: Map<string, number[]>;
   bestStintPaceMs: number | null;
   bestStintLabel: string | null;
   bestStintPaceByCompound: Map<string, BestStintPace>;
@@ -137,7 +137,7 @@ interface BestStintPace {
   compound: string;
 }
 
-const MIN_CLEAN_LAPS_FOR_SETUP_PACE = 3;
+const MIN_RACE_PACE_LAPS_FOR_SETUP_PACE = 3;
 const MIN_FAIR_COMPARISON_SETUPS = 2;
 
 type ComparableMetricField =
@@ -146,7 +146,7 @@ type ComparableMetricField =
   | "comparableWear";
 
 type CompoundMetricField =
-  | "medianCleanPaceByCompound"
+  | "medianRacePaceByCompound"
   | "bestStintPaceByCompound"
   | "wearRateByCompound";
 
@@ -232,15 +232,15 @@ function medianValue(values: number[]): number | null {
     : sorted[mid]!;
 }
 
-function cleanPaceSamples(player: DriverData): {
+function racePaceSamples(player: DriverData): {
   lapTimesMs: number[];
   lapCount: number;
   byCompound: Map<string, number[]>;
 } {
-  const cleanLaps = getCleanRaceLapSamples(player);
+  const samples = getRacePaceLapSamples(player);
   const byCompound = new Map<string, number[]>();
 
-  cleanLaps.forEach((sample) => {
+  samples.forEach((sample) => {
     if (!sample.compound) return;
     const lapTimes = byCompound.get(sample.compound) ?? [];
     lapTimes.push(sample.timeMs);
@@ -248,8 +248,8 @@ function cleanPaceSamples(player: DriverData): {
   });
 
   return {
-    lapTimesMs: cleanLaps.map((lap) => lap.timeMs),
-    lapCount: cleanLaps.length,
+    lapTimesMs: samples.map((lap) => lap.timeMs),
+    lapCount: samples.length,
     byCompound,
   };
 }
@@ -502,7 +502,7 @@ function withComparisonMetadata(
 
   nextCandidates = applyFairCompoundComparison(
     nextCandidates,
-    "medianCleanPaceByCompound",
+    "medianRacePaceByCompound",
     "comparablePace",
     "best-pace",
   );
@@ -647,7 +647,7 @@ export function buildRaceSetupComparison(
       summary: run.summary,
       bestLapMs,
     };
-    const cleanPace = cleanPaceSamples(player);
+    const paceSamples = racePaceSamples(player);
     const bestStint = getBestStintPace(player);
     const bestStintsByCompound = getBestStintPaces(player);
     const compoundWearSamples = wearSamplesByCompound(player);
@@ -660,11 +660,11 @@ export function buildRaceSetupComparison(
         setup,
         setupSummary: summarizeSetup(setup),
         sampleCount: 0,
-        cleanLapCount: 0,
+        racePaceLapCount: 0,
         bestLapMs: null,
         bestLapSource: null,
-        cleanPaceSamples: [],
-        cleanPaceSamplesByCompound: new Map(),
+        racePaceSamples: [],
+        racePaceSamplesByCompound: new Map(),
         bestStintPaceMs: null,
         bestStintLabel: null,
         bestStintPaceByCompound: new Map(),
@@ -676,7 +676,7 @@ export function buildRaceSetupComparison(
     }
 
     accumulator.sampleCount += 1;
-    accumulator.cleanLapCount += cleanPace.lapCount;
+    accumulator.racePaceLapCount += paceSamples.lapCount;
 
     if (
       bestLapMs !== null &&
@@ -686,8 +686,11 @@ export function buildRaceSetupComparison(
       accumulator.bestLapSource = source;
     }
 
-    accumulator.cleanPaceSamples.push(...cleanPace.lapTimesMs);
-    addMapSamples(accumulator.cleanPaceSamplesByCompound, cleanPace.byCompound);
+    accumulator.racePaceSamples.push(...paceSamples.lapTimesMs);
+    addMapSamples(
+      accumulator.racePaceSamplesByCompound,
+      paceSamples.byCompound,
+    );
     addBestStints(accumulator.bestStintPaceByCompound, bestStintsByCompound);
     addMapSamples(accumulator.wearSamplesByCompound, compoundWearSamples);
 
@@ -711,21 +714,21 @@ export function buildRaceSetupComparison(
     setup: accumulator.setup,
     setupSummary: accumulator.setupSummary,
     sampleCount: accumulator.sampleCount,
-    cleanLapCount: accumulator.cleanLapCount,
+    racePaceLapCount: accumulator.racePaceLapCount,
     bestLapMs: accumulator.bestLapMs,
     // A one- or two-lap run can be representative of a hotlap, not race pace.
     // Keep the lap count visible, but only rank setup pace once there is at
-    // least a short stint's worth of clean evidence.
-    medianCleanPaceMs:
-      accumulator.cleanPaceSamples.length >= MIN_CLEAN_LAPS_FOR_SETUP_PACE
-        ? medianValue(accumulator.cleanPaceSamples)
+    // least a short stint's worth of race-pace evidence.
+    medianRacePaceMs:
+      accumulator.racePaceSamples.length >= MIN_RACE_PACE_LAPS_FOR_SETUP_PACE
+        ? medianValue(accumulator.racePaceSamples)
         : null,
     bestStintPaceMs: accumulator.bestStintPaceMs,
     bestStintLabel: accumulator.bestStintLabel,
     avgWearRatePerLap: average(accumulator.wearSamples),
-    medianCleanPaceByCompound: compoundMetricsFromSamples(
-      accumulator.cleanPaceSamplesByCompound,
-      MIN_CLEAN_LAPS_FOR_SETUP_PACE,
+    medianRacePaceByCompound: compoundMetricsFromSamples(
+      accumulator.racePaceSamplesByCompound,
+      MIN_RACE_PACE_LAPS_FOR_SETUP_PACE,
     ),
     bestStintPaceByCompound: bestStintMetricsFromMap(
       accumulator.bestStintPaceByCompound,
@@ -754,8 +757,7 @@ export function buildRaceSetupComparison(
       const lapDiff = sortableMetric(a.bestLapMs) - sortableMetric(b.bestLapMs);
       if (lapDiff !== 0) return lapDiff;
       const paceDiff =
-        sortableMetric(a.medianCleanPaceMs) -
-        sortableMetric(b.medianCleanPaceMs);
+        sortableMetric(a.medianRacePaceMs) - sortableMetric(b.medianRacePaceMs);
       if (paceDiff !== 0) return paceDiff;
       const wearDiff =
         sortableMetric(a.avgWearRatePerLap) -
