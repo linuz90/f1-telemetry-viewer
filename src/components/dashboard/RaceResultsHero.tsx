@@ -155,7 +155,7 @@ export function RaceResultsHero({
       : undefined;
 
   return (
-    <Card as="section" className="overflow-hidden">
+    <Card as="section" className="min-w-0 overflow-hidden">
       {/* Negative margins pull the header strip out of Card's p-5 so the divider
           runs edge-to-edge; the wrapper Card clips them via overflow-hidden. */}
       <HStack

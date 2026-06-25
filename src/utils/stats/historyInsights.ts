@@ -11,9 +11,19 @@ export interface TrackPBData {
   bestS1Ms: number;
   bestS2Ms: number;
   bestS3Ms: number;
+  bestTimeTrialLapMs?: number;
+  bestTimeTrialS1Ms?: number;
+  bestTimeTrialS2Ms?: number;
+  bestTimeTrialS3Ms?: number;
+  timeTrialSessionCount?: number;
   bestRaceLapMs: number;
   bestRacePaceMs: number;
   sessionCount: number;
+}
+
+function minPositive(values: readonly number[]): number {
+  const positive = values.filter((value) => value > 0);
+  return positive.length > 0 ? Math.min(...positive) : 0;
 }
 
 /** Generate qualifying insights comparing to personal bests on this track */
@@ -31,22 +41,26 @@ export function generateQualiHistoryInsights(
   // 1. vs Personal Best lap
   if (currentBest > 0 && pbs.bestQualiLapMs > 0) {
     const delta = currentBest - pbs.bestQualiLapMs;
-    if (delta <= 0) {
+    if (delta < 0) {
       insights.push({
         type: "history",
         label: "vs Personal Best",
         value: "New PB!",
-        detail:
-          delta < 0
-            ? `-${(Math.abs(delta) / 1000).toFixed(3)}s improvement`
-            : "matched your best",
+        detail: `-${(Math.abs(delta) / 1000).toFixed(3)}s improvement`,
+      });
+    } else if (delta === 0) {
+      insights.push({
+        type: "history",
+        label: "vs Personal Best",
+        value: "Matched PB",
+        detail: "matched your best",
       });
     } else {
       insights.push({
         type: "history",
         label: "vs Personal Best",
         value: `+${(delta / 1000).toFixed(3)}s`,
-        detail: `off your PB of ${msToLapTimeLocal(pbs.bestQualiLapMs)}`,
+        detail: `PB ${msToLapTimeLocal(pbs.bestQualiLapMs)}`,
       });
     }
   }
@@ -76,7 +90,7 @@ export function generateQualiHistoryInsights(
         type: "history",
         label: "vs PB Sectors",
         value: worst.sector,
-        detail: `+${(worst.delta / 1000).toFixed(3)}s vs your all-time best`,
+        detail: `+${(worst.delta / 1000).toFixed(3)}s vs PB`,
       });
     } else {
       // All sectors matched or beat PB
@@ -97,6 +111,108 @@ export function generateQualiHistoryInsights(
   }
 
   return insights;
+}
+
+/** Generate Time Trial history insights without mixing in qualifying sessions. */
+export function generateTimeTrialHistoryInsights(
+  player: DriverData,
+  pbs: TrackPBData,
+): StrategyInsight[] {
+  return generateQualiHistoryInsights(player, {
+    ...pbs,
+    bestQualiLapMs: pbs.bestTimeTrialLapMs ?? 0,
+    bestS1Ms: pbs.bestTimeTrialS1Ms ?? 0,
+    bestS2Ms: pbs.bestTimeTrialS2Ms ?? 0,
+    bestS3Ms: pbs.bestTimeTrialS3Ms ?? 0,
+  });
+}
+
+function signedDelta(seconds: number): string {
+  if (Math.abs(seconds) < 0.001) return "matched";
+  return `${seconds > 0 ? "+" : "-"}${Math.abs(seconds).toFixed(3)}s`;
+}
+
+function timeTrialTheoreticalMs(player: DriverData): number {
+  const valid = getValidLaps(player["session-history"]["lap-history-data"]);
+  if (valid.length === 0) return 0;
+
+  const currentS1 = bestSectorTimeMs(valid, 1);
+  const currentS2 = bestSectorTimeMs(valid, 2);
+  const currentS3 = bestSectorTimeMs(valid, 3);
+  return currentS1 > 0 && currentS2 > 0 && currentS3 > 0
+    ? currentS1 + currentS2 + currentS3
+    : 0;
+}
+
+function absoluteTimeTrialTheoreticalMs(
+  player: DriverData,
+  pbs: TrackPBData,
+): number {
+  const valid = getValidLaps(player["session-history"]["lap-history-data"]);
+  if (valid.length === 0) return 0;
+
+  const currentS1 = bestSectorTimeMs(valid, 1);
+  const currentS2 = bestSectorTimeMs(valid, 2);
+  const currentS3 = bestSectorTimeMs(valid, 3);
+  if (currentS1 <= 0 || currentS2 <= 0 || currentS3 <= 0) return 0;
+
+  // The current run is part of the absolute answer; historical TT sectors only
+  // improve the line when they beat one of this run's best sectors.
+  return (
+    minPositive([currentS1, pbs.bestTimeTrialS1Ms ?? 0]) +
+    minPositive([currentS2, pbs.bestTimeTrialS2Ms ?? 0]) +
+    minPositive([currentS3, pbs.bestTimeTrialS3Ms ?? 0])
+  );
+}
+
+export function generateTimeTrialTrackPbInsight(
+  player: DriverData,
+  pbs: TrackPBData,
+): StrategyInsight[] {
+  if ((pbs.timeTrialSessionCount ?? 0) === 0 || !pbs.bestTimeTrialLapMs) {
+    return [];
+  }
+
+  const laps = player["session-history"]["lap-history-data"];
+  const currentBestMs = getBestLapTime(laps);
+  if (currentBestMs <= 0) return [];
+
+  const previousPbMs = pbs.bestTimeTrialLapMs;
+  const trackPbMs = Math.min(previousPbMs, currentBestMs);
+  const currentDeltaMs = currentBestMs - previousPbMs;
+  const sessionTheoreticalMs = timeTrialTheoreticalMs(player);
+  const absoluteTheoreticalMs = absoluteTimeTrialTheoreticalMs(player, pbs);
+
+  const detail =
+    currentDeltaMs < -1
+      ? `${signedDelta(currentDeltaMs / 1000)} improvement`
+      : Math.abs(currentDeltaMs) < 1
+        ? "matched in this run"
+        : `this run ${signedDelta(currentDeltaMs / 1000)}`;
+
+  const theoreticalDeltaMs =
+    sessionTheoreticalMs > 0 ? sessionTheoreticalMs - trackPbMs : undefined;
+  const absoluteDeltaMs =
+    absoluteTheoreticalMs > 0 ? absoluteTheoreticalMs - trackPbMs : undefined;
+
+  return [
+    {
+      type: "history",
+      label: "Track PB",
+      value: msToLapTimeLocal(trackPbMs),
+      detail,
+      tooltip:
+        "Track PB is your fastest valid Time Trial lap on this track/formula. Absolute theoretical is your best valid S1 + S2 + S3 across this run and prior TT sessions.",
+      extraDetails: [
+        theoreticalDeltaMs == null
+          ? undefined
+          : `This theoretical ${signedDelta(theoreticalDeltaMs / 1000)}`,
+        absoluteDeltaMs == null || Math.abs(absoluteDeltaMs) < 1
+          ? undefined
+          : `Absolute theoretical ${msToLapTimeLocal(absoluteTheoreticalMs)} · ${signedDelta(absoluteDeltaMs / 1000)}`,
+      ].filter((line): line is string => Boolean(line)),
+    },
+  ];
 }
 
 /** Generate race insights comparing to historical data on this track */

@@ -29,7 +29,7 @@ export function SectionHeader({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-end justify-between gap-x-3 gap-y-2",
+        "flex flex-wrap items-start justify-between gap-x-3 gap-y-2",
         containerClassName,
         className,
       )}

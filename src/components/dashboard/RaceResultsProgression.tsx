@@ -4,6 +4,7 @@ import { cn } from "../../utils/cn";
 import { formatShortDate } from "../../utils/format";
 import { sessionSummaryPath } from "../../utils/routes";
 import { TrackFlag } from "../TrackFlag";
+import { ScrollArea } from "../ui/ScrollArea";
 import { HStack } from "../ui/Stack";
 import { isProblemStatus } from "./helpers";
 
@@ -62,6 +63,9 @@ export function RaceResultsProgression({
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
   const firstDate = formatShortDate(ordered[0]!.date);
+  const middleDate = formatShortDate(
+    ordered[Math.floor(ordered.length / 2)]!.date,
+  );
   const lastDate = formatShortDate(ordered.at(-1)!.date);
 
   return (
@@ -77,7 +81,7 @@ export function RaceResultsProgression({
             Race-by-race
           </div>
           <div className="mt-0.5 font-mono text-xs tabular-nums text-zinc-500">
-            Grid (left) vs finish (right). Taller = higher up the order.
+            Grid (left) vs finish (right).
           </div>
         </div>
         <HStack
@@ -106,22 +110,25 @@ export function RaceResultsProgression({
             label="P11+"
           />
           <span className="inline-flex items-center gap-1 text-behind">
-            <span className="text-2xs leading-none">💥</span>DNF
+            <span className="text-2xs leading-none">×</span>DNF
           </span>
         </HStack>
       </HStack>
 
-      <div className="flex items-end justify-between gap-1 sm:gap-1.5">
-        {ordered.map((session) => (
-          <ProgressionColumn key={session.relativePath} session={session} />
-        ))}
-      </div>
-
-      <div className="mt-2 flex items-center justify-between font-mono text-2xs uppercase tracking-wider tabular-nums text-zinc-600">
-        <span>{firstDate}</span>
-        <span className="text-zinc-700">first → latest</span>
-        <span>{lastDate}</span>
-      </div>
+      <ScrollArea axis="x" tone="subtle" className="min-w-0 max-w-full">
+        <div className="inline-flex min-w-min flex-col pb-4">
+          <div className="inline-flex items-end justify-between gap-3 sm:gap-6">
+            {ordered.map((session) => (
+              <ProgressionColumn key={session.relativePath} session={session} />
+            ))}
+          </div>
+          <div className="mt-2 flex w-full items-center justify-between font-mono text-2xs uppercase tracking-wider tabular-nums text-zinc-600">
+            <span>{firstDate}</span>
+            {ordered.length > 4 && <span>{middleDate}</span>}
+            <span>{lastDate}</span>
+          </div>
+        </div>
+      </ScrollArea>
     </div>
   );
 }
@@ -185,7 +192,7 @@ function ProgressionColumn({ session }: { session: SessionSummary }) {
   const qualiColor = isPole ? "bg-purple-500/80" : "bg-zinc-600";
   const qualiLabelClass = isPole ? "text-best" : "text-zinc-500";
 
-  const finishLabel = isDnf ? "💥" : `P${result.position}`;
+  const finishLabel = isDnf ? "×" : `P${result.position}`;
   const finishLabelClass = isDnf ? "text-behind" : "text-zinc-200";
   const gridLabel = grid ? `P${grid}` : "—";
   const title = `${session.track} · ${formatShortDate(session.date)}\nGrid ${gridLabel} → Finish ${isDnf ? "DNF" : `P${result.position}`}`;

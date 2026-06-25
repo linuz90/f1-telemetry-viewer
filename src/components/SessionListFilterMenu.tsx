@@ -103,7 +103,7 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
         <div
           role="dialog"
           aria-label="Session filters"
-          className="absolute right-0 top-full z-20 mt-1.5 w-64 max-w-[calc(100vw-2rem)] rounded-xl bg-zinc-950 ring-1 ring-white/[0.06] shadow-xl divide-y divide-white/[0.05]"
+          className="absolute right-0 top-full z-20 mt-1.5 w-56 max-w-[calc(100vw-2rem)] rounded-xl bg-zinc-950 ring-1 ring-white/[0.06] shadow-xl divide-y divide-white/[0.05]"
         >
           <Section label="Session type" icon={SessionTypeIcon}>
             <SegmentedControl<SessionTypeFilter>
@@ -118,6 +118,10 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
                 {
                   value: "quali",
                   label: SESSION_TYPE_FILTER_META.quali.label,
+                },
+                {
+                  value: "tt",
+                  label: SESSION_TYPE_FILTER_META.tt.label,
                 },
               ]}
               value={value.type}

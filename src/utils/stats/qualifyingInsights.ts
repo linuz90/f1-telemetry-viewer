@@ -168,7 +168,9 @@ export function generateQualiInsights(
           type: "pace",
           label: "Theoretical Best",
           value: msToLapTimeLocal(theoretical),
-          detail: `${(gap / 1000).toFixed(3)}s left on the table`,
+          detail: `${(gap / 1000).toFixed(3)}s in this run`,
+          tooltip:
+            "Session theoretical best: your best valid S1 + S2 + S3 from this run.",
         });
       }
     }

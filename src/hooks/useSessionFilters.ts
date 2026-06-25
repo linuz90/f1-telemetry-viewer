@@ -7,10 +7,11 @@ import type { SessionSummary } from "../types/telemetry";
 import {
   isQualifyingSessionType,
   isRaceSessionType,
+  isTimeTrialSessionType,
 } from "../utils/sessionTypes";
 import { readStoredString, writeStoredString } from "../utils/storage";
 
-export type SessionTypeFilter = "all" | "race" | "quali";
+export type SessionTypeFilter = "all" | "race" | "quali" | "tt";
 export type SessionModeFilter = "all" | "online" | "ai";
 
 export interface SessionListFilters {
@@ -32,7 +33,9 @@ function normalizeFilters(
 ): SessionListFilters {
   return {
     type:
-      value?.type === "race" || value?.type === "quali" ? value.type : "all",
+      value?.type === "race" || value?.type === "quali" || value?.type === "tt"
+        ? value.type
+        : "all",
     mode: value?.mode === "online" || value?.mode === "ai" ? value.mode : "all",
   };
 }
@@ -127,6 +130,8 @@ export function matchesSessionFilters(
   if (filters.type === "race" && !isRaceSessionType(session.sessionType))
     return false;
   if (filters.type === "quali" && !isQualifyingSessionType(session.sessionType))
+    return false;
+  if (filters.type === "tt" && !isTimeTrialSessionType(session.sessionType))
     return false;
   if (filters.mode === "online" && session.isOnline !== true) return false;
   if (

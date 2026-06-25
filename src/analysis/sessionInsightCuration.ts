@@ -14,6 +14,13 @@ function compactMetricLine(prefix: string, insight: SessionInsight): string {
   return `${prefix}: ${insight.value}${insight.detail ? ` (${insight.detail})` : ""}`;
 }
 
+function compactHistoryLine(insight: SessionInsight): string {
+  if (insight.label === "vs PB Sectors") {
+    return `Sectors: ${insight.value}${insight.detail ? ` ${insight.detail}` : ""}`;
+  }
+  return compactMetricLine(insight.label.replace(/^vs\s+/i, ""), insight);
+}
+
 function compactEventLine(insight: SessionInsight): string {
   const peak = insight.detail.match(/^(.+?) peak\b/);
   if (insight.label === "Penalties") return insight.value;
@@ -180,6 +187,63 @@ function mergeBestLapInsight(
       ...(bestLap.extraDetails ?? []),
       compactMetricLine("Theoretical", theoreticalBest),
     ]),
+  };
+}
+
+function timeTrialTheoreticalInsight(
+  theoreticalBest: SessionInsight | undefined,
+): SessionInsight | undefined {
+  if (!theoreticalBest) return undefined;
+
+  return {
+    ...theoreticalBest,
+    accent: "purple",
+    tone: "best",
+  };
+}
+
+function timeTrialNewPersonalBest(
+  historyInsights: SessionInsight[],
+): SessionInsight | undefined {
+  return historyInsights.find(
+    (insight) =>
+      insight.label === "vs Personal Best" && /^new pb!?$/i.test(insight.value),
+  );
+}
+
+function compactPersonalBestImprovement(insight: SessionInsight): string {
+  return insight.detail.replace(/\s+improvement$/i, "");
+}
+
+function mergeTimeTrialNewPersonalBestIntoLap(
+  bestLap: SessionInsight | undefined,
+  historyInsights: SessionInsight[],
+): SessionInsight | undefined {
+  if (!bestLap) return undefined;
+
+  const personalBest = timeTrialNewPersonalBest(historyInsights);
+  if (!personalBest) return bestLap;
+
+  return {
+    ...bestLap,
+    detail: `New PB · ${compactPersonalBestImprovement(personalBest)}`,
+    tone: "best",
+    accent: "purple",
+  };
+}
+
+function timeTrialTrackPersonalBestInsight(
+  historyInsights: SessionInsight[],
+): SessionInsight | undefined {
+  const trackPb = historyInsights.find(
+    (insight) => insight.label === "Track PB",
+  );
+  if (!trackPb) return undefined;
+
+  return {
+    ...trackPb,
+    tone: /improvement|matched/i.test(trackPb.detail) ? "best" : "neutral",
+    accent: "zinc",
   };
 }
 
@@ -356,9 +420,7 @@ function mergeHistoryInsights(
     accent: isPersonalBest ? "purple" : "zinc",
     extraDetails: historyInsights
       .filter((insight) => insight !== primary)
-      .map((insight) =>
-        compactMetricLine(insight.label.replace(/^vs\s+/i, ""), insight),
-      ),
+      .map(compactHistoryLine),
   };
 }
 
@@ -438,7 +500,22 @@ export function curateSessionInsights(
     takeByLabel(remaining, "Run Status");
   const bestLap = takeByLabel(remaining, "Best Lap");
   const theoreticalBest = takeByLabel(remaining, "Theoretical Best");
-  const lap = mergeBestLapInsight(bestLap, theoreticalBest);
+  const historyInsights = takeWhere(
+    remaining,
+    (insight) => insight.type === "history",
+  );
+  const timeTrialPersonalBest = isTimeTrial
+    ? timeTrialNewPersonalBest(historyInsights)
+    : undefined;
+  const lap = isTimeTrial
+    ? mergeTimeTrialNewPersonalBestIntoLap(bestLap, historyInsights)
+    : mergeBestLapInsight(bestLap, theoreticalBest);
+  const timeTrialTheoretical = isTimeTrial
+    ? timeTrialTheoreticalInsight(theoreticalBest)
+    : undefined;
+  const timeTrialTrackPb = isTimeTrial
+    ? timeTrialTrackPersonalBestInsight(historyInsights)
+    : undefined;
   const raceFlow = takeByLabel(remaining, "Race Flow");
   const events = mergeEventInsights(
     takeWhere(
@@ -462,7 +539,13 @@ export function curateSessionInsights(
     takeWhere(remaining, (insight) => insight.type === "ers"),
   );
   const history = mergeHistoryInsights(
-    takeWhere(remaining, (insight) => insight.type === "history"),
+    timeTrialPersonalBest
+      ? historyInsights.filter(
+          (insight) =>
+            insight !== timeTrialPersonalBest &&
+            insight.label !== "vs PB Sectors",
+        )
+      : historyInsights,
   );
 
   const curated: SessionInsight[] = [];
@@ -482,11 +565,12 @@ export function curateSessionInsights(
     // slot when it is actually notable (PB/matched PB/new best style signals).
     if (isHighValueHistory(history)) appendIfPresent(curated, history);
   } else if (isTimeTrial) {
-    // Time Trial is lap-first by nature; start with lap/history instead of a
-    // "result" tile that would only repeat timed-lap metadata.
+    // Time Trial is lap-first by nature: Key Insights shows run-level lap
+    // potential and historical PBs, while Sector Benchmarks owns sector detail.
     curated.length = 0;
     appendIfPresent(curated, lap);
-    appendIfPresent(curated, history);
+    appendIfPresent(curated, timeTrialTheoretical);
+    appendIfPresent(curated, timeTrialTrackPb);
     appendIfPresent(curated, result);
     appendIfPresent(curated, sectors);
     appendIfPresent(curated, power);

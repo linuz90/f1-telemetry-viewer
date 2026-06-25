@@ -3,6 +3,7 @@ import type { BadgeTone } from "./ui/Badge";
 import {
   isQualifyingSessionType,
   isRaceSessionType,
+  isTimeTrialSessionType,
 } from "../utils/sessionTypes";
 
 /**
@@ -80,8 +81,13 @@ export const SESSION_TYPE_FILTER_META = {
     label: "Quali",
     buttonLabel: "Qualifying filters",
   },
+  tt: {
+    ...META["Time Trial"],
+    label: "TT",
+    buttonLabel: "Time Trial filters",
+  },
 } satisfies Record<
-  "race" | "quali",
+  "race" | "quali" | "tt",
   SessionTypeMeta & { label: string; buttonLabel: string }
 >;
 
@@ -92,5 +98,6 @@ export function getSessionTypeMeta(label: string): SessionTypeMeta {
   // callers pass the raw session-type instead of the formatted label.
   if (isRaceSessionType(label)) return META.Race;
   if (isQualifyingSessionType(label)) return META["Short Quali"];
+  if (isTimeTrialSessionType(label)) return META["Time Trial"];
   return FALLBACK;
 }

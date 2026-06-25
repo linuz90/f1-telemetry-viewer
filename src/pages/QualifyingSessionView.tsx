@@ -15,8 +15,13 @@ import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
 import { useSessionList } from "../hooks/useSessionList";
 import { useTrackHistory } from "../hooks/useTrackHistory";
 import type { TelemetrySession } from "../types/telemetry";
+import { isTimeTrialSessionType } from "../utils/sessionTypes";
 import { findFocusedDriver } from "../utils/stats/drivers";
-import { generateQualiHistoryInsights } from "../utils/stats/historyInsights";
+import {
+  generateQualiHistoryInsights,
+  generateTimeTrialHistoryInsights,
+  generateTimeTrialTrackPbInsight,
+} from "../utils/stats/historyInsights";
 import { generateQualiInsights } from "../utils/stats/qualifyingInsights";
 
 export function QualifyingSessionView({
@@ -64,8 +69,18 @@ export function QualifyingSessionView({
   const insights = useMemo(() => {
     if (!focusedDriver) return [];
     const base = generateQualiInsights(session, focusedDriver);
+    const isTimeTrial = isTimeTrialSessionType(
+      session["session-info"]["session-type"],
+    );
     if (pbs) {
-      base.push(...generateQualiHistoryInsights(focusedDriver, pbs));
+      base.push(
+        ...(isTimeTrial
+          ? [
+              ...generateTimeTrialHistoryInsights(focusedDriver, pbs),
+              ...generateTimeTrialTrackPbInsight(focusedDriver, pbs),
+            ]
+          : generateQualiHistoryInsights(focusedDriver, pbs)),
+      );
     }
     return base;
   }, [session, focusedDriver, pbs]);
@@ -110,6 +125,7 @@ export function QualifyingSessionView({
         <SectorVsBest
           session={session}
           focusedDriverIndex={focusedDriverIndex}
+          trackPbs={pbs}
         />
       </Card>
 

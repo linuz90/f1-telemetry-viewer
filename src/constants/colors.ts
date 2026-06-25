@@ -82,6 +82,8 @@ export const PERF_COLORS = {
   invalid: "#52525b40",
 } as const;
 
+export type PerformanceTone = keyof typeof PERF_COLORS;
+
 /** Per-sector colors used in sector-improvement charts and best-sector cards. */
 export const SECTOR_COLORS = {
   S1: "#3b82f6",
