@@ -6,6 +6,8 @@ import { scrollAxisClass, scrollbarClass } from "./ScrollArea";
 export interface SegmentedOption<T extends string = string> {
   value: T;
   label: string;
+  /** Shorter copy for narrow screens; included in the accessible name when set. */
+  mobileLabel?: string;
   /** Secondary text, such as a count, rendered quieter than the main label. */
   meta?: ReactNode;
   /** Leading icon — dimmed when inactive, matches label tone when active. */
@@ -56,6 +58,10 @@ export function SegmentedControl<T extends string>({
       {options.map((opt) => {
         const active = value === opt.value;
         const Icon = opt.icon;
+        const accessibleLabel =
+          opt.mobileLabel && opt.mobileLabel !== opt.label
+            ? `${opt.mobileLabel}, ${opt.label}`
+            : opt.label;
         return (
           <button
             key={opt.value}
@@ -63,7 +69,9 @@ export function SegmentedControl<T extends string>({
             role="radio"
             aria-checked={active}
             aria-label={
-              opt.meta != null ? `${opt.label} ${opt.meta}` : opt.label
+              opt.meta != null
+                ? `${accessibleLabel} ${opt.meta}`
+                : accessibleLabel
             }
             onClick={() => onChange(opt.value)}
             className={cn(
@@ -86,7 +94,14 @@ export function SegmentedControl<T extends string>({
                 />
               )}
               <span className={cn("truncate", !!Icon && "translate-y-px")}>
-                {opt.label}
+                {opt.mobileLabel ? (
+                  <>
+                    <span className="sm:hidden">{opt.mobileLabel}</span>
+                    <span className="hidden sm:inline">{opt.label}</span>
+                  </>
+                ) : (
+                  opt.label
+                )}
               </span>
               {opt.meta != null && (
                 <span

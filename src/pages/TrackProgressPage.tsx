@@ -88,6 +88,12 @@ const TRACK_TAB_LABELS: Record<TrackSessionKind, string> = {
   "time-trial": "Time Trial",
 };
 
+const TRACK_TAB_MOBILE_LABELS: Record<TrackSessionKind, string> = {
+  qualifying: "Quali",
+  race: "Race",
+  "time-trial": "TT",
+};
+
 // Map each tab to the canonical session-type label the shared `getSessionTypeMeta`
 // helper understands. "Qualifying" pools Short Quali + One-Shot Quali, so we
 // resolve via "Short Quali" (the Timer icon) — the timer reads as the more
@@ -503,6 +509,7 @@ export function TrackProgressPage() {
   const tabOptions = availableTabs.map((value) => ({
     value,
     label: TRACK_TAB_LABELS[value],
+    mobileLabel: TRACK_TAB_MOBILE_LABELS[value],
     icon: getSessionTypeMeta(TRACK_TAB_META_LABEL[value]).icon,
   }));
   const handleRaceLengthChange = (raceLaps: string) => {
@@ -520,8 +527,8 @@ export function TrackProgressPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-xl font-bold mb-1">
             <TrackFlag
               track={displayTrackName}
@@ -538,11 +545,11 @@ export function TrackProgressPage() {
                 {" · "}
                 <Link
                   to={sessionSummaryPath(bestTimeTrialSession.summary)}
-                  className="inline-flex items-center gap-1 text-zinc-400 transition-colors hover:text-cyan-200"
+                  className="inline-flex items-center gap-1 whitespace-nowrap text-zinc-400 transition-colors hover:text-cyan-200"
                 >
                   <Gauge className="size-3 text-cyan-300" />
                   <span className="text-cyan-300/80">Best TT</span>
-                  <span className="font-mono text-zinc-300">
+                  <span className="whitespace-nowrap font-mono text-zinc-300">
                     {msToLapTime(bestTimeTrialMs)}
                   </span>
                 </Link>
@@ -551,7 +558,7 @@ export function TrackProgressPage() {
           </p>
         </div>
 
-        <VStack align="end" className="shrink-0 gap-2">
+        <VStack align="start" className="gap-2 sm:shrink-0 sm:items-end">
           {/* Tab switcher: interactive when multiple analysis buckets exist, static otherwise. */}
           {tabOptions.length > 1 && (
             <SegmentedControl<TrackSessionKind>
