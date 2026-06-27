@@ -1,5 +1,12 @@
-import type { ComponentProps, ReactNode } from "react";
-import { Tooltip as TooltipPrimitive } from "radix-ui";
+import {
+  Fragment,
+  cloneElement,
+  isValidElement,
+  type ComponentProps,
+  type ReactElement,
+  type ReactNode,
+} from "react";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "../utils/cn";
 
 interface TooltipProps {
@@ -28,14 +35,22 @@ export function TooltipProvider({
  * `<Tooltip text="...">` call sites.
  */
 export function Tooltip({ text, children, className = "" }: TooltipProps) {
+  const trigger: ReactElement =
+    isValidElement<{ className?: string }>(children) &&
+    children.type !== Fragment ? (
+      cloneElement(children, {
+        className: cn(children.props.className, className),
+      })
+    ) : (
+      <span className={cn("inline-flex items-center", className)}>
+        {children}
+      </span>
+    );
+
   return (
     <TooltipProvider>
       <TooltipPrimitive.Root>
-        <TooltipPrimitive.Trigger asChild>
-          <span className={cn("inline-flex items-center", className)}>
-            {children}
-          </span>
-        </TooltipPrimitive.Trigger>
+        <TooltipPrimitive.Trigger asChild>{trigger}</TooltipPrimitive.Trigger>
         <TooltipPrimitive.Portal>
           <TooltipPrimitive.Content
             side="top"
