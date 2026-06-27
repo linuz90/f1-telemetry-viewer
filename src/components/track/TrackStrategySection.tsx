@@ -1,11 +1,14 @@
-import { AlertTriangle, Award, Disc } from "lucide-react";
+import { AlertTriangle, Award, CircleHelp, Disc } from "lucide-react";
 import { cn } from "../../utils/cn";
 import type { TrackStrategySuggestion } from "../../utils/stats/trackStrategy";
 import { PUNCTURE_THRESHOLD } from "../../utils/stats/tyres";
 import { cardClass } from "../Card";
+import { Tooltip } from "../Tooltip";
 import { SectionHeader } from "../ui/SectionHeader";
 import { HStack } from "../ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
+
+const STRATEGY_EVIDENCE_TOOLTIP = `Built from this race-length bucket. Wear prefers matching long stints, then compound averages. Pit laps are wear-balanced with a 1-lap undercut; stints target the ${PUNCTURE_THRESHOLD}% cap.`;
 
 /**
  * F1 broadcast-style strategy visualization for the Race tab. Shows the
@@ -45,7 +48,11 @@ export function TrackStrategySection({
 
   return (
     <section className={cn(cardClass, "space-y-7")}>
-      <SectionHeader title="Strategy" hint={subtitleParts.join(" · ")} />
+      <SectionHeader
+        title="Strategy"
+        hint={subtitleParts.join(" · ")}
+        action={<StrategyEvidenceHelp />}
+      />
 
       <StrategyRow
         kind="recommended"
@@ -59,19 +66,21 @@ export function TrackStrategySection({
           totalLaps={totalLaps}
         />
       )}
-
-      {/* Footer footnote — separated by a faint hairline so it reads as
-            "context about the algorithm" instead of crowding the alternative
-            row's pit-detail line directly above. */}
-      <p className="border-t border-white/[0.04] pt-4 text-xs leading-relaxed text-zinc-500">
-        Built from observed tyre wear in this race-length bucket, not from the
-        most common past sequence. Wear prefers long-enough stints from the same
-        compound and strategy slot, then same stint role, then any long-enough
-        stint before compound averages. Pit lap is wear-balanced, then nudged
-        one lap earlier to bank a small undercut. Shown stints target the{" "}
-        {PUNCTURE_THRESHOLD}% puncture-risk cap.
-      </p>
     </section>
+  );
+}
+
+function StrategyEvidenceHelp() {
+  return (
+    <Tooltip text={STRATEGY_EVIDENCE_TOOLTIP}>
+      <button
+        type="button"
+        className="inline-flex size-7 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-white/[0.03] hover:text-zinc-300 focus-visible:outline focus-visible:outline-1 focus-visible:outline-zinc-500"
+        aria-label="How strategy is calculated"
+      >
+        <CircleHelp className="size-4" aria-hidden="true" />
+      </button>
+    </Tooltip>
   );
 }
 
