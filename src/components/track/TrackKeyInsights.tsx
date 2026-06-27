@@ -22,11 +22,10 @@ import { SectionHeader } from "../ui/SectionHeader";
  * derivations come from `buildTrackRaceRecommendation()`.
  *
  * Evidence gate: recommended + alternative strategy cards only render when the
- * helper reports `hasEvidence` (≥1 near-full-distance multi-stint race in the
- * selected race-length bucket). The always-on chips (best race lap,
- * race-vs-quali, ERS, fuel, since-last-race) render whenever their respective
- * data is available, so a track with only short repros still gives useful
- * signal.
+ * helper can synthesize a usable shape from bucket tyre data. The always-on
+ * chips (best race lap, race-vs-quali, ERS, fuel, since-last-race) render
+ * whenever their respective data is available, so a track with only short
+ * repros still gives useful signal.
  *
  * Each tile uses the shared `InsightTile` shell so this section reads as the
  * same family as the dashboard `Insights` cards (icon + uppercase mono eyebrow
@@ -177,15 +176,14 @@ function FuelTargetTile({
   // Negative means the slider value you used would only get you home thanks
   // to safety-car saves — bad advice for next race.
   const excess = target.excessAtFinishLaps;
-  const raceLabel = pluralize(target.raceCount, "race");
   let note: string | null = null;
   if (Math.abs(excess) >= 0.4) {
     note =
       excess > 0
-        ? `~${excess.toFixed(1)} laps spare in a clean race (${raceLabel})`
-        : `~${Math.abs(excess).toFixed(1)} laps short in a clean race (${raceLabel})`;
+        ? `~${excess.toFixed(1)} laps spare in a clean race`
+        : `~${Math.abs(excess).toFixed(1)} laps short in a clean race`;
   } else {
-    note = `on target for a clean race (${raceLabel})`;
+    note = "on target for a clean race";
   }
 
   return (

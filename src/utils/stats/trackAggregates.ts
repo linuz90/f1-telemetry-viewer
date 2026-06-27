@@ -5,6 +5,24 @@ import { findPlayer, isRaceSession } from "./drivers";
 import { collectGreenFlagBurnDeltas, fuelSafetyMarginLaps } from "./energy";
 import { estimateMaxLife, stintWearRate } from "./tyres";
 
+/** One observed player stint kept for strategy-specific wear projections. */
+export interface CompoundLifeSample {
+  compound: string;
+  wearRatePerLap: number;
+  stintLength: number;
+  /** Zero-based position in the tyre sequence: 0 = opening stint. */
+  stintIndex: number;
+  startLap: number;
+  endLap: number;
+  /** True only when this stint reached the race finish, not just a DNF export. */
+  isFinalStint: boolean;
+  /**
+   * Higher means newer. Prefer the parsed export timestamp when present, with
+   * input order as a fallback because track pages already sort sessions by date.
+   */
+  sessionSortKey: number;
+}
+
 /** Per-compound tyre life stats aggregated across sessions */
 export interface CompoundLifeStats {
   compound: string;
@@ -15,10 +33,35 @@ export interface CompoundLifeStats {
   stintCount: number;
   /** Best valid lap time in ms on this compound (0 if none) */
   bestLapMs: number;
+  /** Raw stint samples retained so strategy projections can prefer matching
+   *  stint-position evidence without changing the aggregate tyre-life cards. */
+  samples: CompoundLifeSample[];
 }
 
 /** Minimum stint length to include in aggregate compound stats */
 const MIN_STINT_LAPS = 3;
+
+function parseSessionSortKey(
+  session: TelemetrySession,
+  fallbackIndex: number,
+): number {
+  const raw = `${session.debug?.["file-name"] ?? ""} ${session.debug?.timestamp ?? ""}`;
+  const match = raw.match(
+    /(\d{4})[_-](\d{2})[_-](\d{2})[_\s-](\d{2})[_:](\d{2})[_:](\d{2})/,
+  );
+  if (!match) return fallbackIndex;
+
+  const [, year, month, day, hour, minute, second] = match;
+  const value = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+  );
+  return Number.isFinite(value) ? value : fallbackIndex;
+}
 
 /** Aggregate compound tyre life across all race sessions at a track */
 export function aggregateCompoundLife(
@@ -26,17 +69,30 @@ export function aggregateCompoundLife(
 ): CompoundLifeStats[] {
   const byCompound: Record<
     string,
-    { rates: number[]; lengths: number[]; bestLapMs: number }
+    {
+      rates: number[];
+      lengths: number[];
+      bestLapMs: number;
+      samples: CompoundLifeSample[];
+    }
   > = {};
 
-  for (const session of sessions) {
+  for (const [sessionIndex, session] of sessions.entries()) {
     if (!isRaceSession(session)) continue;
     const player = findPlayer(session);
     if (!player) continue;
 
     const laps = player["session-history"]["lap-history-data"];
+    const stints = player["tyre-set-history"] ?? [];
+    const sessionSortKey = parseSessionSortKey(session, sessionIndex);
+    const totalLaps = session["session-info"]["total-laps"];
+    const lapsCompleted = player["session-history"]["num-laps"] ?? 0;
+    const reachedRaceFinish =
+      Number.isFinite(totalLaps) &&
+      totalLaps > 0 &&
+      lapsCompleted >= totalLaps - 1;
 
-    for (const stint of player["tyre-set-history"]) {
+    for (const [stintIndex, stint] of stints.entries()) {
       if (stint["stint-length"] < MIN_STINT_LAPS) continue;
 
       const compound = stint["tyre-set-data"]["visual-tyre-compound"];
@@ -44,9 +100,27 @@ export function aggregateCompoundLife(
       if (rate <= 0) continue;
 
       if (!byCompound[compound])
-        byCompound[compound] = { rates: [], lengths: [], bestLapMs: 0 };
+        byCompound[compound] = {
+          rates: [],
+          lengths: [],
+          bestLapMs: 0,
+          samples: [],
+        };
       byCompound[compound].rates.push(rate);
       byCompound[compound].lengths.push(stint["stint-length"]);
+      byCompound[compound].samples.push({
+        compound,
+        wearRatePerLap: rate,
+        stintLength: stint["stint-length"],
+        stintIndex,
+        startLap: stint["start-lap"],
+        endLap: stint["end-lap"],
+        isFinalStint:
+          stintIndex === stints.length - 1 &&
+          reachedRaceFinish &&
+          stint["end-lap"] >= totalLaps - 1,
+        sessionSortKey,
+      });
 
       // Find best valid lap in this stint
       let lapNum = 0;
@@ -70,7 +144,7 @@ export function aggregateCompoundLife(
   }
 
   return Object.entries(byCompound).map(
-    ([compound, { rates, lengths, bestLapMs }]) => {
+    ([compound, { rates, lengths, bestLapMs, samples }]) => {
       const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
       const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
       return {
@@ -81,6 +155,7 @@ export function aggregateCompoundLife(
         longestStint: Math.max(...lengths),
         stintCount: rates.length,
         bestLapMs,
+        samples,
       };
     },
   );

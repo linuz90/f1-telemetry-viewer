@@ -1,23 +1,26 @@
-import { Award, Disc } from "lucide-react";
+import { AlertTriangle, Award, CircleHelp, Disc } from "lucide-react";
 import { cn } from "../../utils/cn";
 import type { TrackStrategySuggestion } from "../../utils/stats/trackStrategy";
 import { PUNCTURE_THRESHOLD } from "../../utils/stats/tyres";
 import { cardClass } from "../Card";
+import { Tooltip } from "../Tooltip";
 import { SectionHeader } from "../ui/SectionHeader";
 import { HStack } from "../ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
 
+const STRATEGY_EVIDENCE_TOOLTIP = `Built from this race-length bucket. Wear prefers matching long stints, then compound averages. Pit laps are wear-balanced with a 1-lap undercut; stints target the ${PUNCTURE_THRESHOLD}% cap.`;
+
 /**
  * F1 broadcast-style strategy visualization for the Race tab. Shows the
- * recommended and alternative one-stop shapes as stacked equal-weight ribbons,
- * with stints scaled to their lap counts and a pit window shaded ±1 lap
- * around the target pit lap.
+ * recommended and alternative strategy shapes as stacked equal-weight ribbons,
+ * with stints scaled to their lap counts and pit windows shaded ±1 lap around
+ * the target pit lap.
  *
- * Both shapes come from the same wear-data synthesis in
- * `utils/stats/trackStrategy.ts` — the recommended row is the "fast start"
- * pairing (softer compound first, undercut bias) and the alternative is its
- * mirror (durable start, fast finish). The alternative row is hidden when the
- * mirror isn't feasible under the puncture-risk cap.
+ * Shapes come from the same selected race-length tyre-wear synthesis in
+ * `utils/stats/trackStrategy.ts`. The alternative row is usually a strict
+ * mirror of the one-stop, but can also be a flagged managed-risk one-stop when
+ * the mirror barely misses the cap or the safe recommendation falls back to
+ * two stops.
  */
 export function TrackStrategySection({
   recommended,
@@ -40,12 +43,16 @@ export function TrackStrategySection({
   const subtitleParts: string[] = [];
   if (raceLengthLabel) subtitleParts.push(raceLengthLabel);
   subtitleParts.push(
-    `${sampleCount} ${sampleKind}${sampleCount === 1 ? "" : "s"} of tyre data`,
+    `based on ${sampleCount} ${sampleKind}${sampleCount === 1 ? "" : "s"} of tyre-wear data`,
   );
 
   return (
     <section className={cn(cardClass, "space-y-7")}>
-      <SectionHeader title="Strategy" hint={subtitleParts.join(" · ")} />
+      <SectionHeader
+        title="Strategy"
+        hint={subtitleParts.join(" · ")}
+        action={<StrategyEvidenceHelp />}
+      />
 
       <StrategyRow
         kind="recommended"
@@ -59,16 +66,21 @@ export function TrackStrategySection({
           totalLaps={totalLaps}
         />
       )}
-
-      {/* Footer footnote — separated by a faint hairline so it reads as
-            "context about the algorithm" instead of crowding the alternative
-            row's pit-detail line directly above. */}
-      <p className="border-t border-white/[0.04] pt-4 text-xs leading-relaxed text-zinc-500">
-        Pit lap is balanced so both stints reach the same fraction of their tyre
-        life, then nudged one lap earlier to bank a small undercut. Both stints
-        stay under the {PUNCTURE_THRESHOLD}% puncture-risk threshold.
-      </p>
     </section>
+  );
+}
+
+function StrategyEvidenceHelp() {
+  return (
+    <Tooltip text={STRATEGY_EVIDENCE_TOOLTIP}>
+      <button
+        type="button"
+        className="inline-flex size-7 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-white/[0.03] hover:text-zinc-300 focus-visible:outline focus-visible:outline-1 focus-visible:outline-zinc-500"
+        aria-label="How strategy is calculated"
+      >
+        <CircleHelp className="size-4" aria-hidden="true" />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -82,13 +94,16 @@ function StrategyRow({
   totalLaps: number;
 }) {
   const isRecommended = kind === "recommended";
-  const Icon = isRecommended ? Award : Disc;
+  const isManaged = strategy.risk?.kind === "managed-tyres";
+  const Icon = isManaged ? AlertTriangle : isRecommended ? Award : Disc;
   // Recommended = amber/gold — broadcast convention for the "winning" or
   // "podium" strategy callout. Alternative stays neutral zinc so the eye
   // tracks Recommended first without dimming the alternative's data.
   const labelTone = isRecommended ? "text-amber-300" : "text-zinc-300";
-  const tagline =
-    strategy.fastStart === true
+  const label = isRecommended ? "Recommended" : "Alternative";
+  const tagline = isManaged
+    ? "One-stop, tyre management required"
+    : strategy.fastStart === true
       ? "Fast start, durable finish"
       : strategy.fastStart === false
         ? "Durable start, fast finisher"
@@ -104,7 +119,7 @@ function StrategyRow({
           )}
         >
           <Icon className="h-3.5 w-3.5" />
-          {isRecommended ? "Recommended" : "Alternative"}
+          {label}
         </span>
         <span className="text-xs text-zinc-500">· {tagline}</span>
       </HStack>
@@ -112,6 +127,7 @@ function StrategyRow({
       <StintRibbon
         compounds={strategy.compounds}
         stintLaps={strategy.stintLaps}
+        stintWearPercentages={strategy.stintWearPercentages}
         pitWindows={strategy.pitWindows}
         totalLaps={totalLaps}
       />
@@ -129,11 +145,13 @@ function StrategyRow({
 function StintRibbon({
   compounds,
   stintLaps,
+  stintWearPercentages,
   pitWindows,
   totalLaps,
 }: {
   compounds: string[];
   stintLaps: number[];
+  stintWearPercentages: number[];
   pitWindows: { earliest: number; latest: number; target: number }[];
   totalLaps: number;
 }) {
@@ -157,7 +175,7 @@ function StintRibbon({
               <div
                 key={`${compound}-${i}`}
                 className={cn(
-                  "flex h-full items-center justify-center overflow-hidden text-xs font-semibold",
+                  "relative flex h-full items-center justify-center overflow-hidden text-xs font-semibold",
                   isFirst && "rounded-l-md",
                   isLast && "rounded-r-md",
                 )}
@@ -166,7 +184,7 @@ function StintRibbon({
                   flexBasis: 0,
                   ...stintChipStyle(compound),
                 }}
-                title={`${compound} · ${laps} laps`}
+                title={`${compound} · ${laps} laps · projected ${formatWearPercent(stintWearPercentages[i])} wear`}
               >
                 <span
                   className="truncate px-1"
@@ -207,12 +225,13 @@ function StintRibbon({
       {/* Lap axis — start / each pit target / flag. Position labels at the
           same percentages as the bar segments so the eye can trace pit lap to
           stint boundary directly. */}
-      <div className="relative mt-2 h-3.5 text-xs text-zinc-500">
+      <div className="relative mt-2 h-5 text-xs text-zinc-500">
         {lapMarks.map((lap, i) => {
           const pct = (lap / totalLaps) * 100;
           // Anchor: leftmost label flush left, rightmost flush right, the rest centered.
           const isFirst = i === 0;
           const isLast = i === lapMarks.length - 1;
+          const wear = isFirst ? null : stintWearPercentages[i - 1];
           const transform = isFirst
             ? "translateX(0)"
             : isLast
@@ -221,16 +240,43 @@ function StintRibbon({
           return (
             <span
               key={`tick-${i}`}
-              className="absolute font-mono"
+              className="absolute flex items-center gap-2 whitespace-nowrap font-mono"
               style={{ left: `${pct}%`, transform }}
             >
-              L{lap}
+              {wear != null && <StintWearBadge wear={wear} />}
+              <span>L{lap}</span>
             </span>
           );
         })}
       </div>
     </div>
   );
+}
+
+function StintWearBadge({ wear }: { wear: number }) {
+  if (!Number.isFinite(wear) || wear <= 0) return null;
+
+  return (
+    <span
+      className={cn(
+        "pointer-events-none inline-flex rounded px-1.5 py-0.5 font-mono text-[10px] font-bold leading-none ring-1",
+        wearBadgeTone(wear),
+      )}
+    >
+      {formatWearPercent(wear)}
+    </span>
+  );
+}
+
+function formatWearPercent(wear: number): string {
+  if (!Number.isFinite(wear) || wear <= 0) return "--%";
+  return `${Math.round(wear)}%`;
+}
+
+function wearBadgeTone(wear: number): string {
+  if (wear >= 75) return "bg-zinc-950/85 text-red-300 ring-red-300/45";
+  if (wear >= 65) return "bg-zinc-950/85 text-amber-300 ring-amber-300/40";
+  return "bg-zinc-950/55 text-white/80 ring-white/15";
 }
 
 function PitDetail({
