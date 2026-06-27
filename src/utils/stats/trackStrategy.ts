@@ -2,7 +2,11 @@ import type { DriverData, TelemetrySession } from "../../types/telemetry";
 import { bestSectorTimeMs } from "../format";
 import { findPlayer, isRaceSession } from "./drivers";
 import { avgErsDeployMj } from "./energy";
-import type { CompoundLifeStats, TrackFuelStats } from "./trackAggregates";
+import type {
+  CompoundLifeSample,
+  CompoundLifeStats,
+  TrackFuelStats,
+} from "./trackAggregates";
 import { getBestLapTime, getRacePaceLapSamples, getRacePaceLaps } from "./laps";
 import { avgWearRate, PUNCTURE_THRESHOLD } from "./tyres";
 
@@ -24,19 +28,32 @@ export interface TrackStrategySuggestion {
   compounds: string[];
   /** Stint lengths the recommendation is anchored on (laps). Same length as compounds */
   stintLaps: number[];
+  /** Projected worst-wheel wear at the end of each stint. Same length as compounds */
+  stintWearPercentages: number[];
   /** Pit-window per stop, indexed by the pit (stops between compounds[i] and compounds[i+1]).
    *  Empty for a no-stop strategy. */
   pitWindows: { earliest: number; latest: number; target: number }[];
-  /** Number of races in the bucket that ran this exact sequence */
+  /** Number of races in the selected race-length bucket */
   raceCount: number;
-  /** Number of those races that were near-full-distance */
+  /** Number of bucket races that were near-full-distance */
   fullDistanceRaceCount: number;
-  /** True when at least one near-full-distance multi-stint race backs this sequence */
+  /** True when the shape was synthesized from usable bucket tyre data */
   isEvidenceBacked: boolean;
   /** True when the first stint is on a softer compound than the second — a
    *  "fast start, durable finish" shape. False for the mirror "durable start,
    *  fast finish" alternative. Undefined for two-stop sandwiches. */
   fastStart?: boolean;
+  /** Present when a borderline one-stop exceeds the normal tyre-wear cap and
+   *  should be treated as viable only with deliberate tyre management. */
+  risk?: TrackStrategyRisk;
+}
+
+export interface TrackStrategyRisk {
+  kind: "managed-tyres";
+  projectedMaxWear: number;
+  overThreshold: number;
+  limitingCompound: string;
+  limitingStintLaps: number;
 }
 
 export interface TrackFuelTarget {
@@ -64,7 +81,7 @@ export interface TrackRaceRecommendation {
   raceCount: number;
   /** Number of races in the bucket that finished near full distance (>= totalLaps - 1) */
   fullDistanceRaceCount: number;
-  /** Whether we have at least one near-full-distance multi-stint race in the bucket */
+  /** Whether usable bucket tyre data produced a strategy shape */
   hasEvidence: boolean;
   bestRaceLap: TrackBestRaceLap | null;
   /** Best race lap vs best quali lap (ms). Negative = race lap was faster. 0 if either side missing */
@@ -136,16 +153,22 @@ function buildPitWindow(stintEndLap: number, totalLaps: number) {
 //      (across-the-allocation pairings are dominated by Soft+Medium or
 //      Medium+Hard — confirmed at 0/35 observations in user telemetry).
 //   3. For each pair, the pit lap is set so BOTH stints hit roughly the same
-//      fraction of their wear life:
+//      fraction of their aggregate wear life:
 //          balanced = round(totalLaps * wearRate(second)
 //                           / (wearRate(first) + wearRate(second)))
 //      then nudged 1 lap earlier to bank a small undercut margin (fresh rubber
 //      gives ~1.5–2s on the out-lap; one lap = roughly that gain).
-//   4. Both stints must clear the PUNCTURE_THRESHOLD safety cap — the
+//   4. Projected stint wear prefers matching real stint samples (same compound,
+//      same sequence slot, and long enough for the projected stint), falling
+//      back through broader samples to the aggregate compound average. Both
+//      projected stints must clear the PUNCTURE_THRESHOLD safety cap — the
 //      puncture-risk threshold beyond which grip falls off a cliff.
 //   5. Recommended = first feasible (fast-first) pairing; Alternative = its
-//      mirror (slow-first, "fast-finisher") when also feasible.
-//   6. Two-stop sandwich (fast-durable-fast) only when NO one-stop pair fits.
+//      mirror (slow-first, "fast-finisher") when feasible, or when it only
+//      misses the cap by a small manage-the-tyres margin.
+//   6. Two-stop sandwich (fast-durable-fast) only when NO strict one-stop pair
+//      fits. If the closest one-stop is borderline, surface it as the managed
+//      alternative rather than hiding the tradeoff.
 //
 // Pit windows are centered on the projected pit lap with ±1 lap of slack.
 
@@ -157,6 +180,11 @@ function buildPitWindow(stintEndLap: number, totalLaps: number) {
  *  to bank a small undercut margin. F1 broadcasts cite ~1.5–2s gain on the
  *  out-lap from fresh rubber, which is roughly one lap of pace differential. */
 const UNDERCUT_NUDGE_LAPS = 1;
+
+/** Borderline one-stops are useful to see, but only when they're within about
+ *  one high-deg lap of the normal puncture-risk cap. Anything beyond this is
+ *  too far into "hope for a safety car" territory to present as a strategy. */
+const MANAGED_ONE_STOP_WEAR_BUFFER = 7;
 
 /** Dry compound softness priority — lower number = softer = faster on fresh
  *  rubber. Soft/Medium/Hard are the relative labels Pits n' Giggles surfaces
@@ -175,13 +203,6 @@ const DRY_COMPOUND_PRIORITY: Record<string, number> = {
 
 function isDryCompound(compound: string): boolean {
   return compound in DRY_COMPOUND_PRIORITY;
-}
-
-/** Max laps a stint of this compound can safely cover without crossing the
- *  wear threshold, given the observed average wear rate (%/lap). */
-function safeStintMaxLaps(wearRatePerLap: number): number {
-  if (wearRatePerLap <= 0) return Number.POSITIVE_INFINITY;
-  return Math.max(1, Math.floor(PUNCTURE_THRESHOLD / wearRatePerLap));
 }
 
 /** Sort dry compound stats by relative softness (Soft → Medium → Hard).
@@ -206,20 +227,93 @@ function rankDryCompoundsByPace(
   });
 }
 
+function pickLatestRelevantSample(
+  samples: CompoundLifeSample[],
+  plannedLaps: number,
+): CompoundLifeSample | null {
+  return (
+    [...samples].sort((a, b) => {
+      if (a.sessionSortKey !== b.sessionSortKey) {
+        return b.sessionSortKey - a.sessionSortKey;
+      }
+      const aExtra = Math.abs(a.stintLength - plannedLaps);
+      const bExtra = Math.abs(b.stintLength - plannedLaps);
+      if (aExtra !== bExtra) return aExtra - bExtra;
+      return b.stintLength - a.stintLength;
+    })[0] ?? null
+  );
+}
+
+function hasSameStintRole(
+  sample: CompoundLifeSample,
+  stintIndex: number,
+  stintCount: number,
+): boolean {
+  if (stintIndex === 0) return sample.stintIndex === 0;
+  if (stintIndex === stintCount - 1) return sample.isFinalStint;
+  return sample.stintIndex > 0 && !sample.isFinalStint;
+}
+
+function wearRateForProjectedStint(
+  compound: CompoundLifeStats,
+  plannedLaps: number,
+  stintIndex: number,
+  stintCount: number,
+): number {
+  const longEnoughSamples = compound.samples.filter(
+    (sample) => sample.wearRatePerLap > 0 && sample.stintLength >= plannedLaps,
+  );
+  const exactSlotSample = pickLatestRelevantSample(
+    longEnoughSamples.filter((sample) => sample.stintIndex === stintIndex),
+    plannedLaps,
+  );
+  if (exactSlotSample) return exactSlotSample.wearRatePerLap;
+
+  const roleMatchedSample = pickLatestRelevantSample(
+    longEnoughSamples.filter((sample) =>
+      hasSameStintRole(sample, stintIndex, stintCount),
+    ),
+    plannedLaps,
+  );
+  if (roleMatchedSample) return roleMatchedSample.wearRatePerLap;
+
+  const anyLongEnoughSample = pickLatestRelevantSample(
+    longEnoughSamples,
+    plannedLaps,
+  );
+  return anyLongEnoughSample?.wearRatePerLap ?? compound.avgWearRatePerLap;
+}
+
+function projectedStintWear(
+  compound: CompoundLifeStats,
+  plannedLaps: number,
+  stintIndex: number,
+  stintCount: number,
+): number {
+  return (
+    plannedLaps *
+    wearRateForProjectedStint(compound, plannedLaps, stintIndex, stintCount)
+  );
+}
+
 interface SynthesizedStrategyShape {
   compounds: string[];
   stintLaps: number[];
+  stintWearPercentages: number[];
+  risk?: TrackStrategyRisk;
 }
 
 /** One-stop strategy with `first` compound on stint 1, `second` on stint 2.
  *  Pit lap is wear-balanced (both stints hit ~the same fraction of their wear
  *  life) and nudged earlier by UNDERCUT_NUDGE_LAPS to bank fresh-rubber out-lap
  *  pace as undercut margin. Returns null when either stint would exceed the
- *  PUNCTURE_THRESHOLD puncture cap at the recommended pit lap. */
+ *  PUNCTURE_THRESHOLD puncture cap, unless `allowManaged` accepts a small
+ *  overage for a clearly flagged tyre-management alternative. */
 function buildOneStopShape(
   first: CompoundLifeStats,
   second: CompoundLifeStats,
   totalLaps: number,
+  options: { allowManaged?: boolean } = {},
 ): SynthesizedStrategyShape | null {
   const firstWear = first.avgWearRatePerLap;
   const secondWear = second.avgWearRatePerLap;
@@ -242,11 +336,37 @@ function buildOneStopShape(
   // user's wear rates are too aggressive for either compound to make its half
   // of the race, fall through and let synthesizeStrategies try a harder pair
   // (or eventually a two-stop sandwich).
-  if (stint1 * firstWear > PUNCTURE_THRESHOLD) return null;
-  if (stint2 * secondWear > PUNCTURE_THRESHOLD) return null;
+  const projectedWears = [
+    projectedStintWear(first, stint1, 0, 2),
+    projectedStintWear(second, stint2, 1, 2),
+  ];
+  const projectedMaxWear = Math.max(...projectedWears);
+  const overThreshold = projectedMaxWear - PUNCTURE_THRESHOLD;
+  if (overThreshold > 0) {
+    if (!options.allowManaged || overThreshold > MANAGED_ONE_STOP_WEAR_BUFFER) {
+      return null;
+    }
+
+    const limitingIndex = projectedWears[0] >= projectedWears[1] ? 0 : 1;
+    const compounds = [first.compound, second.compound];
+    const stintLaps = [stint1, stint2];
+    return {
+      compounds,
+      stintLaps,
+      stintWearPercentages: projectedWears,
+      risk: {
+        kind: "managed-tyres",
+        projectedMaxWear,
+        overThreshold,
+        limitingCompound: compounds[limitingIndex],
+        limitingStintLaps: stintLaps[limitingIndex],
+      },
+    };
+  }
   return {
     compounds: [first.compound, second.compound],
     stintLaps: [stint1, stint2],
+    stintWearPercentages: projectedWears,
   };
 }
 
@@ -259,19 +379,23 @@ function buildTwoStopShape(
   durable: CompoundLifeStats,
   totalLaps: number,
 ): SynthesizedStrategyShape | null {
-  const fastMax = safeStintMaxLaps(fastest.avgWearRatePerLap);
-  const durableMax = safeStintMaxLaps(durable.avgWearRatePerLap);
   const base = Math.floor(totalLaps / 3);
   const remainder = totalLaps - base * 3;
   // Concentrate any leftover laps on the middle (durable) stint.
   const stintLaps = [base, base + remainder, base];
   if (stintLaps.some((l) => l < 1)) return null;
-  if (stintLaps[0] > fastMax) return null;
-  if (stintLaps[1] > durableMax) return null;
-  if (stintLaps[2] > fastMax) return null;
+  const stintWearPercentages = [
+    projectedStintWear(fastest, stintLaps[0], 0, 3),
+    projectedStintWear(durable, stintLaps[1], 1, 3),
+    projectedStintWear(fastest, stintLaps[2], 2, 3),
+  ];
+  if (stintWearPercentages.some((wear) => wear > PUNCTURE_THRESHOLD)) {
+    return null;
+  }
   return {
     compounds: [fastest.compound, durable.compound, fastest.compound],
     stintLaps,
+    stintWearPercentages,
   };
 }
 
@@ -291,11 +415,13 @@ function suggestionFromShape(
   return {
     compounds: shape.compounds,
     stintLaps: shape.stintLaps,
+    stintWearPercentages: shape.stintWearPercentages,
     pitWindows,
     raceCount,
     fullDistanceRaceCount,
     isEvidenceBacked: true,
     fastStart,
+    risk: shape.risk,
   };
 }
 
@@ -324,6 +450,18 @@ function synthesizeStrategies(
   const ranked = rankDryCompoundsByPace(compoundLifeStats);
   if (ranked.length < 2) return { recommended: null, alternative: null };
 
+  const managedOneStops: {
+    shape: SynthesizedStrategyShape;
+    fastStart: boolean;
+  }[] = [];
+  const rememberManagedOneStop = (
+    shape: SynthesizedStrategyShape | null,
+    fastStart: boolean,
+  ) => {
+    if (!shape?.risk) return;
+    managedOneStops.push({ shape, fastStart });
+  };
+
   // Walk compound pairs in softness order: (0,1) → (1,2) … so the softest
   // feasible adjacent-rung pairing wins. On high-wear tracks where soft
   // wear outruns the puncture cap, Soft+Medium gets rejected and we fall
@@ -336,7 +474,16 @@ function synthesizeStrategies(
       if (isSoftHardPair(softer, harder)) continue;
       const fastFirst = buildOneStopShape(softer, harder, totalLaps);
       const slowFirst = buildOneStopShape(harder, softer, totalLaps);
+      const managedFastFirst = buildOneStopShape(softer, harder, totalLaps, {
+        allowManaged: true,
+      });
+      const managedSlowFirst = buildOneStopShape(harder, softer, totalLaps, {
+        allowManaged: true,
+      });
+      rememberManagedOneStop(managedFastFirst, true);
+      rememberManagedOneStop(managedSlowFirst, false);
       if (fastFirst) {
+        const slowAlternative = slowFirst ?? managedSlowFirst;
         return {
           recommended: suggestionFromShape(
             fastFirst,
@@ -345,9 +492,9 @@ function synthesizeStrategies(
             fullDistanceRaceCount,
             true,
           ),
-          alternative: slowFirst
+          alternative: slowAlternative
             ? suggestionFromShape(
-                slowFirst,
+                slowAlternative,
                 totalLaps,
                 raceCount,
                 fullDistanceRaceCount,
@@ -365,11 +512,24 @@ function synthesizeStrategies(
             fullDistanceRaceCount,
             false,
           ),
-          alternative: null,
+          alternative: managedFastFirst?.risk
+            ? suggestionFromShape(
+                managedFastFirst,
+                totalLaps,
+                raceCount,
+                fullDistanceRaceCount,
+                true,
+              )
+            : null,
         };
       }
     }
   }
+
+  const bestManagedOneStop =
+    managedOneStops.sort(
+      (a, b) => a.shape.risk!.overThreshold - b.shape.risk!.overThreshold,
+    )[0] ?? null;
 
   // One-stop infeasible across every dry pair — only then consider a two-stop
   // sandwich, anchored on the two fastest compounds (the standard F1 shape).
@@ -382,7 +542,18 @@ function synthesizeStrategies(
         raceCount,
         fullDistanceRaceCount,
       ),
-      alternative: null,
+      // On high-deg tracks the strict cap can push the main recommendation to a
+      // two-stop even when a one-stop only just misses. Surface that as a
+      // managed-risk alternative so the user sees the strategic tradeoff.
+      alternative: bestManagedOneStop
+        ? suggestionFromShape(
+            bestManagedOneStop.shape,
+            totalLaps,
+            raceCount,
+            fullDistanceRaceCount,
+            bestManagedOneStop.fastStart,
+          )
+        : null,
     };
   }
   return { recommended: null, alternative: null };
@@ -482,10 +653,10 @@ export function buildTrackRaceRecommendation(
 
   // ── Recommended + alternative strategy ──────────────────────────────────
   // Synthesized from compound pace + wear stats (see synthesizeStrategies).
-  // This deliberately ignores the *specific* sequences run in past races —
-  // with one or two races in the bucket the most-frequent sequence is just
-  // "whatever happened that one time," which produces nonsense recommendations
-  // (e.g. a 4-lap stint pulled from an early-ended race in a 17-lap event).
+  // We don't replay the most common sequence, but projected wear does prefer
+  // long-enough real stints from the same sequence slot when available. That
+  // lets a Hard-Medium alternative use Hard-opening evidence without letting
+  // one weird historical strategy dictate the whole recommendation shape.
   const { recommended, alternative } = synthesizeStrategies(
     bucketCompoundLifeStats,
     totalLaps,

@@ -1355,9 +1355,8 @@ export function TrackProgressPage() {
                 </div>
               )}
 
-              {/* Strategy — wear-balanced one-stop with optional mirror alternative.
-                Only renders when we have enough data to back the recommended
-                shape; the synthesis itself enforces the puncture-risk cap. */}
+              {/* Strategy — wear-balanced one-stop or high-deg two-stop, with a
+                mirror/managed alternative when the tyre evidence supports it. */}
               {recommendation?.recommended && strategyTotalLaps > 0 && (
                 <TrackStrategySection
                   recommended={recommendation.recommended}

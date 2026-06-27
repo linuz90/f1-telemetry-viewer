@@ -22,11 +22,10 @@ import { SectionHeader } from "../ui/SectionHeader";
  * derivations come from `buildTrackRaceRecommendation()`.
  *
  * Evidence gate: recommended + alternative strategy cards only render when the
- * helper reports `hasEvidence` (≥1 near-full-distance multi-stint race in the
- * selected race-length bucket). The always-on chips (best race lap,
- * race-vs-quali, ERS, fuel, since-last-race) render whenever their respective
- * data is available, so a track with only short repros still gives useful
- * signal.
+ * helper can synthesize a usable shape from bucket tyre data. The always-on
+ * chips (best race lap, race-vs-quali, ERS, fuel, since-last-race) render
+ * whenever their respective data is available, so a track with only short
+ * repros still gives useful signal.
  *
  * Each tile uses the shared `InsightTile` shell so this section reads as the
  * same family as the dashboard `Insights` cards (icon + uppercase mono eyebrow

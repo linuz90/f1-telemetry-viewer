@@ -164,23 +164,34 @@ const sampleInsights: SessionInsight[] = [
 ];
 
 const trackStrategy: TrackStrategySuggestion = {
-  compounds: ["Medium", "Hard"],
-  stintLaps: [12, 15],
-  pitWindows: [{ earliest: 11, latest: 13, target: 12 }],
+  compounds: ["Medium", "Hard", "Medium"],
+  stintLaps: [9, 9, 9],
+  stintWearPercentages: [58, 42, 58],
+  pitWindows: [
+    { earliest: 8, latest: 10, target: 9 },
+    { earliest: 17, latest: 19, target: 18 },
+  ],
   raceCount: 2,
   fullDistanceRaceCount: 1,
   isEvidenceBacked: true,
-  fastStart: true,
 };
 
 const trackAlternative: TrackStrategySuggestion = {
-  compounds: ["Hard", "Medium"],
-  stintLaps: [15, 12],
-  pitWindows: [{ earliest: 14, latest: 16, target: 15 }],
+  compounds: ["Medium", "Hard"],
+  stintLaps: [12, 15],
+  stintWearPercentages: [68, 78.2],
+  pitWindows: [{ earliest: 11, latest: 13, target: 12 }],
   raceCount: 1,
   fullDistanceRaceCount: 1,
   isEvidenceBacked: true,
-  fastStart: false,
+  fastStart: true,
+  risk: {
+    kind: "managed-tyres",
+    projectedMaxWear: 78.2,
+    overThreshold: 3.2,
+    limitingCompound: "Hard",
+    limitingStintLaps: 15,
+  },
 };
 
 const trackRecommendation: TrackRaceRecommendation = {
