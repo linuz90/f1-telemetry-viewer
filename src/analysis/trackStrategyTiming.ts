@@ -392,8 +392,34 @@ function strategyStopCountLabel(stopCount: number): string {
   return `${stopCount}-stop`;
 }
 
+function alignPaceModelToSharedScale(
+  model: CompoundPaceModel,
+  sharedModel: CompoundPaceModel,
+): CompoundPaceModel | null {
+  const shifts = [...model.offsetsMs.entries()]
+    .map(([compound, offset]) => {
+      const sharedOffset = sharedModel.offsetsMs.get(compound);
+      return sharedOffset == null ? null : sharedOffset - offset;
+    })
+    .filter((value): value is number => value != null);
+  const shift = median(shifts);
+  if (shift == null) return null;
+
+  const offsetsMs = new Map<string, number>();
+  for (const [compound, offset] of model.offsetsMs) {
+    offsetsMs.set(compound, offset + shift);
+  }
+
+  return {
+    ...model,
+    offsetsMs,
+    source: `${model.source}; aligned to shared compound scale`,
+  };
+}
+
 function buildStrategyPaceModels(
   entries: BucketRaceEntry[],
+  sharedModel: CompoundPaceModel,
 ): Map<number, CompoundPaceModel> {
   const models = new Map<number, CompoundPaceModel>();
   const stopCounts = new Set(entries.map((entry) => observedStopCount(entry)));
@@ -404,10 +430,15 @@ function buildStrategyPaceModels(
     );
     const evidenceModel = resolveEvidenceCompoundPaceModel(matchingEntries);
     if (!evidenceModel) continue;
+    const alignedModel = alignPaceModelToSharedScale(
+      evidenceModel,
+      sharedModel,
+    );
+    if (!alignedModel) continue;
 
     models.set(stopCount, {
-      ...evidenceModel,
-      source: `${strategyStopCountLabel(stopCount)} matched ${evidenceModel.source}`,
+      ...alignedModel,
+      source: `${strategyStopCountLabel(stopCount)} matched ${alignedModel.source}`,
     });
   }
 
@@ -539,11 +570,12 @@ export function buildTimingContext(
 
   const pitLoss = resolvePitLoss(pitLossEntries, representative);
   if (!pitLoss) return null;
+  const paceModel = resolveCompoundPaceModel(entries, rankedCompounds);
 
   return {
     pitLoss,
-    paceModel: resolveCompoundPaceModel(entries, rankedCompounds),
-    strategyPaceModels: buildStrategyPaceModels(entries),
+    paceModel,
+    strategyPaceModels: buildStrategyPaceModels(entries, paceModel),
   };
 }
 
