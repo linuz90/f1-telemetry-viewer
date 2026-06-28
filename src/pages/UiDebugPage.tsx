@@ -720,7 +720,7 @@ export function UiDebugPage() {
               rows={[
                 { label: "Best lap", value: msToLapTime(82200 + index * 380) },
                 {
-                  label: "Avg wear",
+                  label: "Avg worst/lap",
                   value: `${(7.8 - index * 2.1).toFixed(1)}%/lap`,
                 },
                 {

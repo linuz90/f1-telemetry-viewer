@@ -125,6 +125,13 @@ ERS:
 - Fall back to `car-status-data["ers-deployed-this-lap"]` for older exports.
 - Show battery-store values as percentages only when explicitly displaying remaining store.
 
+Tyre wear:
+
+- User-facing tyre wear rates, stint life, and strategy projections use worst-wheel wear (max of FL/FR/RL/RR), not the exported average.
+- Compact `session-history.tyre-stints-history-data[].end-lap` is one lap before the detailed outgoing stint boundary; use `getDriverStints()` instead of raw compact data so pit-in/out filtering stays aligned.
+- PnG may emit a fresh incoming-tyre `0%` snapshot on the previous pit-boundary lap. Normalize duplicate lap wear via shared tyre helpers so outgoing worn tyres are not overwritten by incoming fresh tyres.
+- Absolute strategy timing anchors require real tyre-wear history; synthesized/basic-only stints can describe compound sequence and pit laps but must not anchor race-duration estimates as zero-wear stints.
+
 Analysis layer:
 
 - Calculation-heavy logic belongs in `src/analysis/`, not page/chart components.

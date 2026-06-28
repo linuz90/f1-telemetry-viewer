@@ -2,7 +2,7 @@ import type {
   CompoundLifeSample,
   CompoundLifeStats,
 } from "../utils/stats/trackAggregates";
-import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
+import { PUNCTURE_THRESHOLD, projectWearFromCurve } from "../utils/stats/tyres";
 import {
   DRY_COMPOUND_PRIORITY,
   rankDryCompoundsByPace,
@@ -47,10 +47,11 @@ function buildPitWindow(stintEndLap: number, totalLaps: number) {
 //      then nudged 1 lap earlier to bank a small undercut margin (fresh rubber
 //      gives ~1.5–2s on the out-lap; one lap = roughly that gain).
 //   4. Projected stint wear prefers matching real stint samples (same compound,
-//      same sequence slot, and long enough for the projected stint), falling
-//      back through broader samples to the aggregate compound average. Both
-//      projected stints must clear the PUNCTURE_THRESHOLD safety cap — the
-//      puncture-risk threshold beyond which grip falls off a cliff.
+//      same sequence slot, and long enough for the projected stint), using the
+//      observed worst-wheel wear curve at the planned lap before falling back
+//      to the aggregate compound average. Both projected stints must clear the
+//      PUNCTURE_THRESHOLD safety cap — the puncture-risk threshold beyond which
+//      grip falls off a cliff.
 //   5. Candidate strategies are scored by distance-matched compound pace, wear
 //      degradation, pit-loss cost, and managed-tyre risk. The fastest scored
 //      candidate becomes Recommended; the next distinct shape becomes Alternative.
@@ -101,7 +102,17 @@ function hasSameStintRole(
   return sample.stintIndex > 0 && !sample.isFinalStint;
 }
 
-function wearRateForProjectedStint(
+function projectedWearForSample(
+  sample: CompoundLifeSample,
+  plannedLaps: number,
+): number {
+  return (
+    projectWearFromCurve(sample.wearCurve, plannedLaps) ??
+    sample.wearRatePerLap * plannedLaps
+  );
+}
+
+function wearForProjectedStint(
   compound: CompoundLifeStats,
   plannedLaps: number,
   stintIndex: number,
@@ -135,13 +146,15 @@ function wearRateForProjectedStint(
         (sample) => sample.strategyStopCount === preferredStopCount,
       ),
     );
-    if (strategyMatchedSample) return strategyMatchedSample.wearRatePerLap;
+    if (strategyMatchedSample) {
+      return projectedWearForSample(strategyMatchedSample, plannedLaps);
+    }
   }
 
-  return (
-    pickFromSamples(longEnoughSamples)?.wearRatePerLap ??
-    compound.avgWearRatePerLap
-  );
+  const sample = pickFromSamples(longEnoughSamples);
+  if (sample) return projectedWearForSample(sample, plannedLaps);
+
+  return compound.avgWearRatePerLap * plannedLaps;
 }
 
 function projectedStintWear(
@@ -151,15 +164,12 @@ function projectedStintWear(
   stintCount: number,
   preferredStopCount?: number,
 ): number {
-  return (
-    plannedLaps *
-    wearRateForProjectedStint(
-      compound,
-      plannedLaps,
-      stintIndex,
-      stintCount,
-      preferredStopCount,
-    )
+  return wearForProjectedStint(
+    compound,
+    plannedLaps,
+    stintIndex,
+    stintCount,
+    preferredStopCount,
   );
 }
 

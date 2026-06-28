@@ -5,7 +5,7 @@ import type {
 } from "../types/telemetry";
 import { isLapValid, sectorTimeMs } from "../utils/format";
 import { ersDeployMjForLap, ersHarvestMjForLap } from "../utils/stats/energy";
-import { getWorstWheelWear } from "../utils/stats/tyres";
+import { buildWorstWearByLap } from "../utils/stats/tyres";
 import {
   buildSafetyCarRanges,
   isFullSafetyCarStatus,
@@ -191,25 +191,6 @@ function buildRivalLapMap(rivalLaps: readonly LapHistoryEntry[] | undefined) {
   return map;
 }
 
-/**
- * Tyre-wear history records the fresh incoming tyre at pit boundaries. When
- * two stints report the same lap, keep the higher value so the table shows the
- * outgoing tyre wear instead of replacing it with the incoming 0%.
- */
-function buildWearMap(stints: readonly TyreStint[] | undefined) {
-  const wearByLap = new Map<number, number>();
-  for (const stint of stints ?? []) {
-    for (const entry of stint["tyre-wear-history"] ?? []) {
-      const worst = getWorstWheelWear(entry);
-      const existing = wearByLap.get(entry["lap-number"]);
-      if (existing == null || worst > existing) {
-        wearByLap.set(entry["lap-number"], worst);
-      }
-    }
-  }
-  return wearByLap;
-}
-
 function buildPitOutlierLaps({
   stints,
   pitLaps,
@@ -250,7 +231,7 @@ export function buildLapAnalysis({
   const lapInfoByNumber = buildPerLapInfoMap(perLapInfo);
   const { burnByLap, medianGreenBurn } = buildFuelBurnModel(perLapInfo);
   const rivalByLap = buildRivalLapMap(rivalLaps);
-  const wearByLap = buildWearMap(stints);
+  const wearByLap = buildWorstWearByLap(stints);
 
   const rows = laps
     .filter((lap) => lap["lap-time-in-ms"] > 0)

@@ -6,7 +6,7 @@ import { avgErsDeployMj, avgErsHarvestMj } from "./energy";
 import type { StrategyInsight } from "./insightTypes";
 import { RACE_PACE_TOOLTIP } from "./insightTypes";
 import { getRacePaceLaps } from "./laps";
-import { getCompletedStints, stintWearRate } from "./tyres";
+import { getCompletedStints, getDriverStints, stintWearRate } from "./tyres";
 
 /** Generate strategy insights for the player (race) */
 export function generateInsights(
@@ -45,10 +45,10 @@ export function generateInsights(
     }
 
     // 2. Tyre wear delta vs rival
-    const playerRates = getCompletedStints(player["tyre-set-history"])
+    const playerRates = getCompletedStints(getDriverStints(player))
       .map((s) => stintWearRate(s))
       .filter((r) => r > 0);
-    const rivalRates = getCompletedStints(rival["tyre-set-history"])
+    const rivalRates = getCompletedStints(getDriverStints(rival))
       .map((s) => stintWearRate(s))
       .filter((r) => r > 0);
     if (playerRates.length > 0 && rivalRates.length > 0) {
@@ -204,7 +204,7 @@ export function generateInsights(
     // 2. Tyre wear ranking
     const wearRanking: { driver: DriverData; avgRate: number }[] = [];
     for (const d of allDrivers) {
-      const stints = getCompletedStints(d["tyre-set-history"] ?? []);
+      const stints = getCompletedStints(getDriverStints(d));
       if (!stints.length) continue;
       const rates = stints.map((s) => stintWearRate(s)).filter((r) => r > 0);
       if (rates.length === 0) continue;
@@ -392,10 +392,10 @@ export function generateInsights(
 
   // 4. Pit timing vs rival
   if (rival) {
-    const playerPits = getCompletedStints(player["tyre-set-history"])
+    const playerPits = getCompletedStints(getDriverStints(player))
       .slice(1)
       .map((s) => s["start-lap"]);
-    const rivalPits = getCompletedStints(rival["tyre-set-history"])
+    const rivalPits = getCompletedStints(getDriverStints(rival))
       .slice(1)
       .map((s) => s["start-lap"]);
 

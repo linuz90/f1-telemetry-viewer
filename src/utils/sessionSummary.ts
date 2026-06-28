@@ -22,6 +22,7 @@ import {
   toSlug,
 } from "./parseFilename";
 import { getRacePaceLapSamples, medianLapTimeMs } from "./stats/laps";
+import { getWorstStintEndWear } from "./stats/tyres";
 
 export interface BuiltSessionSummary {
   summary: SessionSummary & { fileSize: number };
@@ -442,9 +443,8 @@ function buildRaceTelemetryExtras(
   for (const stint of stints) {
     const laps = stint["stint-length"];
     if (!laps || laps < 1) continue;
-    const wearHistory = stint["tyre-wear-history"] ?? [];
-    const endWear = wearHistory.at(-1)?.average;
-    if (typeof endWear !== "number") continue;
+    const endWear = getWorstStintEndWear(stint);
+    if (endWear <= 0) continue;
     const compound = stint["tyre-set-data"]?.["visual-tyre-compound"];
     if (!compound) continue;
     stintSummaries.push({ compound, laps, endWearAvg: endWear });

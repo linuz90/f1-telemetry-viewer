@@ -82,7 +82,7 @@ export interface PlayerStintSummary {
   /** Visual compound name (Soft, Medium, Hard, Intermediate, Wet). */
   compound: string;
   laps: number;
-  /** Average tyre wear percentage at the end of the stint (0-100). */
+  /** Worst-wheel tyre wear percentage at stint end. Field name is historical. */
   endWearAvg: number;
 }
 

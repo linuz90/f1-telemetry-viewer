@@ -9,7 +9,7 @@ import type { CompoundLifeStats } from "../utils/stats/trackAggregates";
 import { getRacePaceLapSamples } from "../utils/stats/laps";
 import {
   getDriverStints,
-  getWorstWheelWear,
+  getWorstStintEndWear,
   PUNCTURE_THRESHOLD,
 } from "../utils/stats/tyres";
 import {
@@ -523,15 +523,15 @@ function observedShapeFromEntry(
   );
   if (observedLaps < entry.totalLaps - 1) return null;
 
+  const stintWearPercentages = stints.map(getWorstStintEndWear);
+  if (stintWearPercentages.some((wear) => wear <= 0)) return null;
+
   return {
     compounds: stints.map(
       (stint) => stint["tyre-set-data"]["visual-tyre-compound"],
     ),
     stintLaps: stints.map((stint) => stint["stint-length"]),
-    stintWearPercentages: stints.map((stint) => {
-      const lastWear = stint["tyre-wear-history"].at(-1);
-      return lastWear ? getWorstWheelWear(lastWear) : 0;
-    }),
+    stintWearPercentages,
   };
 }
 
