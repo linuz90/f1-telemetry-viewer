@@ -79,7 +79,7 @@ import {
   aggregateFuelData,
 } from "../utils/stats/trackAggregates";
 import { buildPaceEvolution } from "../utils/stats/trackPaceEvolution";
-import { buildTrackRaceRecommendation } from "../utils/stats/trackStrategy";
+import { buildTrackRaceRecommendation } from "../analysis/trackRaceRecommendation";
 import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
 
 const TRACK_TAB_LABELS: Record<TrackSessionKind, string> = {
@@ -225,17 +225,15 @@ export function TrackProgressPage() {
     return requestedBucket ?? defaultRaceAnalysisBucket;
   }, [defaultRaceAnalysisBucket, raceAnalysisBuckets, requestedRaceLaps]);
   const showRaceLengthSelector = raceAnalysisBuckets.length > 1;
-  const selectedCompoundLifeStats =
-    showRaceLengthSelector && selectedRaceAnalysisBucket
-      ? selectedRaceAnalysisBucket.compoundLifeStats
-      : compoundLifeStats;
+  const selectedCompoundLifeStats = selectedRaceAnalysisBucket
+    ? selectedRaceAnalysisBucket.compoundLifeStats
+    : compoundLifeStats;
   // Race sessions in the selected length bucket, used by the Key Insights
-  // recommendation and the bucket-scoped fuel stats. Falls back to all race
-  // sessions when there's only a single race-length bucket (no selector).
-  const selectedRaceSessions =
-    showRaceLengthSelector && selectedRaceAnalysisBucket
-      ? selectedRaceAnalysisBucket.sessions
-      : raceSessions;
+  // recommendation and the bucket-scoped fuel stats. Use the bucket object even
+  // when the selector is hidden so every Race-tab model shares one distance.
+  const selectedRaceSessions = selectedRaceAnalysisBucket
+    ? selectedRaceAnalysisBucket.sessions
+    : raceSessions;
   const selectedTrackFuelStats = useMemo(
     () => aggregateFuelData(selectedRaceSessions),
     [selectedRaceSessions],
@@ -254,10 +252,9 @@ export function TrackProgressPage() {
       ),
     [sessions, activeFormulaKey, trackId],
   );
-  const selectedRaceSetupCandidates =
-    showRaceLengthSelector && selectedRaceAnalysisBucket
-      ? selectedRaceAnalysisBucket.setupCandidates
-      : allRaceSetupCandidates;
+  const selectedRaceSetupCandidates = selectedRaceAnalysisBucket
+    ? selectedRaceAnalysisBucket.setupCandidates
+    : allRaceSetupCandidates;
   const raceLengthOptions = raceAnalysisBuckets.map((bucket) => ({
     value: bucket.value,
     label: bucket.label,
@@ -268,10 +265,9 @@ export function TrackProgressPage() {
     showRaceLengthSelector && selectedRaceAnalysisBucket
       ? `${selectedRaceAnalysisBucket.totalLaps}-lap`
       : undefined;
-  const selectedTyreLifeRaceCount =
-    showRaceLengthSelector && selectedRaceAnalysisBucket
-      ? selectedRaceAnalysisBucket.raceCount
-      : raceDataAll.length;
+  const selectedTyreLifeRaceCount = selectedRaceAnalysisBucket
+    ? selectedRaceAnalysisBucket.raceCount
+    : raceDataAll.length;
   const selectedTyreLifeStintCount = selectedCompoundLifeStats.reduce(
     (sum, compound) => sum + compound.stintCount,
     0,
@@ -1261,7 +1257,10 @@ export function TrackProgressPage() {
             selectedRaceSessions,
             selectedCompoundLifeStats,
             selectedTrackFuelStats,
-            { bestQualiLapMs: actualBestQualiMs },
+            {
+              bestQualiLapMs: actualBestQualiMs,
+              pitLossRaceSessions: raceSessions,
+            },
           );
           const strategyTotalLaps =
             recommendation?.recommended?.stintLaps.reduce(
@@ -1355,8 +1354,8 @@ export function TrackProgressPage() {
                 </div>
               )}
 
-              {/* Strategy — wear-balanced one-stop or high-deg two-stop, with a
-                mirror/managed alternative when the tyre evidence supports it. */}
+              {/* Strategy — ranks feasible wear-gated shapes by projected tyre
+                pace, wear, and pit-loss time for this race-length bucket. */}
               {recommendation?.recommended && strategyTotalLaps > 0 && (
                 <TrackStrategySection
                   recommended={recommendation.recommended}

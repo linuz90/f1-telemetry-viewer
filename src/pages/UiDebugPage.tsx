@@ -58,7 +58,7 @@ import {
 import type {
   TrackRaceRecommendation,
   TrackStrategySuggestion,
-} from "../utils/stats/trackStrategy";
+} from "../analysis/trackStrategyTypes";
 import type { CumulativeDelta } from "../utils/stats/laps";
 
 const COMPOUNDS = [
@@ -174,6 +174,18 @@ const trackStrategy: TrackStrategySuggestion = {
   raceCount: 2,
   fullDistanceRaceCount: 1,
   isEvidenceBacked: true,
+  timeEstimate: {
+    predictedTotalRaceMs: 2482_200,
+    deltaToFastestMs: 0,
+    pitLossMs: 19_000,
+    confidence: "medium",
+    source: "anchored to your completed race",
+    details: {
+      pitLossSource: "Pits n' Giggles Austria default",
+      paceSource: "distance-matched tyre-set deltas",
+      anchorSource: "latest completed race anchor",
+    },
+  },
 };
 
 const trackAlternative: TrackStrategySuggestion = {
@@ -185,6 +197,18 @@ const trackAlternative: TrackStrategySuggestion = {
   fullDistanceRaceCount: 1,
   isEvidenceBacked: true,
   fastStart: true,
+  timeEstimate: {
+    predictedTotalRaceMs: 2488_900,
+    deltaToFastestMs: 6700,
+    pitLossMs: 19_000,
+    confidence: "medium",
+    source: "anchored to your completed race",
+    details: {
+      pitLossSource: "Pits n' Giggles Austria default",
+      paceSource: "distance-matched tyre-set deltas",
+      anchorSource: "latest completed race anchor",
+    },
+  },
   risk: {
     kind: "managed-tyres",
     projectedMaxWear: 78.2,
