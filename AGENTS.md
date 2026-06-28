@@ -133,6 +133,13 @@ Analysis layer:
 - Product-specific ranking, curation, bucketing, and insight thresholds belong in `src/analysis/`.
 - Add concise why-comments for exporter quirks, thresholds, and comparison policies.
 
+Strategy timing:
+
+- Track Strategy timing must stay race-distance scoped. Tyre wear and degradation differ between 25%, 50%, and full-distance races, so do not reuse same-track tyre pace/wear evidence across `total-laps` buckets unless a future model explicitly normalizes race-distance percentage.
+- When same-distance strategy evidence exists, prefer same stop-count samples for strategy timing and wear projection, then fall back to the broader selected race-distance bucket.
+- Pit-loss fallbacks may cross distance because pit-lane time loss is distance-independent: infer same-track user pit loss first, then use attributed Pits n' Giggles F1 defaults, then a low-confidence F1 median. Do not invent F2 pit-loss defaults.
+- Absolute strategy durations are display estimates anchored to completed same-distance races; otherwise prefer relative deltas and confidence/source copy.
+
 Rivals roster:
 
 - Online race summaries may include `SessionSummary.rivals`.

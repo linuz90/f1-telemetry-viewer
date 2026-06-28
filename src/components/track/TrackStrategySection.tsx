@@ -1,14 +1,15 @@
 import { AlertTriangle, Award, CircleHelp, Disc } from "lucide-react";
+import type { TrackStrategySuggestion } from "../../analysis/trackStrategyTypes";
 import { cn } from "../../utils/cn";
-import type { TrackStrategySuggestion } from "../../utils/stats/trackStrategy";
 import { PUNCTURE_THRESHOLD } from "../../utils/stats/tyres";
+import { formatSignedSeconds } from "../../utils/format";
 import { cardClass } from "../Card";
 import { Tooltip } from "../Tooltip";
 import { SectionHeader } from "../ui/SectionHeader";
 import { HStack } from "../ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
 
-const STRATEGY_EVIDENCE_TOOLTIP = `Built from this race-length bucket. Wear prefers matching long stints, then compound averages. Pit laps are wear-balanced with a 1-lap undercut; stints target the ${PUNCTURE_THRESHOLD}% cap.`;
+const STRATEGY_EVIDENCE_TOOLTIP = `Built from this race-length bucket. Ranking blends distance-matched compound pace, projected wear, pit-loss cost, and managed-tyre risk; stints still target the ${PUNCTURE_THRESHOLD}% cap.`;
 
 /**
  * F1 broadcast-style strategy visualization for the Race tab. Shows the
@@ -17,10 +18,8 @@ const STRATEGY_EVIDENCE_TOOLTIP = `Built from this race-length bucket. Wear pref
  * the target pit lap.
  *
  * Shapes come from the same selected race-length tyre-wear synthesis in
- * `utils/stats/trackStrategy.ts`. The alternative row is usually a strict
- * mirror of the one-stop, but can also be a flagged managed-risk one-stop when
- * the mirror barely misses the cap or the safe recommendation falls back to
- * two stops.
+ * `analysis/trackStrategySynthesis.ts`, then get ranked by the timing model. The
+ * alternative row prefers a different stop count when that tradeoff exists.
  */
 export function TrackStrategySection({
   recommended,
@@ -108,6 +107,7 @@ function StrategyRow({
       : strategy.fastStart === false
         ? "Durable start, fast finisher"
         : "Two-stop sandwich";
+  const timingLabel = formatStrategyTiming(kind, strategy.timeEstimate);
 
   return (
     <div className="space-y-3">
@@ -122,6 +122,22 @@ function StrategyRow({
           {label}
         </span>
         <span className="text-xs text-zinc-500">· {tagline}</span>
+        {timingLabel && (
+          <Tooltip text={formatTimingTooltip(strategy)}>
+            <span
+              className={cn(
+                "inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none ring-1",
+                strategy.timeEstimate?.confidence === "low"
+                  ? "text-zinc-400 ring-white/10"
+                  : isRecommended
+                    ? "text-amber-200 ring-amber-300/30"
+                    : "text-zinc-200 ring-white/15",
+              )}
+            >
+              {timingLabel}
+            </span>
+          </Tooltip>
+        )}
       </HStack>
 
       <StintRibbon
@@ -135,6 +151,69 @@ function StrategyRow({
       <PitDetail pitWindows={strategy.pitWindows} totalLaps={totalLaps} />
     </div>
   );
+}
+
+function formatStrategyTiming(
+  kind: "recommended" | "alternative",
+  estimate: TrackStrategySuggestion["timeEstimate"],
+): string | null {
+  if (!estimate) return null;
+
+  const deltaLabel =
+    estimate.deltaToFastestMs <= 250
+      ? kind === "recommended"
+        ? "fastest"
+        : "even"
+      : formatSignedSeconds(estimate.deltaToFastestMs, 1);
+
+  if (estimate.predictedTotalRaceMs && estimate.confidence !== "low") {
+    return `~${formatRaceDuration(estimate.predictedTotalRaceMs)} · ${deltaLabel}`;
+  }
+
+  return kind === "recommended" && estimate.deltaToFastestMs <= 250
+    ? "fastest by model"
+    : deltaLabel;
+}
+
+function formatRaceDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatTimingTooltip(strategy: TrackStrategySuggestion): string {
+  const estimate = strategy.timeEstimate;
+  if (!estimate) return STRATEGY_EVIDENCE_TOOLTIP;
+
+  const detailParts = [
+    estimate.details?.pitLossSource,
+    estimate.details?.paceSource,
+    estimate.details?.anchorSource,
+  ].filter(Boolean);
+  const stopCount = strategy.pitWindows.length;
+  const pitLoss = formatPitLossTooltip(estimate.pitLossMs, stopCount);
+
+  return `${pitLoss}${estimate.confidence} confidence · ${estimate.source}${detailParts.length ? ` · ${detailParts.join(" · ")}` : ""}`;
+}
+
+function formatPitLossTooltip(
+  pitLossMs: number | undefined,
+  stopCount: number,
+): string {
+  if (pitLossMs == null || stopCount === 0) return "";
+
+  const perStop = formatSignedSeconds(pitLossMs, 1).replace("+", "");
+  if (stopCount === 1) return `Pit loss ${perStop}. `;
+
+  const total = formatSignedSeconds(pitLossMs * stopCount, 1).replace("+", "");
+  return `Pit loss ${perStop}/stop (${total} total). `;
 }
 
 /** Stacked horizontal stint ribbon — each segment's width is proportional to

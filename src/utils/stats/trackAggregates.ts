@@ -12,6 +12,8 @@ export interface CompoundLifeSample {
   stintLength: number;
   /** Zero-based position in the tyre sequence: 0 = opening stint. */
   stintIndex: number;
+  /** Number of pit stops in the source strategy shape. */
+  strategyStopCount: number;
   startLap: number;
   endLap: number;
   /** True only when this stint reached the race finish, not just a DNF export. */
@@ -113,6 +115,7 @@ export function aggregateCompoundLife(
         wearRatePerLap: rate,
         stintLength: stint["stint-length"],
         stintIndex,
+        strategyStopCount: Math.max(0, stints.length - 1),
         startLap: stint["start-lap"],
         endLap: stint["end-lap"],
         isFinalStint:
