@@ -33,6 +33,7 @@ const F1_PIT_LOSS_DEFAULT_SECONDS: Record<string, number> = {
   lasvegas: 20,
   losail: 25,
   abudhabi: 19,
+  // TODO: Add Madrid/Madring once Pits n' Giggles publishes a sourced F1 pit-loss default.
 };
 
 const F1_PIT_LOSS_ALIASES: Record<string, string> = {
