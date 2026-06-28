@@ -9,7 +9,7 @@ import { SectionHeader } from "../ui/SectionHeader";
 import { HStack } from "../ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
 
-const STRATEGY_EVIDENCE_TOOLTIP = `Built from this race-length bucket. Ranking blends distance-matched compound pace, projected wear, pit-loss cost, and managed-tyre risk; stints still target the ${PUNCTURE_THRESHOLD}% cap.`;
+const STRATEGY_EVIDENCE_TOOLTIP = `Built from this race-length bucket. Ranking blends distance-matched compound pace, projected worst-wheel wear, pit-loss cost, and managed-tyre risk; stints still target the ${PUNCTURE_THRESHOLD}% cap.`;
 
 /**
  * F1 broadcast-style strategy visualization for the Race tab. Shows the
@@ -42,7 +42,7 @@ export function TrackStrategySection({
   const subtitleParts: string[] = [];
   if (raceLengthLabel) subtitleParts.push(raceLengthLabel);
   subtitleParts.push(
-    `based on ${sampleCount} ${sampleKind}${sampleCount === 1 ? "" : "s"} of tyre-wear data`,
+    `based on ${sampleCount} ${sampleKind}${sampleCount === 1 ? "" : "s"} in this bucket`,
   );
 
   return (
@@ -263,7 +263,7 @@ function StintRibbon({
                   flexBasis: 0,
                   ...stintChipStyle(compound),
                 }}
-                title={`${compound} · ${laps} laps · projected ${formatWearPercent(stintWearPercentages[i])} wear`}
+                title={`${compound} · ${laps} laps · projected ${formatWearPercent(stintWearPercentages[i])} worst-wheel wear`}
               >
                 <span
                   className="truncate px-1"

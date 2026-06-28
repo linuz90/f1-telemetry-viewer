@@ -248,7 +248,7 @@ interface RaceScenario {
   playerPurpleSectors?: { s1?: boolean; s2?: boolean; s3?: boolean };
   /** True when the player set the overall fastest lap of the race. */
   playerSetFastestLap?: boolean;
-  /** Tyre stints the player completed (compound + laps + endWearAvg %). */
+  /** Tyre stints the player completed (compound + laps + worst-wheel end wear %; field name is historical). */
   playerStints?: PlayerStintSummary[];
   /** Optional override for player's mean lap time. */
   playerMeanMs?: number;

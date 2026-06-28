@@ -1328,7 +1328,7 @@ export function TrackProgressPage() {
                               ]
                             : []),
                           {
-                            label: "Avg wear",
+                            label: "Avg worst/lap",
                             value: `${cs.avgWearRatePerLap.toFixed(1)}%/lap`,
                             divider: cs.bestLapMs > 0,
                           },

@@ -3,7 +3,8 @@ import { isLapValid } from "../format";
 import { median } from "./core";
 import { findPlayer, isRaceSession } from "./drivers";
 import { collectGreenFlagBurnDeltas, fuelSafetyMarginLaps } from "./energy";
-import { estimateMaxLife, stintWearRate } from "./tyres";
+import type { StintWearCurvePoint } from "./tyres";
+import { estimateMaxLife, getStintWearCurve, stintWearRate } from "./tyres";
 
 /** One observed player stint kept for strategy-specific wear projections. */
 export interface CompoundLifeSample {
@@ -16,6 +17,10 @@ export interface CompoundLifeSample {
   strategyStopCount: number;
   startLap: number;
   endLap: number;
+  /** Worst-wheel wear by completed stint lap. Strategy projections use this
+   *  when a real stint is longer than the candidate stint, so late-stint wear
+   *  acceleration is not flattened into a full-stint average. */
+  wearCurve: StintWearCurvePoint[];
   /** True only when this stint reached the race finish, not just a DNF export. */
   isFinalStint: boolean;
   /**
@@ -100,6 +105,7 @@ export function aggregateCompoundLife(
       const compound = stint["tyre-set-data"]["visual-tyre-compound"];
       const rate = stintWearRate(stint);
       if (rate <= 0) continue;
+      const wearCurve = getStintWearCurve(stint);
 
       if (!byCompound[compound])
         byCompound[compound] = {
@@ -118,6 +124,7 @@ export function aggregateCompoundLife(
         strategyStopCount: Math.max(0, stints.length - 1),
         startLap: stint["start-lap"],
         endLap: stint["end-lap"],
+        wearCurve,
         isFinalStint:
           stintIndex === stints.length - 1 &&
           reachedRaceFinish &&

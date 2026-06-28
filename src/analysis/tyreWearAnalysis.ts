@@ -1,5 +1,5 @@
 import type { PerLapInfo, TyreStint } from "../types/telemetry";
-import { getWorstWheelWear } from "../utils/stats/tyres";
+import { buildWorstWearByLap, getStintWearCurve } from "../utils/stats/tyres";
 import {
   buildSafetyCarRangesFromPerLapInfo,
   type SafetyCarRange,
@@ -31,16 +31,6 @@ export interface TyreWearAnalysis {
   hasRival: boolean;
 }
 
-function buildWearMap(stints: readonly TyreStint[] | undefined) {
-  const map = new Map<number, number>();
-  for (const stint of stints ?? []) {
-    for (const entry of stint["tyre-wear-history"]) {
-      map.set(entry["lap-number"], +getWorstWheelWear(entry).toFixed(1));
-    }
-  }
-  return map;
-}
-
 /**
  * Build the Recharts-ready tyre-wear series.
  *
@@ -57,28 +47,34 @@ export function buildTyreWearAnalysis({
   rivalStints?: readonly TyreStint[];
   perLapInfo?: readonly PerLapInfo[];
 }): TyreWearAnalysis {
-  const hasAnyWearData = stints.some(
-    (stint) => stint["tyre-wear-history"].length > 0,
+  const stintWearCurves = stints.map((stint) => ({
+    stint,
+    wearCurve: getStintWearCurve(stint),
+  }));
+  const hasAnyWearData = stintWearCurves.some(
+    ({ wearCurve }) => wearCurve.length > 0,
   );
-  const rivalWearByLap = buildWearMap(rivalStints);
+  const rivalWearByLap = buildWorstWearByLap(rivalStints);
   const data: TyreWearPoint[] = [];
 
-  stints.forEach((stint, index) => {
-    const wearHistory = stint["tyre-wear-history"];
-    if (index > 0 && wearHistory.length > 0) {
+  stintWearCurves.forEach(({ stint, wearCurve }, index) => {
+    if (index > 0 && wearCurve.length > 0) {
       data.push({
-        lap: wearHistory[0]!["lap-number"] - 0.5,
+        lap: wearCurve[0]!.lapNumber - 0.5,
         wear: undefined,
         compound: "",
       });
     }
 
-    for (const wear of wearHistory) {
+    for (const wear of wearCurve) {
       data.push({
-        lap: wear["lap-number"],
-        wear: +getWorstWheelWear(wear).toFixed(1),
+        lap: wear.lapNumber,
+        wear: +wear.worstWear.toFixed(1),
         compound: stint["tyre-set-data"]["visual-tyre-compound"],
-        rivalWear: rivalWearByLap.get(wear["lap-number"]) ?? undefined,
+        rivalWear:
+          rivalWearByLap.get(wear.lapNumber) == null
+            ? undefined
+            : +rivalWearByLap.get(wear.lapNumber)!.toFixed(1),
       });
     }
   });

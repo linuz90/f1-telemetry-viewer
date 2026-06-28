@@ -2,7 +2,7 @@ import type { LapHistoryEntry, TyreStint } from "../types/telemetry";
 import { isLapValid } from "../utils/format";
 import {
   estimateMaxLife,
-  getWorstWheelWear,
+  getWorstStintEndWear,
   stintWearRate,
 } from "../utils/stats/tyres";
 
@@ -89,11 +89,7 @@ export function buildStintDetails(
 
   return stints.map((stint, index) => {
     const compound = stint["tyre-set-data"]["visual-tyre-compound"];
-    const wearHistory = stint["tyre-wear-history"];
-    const peakWear =
-      wearHistory.length > 0
-        ? getWorstWheelWear(wearHistory[wearHistory.length - 1]!)
-        : 0;
+    const peakWear = getWorstStintEndWear(stint);
     const wearRate = stintWearRate(stint);
     const stintTimes: number[] = [];
     const stintTimesWithOutlap: number[] = [];
