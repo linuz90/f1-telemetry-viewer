@@ -15,6 +15,7 @@ F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON ex
 
 ```bash
 pnpm dev                      # Start dev server, usually http://localhost:5173
+pnpm dev:port                 # Print the expected dev server port for this checkout
 pnpm dev:telemetry <folder>   # Start dev server against one telemetry folder
 pnpm dev:debug                # Use DEBUG_TELEMETRY_DIR from .env
 pnpm dev:prod                 # Skip local API; use demo/upload mode
@@ -40,6 +41,7 @@ When a user gives a localhost URL or screenshot, prefer the telemetry source tha
 - `.worktreeinclude` copies ignored local env files into managed worktrees.
 - Conductor shared settings: `.conductor/settings.toml`.
 - Personal Conductor overrides: `.conductor/settings.local.toml` (gitignored).
+- Dev server ports are deterministic in managed worktrees: Conductor uses `$CONDUCTOR_PORT`; Codex worktrees under `$CODEX_HOME/worktrees` get a stable hash-based Vite port. Run `pnpm dev:port` or `pnpm dev:port -- --json` to inspect it. Export `VITE_DEV_PORT` to override manually.
 - If no `.env` exists in a worktree, use `pnpm dev:prod` or create one from `.env.example`.
 
 ## Architecture

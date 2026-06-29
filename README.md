@@ -64,12 +64,15 @@ Then start the app:
 pnpm dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Open the URL printed by Vite, usually [http://localhost:5173](http://localhost:5173).
+Managed Codex/Conductor worktrees use deterministic per-worktree ports so
+parallel branches do not silently drift to whichever port is next available.
 
 ## Commands
 
 ```bash
-pnpm dev            # Start dev server at http://localhost:5173
+pnpm dev            # Start dev server, usually at http://localhost:5173
+pnpm dev:port       # Print the expected dev server port for this checkout
 pnpm dev:telemetry <folder>  # Start dev server with a specific telemetry folder
 pnpm dev:debug      # Start dev server with DEBUG_TELEMETRY_DIR from .env
 pnpm dev:prod       # Run the production-like demo/upload flow locally
@@ -90,6 +93,8 @@ pnpm dev:telemetry /path/to/debug-data -- --host 127.0.0.1 --port 5174
 ```
 
 The folder is served through the normal local `/api/sessions` flow, so scoped session URLs, track pages, and browser refreshes work the same way as your main telemetry directory.
+Run `pnpm dev:port -- --url` to print the expected local URL, or export
+`VITE_DEV_PORT` if you need to pin a specific dev-server port manually.
 
 If you have a larger generated/debug telemetry corpus, keep its path out of git
 and put it in your local `.env`:

@@ -3,12 +3,21 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { telemetryServer } from "./src/plugin/telemetry-server";
 import { changelogPlugin } from "./src/plugin/changelog";
+import { resolveDevServerPort } from "./scripts/dev-server-port.ts";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const devServerPort = resolveDevServerPort();
+
   return {
     server: {
       open: true,
+      ...(devServerPort.port
+        ? {
+            port: devServerPort.port,
+            strictPort: devServerPort.strict,
+          }
+        : {}),
     },
     plugins: [
       react(),

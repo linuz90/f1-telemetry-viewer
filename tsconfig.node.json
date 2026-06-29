@@ -10,5 +10,11 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "src/plugin/**/*", "src/utils/parseFilename.ts"]
+  "include": [
+    "vite.config.ts",
+    "scripts/dev-port.ts",
+    "scripts/dev-server-port.ts",
+    "src/plugin/**/*",
+    "src/utils/parseFilename.ts"
+  ]
 }
