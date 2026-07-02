@@ -54,7 +54,8 @@ function buildPitWindow(stintEndLap: number, totalLaps: number) {
 //      grip falls off a cliff.
 //   5. Candidate strategies are scored by distance-matched compound pace, wear
 //      degradation, pit-loss cost, and managed-tyre risk. The fastest scored
-//      candidate becomes Recommended; the next distinct shape becomes Alternative.
+//      candidate becomes Recommended; Alternative prefers a different stop count
+//      only when it stays time-competitive, otherwise the next best distinct shape.
 //   6. Two-stop sandwich (fast-durable-fast) stays in the candidate set so the
 //      scorer can decide when an extra stop pays back on high-wear tracks.
 //
@@ -74,6 +75,10 @@ const UNDERCUT_NUDGE_LAPS = 1;
  *  too far into "hope for a safety car" territory to present as a strategy. */
 const MANAGED_ONE_STOP_WEAR_BUFFER = 7;
 const ONE_STOP_PIT_LAP_ADJUSTMENTS = [0, -1, 1] as const;
+// Show stop-count variety only when it is plausibly actionable. A 15-20s slower
+// two-stop is technically different, but a near-even one-stop mirror is the more
+// useful alternative for race planning.
+const STOP_COUNT_ALTERNATIVE_MAX_DELTA_MS = 5_000;
 
 function pickLatestRelevantSample(
   samples: CompoundLifeSample[],
@@ -323,6 +328,16 @@ function shapeKey(shape: TrackStrategyShape): string {
   return `${shape.compounds.join(">")}|${shape.stintLaps.join("-")}`;
 }
 
+function isCompetitiveStopCountAlternative(
+  suggestion: TrackStrategySuggestion,
+): boolean {
+  return (
+    suggestion.timeEstimate != null &&
+    suggestion.timeEstimate.deltaToFastestMs <=
+      STOP_COUNT_ALTERNATIVE_MAX_DELTA_MS
+  );
+}
+
 function candidateFallbackRank(candidate: StrategyCandidate): number {
   if (candidate.kind === "one-stop") return 0;
   if (candidate.kind === "two-stop") return 1;
@@ -462,13 +477,20 @@ export function synthesizeStrategies(
   const isDifferentSuggestion = (suggestion: TrackStrategySuggestion) =>
     `${suggestion.compounds.join(">")}|${suggestion.stintLaps.join("-")}` !==
     recommendedKey;
+  const hasRecommendedStopCount = (suggestion: TrackStrategySuggestion) =>
+    suggestion.pitWindows.length === recommendedStopCount;
   const alternative =
     suggestions.find(
       (suggestion) =>
         isDifferentSuggestion(suggestion) &&
-        suggestion.pitWindows.length !== recommendedStopCount,
+        !hasRecommendedStopCount(suggestion) &&
+        isCompetitiveStopCountAlternative(suggestion),
     ) ??
-    suggestions.find((suggestion) => isDifferentSuggestion(suggestion)) ??
+    suggestions.find(
+      (suggestion) =>
+        isDifferentSuggestion(suggestion) &&
+        hasRecommendedStopCount(suggestion),
+    ) ??
     null;
 
   return { recommended, alternative };

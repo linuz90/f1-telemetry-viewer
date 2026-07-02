@@ -36,11 +36,20 @@ const PIT_LOSS_MIN_MS = 10_000;
 const PIT_LOSS_MAX_MS = 45_000;
 const PIT_LOSS_LOOKAROUND_LAPS = 6;
 const PIT_LOSS_NEIGHBOR_SAMPLE_COUNT = 3;
+const PIT_LOSS_REFERENCE_OUTLIER_MS = 7_000;
+const PIT_LOSS_REFERENCE_OUTLIER_RATIO = 0.3;
+const PIT_LOSS_SAMPLE_OUTLIER_MS = 5_000;
+const PIT_LOSS_SAMPLE_OUTLIER_RATIO = 0.18;
+const PIT_LOSS_HIGH_CONFIDENCE_SPREAD_MS = 3_000;
 
 interface PitLossEstimate {
   ms: number;
   confidence: StrategyEstimateConfidence;
   source: string;
+}
+
+interface PitLossSample {
+  lossMs: number;
 }
 
 interface CompoundPaceModel {
@@ -122,8 +131,64 @@ function nearbyCleanMedianLapTime(
   return median(values) ?? null;
 }
 
-function inferPitLoss(entries: BucketRaceEntry[]): PitLossEstimate | null {
-  const losses: number[] = [];
+function isNearReferencePitLoss(lossMs: number, referenceMs: number): boolean {
+  const tolerance = Math.max(
+    PIT_LOSS_REFERENCE_OUTLIER_MS,
+    referenceMs * PIT_LOSS_REFERENCE_OUTLIER_RATIO,
+  );
+  return Math.abs(lossMs - referenceMs) <= tolerance;
+}
+
+function filterPitLossOutliers(
+  samples: PitLossSample[],
+  referenceMs: number | null,
+): PitLossSample[] {
+  let eligible = referenceMs
+    ? samples.filter((sample) =>
+        isNearReferencePitLoss(sample.lossMs, referenceMs),
+      )
+    : samples;
+
+  if (eligible.length <= 1) return eligible;
+
+  if (eligible.length === 2) {
+    const spread = Math.abs(eligible[0].lossMs - eligible[1].lossMs);
+    // With only two stops, a wide disagreement is more likely traffic/impeding
+    // than real pit-lane geometry. Prefer the sourced/default fallback instead
+    // of averaging one clean stop with one compromised stop.
+    return spread <= PIT_LOSS_SAMPLE_OUTLIER_MS ? eligible : [];
+  }
+
+  const center = median(eligible.map((sample) => sample.lossMs));
+  if (center == null) return [];
+
+  const tolerance = Math.max(
+    PIT_LOSS_SAMPLE_OUTLIER_MS,
+    center * PIT_LOSS_SAMPLE_OUTLIER_RATIO,
+  );
+  const filtered = eligible.filter(
+    (sample) => Math.abs(sample.lossMs - center) <= tolerance,
+  );
+
+  // If the robust pass rejects everything, none of the samples are meaningful
+  // enough to beat the track default.
+  eligible = filtered;
+  return eligible;
+}
+
+function pitLossSource(usedCount: number, totalCount: number): string {
+  const ignoredCount = totalCount - usedCount;
+  const stopLabel = `user pit stop${totalCount === 1 ? "" : "s"}`;
+  if (ignoredCount <= 0) return `inferred from ${usedCount} ${stopLabel}`;
+
+  return `inferred from ${usedCount} of ${totalCount} ${stopLabel}; ignored ${ignoredCount} outlier${ignoredCount === 1 ? "" : "s"}`;
+}
+
+function inferPitLoss(
+  entries: BucketRaceEntry[],
+  referenceMs: number | null,
+): PitLossEstimate | null {
+  const samples: PitLossSample[] = [];
 
   for (const entry of entries) {
     const stints = getDriverStints(entry.player);
@@ -152,18 +217,25 @@ function inferPitLoss(entries: BucketRaceEntry[]): PitLossEstimate | null {
 
       const lossMs = pitInMs + pitOutMs - expectedInMs - expectedOutMs;
       if (lossMs >= PIT_LOSS_MIN_MS && lossMs <= PIT_LOSS_MAX_MS) {
-        losses.push(lossMs);
+        samples.push({ lossMs });
       }
     }
   }
 
+  const filteredSamples = filterPitLossOutliers(samples, referenceMs);
+  const losses = filteredSamples.map((sample) => sample.lossMs);
   const pitLossMs = median(losses);
   if (pitLossMs == null) return null;
+  const spread =
+    losses.length > 1 ? Math.max(...losses) - Math.min(...losses) : 0;
 
   return {
     ms: pitLossMs,
-    confidence: losses.length >= 2 ? "high" : "medium",
-    source: `inferred from ${losses.length} user pit stop${losses.length === 1 ? "" : "s"}`,
+    confidence:
+      losses.length >= 2 && spread <= PIT_LOSS_HIGH_CONFIDENCE_SPREAD_MS
+        ? "high"
+        : "medium",
+    source: pitLossSource(losses.length, samples.length),
   };
 }
 
@@ -171,17 +243,19 @@ function resolvePitLoss(
   pitLossEntries: BucketRaceEntry[],
   representative: BucketRaceEntry,
 ): PitLossEstimate | null {
-  const inferred = inferPitLoss(pitLossEntries);
-  if (inferred) return inferred;
-
   const formulaKey = getFormulaComparisonKey(
     representative.session["session-info"].formula,
     representative.session["game-year"],
   );
+  const trackId = representative.session["session-info"]["track-id"];
+  const defaultMs = formulaKey.startsWith("f1-")
+    ? getF1PitLossDefaultMs(trackId)
+    : null;
+  const inferred = inferPitLoss(pitLossEntries, defaultMs);
+  if (inferred) return inferred;
+
   if (!formulaKey.startsWith("f1-")) return null;
 
-  const trackId = representative.session["session-info"]["track-id"];
-  const defaultMs = getF1PitLossDefaultMs(trackId);
   if (defaultMs != null) {
     return {
       ms: defaultMs,

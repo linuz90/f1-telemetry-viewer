@@ -1354,8 +1354,8 @@ export function TrackProgressPage() {
                 </div>
               )}
 
-              {/* Strategy — ranks feasible wear-gated shapes by projected tyre
-                pace, wear, and pit-loss time for this race-length bucket. */}
+              {/* Strategy — ranks feasible wear-gated shapes by bucket-scoped
+                tyre pace/wear plus same-track or default pit-loss time. */}
               {recommendation?.recommended && strategyTotalLaps > 0 && (
                 <TrackStrategySection
                   recommended={recommendation.recommended}

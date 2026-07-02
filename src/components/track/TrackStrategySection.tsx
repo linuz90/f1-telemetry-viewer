@@ -9,7 +9,7 @@ import { SectionHeader } from "../ui/SectionHeader";
 import { HStack } from "../ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
 
-const STRATEGY_EVIDENCE_TOOLTIP = `Built from this race-length bucket. Ranking blends distance-matched compound pace, projected worst-wheel wear, pit-loss cost, and managed-tyre risk; stints still target the ${PUNCTURE_THRESHOLD}% cap.`;
+const STRATEGY_EVIDENCE_TOOLTIP = `Pace and wear come from this race-length bucket. Ranking blends distance-matched compound pace, projected worst-wheel wear, pit-loss cost, and managed-tyre risk; pit loss uses same-track player stops when available, then F1 defaults. Stints still target the ${PUNCTURE_THRESHOLD}% cap.`;
 
 /**
  * F1 broadcast-style strategy visualization for the Race tab. Shows the
@@ -19,7 +19,8 @@ const STRATEGY_EVIDENCE_TOOLTIP = `Built from this race-length bucket. Ranking b
  *
  * Shapes come from the same selected race-length tyre-wear synthesis in
  * `analysis/trackStrategySynthesis.ts`, then get ranked by the timing model. The
- * alternative row prefers a different stop count when that tradeoff exists.
+ * alternative row prefers a different stop count only when that tradeoff stays
+ * time-competitive.
  */
 export function TrackStrategySection({
   recommended,
