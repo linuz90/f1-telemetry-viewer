@@ -5,6 +5,7 @@ import {
   buildSessionInsightsHint,
   buildSessionSummaryInsights,
 } from "../analysis/sessionInsightSummary";
+import { buildEventLocationBreakdown } from "../analysis/eventLocationBreakdown";
 import { buildStartReactionModel } from "../analysis/startReactionAnalysis";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
@@ -12,6 +13,7 @@ import { CompoundLapComparison } from "../components/CompoundLapComparison";
 import { DamageTimeline } from "../components/DamageTimeline";
 import { DriverComparisonPicker } from "../components/DriverComparisonPicker";
 import { DuplicateNotice } from "../components/DuplicateNotice";
+import { EventLocationPieChart } from "../components/EventLocationPieChart";
 import { LapTimeChart } from "../components/LapTimeChart";
 import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
 import { PositionChart } from "../components/PositionChart";
@@ -194,6 +196,14 @@ export function RaceSessionView({
   );
   const raceControlOvertakes = useMemo(
     () => raceControlEventsToOvertakes(raceControlEvents),
+    [raceControlEvents],
+  );
+  const overtakeLocations = useMemo(
+    () => buildEventLocationBreakdown(raceControlEvents, "OVERTAKE"),
+    [raceControlEvents],
+  );
+  const collisionLocations = useMemo(
+    () => buildEventLocationBreakdown(raceControlEvents, "COLLISION"),
     [raceControlEvents],
   );
   const filteredOvertakes = useMemo(
@@ -427,6 +437,50 @@ export function RaceSessionView({
             raceControlEvents={raceControlEvents}
           />
         </Card>
+
+        {/* Where overtakes and collisions happened on track. Gated on total
+            (not located) events so pre-v4.3.0 sessions still render the cards
+            with an explanation instead of silently disappearing. */}
+        {(overtakeLocations.total > 0 || collisionLocations.total > 0) && (
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card as="section">
+              <EventLocationPieChart
+                title="Overtake Locations"
+                unit="overtake"
+                breakdown={overtakeLocations}
+                emptyMessage="No overtakes were recorded for this session."
+                focus={
+                  focusedDriver
+                    ? {
+                        driver: focusedDriver,
+                        mode: "overtaker",
+                        events: raceControlEvents,
+                        messageType: "OVERTAKE",
+                      }
+                    : undefined
+                }
+              />
+            </Card>
+            <Card as="section">
+              <EventLocationPieChart
+                title="Collision Locations"
+                unit="collision"
+                breakdown={collisionLocations}
+                emptyMessage="No collisions were recorded for this session."
+                focus={
+                  focusedDriver
+                    ? {
+                        driver: focusedDriver,
+                        mode: "involved",
+                        events: raceControlEvents,
+                        messageType: "COLLISION",
+                      }
+                    : undefined
+                }
+              />
+            </Card>
+          </div>
+        )}
 
         <DuplicateNotice
           count={sessionMeta?.duplicateCount ?? 0}

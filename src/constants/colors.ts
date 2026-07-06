@@ -119,6 +119,29 @@ export const CHART_THEME = {
   valid: "#10b981",
 } as const;
 
+/**
+ * Categorical palette for location-breakdown pie charts (overtake / collision
+ * locations). Eight fixed hues assigned in order (never cycled by rank across
+ * repaints), ordered so adjacent slices stay distinct. Drawn from the same
+ * Tailwind-500 family the rest of the app's charts use (see SECTOR_COLORS,
+ * DAMAGE_COLORS, CHART_THEME) so it reads as one system; slices carry a direct
+ * label via the legend rather than relying on color alone. "Other" / "Unknown"
+ * buckets use `LOCATION_OTHER_COLOR` so an aggregate slice never reads as a hue.
+ */
+export const LOCATION_BREAKDOWN_COLORS = [
+  "#3b82f6", // blue-500
+  "#f97316", // orange-500
+  "#22c55e", // green-500
+  "#a855f7", // purple-500
+  "#22d3ee", // cyan-400
+  "#ec4899", // pink-500
+  "#eab308", // yellow-500
+  "#ef4444", // red-500
+] as const;
+
+/** Muted grey for the aggregate "Other" / "Unknown" slices. */
+export const LOCATION_OTHER_COLOR = CHART_THEME.muted;
+
 /** Reusable Recharts tooltip content style. */
 export const TOOLTIP_STYLE = {
   contentStyle: {

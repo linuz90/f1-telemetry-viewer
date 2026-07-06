@@ -25,6 +25,7 @@ import {
 import { accentCardClass, cardClass } from "../components/Card";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { CompoundStatCard } from "../components/CompoundStatCard";
+import { EventLocationPieChart } from "../components/EventLocationPieChart";
 import { RaceSetupComparison } from "../components/RaceSetupComparison";
 import { SessionRow } from "../components/SessionRow";
 import { getSessionTypeMeta } from "../components/sessionTypeMeta";
@@ -53,6 +54,7 @@ import {
   type TrackSessionData,
   type TrackSessionKind,
 } from "../analysis/trackAnalysis";
+import { buildTrackLocationBreakdowns } from "../analysis/eventLocationBreakdown";
 import { buildTrackRivalBenchmark } from "../analysis/rivalStats";
 import type { SessionSummary } from "../types/telemetry";
 import { cn } from "../utils/cn";
@@ -66,6 +68,7 @@ import {
   msToLapTime,
   msToSectorTime,
 } from "../utils/format";
+import { getRaceControlEvents } from "../utils/raceControl";
 import { isTrackSlugMatch } from "../utils/tracks";
 import {
   dashboardPath,
@@ -205,6 +208,24 @@ export function TrackProgressPage() {
   const compoundLifeStats = useMemo(
     () => aggregateCompoundLife(raceSessions),
     [raceSessions],
+  );
+  // Overtake/collision locations aggregated across every race at this track.
+  // Location distribution isn't race-length dependent, so we pool all races
+  // (not the length bucket) for the strongest sample. Races that predate the
+  // v4.3.0 location data are excluded from the pies (see helper) and reported
+  // via excludedRaceCount so we can note the coverage.
+  const raceEventLists = useMemo(
+    () => raceSessions.map((session) => getRaceControlEvents(session)),
+    [raceSessions],
+  );
+  const {
+    overtakes: overtakeLocations,
+    collisions: collisionLocations,
+    locatedRaceCount,
+    excludedRaceCount,
+  } = useMemo(
+    () => buildTrackLocationBreakdowns(raceEventLists),
+    [raceEventLists],
   );
   const allRaceSetupCandidates = useMemo(
     () => buildRaceSetupCandidates(raceDataAll),
@@ -1368,6 +1389,44 @@ export function TrackProgressPage() {
               {/* Pace evolution (race-on-race race-pace window per compound) */}
               {paceEvolutionData.length > 1 && (
                 <PaceEvolutionChart data={paceEvolutionData} />
+              )}
+
+              {/* Where overtakes and collisions happen at this track,
+                  aggregated across the races that carry location data. Gated on
+                  total (not located) events so tracks whose races all predate
+                  v4.3.0 still render the cards with an explanation instead of
+                  silently disappearing. */}
+              {(overtakeLocations.total > 0 ||
+                collisionLocations.total > 0) && (
+                <div>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <section className={cardClass}>
+                      <EventLocationPieChart
+                        title="Overtake Locations"
+                        unit="overtake"
+                        breakdown={overtakeLocations}
+                        emptyMessage="No overtakes were recorded at this track."
+                      />
+                    </section>
+                    <section className={cardClass}>
+                      <EventLocationPieChart
+                        title="Collision Locations"
+                        unit="collision"
+                        breakdown={collisionLocations}
+                        emptyMessage="No collisions were recorded at this track."
+                      />
+                    </section>
+                  </div>
+                  {locatedRaceCount > 0 && excludedRaceCount > 0 && (
+                    <p className="mt-2 text-xs text-zinc-600">
+                      Based on {locatedRaceCount} race
+                      {locatedRaceCount === 1 ? "" : "s"} with track-location
+                      data. {excludedRaceCount} older race
+                      {excludedRaceCount === 1 ? "" : "s"} (pre-v4.3.0){" "}
+                      {excludedRaceCount === 1 ? "is" : "are"} excluded.
+                    </p>
+                  )}
+                </div>
               )}
 
               {/* Race setup comparison */}
