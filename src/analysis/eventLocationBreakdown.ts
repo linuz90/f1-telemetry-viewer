@@ -99,9 +99,9 @@ function foldTailBySector(tail: LocatedBucket[]): LocationSlice[] {
  * track location the race-control timeline shows for them
  * (`formatRaceControlLocation`: corner/segment name, falling back to sector).
  *
- * Events without location data (older exports that carry no `segment-info`) are
- * counted as "Unknown" and reported via `locatedCount` so callers can hide the
- * chart when nothing has a resolvable location.
+ * Events without location fields are counted as "Unknown" and reported via
+ * `locatedCount` so callers can explain unavailable location detail without
+ * inferring it from an exporter version string.
  */
 export function buildEventLocationBreakdown(
   events: RaceControlEvent[],
@@ -173,14 +173,16 @@ export interface TrackLocationBreakdown {
 }
 
 /**
- * Aggregate overtake/collision locations across a track's races. Location data
- * is all-or-nothing per session (added in Pits n' Giggles v4.3.0), so a race
- * either fully has it or not — mixing them would dump whole older races into one
- * huge "Unknown" wedge. Instead we bucket only the races that have location and
- * report `excludedRaceCount` so the UI can note the coverage.
+ * Aggregate overtake/collision locations across a track's races. Location field
+ * availability is detected from the events themselves, not the exporter version,
+ * because real exports can report a current version while still omitting these
+ * fields for some incidents. Races without any located incidents are excluded
+ * from the pies so they don't collapse into one huge "Unknown" wedge; the UI
+ * reports `excludedRaceCount` so it can note the coverage.
  *
  * When no race has location, we fall back to every race's events so the charts
- * still surface the "needs v4.3.0" explanation rather than reading "no events".
+ * still surface the unavailable-location explanation rather than reading
+ * "no events".
  */
 export function buildTrackLocationBreakdowns(
   raceEventLists: RaceControlEvent[][],

@@ -116,11 +116,12 @@ export function EventLocationPieChart({
       {total === 0 ? (
         <EmptyState title={title} message={noDataMessage} />
       ) : locatedCount === 0 ? (
-        // Events exist but predate the location data. Say when it landed so the
-        // absence is explained rather than the section silently vanishing.
+        // Events exist, but this export did not include the fields needed to
+        // place them on track. Avoid inferring exporter age from version strings:
+        // some current-version files can still omit location detail.
         <EmptyState
           title={title}
-          message="Track locations are recorded from Pits n' Giggles v4.3.0 onwards; this session data is from an older version."
+          message="Track-location fields were not recorded for these events."
         />
       ) : (
         <div className="flex flex-col items-center gap-5 sm:flex-row">

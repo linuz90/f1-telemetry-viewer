@@ -211,9 +211,9 @@ export function TrackProgressPage() {
   );
   // Overtake/collision locations aggregated across every race at this track.
   // Location distribution isn't race-length dependent, so we pool all races
-  // (not the length bucket) for the strongest sample. Races that predate the
-  // v4.3.0 location data are excluded from the pies (see helper) and reported
-  // via excludedRaceCount so we can note the coverage.
+  // (not the length bucket) for the strongest sample. Races without located
+  // incidents are excluded from the pies (see helper) and reported via
+  // excludedRaceCount so we can note the coverage.
   const raceEventLists = useMemo(
     () => raceSessions.map((session) => getRaceControlEvents(session)),
     [raceSessions],
@@ -1393,8 +1393,8 @@ export function TrackProgressPage() {
 
               {/* Where overtakes and collisions happen at this track,
                   aggregated across the races that carry location data. Gated on
-                  total (not located) events so tracks whose races all predate
-                  v4.3.0 still render the cards with an explanation instead of
+                  total (not located) events so tracks whose races lack location
+                  fields still render the cards with an explanation instead of
                   silently disappearing. */}
               {(overtakeLocations.total > 0 ||
                 collisionLocations.total > 0) && (
@@ -1421,8 +1421,9 @@ export function TrackProgressPage() {
                     <p className="mt-2 text-xs text-zinc-600">
                       Based on {locatedRaceCount} race
                       {locatedRaceCount === 1 ? "" : "s"} with track-location
-                      data. {excludedRaceCount} older race
-                      {excludedRaceCount === 1 ? "" : "s"} (pre-v4.3.0){" "}
+                      data. {excludedRaceCount} race
+                      {excludedRaceCount === 1 ? "" : "s"} without
+                      track-location data{" "}
                       {excludedRaceCount === 1 ? "is" : "are"} excluded.
                     </p>
                   )}

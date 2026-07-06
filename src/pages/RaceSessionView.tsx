@@ -439,8 +439,9 @@ export function RaceSessionView({
         </Card>
 
         {/* Where overtakes and collisions happened on track. Gated on total
-            (not located) events so pre-v4.3.0 sessions still render the cards
-            with an explanation instead of silently disappearing. */}
+            (not located) events so sessions missing location fields still
+            render the cards with an explanation instead of silently
+            disappearing. */}
         {(overtakeLocations.total > 0 || collisionLocations.total > 0) && (
           <div className="grid gap-6 md:grid-cols-2">
             <Card as="section">
