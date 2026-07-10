@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
   const devServerPort = resolveDevServerPort();
 
   return {
+    base: env.VITE_BASE_PATH || "/",
     server: {
       open: true,
       ...(devServerPort.port

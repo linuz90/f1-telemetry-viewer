@@ -2,7 +2,7 @@ import type { SessionSummary, TelemetrySession } from "../types/telemetry";
 
 /** Fetch list of all available sessions */
 export async function listSessions(): Promise<SessionSummary[]> {
-  const res = await fetch("/api/sessions");
+  const res = await fetch(`${import.meta.env.BASE_URL}api/sessions`);
   if (!res.ok) throw new Error("Failed to load sessions");
   return res.json();
 }
@@ -14,7 +14,7 @@ export function getSession(slug: string): Promise<TelemetrySession> {
   const cached = sessionCache.get(slug);
   if (cached) return cached;
 
-  const promise = fetch(`/api/sessions/${slug}`).then((res) => {
+  const promise = fetch(`${import.meta.env.BASE_URL}api/sessions/${slug}`).then((res) => {
     if (!res.ok) {
       sessionCache.delete(slug);
       throw new Error(`Failed to load session: ${slug}`);

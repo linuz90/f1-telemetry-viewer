@@ -94,7 +94,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   // Detect mode on mount
   useEffect(() => {
     const tryDemo = () =>
-      fetch("/demo/sessions.json")
+      fetch(`${import.meta.env.BASE_URL}demo/sessions.json`)
         .then((res) => {
           if (!res.ok) throw new Error("No demo data");
           return res.json() as Promise<SessionSummary[]>;
@@ -113,7 +113,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    fetch("/api/sessions")
+    fetch(`${import.meta.env.BASE_URL}api/sessions`)
       .then((res) => {
         if (!res.ok) throw new Error("API unavailable");
         return res.json() as Promise<SessionSummary[]>;
@@ -141,7 +141,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         const cached = apiCache.get(slug);
         if (cached) return cached;
 
-        const promise = fetch(`/demo/${slug}.json`).then((res) => {
+        const promise = fetch(`${import.meta.env.BASE_URL}demo/${slug}.json`).then((res) => {
           if (!res.ok) {
             apiCache.delete(slug);
             throw new Error(`Failed to load demo session: ${slug}`);
@@ -157,7 +157,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       const cached = apiCache.get(slug);
       if (cached) return cached;
 
-      const promise = fetch(`/api/sessions/${slug}`).then((res) => {
+      const promise = fetch(`${import.meta.env.BASE_URL}api/sessions/${slug}`).then((res) => {
         if (!res.ok) {
           apiCache.delete(slug);
           throw new Error(`Failed to load session: ${slug}`);
