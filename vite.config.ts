@@ -8,8 +8,14 @@ import { resolveDevServerPort } from "./scripts/dev-server-port.ts";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const devServerPort = resolveDevServerPort();
+  const rawBase = env.VITE_BASE_PATH || "/";
+  const leadingSlashBase = rawBase.startsWith("/") ? rawBase : `/${rawBase}`;
+  const base = leadingSlashBase.endsWith("/")
+    ? leadingSlashBase
+    : `${leadingSlashBase}/`;
 
   return {
+    base,
     server: {
       open: true,
       ...(devServerPort.port
@@ -23,7 +29,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       changelogPlugin(),
-      telemetryServer(env.TELEMETRY_DIR),
+      telemetryServer(env.TELEMETRY_DIR, base),
     ],
   };
 });
