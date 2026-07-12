@@ -14,13 +14,15 @@ export function getSession(slug: string): Promise<TelemetrySession> {
   const cached = sessionCache.get(slug);
   if (cached) return cached;
 
-  const promise = fetch(`${import.meta.env.BASE_URL}api/sessions/${slug}`).then((res) => {
-    if (!res.ok) {
-      sessionCache.delete(slug);
-      throw new Error(`Failed to load session: ${slug}`);
-    }
-    return res.json() as Promise<TelemetrySession>;
-  });
+  const promise = fetch(`${import.meta.env.BASE_URL}api/sessions/${slug}`).then(
+    (res) => {
+      if (!res.ok) {
+        sessionCache.delete(slug);
+        throw new Error(`Failed to load session: ${slug}`);
+      }
+      return res.json() as Promise<TelemetrySession>;
+    },
+  );
 
   sessionCache.set(slug, promise);
   return promise;

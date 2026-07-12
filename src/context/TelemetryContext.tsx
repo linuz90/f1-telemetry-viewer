@@ -141,7 +141,9 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         const cached = apiCache.get(slug);
         if (cached) return cached;
 
-        const promise = fetch(`${import.meta.env.BASE_URL}demo/${slug}.json`).then((res) => {
+        const promise = fetch(
+          `${import.meta.env.BASE_URL}demo/${slug}.json`,
+        ).then((res) => {
           if (!res.ok) {
             apiCache.delete(slug);
             throw new Error(`Failed to load demo session: ${slug}`);
@@ -157,7 +159,9 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       const cached = apiCache.get(slug);
       if (cached) return cached;
 
-      const promise = fetch(`${import.meta.env.BASE_URL}api/sessions/${slug}`).then((res) => {
+      const promise = fetch(
+        `${import.meta.env.BASE_URL}api/sessions/${slug}`,
+      ).then((res) => {
         if (!res.ok) {
           apiCache.delete(slug);
           throw new Error(`Failed to load session: ${slug}`);

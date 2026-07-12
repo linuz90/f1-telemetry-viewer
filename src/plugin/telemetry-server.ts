@@ -25,16 +25,28 @@ function findJsonFiles(dir: string, base: string): string[] {
  * Vite plugin that serves telemetry JSON files from a local directory.
  * - GET /api/sessions — list all sessions with metadata
  * - GET /api/sessions/[relativePath] — return raw JSON for a session
+ *
+ * `base` is the configured Vite base path (e.g. "/save-viewer/"). The dev
+ * server does not strip it before handing requests to middleware, so
+ * built asset requests to `${base}api/sessions` would otherwise fall
+ * through to `next()` and 404 whenever `base` isn't "/".
  */
-export function telemetryServer(telemetryDir?: string): Plugin {
+export function telemetryServer(telemetryDir?: string, base = "/"): Plugin {
   // Maps slug → relativePath for session lookup
   const slugMap = new Map<string, string>();
+  const basePrefix = base.endsWith("/") ? base.slice(0, -1) : base;
 
   return {
     name: "telemetry-server",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith("/api/sessions")) return next();
+        const rawUrl = req.url ?? "";
+        const url =
+          basePrefix && rawUrl.startsWith(basePrefix)
+            ? rawUrl.slice(basePrefix.length)
+            : rawUrl;
+
+        if (!url.startsWith("/api/sessions")) return next();
 
         if (!telemetryDir) {
           res.statusCode = 500;
@@ -43,7 +55,7 @@ export function telemetryServer(telemetryDir?: string): Plugin {
         }
 
         // GET /api/sessions — list all sessions
-        if (req.url === "/api/sessions" || req.url === "/api/sessions/") {
+        if (url === "/api/sessions" || url === "/api/sessions/") {
           slugMap.clear();
           const files = findJsonFiles(telemetryDir, telemetryDir);
           const sessions = files
@@ -86,7 +98,7 @@ export function telemetryServer(telemetryDir?: string): Plugin {
         }
 
         // GET /api/sessions/[slug] — return session JSON
-        const slug = req.url.replace("/api/sessions/", "");
+        const slug = url.replace("/api/sessions/", "");
         const sessionPath = slugMap.get(slug);
 
         if (!sessionPath) {
