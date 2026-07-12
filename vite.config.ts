@@ -9,7 +9,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const devServerPort = resolveDevServerPort();
   const rawBase = env.VITE_BASE_PATH || "/";
-  const base = rawBase.endsWith("/") ? rawBase : `${rawBase}/`;
+  const leadingSlashBase = rawBase.startsWith("/") ? rawBase : `/${rawBase}`;
+  const base = leadingSlashBase.endsWith("/")
+    ? leadingSlashBase
+    : `${leadingSlashBase}/`;
 
   return {
     base,
