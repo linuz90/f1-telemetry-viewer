@@ -1,25 +1,21 @@
-import { useEffect, useState } from "react";
-import type { TelemetrySession } from "../types/telemetry";
+import { useQuery } from "@tanstack/react-query";
 import { useTelemetry } from "../context/TelemetryContext";
 
 export function useSession(slug: string | undefined) {
-  const { getSession } = useTelemetry();
-  const [session, setSession] = useState<TelemetrySession | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { mode, getSessionQueryOptions } = useTelemetry();
 
-  useEffect(() => {
-    if (!slug) return;
+  const query = useQuery({
+    ...getSessionQueryOptions(slug ?? ""),
+    // Wait for data-source detection so a deep link doesn't fetch against the
+    // wrong endpoint while the api → demo fallback is still resolving.
+    enabled: Boolean(slug) && mode !== "detecting",
+  });
 
-    setLoading(true);
-    setError(null);
-    setSession(null);
-
-    getSession(slug)
-      .then(setSession)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [slug, getSession]);
-
-  return { session, loading, error };
+  return {
+    session: query.data ?? null,
+    // Count detection as loading too — the query is disabled during it, and
+    // SessionPage would otherwise flash "Session not found" on deep links.
+    loading: Boolean(slug) && (mode === "detecting" || query.isLoading),
+    error: query.error ? query.error.message : null,
+  };
 }

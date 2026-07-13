@@ -2,13 +2,22 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { useLocation } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
+import {
+  detectDataSource,
+  fetchSessionList,
+  getSessionPollIntervalMs,
+  sessionDetailQueryOptions,
+  telemetryKeys,
+  type Mode,
+  type SessionDetailQueryOptions,
+} from "../queries/telemetry";
 import {
   loadZipFile,
   loadJsonFiles,
@@ -23,8 +32,6 @@ import {
 } from "../utils/formulaScope";
 import { getFormulaScopeCandidateFromPath, isRootPath } from "../utils/routes";
 
-type Mode = "detecting" | "api" | "demo" | "upload";
-
 interface TelemetryContextValue {
   mode: Mode;
   sessions: SessionSummary[];
@@ -34,6 +41,7 @@ interface TelemetryContextValue {
   activeFormulaKey: string | undefined;
   activeFormula: FormulaScopeOption | undefined;
   getSession: (slug: string) => Promise<TelemetrySession>;
+  getSessionQueryOptions: (slug: string) => SessionDetailQueryOptions;
   loadFiles: (files: File[]) => Promise<void>;
   showUploadModal: boolean;
   setShowUploadModal: (show: boolean) => void;
@@ -41,6 +49,9 @@ interface TelemetryContextValue {
 }
 
 const TelemetryContext = createContext<TelemetryContextValue | null>(null);
+
+// Stable fallback so consumers memoized on `sessions` don't recompute while empty.
+const EMPTY_SESSIONS: SessionSummary[] = [];
 
 export function useTelemetry() {
   const ctx = useContext(TelemetryContext);
@@ -51,19 +62,62 @@ export function useTelemetry() {
 
 export function TelemetryProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const [mode, setMode] = useState<Mode>("detecting");
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [filesLoading, setFilesLoading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  // Upload mode overrides whatever the startup probe detected, permanently for
+  // this visit — dropping files while browsing api/demo data switches sources.
+  const [uploadedSessions, setUploadedSessions] = useState<
+    SessionSummary[] | null
+  >(null);
   // In-memory store for upload mode
   const [sessionStore] = useState(() => new Map<string, TelemetrySession>());
 
-  // API-mode session cache (mirrors the old api/client.ts cache)
-  const [apiCache] = useState(
-    () => new Map<string, Promise<TelemetrySession>>(),
-  );
+  const detectionQuery = useQuery({
+    queryKey: telemetryKeys.dataSource,
+    queryFn: () => detectDataSource(queryClient),
+    // Detection is a one-shot startup decision. Never refetch it: a transient
+    // API blip on refocus must not flip a working api-mode UI into demo mode.
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const mode: Mode = uploadedSessions
+    ? "upload"
+    : (detectionQuery.data?.mode ?? "detecting");
+
+  const sessionListQuery = useQuery({
+    queryKey: telemetryKeys.sessionList,
+    queryFn: () => fetchSessionList(`${import.meta.env.BASE_URL}api/sessions`),
+    // Only the local API has a live filesystem behind it — demo and uploaded
+    // lists are static, so background refresh is api-mode only.
+    enabled: mode === "api",
+    // The detection probe seeds this cache; a short freshness window stops the
+    // query from re-fetching the identical payload the moment it's enabled.
+    staleTime: 5_000,
+    // Polling is opt-in (PnG runtime config or VITE_SESSION_POLL_INTERVAL_S).
+    // TanStack pauses the interval while the tab is hidden; the focus refetch
+    // below catches up as soon as the user returns.
+    refetchInterval: getSessionPollIntervalMs() || false,
+    // A session saved while the tab was backgrounded shows up on return even
+    // with polling disabled. On refetch failure TanStack keeps the previous
+    // data, so a transient blip never clobbers a working session list.
+    refetchOnWindowFocus: true,
+  });
+
+  const sessions =
+    uploadedSessions ??
+    (mode === "api" ? sessionListQuery.data : detectionQuery.data?.sessions) ??
+    EMPTY_SESSIONS;
+  const sessionsLoading = uploadedSessions ? false : detectionQuery.isPending;
+  // Detection already proved the API once, and refetch failures keep previous
+  // data — so this only surfaces when the list truly has nothing to show.
+  const sessionsError =
+    mode === "api" && sessionListQuery.isError && !sessionListQuery.data
+      ? sessionListQuery.error.message
+      : null;
 
   const formulaOptions = useMemo(
     () => getFormulaScopeOptions(sessions),
@@ -91,88 +145,16 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
     () => formulaOptions.find((option) => option.key === activeFormulaKey),
     [activeFormulaKey, formulaOptions],
   );
-  // Detect mode on mount
-  useEffect(() => {
-    const tryDemo = () =>
-      fetch(`${import.meta.env.BASE_URL}demo/sessions.json`)
-        .then((res) => {
-          if (!res.ok) throw new Error("No demo data");
-          return res.json() as Promise<SessionSummary[]>;
-        })
-        .then((data) => {
-          setMode("demo");
-          setSessions(data);
-        })
-        .catch(() => {
-          setMode("upload");
-        });
 
-    // Skip API in prod-like dev mode — run the same demo → upload fallback as production
-    if (import.meta.env.VITE_SKIP_API === "true") {
-      tryDemo().finally(() => setSessionsLoading(false));
-      return;
-    }
-
-    fetch(`${import.meta.env.BASE_URL}api/sessions`)
-      .then((res) => {
-        if (!res.ok) throw new Error("API unavailable");
-        return res.json() as Promise<SessionSummary[]>;
-      })
-      .then((data) => {
-        setMode("api");
-        setSessions(data);
-      })
-      .catch(() => tryDemo())
-      .finally(() => setSessionsLoading(false));
-  }, []);
+  const getSessionQueryOptions = useCallback(
+    (slug: string) => sessionDetailQueryOptions(mode, slug, sessionStore),
+    [mode, sessionStore],
+  );
 
   const getSession = useCallback(
-    (slug: string): Promise<TelemetrySession> => {
-      // Upload mode — read from in-memory store
-      if (mode === "upload") {
-        const data = sessionStore.get(slug);
-        if (!data)
-          return Promise.reject(new Error(`Session not found: ${slug}`));
-        return Promise.resolve(data);
-      }
-
-      // Demo mode — fetch from /demo/<slug>.json with cache
-      if (mode === "demo") {
-        const cached = apiCache.get(slug);
-        if (cached) return cached;
-
-        const promise = fetch(
-          `${import.meta.env.BASE_URL}demo/${slug}.json`,
-        ).then((res) => {
-          if (!res.ok) {
-            apiCache.delete(slug);
-            throw new Error(`Failed to load demo session: ${slug}`);
-          }
-          return res.json() as Promise<TelemetrySession>;
-        });
-
-        apiCache.set(slug, promise);
-        return promise;
-      }
-
-      // API mode — fetch with cache
-      const cached = apiCache.get(slug);
-      if (cached) return cached;
-
-      const promise = fetch(
-        `${import.meta.env.BASE_URL}api/sessions/${slug}`,
-      ).then((res) => {
-        if (!res.ok) {
-          apiCache.delete(slug);
-          throw new Error(`Failed to load session: ${slug}`);
-        }
-        return res.json() as Promise<TelemetrySession>;
-      });
-
-      apiCache.set(slug, promise);
-      return promise;
-    },
-    [mode, sessionStore, apiCache],
+    (slug: string): Promise<TelemetrySession> =>
+      queryClient.fetchQuery(getSessionQueryOptions(slug)),
+    [queryClient, getSessionQueryOptions],
   );
 
   const loadFiles = useCallback(
@@ -214,14 +196,17 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
             sessionStore.set(slug, data);
           }
         }
-        setMode("upload");
-        setSessionsError(null);
-        setSessions(deduplicatedSessions);
+        // Re-uploading replaces the store, so cached upload-mode detail queries
+        // (staleTime: Infinity) would otherwise keep serving the old files.
+        queryClient.removeQueries({
+          queryKey: telemetryKeys.sessionDetailsByMode("upload"),
+        });
+        setUploadedSessions(deduplicatedSessions);
       } finally {
         setFilesLoading(false);
       }
     },
-    [sessionStore],
+    [sessionStore, queryClient],
   );
 
   return (
@@ -235,6 +220,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         activeFormulaKey,
         activeFormula,
         getSession,
+        getSessionQueryOptions,
         loadFiles,
         showUploadModal,
         setShowUploadModal,

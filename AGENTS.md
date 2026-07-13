@@ -46,11 +46,12 @@ When a user gives a localhost URL or screenshot, prefer the telemetry source tha
 
 ## Architecture
 
-Stack: React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts 3, React Router 7.
+Stack: React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts 3, React Router 7, TanStack Query 5.
 
 Data flow:
 
 - Pages/hooks -> `TelemetryContext`.
+- All network fetching/caching goes through TanStack Query (`QueryClientProvider` in `src/main.tsx`). Query definitions — the `telemetryKeys` key factory, fetchers, `detectDataSource`, and `sessionDetailQueryOptions` — live in `src/queries/telemetry.ts`. `TelemetryContext` wires them to React state: the one-shot data-source detection query (api -> demo -> upload fallback), the session-list query (opt-in polling + refetch-on-focus, api mode only), and the per-session detail query options shared by `useSession` and the imperative `getSession`.
 - Dev: `src/plugin/telemetry-server.ts` serves `/api/sessions` and raw session JSON.
 - Production/demo: `public/demo/sessions.json`.
 - Upload mode: JSON/zip files parsed in-browser.
@@ -70,7 +71,8 @@ Telemetry filenames follow `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_ss.json`. Fil
 Entry and data:
 
 - `src/App.tsx` — routes, formula guards, `/ui-debug`.
-- `src/context/TelemetryContext.tsx` — data-source selection.
+- `src/queries/telemetry.ts` — TanStack Query definitions: `telemetryKeys` factory, list/detail fetchers, `detectDataSource`, `sessionDetailQueryOptions`.
+- `src/context/TelemetryContext.tsx` — binds those queries to React state (mode/upload store) and exposes the provider surface.
 - `src/context/zipLoader.ts` — uploaded JSON/zip parsing.
 - `src/plugin/telemetry-server.ts` — local telemetry API.
 - `src/utils/parseFilename.ts` — filename -> slug/date parsing.
