@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev", "--port", "5910", "--strictPort"],
+      "port": 5910
+    },
+    {
+      "name": "dev-prod",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:prod", "--port", "5911", "--strictPort"],
+      "port": 5911
+    }
+  ]
+}
