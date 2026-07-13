@@ -53,6 +53,7 @@ function getSessionPollIntervalMs(): number {
     }
   ).__PNG_SAVE_VIEWER_CONFIG__?.sessionPollIntervalMs;
   if (typeof injected === "number") return injected;
+  if (injected === null) return 0; // host explicitly disabled it
   const intervalSecs =
     Number(import.meta.env.VITE_SESSION_POLL_INTERVAL_S) || 0;
   return intervalSecs * 1000;
