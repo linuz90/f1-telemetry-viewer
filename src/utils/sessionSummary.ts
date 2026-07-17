@@ -29,6 +29,13 @@ export interface BuiltSessionSummary {
   valid: boolean;
 }
 
+/**
+ * Invalidates persisted per-file summaries when their shape or meaning changes.
+ * Bump this for `SessionSummary`, filename normalization, or any transitive
+ * summary-producing policy change; final sorting and dedupe are recomputed.
+ */
+export const SESSION_SUMMARY_CACHE_VERSION = 1;
+
 function getDrivers(session: TelemetrySession | undefined): DriverData[] {
   return session?.["classification-data"] ?? [];
 }

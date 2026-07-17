@@ -7,9 +7,9 @@ Guidance for AI coding agents working in this repository.
 F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON exported by "Pits n' Giggles" (an F1 game telemetry tool).
 
 - No database.
-- Local dev reads telemetry JSON from disk.
+- Local dev indexes telemetry summaries and streams raw telemetry JSON from disk.
 - Production/demo mode reads committed demo data or user-uploaded JSON/zip files.
-- No test runner or linter is configured.
+- A focused Node test suite covers the session-summary index. No general UI test runner or linter is configured.
 
 ## Commands
 
@@ -23,6 +23,9 @@ pnpm build                    # Type-check (tsc) + production build
 pnpm preview                  # Preview production build
 pnpm generate-demo            # Regenerate public/demo/
 pnpm find-session <slug-or-url> # Resolve a session URL/slug to JSON on disk
+pnpm test:session-index       # Run the focused Node session-index suite
+pnpm typecheck:node           # Type-check Node servers/plugins/scripts
+pnpm benchmark:session-index  # Benchmark a disposable generated corpus
 ```
 
 ## Local Data
@@ -32,6 +35,7 @@ pnpm find-session <slug-or-url> # Resolve a session URL/slug to JSON on disk
 - Shared repro files live at `/Users/linuz90/PC Stuff/Pits & Giggles/debug data`.
 - `DEBUG_TELEMETRY_DIR` is optional; use `pnpm dev:debug` for broad QA only when that env var is set.
 - Never commit real telemetry files, `.env`, machine-specific paths, or debug corpus data.
+- The viewer-owned summary cache lives under `.cache/f1-telemetry-viewer/`, outside `TELEMETRY_DIR`. It is ignored, private, derived, and safe to delete while the viewer is stopped.
 
 When a user gives a localhost URL or screenshot, prefer the telemetry source that produced that exact page. Use `pnpm find-session <slug-or-url>` against the active source before guessing.
 
@@ -52,7 +56,9 @@ Data flow:
 
 - Pages/hooks -> `TelemetryContext`.
 - All network fetching/caching goes through TanStack Query (`QueryClientProvider` in `src/main.tsx`). Query definitions — the `telemetryKeys` key factory, fetchers, `detectDataSource`, and `sessionDetailQueryOptions` — live in `src/queries/telemetry.ts`. `TelemetryContext` wires them to React state: the one-shot data-source detection query (api -> demo -> upload fallback), the session-list query (opt-in polling + refetch-on-focus, api mode only), and the per-session detail query options shared by `useSession` and the imperative `getSession`.
-- Dev: `src/plugin/telemetry-server.ts` serves `/api/sessions` and raw session JSON.
+- Dev and self-hosting share `src/plugin/session-summary-index.ts`, which incrementally caches pre-dedup summaries for `/api/sessions` and resolves slugs for raw detail streaming.
+- Dev: `src/plugin/telemetry-server.ts` adapts the shared index to Vite middleware.
+- Self-hosting: `server.ts` adapts the same index to the production HTTP server.
 - Production/demo: `public/demo/sessions.json`.
 - Upload mode: JSON/zip files parsed in-browser.
 
@@ -75,6 +81,7 @@ Entry and data:
 - `src/context/TelemetryContext.tsx` — binds those queries to React state (mode/upload store) and exposes the provider surface.
 - `src/context/zipLoader.ts` — uploaded JSON/zip parsing.
 - `src/plugin/telemetry-server.ts` — local telemetry API.
+- `src/plugin/session-summary-index.ts` — Node-only incremental summary index, persistence, dedupe finalization, and safe slug resolution.
 - `src/utils/parseFilename.ts` — filename -> slug/date parsing.
 
 Product surfaces:
@@ -143,6 +150,16 @@ Analysis layer:
 - Generic primitives belong in `src/utils/stats/`.
 - Product-specific ranking, curation, bucketing, and insight thresholds belong in `src/analysis/`.
 - Add concise why-comments for exporter quirks, thresholds, and comparison policies.
+
+Session summary cache:
+
+- `SESSION_INDEX_FORMAT_VERSION` covers the persisted index envelope; bump it when that shape changes.
+- `SESSION_SUMMARY_CACHE_VERSION` lives beside `buildSessionSummary()`. Bump it whenever `SessionSummary`, `buildSessionSummary()`, filename/path normalization, or any transitive summary-producing policy changes.
+- Dedupe and final ordering changes do not require a summary-version bump because the index persists pre-dedup entries and re-derives the final list.
+- Never persist globally derived `duplicateCount` values or raw telemetry in the index.
+- Never write viewer cache files into `TELEMETRY_DIR` or rely on Pits n' Giggles' incomplete `.png_session_cache.json`.
+- Detail endpoints must continue streaming the indexed source file rather than serving cached summary data.
+- Benchmark runs must use a disposable scratch root outside live telemetry data, print aggregates only, and delete only their uniquely owned run directory.
 
 Strategy timing:
 

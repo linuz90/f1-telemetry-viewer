@@ -61,9 +61,8 @@ export async function detectDataSource(
       const sessions = await fetchSessionList(
         `${import.meta.env.BASE_URL}api/sessions`,
       );
-      // Seed the list query so api mode doesn't immediately re-download what
-      // this probe just fetched — the dev server re-reads every telemetry JSON
-      // on disk per request, so duplicate hits are not free.
+      // Seed the list query so api mode reuses the exact successful startup
+      // probe instead of immediately issuing a redundant list request.
       queryClient.setQueryData(telemetryKeys.sessionList, sessions);
       return { mode: "api", sessions };
     } catch {

@@ -81,9 +81,23 @@ pnpm preview        # Preview the production build locally
 pnpm start          # Serve dist/ plus the telemetry API
 pnpm generate-demo  # Regenerate trimmed demo data in public/demo/
 pnpm find-session <slug-or-url>  # Resolve a session URL or slug to JSON
+pnpm test:session-index          # Run the focused Node session-index suite
+pnpm typecheck:node              # Type-check the servers, plugins, and scripts
+pnpm benchmark:session-index     # Benchmark a disposable 1,260-file corpus
 ```
 
-No test runner or linter is configured yet; `pnpm build` is the main validation command.
+The default benchmark writes roughly 628 MiB into a uniquely owned temporary
+child (about 621 MiB of visible telemetry plus a 6.9 MiB hidden-cache fixture)
+and removes that child when it finishes. `--source-dir` runs may be larger. Use
+`pnpm benchmark:session-index -- --scratch-root /path/to/scratch` to measure the
+same filesystem class as a deployment, and always keep the scratch root outside
+your live telemetry folder. Add `--source-dir /path/to/safe/telemetry` to copy
+from a local representative corpus instead of the committed demo fixtures; the
+source remains read-only and only aggregate measurements are printed.
+
+The session-summary index has a focused suite built on Node's test runner. No
+general UI test runner or linter is configured; `pnpm build` remains the main
+whole-app validation command.
 
 For debugging shared repro files without pointing at your full telemetry history, put the files in a small folder and launch against that folder:
 
@@ -121,6 +135,25 @@ TELEMETRY_DIR=/path/to/your/telemetry pnpm start
 
 By default this serves the app at [http://localhost:3080](http://localhost:3080). Unlike `pnpm dev`, it does not run Vite's dev toolchain, file watchers, HMR, or source maps, so it is much lighter for an always-on setup.
 
+The local and self-hosted APIs keep a derived session-summary index under
+`.cache/f1-telemetry-viewer/` in the directory where the viewer is started.
+If that location would overlap the telemetry root or the served build output,
+the viewer refuses to persist there and continues with an in-memory index.
+The first request without a valid index is a cold build and must read each
+visible telemetry file once. Later requests, including the first request after
+a restart, normally stat the files and reuse unchanged summaries; adding or
+changing one save only reads that save.
+
+The cache can contain summary metadata such as driver and rival names, so its
+directory and files are created with private permissions where the operating
+system supports them. It never contains full telemetry JSON, and session-detail
+requests continue to stream the original Pits n' Giggles file byte for byte.
+The viewer does not modify the telemetry folder or use Pits n' Giggles'
+`.png_session_cache.json`. You can safely delete `.cache/f1-telemetry-viewer/`
+while the viewer is stopped; the next session-list request will rebuild it.
+Embedded Pits n' Giggles builds continue to use their Python session API and do
+not initialize or create this viewer-owned Node cache.
+
 | Variable        | Default               | Description                                        |
 | --------------- | --------------------- | -------------------------------------------------- |
 | `TELEMETRY_DIR` | _(required)_          | Path to your Pits n' Giggles telemetry folder      |
@@ -151,10 +184,17 @@ src/
   context/       TelemetryProvider and browser zip/json loader
   hooks/         Session list, session detail, and track history hooks
   pages/         Dashboard, session detail, and track progress routes
-  plugin/        Vite local API for reading telemetry JSON from disk
+  plugin/        Shared session index and Vite local telemetry API
   utils/         Formatting, formula scopes, storage, summaries, routes, low-level stats
   types/         TypeScript telemetry model
 ```
+
+The production server and Vite plugin share the same incremental,
+viewer-owned summary index. It stores one pre-dedup summary per source file,
+then derives filtering, deduplication, ordering, and slug lookup globally on
+each change. This keeps the `/api/sessions` response and raw detail routes
+compatible with Pits n' Giggles while avoiding a full JSON reparse on every
+focus or polling refresh. Demo and browser-upload modes do not use the index.
 
 The `TelemetryProvider` uses one data-access path for every screen:
 

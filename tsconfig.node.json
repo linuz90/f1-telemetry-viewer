@@ -11,7 +11,9 @@
     "types": ["node"]
   },
   "include": [
+    "server.ts",
     "vite.config.ts",
+    "scripts/benchmark-session-index.ts",
     "scripts/dev-port.ts",
     "scripts/dev-server-port.ts",
     "src/plugin/**/*",
