@@ -6,9 +6,8 @@ import "./index.css";
 import { App } from "./App";
 
 // Shared cache for all telemetry queries. Retries are disabled globally: the
-// only backends are the local dev API and static demo files, where failures
-// are deterministic and each retry makes the dev server re-parse every
-// telemetry JSON on disk.
+// startup probe has an explicit fallback, list refetches retain prior data,
+// and detail files are local or static, so automatic retries only add latency.
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
