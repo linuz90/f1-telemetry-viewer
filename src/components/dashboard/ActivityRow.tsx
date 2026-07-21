@@ -2,12 +2,12 @@ import type { DashboardActivityGroup } from "../../analysis/dashboardActivity";
 import { formatTime } from "../../utils/format";
 import { sessionSummaryPath } from "../../utils/routes";
 import { SessionResultMetric } from "../SessionResultMetric";
+import { SessionResultStatusBadge } from "../SessionResultStatusBadge";
 import { SessionTypeBadge } from "../SessionTypeBadge";
 import { TrackFlag } from "../TrackFlag";
-import { Badge } from "../ui/Badge";
 import { SessionRow } from "../SessionRow";
 import { resolveSessionMode } from "../sessionModeMeta";
-import { isProblemStatus, resultStatusLabel } from "./helpers";
+import { Badge } from "../ui/Badge";
 
 function modeLabel(session: DashboardActivityGroup["representative"]): string {
   if (session.isSpectator) return "Spectator";
@@ -31,7 +31,6 @@ export function ActivityRow({
 }) {
   const session = activity.representative;
   const result = session.playerRaceResult;
-  const problem = isProblemStatus(result?.status);
   const attempt = attemptLabel(activity);
   const isTimeTrial = activity.kind === "time-trial";
 
@@ -61,9 +60,7 @@ export function ActivityRow({
             sessionType={session.sessionType}
             formula={session.formula}
           />
-          {problem && (
-            <Badge tone="red">{resultStatusLabel(result?.status)}</Badge>
-          )}
+          <SessionResultStatusBadge status={result?.status} />
           {attempt && (
             <Badge tone="zinc" className="max-sm:hidden">
               {attempt}

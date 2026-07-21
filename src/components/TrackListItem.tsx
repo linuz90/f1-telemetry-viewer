@@ -28,6 +28,10 @@ export function TrackListItem({
   isSyntheticOnly,
 }: TrackListItemProps) {
   const country = getTrackCountryName(track);
+  const countryLabel =
+    country && country.localeCompare(track, "en", { sensitivity: "base" }) !== 0
+      ? country
+      : null;
   const supportingCount = bestLapKind
     ? (bestLapSessionCount ?? 0)
     : totalSessionCount;
@@ -36,9 +40,9 @@ export function TrackListItem({
       <TrackFlag track={track} size="small" className="shrink-0" />
       <span className="min-w-0 flex-1 leading-tight">
         <span className="block truncate font-medium">{track}</span>
-        {country && (
+        {countryLabel && (
           <span className="mt-0.5 block truncate text-xs font-normal text-zinc-400">
-            {country}
+            {countryLabel}
           </span>
         )}
       </span>

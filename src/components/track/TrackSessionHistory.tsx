@@ -13,6 +13,7 @@ import {
 import { sessionSummaryPath, trackTabForSessionType } from "../../utils/routes";
 import { SessionModeLabel } from "../SessionModeLabel";
 import { SessionResultMetric } from "../SessionResultMetric";
+import { SessionResultStatusBadge } from "../SessionResultStatusBadge";
 import { SessionRow } from "../SessionRow";
 import { SessionTypeBadge } from "../SessionTypeBadge";
 import { SESSION_TYPE_FILTER_META } from "../sessionTypeMeta";
@@ -47,7 +48,7 @@ interface HistoryRow {
   kind: TrackSessionKind;
   attemptCount: number;
   bestLapMs: number;
-  bestLapLabel: string;
+  bestLapLabel?: string;
   weather?: string;
   trackTemp?: number;
   airTemp?: number;
@@ -102,8 +103,7 @@ function summaryHistoryRow(summary: SessionSummary): HistoryRow {
     kind,
     attemptCount: 1,
     bestLapMs,
-    bestLapLabel:
-      bestLapMs > 0 ? msToLapTime(bestLapMs) : (exportedBestLap ?? "—"),
+    bestLapLabel: bestLapMs > 0 ? msToLapTime(bestLapMs) : exportedBestLap,
     weather: summary.weather,
   };
 }
@@ -114,7 +114,8 @@ function detailedHistoryRow(session: TrackSessionData): HistoryRow {
     kind: session.kind,
     attemptCount: session.attemptCount,
     bestLapMs: session.bestLapMs,
-    bestLapLabel: session.bestLapMs > 0 ? msToLapTime(session.bestLapMs) : "—",
+    bestLapLabel:
+      session.bestLapMs > 0 ? msToLapTime(session.bestLapMs) : undefined,
     weather: session.weather,
     trackTemp: session.trackTemp,
     airTemp: session.airTemp,
@@ -263,6 +264,9 @@ export function TrackSessionHistory({
                     formula={session.summary.formula}
                     compactLabel={HISTORY_KIND_META[session.kind].label}
                   />
+                  <SessionResultStatusBadge
+                    status={session.summary.playerRaceResult?.status}
+                  />
                   {session.attemptCount > 1 && (
                     <Badge tone="amber" className="max-sm:hidden">
                       ×{session.attemptCount}
@@ -283,9 +287,7 @@ export function TrackSessionHistory({
               trailing={
                 <SessionResultMetric
                   session={session.summary}
-                  // History compares pace between saves; race position remains
-                  // the primary result only in Recent Activity.
-                  kind="session"
+                  kind={session.kind}
                   lapTime={session.bestLapLabel}
                   lapTimeMs={session.bestLapMs}
                   lapTone={
