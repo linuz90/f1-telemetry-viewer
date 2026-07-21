@@ -196,9 +196,12 @@ export function buildTrackRaceRecommendation(
     ? {
         recommendedDeltaLaps: bucketFuelStats.avgRecommendedFuelLaps,
         recommendedFuelKg: bucketFuelStats.avgRecommendedFuelKg,
-        burnRateKgPerLap: bucketFuelStats.avgBurnRateKgPerLap,
+        burnRateKgPerLap: bucketFuelStats.p75BurnRateKgPerLap,
         excessAtFinishLaps: bucketFuelStats.avgExcessAtFinishLaps,
-        raceCount: bucketFuelStats.raceCount,
+        eligibleAttemptCount: bucketFuelStats.eligibleAttemptCount,
+        consecutiveGreenPairCount: bucketFuelStats.consecutiveGreenPairCount,
+        completedRaceCount: bucketFuelStats.completedRaceCount,
+        confidence: bucketFuelStats.confidence,
       }
     : null;
 

@@ -1290,6 +1290,22 @@ export function TrackProgressPage() {
             ) ?? 0;
           return (
             <>
+              {showRaceLengthSelector && selectedRaceAnalysisBucket && (
+                <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+                  <span className="shrink-0 font-mono text-xs font-medium uppercase tracking-wider text-zinc-600">
+                    Race length
+                  </span>
+                  <SegmentedControl
+                    ariaLabel="Race length"
+                    options={raceLengthOptions}
+                    value={selectedRaceLengthValue}
+                    onChange={handleRaceLengthChange}
+                    size="sm"
+                    scrollable
+                  />
+                </div>
+              )}
+
               {/* Key Insights — synthesizes the rest of the tab into "what should
                 I actually do here?". Reacts to the same race-length selector that
                 drives the Compound Tyre Life cards below. */}
@@ -1304,26 +1320,7 @@ export function TrackProgressPage() {
               {/* Compound tyre life cards */}
               {selectedCompoundLifeStats.length > 0 && (
                 <div>
-                  <SectionHeader
-                    title="Compound Tyre Life"
-                    action={
-                      showRaceLengthSelector && selectedRaceAnalysisBucket ? (
-                        <div className="flex max-w-full items-center gap-2">
-                          <span className="shrink-0 font-mono text-xs font-medium uppercase tracking-wider text-zinc-600">
-                            Race length
-                          </span>
-                          <SegmentedControl
-                            ariaLabel="Race length"
-                            options={raceLengthOptions}
-                            value={selectedRaceLengthValue}
-                            onChange={handleRaceLengthChange}
-                            size="sm"
-                            scrollable
-                          />
-                        </div>
-                      ) : undefined
-                    }
-                  />
+                  <SectionHeader title="Compound Tyre Life" />
                   <div
                     className="grid gap-2"
                     style={{

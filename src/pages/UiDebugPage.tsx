@@ -134,7 +134,7 @@ const sampleInsights: SessionInsight[] = [
     detail: "fuel slider recommendation",
     extraDetails: [
       "Loaded -0.9 laps (35 kg - 1.20 kg/lap avg)",
-      "+2.2 laps spare in a clean race (27 green laps)",
+      "+2.2 laps spare in a clean race (27 green pairs)",
     ],
     accent: "amber",
   },
@@ -237,7 +237,10 @@ const trackRecommendation: TrackRaceRecommendation = {
     recommendedFuelKg: 32.9,
     burnRateKgPerLap: 1.2,
     excessAtFinishLaps: 2.2,
-    raceCount: 1,
+    eligibleAttemptCount: 1,
+    consecutiveGreenPairCount: 36,
+    completedRaceCount: 1,
+    confidence: "medium",
   },
   sinceLastRace: {
     bestLapDeltaMs: -2643,

@@ -81,10 +81,12 @@ pnpm preview        # Preview the production build locally
 pnpm start          # Serve dist/ plus the telemetry API
 pnpm generate-demo  # Regenerate trimmed demo data in public/demo/
 pnpm find-session <slug-or-url>  # Resolve a session URL or slug to JSON
+pnpm test                        # Run all focused Node test suites
 pnpm test:session-index          # Run the focused Node session-index suite
 pnpm test:lap-stats              # Run complete-lap timing regressions
 pnpm test:race-pace              # Run Race Pace estimator/matching regressions
 pnpm test:energy-stats           # Run ERS/fuel energy-stat regressions
+pnpm test:fuel                   # Run the focused fuel-aggregation suite
 pnpm typecheck:node              # Type-check the servers, plugins, and scripts
 pnpm benchmark:session-index     # Benchmark a disposable 1,260-file corpus
 ```
@@ -98,9 +100,10 @@ your live telemetry folder. Add `--source-dir /path/to/safe/telemetry` to copy
 from a local representative corpus instead of the committed demo fixtures; the
 source remains read-only and only aggregate measurements are printed.
 
-The session-summary index has a focused suite built on Node's test runner. No
-general UI test runner or linter is configured; `pnpm build` remains the main
-whole-app validation command.
+The session-summary index, complete-lap timing, Race Pace estimation, and fuel
+aggregation have focused suites built on Node's test runner. No general UI test
+runner or linter is configured; `pnpm build` remains the main whole-app
+validation command.
 
 For debugging shared repro files without pointing at your full telemetry history, put the files in a small folder and launch against that folder:
 

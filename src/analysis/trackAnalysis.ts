@@ -19,6 +19,7 @@ import {
 } from "../utils/stats/laps";
 import {
   aggregateCompoundLife,
+  aggregateFuelData,
   type CompoundLifeStats,
 } from "../utils/stats/trackAggregates";
 import { avgWearRate } from "../utils/stats/tyres";
@@ -80,6 +81,7 @@ export interface RaceAnalysisBucket {
   setupCandidates: RaceSetupCandidate[];
   tyreEvidenceCount: number;
   setupSampleCount: number;
+  hasFuelEvidence: boolean;
   raceCount: number;
 }
 
@@ -325,6 +327,7 @@ export function buildRaceAnalysisBuckets(
       const sessions = raceData.map((race) => race.session);
       const compoundLifeStats = aggregateCompoundLife(sessions);
       const setupCandidates = buildRaceSetupCandidates(raceData);
+      const hasFuelEvidence = aggregateFuelData(sessions) !== null;
       const tyreEvidenceCount = compoundLifeStats.reduce(
         (sum, compound) => sum + compound.stintCount,
         0,
@@ -344,11 +347,15 @@ export function buildRaceAnalysisBuckets(
         setupCandidates,
         tyreEvidenceCount,
         setupSampleCount,
+        hasFuelEvidence,
         raceCount: raceData.length,
       };
     })
     .filter(
-      (bucket) => bucket.tyreEvidenceCount > 0 || bucket.setupSampleCount > 0,
+      (bucket) =>
+        bucket.tyreEvidenceCount > 0 ||
+        bucket.setupSampleCount > 0 ||
+        bucket.hasFuelEvidence,
     )
     .sort((a, b) => a.totalLaps - b.totalLaps);
 }

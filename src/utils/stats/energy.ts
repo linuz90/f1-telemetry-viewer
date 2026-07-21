@@ -34,7 +34,7 @@ export function fuelSafetyMarginLaps(burnRateKg: number): number {
 /** Result of a fuel burn-rate calculation for a single race session */
 export interface FuelCalcResult {
   burnRateKg: number;
-  greenFlagLapCount: number;
+  greenFlagPairCount: number;
   startFuelKg: number;
   startFuelLaps: number;
   /** Game's fuel-remaining-laps at lap 0 — what the player loaded */
@@ -58,18 +58,30 @@ export function collectGreenFlagBurnDeltas(player: DriverData): number[] {
   const perLap = player["per-lap-info"];
   if (!perLap?.length) return [];
   const lapsWithFuel = perLap.filter(
-    (l) => l["car-status-data"]?.["fuel-in-tank"] > 0,
+    (l) =>
+      Number.isFinite(l["car-status-data"]?.["fuel-in-tank"]) &&
+      l["car-status-data"]["fuel-in-tank"] > 0,
   );
   if (lapsWithFuel.length < 2) return [];
   const deltas: number[] = [];
   for (let i = 1; i < lapsWithFuel.length; i++) {
     const prev = lapsWithFuel[i - 1];
     const curr = lapsWithFuel[i];
+    // Filtering out unusable snapshots can make adjacent array entries span
+    // multiple laps. Treating that gap as one lap's burn would inflate both
+    // the sample count and the conservative fuel target.
+    if (
+      !Number.isFinite(prev["lap-number"]) ||
+      !Number.isFinite(curr["lap-number"]) ||
+      curr["lap-number"] !== prev["lap-number"] + 1
+    ) {
+      continue;
+    }
     if (!isGreenFlagLap(prev) || !isGreenFlagLap(curr)) continue;
     const delta =
       prev["car-status-data"]["fuel-in-tank"] -
       curr["car-status-data"]["fuel-in-tank"];
-    if (delta > 0) deltas.push(delta);
+    if (Number.isFinite(delta) && delta > 0) deltas.push(delta);
   }
   return deltas;
 }
@@ -226,7 +238,9 @@ export function calculateBurnRate(player: DriverData): FuelCalcResult | null {
   if (!perLap?.length) return null;
 
   const lapsWithFuel = perLap.filter(
-    (l) => l["car-status-data"]?.["fuel-in-tank"] > 0,
+    (l) =>
+      Number.isFinite(l["car-status-data"]?.["fuel-in-tank"]) &&
+      l["car-status-data"]["fuel-in-tank"] > 0,
   );
   if (lapsWithFuel.length < 6) return null;
 
@@ -248,7 +262,7 @@ export function calculateBurnRate(player: DriverData): FuelCalcResult | null {
 
   return {
     burnRateKg,
-    greenFlagLapCount: deltas.length,
+    greenFlagPairCount: deltas.length,
     startFuelKg,
     startFuelLaps,
     startFuelRemaining,
@@ -281,7 +295,7 @@ export function generateFuelInsights(
     ];
   }
 
-  const { burnRateKg, greenFlagLapCount, startFuelRemaining } = result;
+  const { burnRateKg, greenFlagPairCount, startFuelRemaining } = result;
 
   const insights: StrategyInsight[] = [];
 
@@ -303,7 +317,7 @@ export function generateFuelInsights(
   // race at the measured green-flag burn rate, then keeps a small safety
   // margin on top (see MIN_FUEL_LEVEL_KG + FUEL_SURPLUS_LAPS) so following
   // it never leaves you stranded in a clean race.
-  if (greenFlagLapCount >= 5) {
+  if (greenFlagPairCount >= 5) {
     // Raw "clean race" excess — what would be left over if every lap burned
     // at the measured green-flag rate. Shown verbatim in the detail line.
     const rawExcessLaps = result.startFuelKg / burnRateKg - totalRaceLaps;
@@ -312,11 +326,11 @@ export function generateFuelInsights(
       startFuelRemaining - (rawExcessLaps - fuelSafetyMarginLaps(burnRateKg));
     let detail: string;
     if (Math.abs(rawExcessLaps) < 0.3) {
-      detail = `clean-race fuel load was spot on (${greenFlagLapCount} green laps)`;
+      detail = `clean-race fuel load was spot on (${greenFlagPairCount} green pairs)`;
     } else if (rawExcessLaps > 0) {
-      detail = `${formatLapDelta(rawExcessLaps)} laps spare in a clean race (${greenFlagLapCount} green laps)`;
+      detail = `${formatLapDelta(rawExcessLaps)} laps spare in a clean race (${greenFlagPairCount} green pairs)`;
     } else {
-      detail = `${formatLapDelta(rawExcessLaps)} laps short in a clean race (${greenFlagLapCount} green laps)`;
+      detail = `${formatLapDelta(rawExcessLaps)} laps short in a clean race (${greenFlagPairCount} green pairs)`;
     }
     insights.push({
       type: "fuel",
@@ -329,7 +343,7 @@ export function generateFuelInsights(
       type: "fuel",
       label: "Recommended Fuel",
       value: "—",
-      detail: `need 5+ green-flag laps, got ${greenFlagLapCount}`,
+      detail: `need 5+ green-flag lap pairs, got ${greenFlagPairCount}`,
     });
   }
 
