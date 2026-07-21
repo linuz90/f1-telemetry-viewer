@@ -9,6 +9,11 @@ export interface SessionModeMeta {
   color: string;
 }
 
+export interface ResolvedSessionMode {
+  key: SessionModeMetaKey;
+  label: string;
+}
+
 export const SESSION_MODE_META = {
   ai: {
     icon: Bot,
@@ -32,4 +37,21 @@ export const SESSION_MODE_META = {
 
 export function getSessionModeMeta(mode: SessionModeMetaKey): SessionModeMeta {
   return SESSION_MODE_META[mode];
+}
+
+/**
+ * Resolve the user-facing mode from normalized summary fields. Online must win
+ * over AI because older/raw exports can retain an AI difficulty in online
+ * sessions even though that value does not describe the lobby.
+ */
+export function resolveSessionMode(
+  isOnline: boolean | undefined,
+  aiDifficulty: number | undefined,
+  includeOffline = false,
+): ResolvedSessionMode | null {
+  if (isOnline === true) return { key: "online", label: "Online" };
+  if (aiDifficulty != null && aiDifficulty > 0) {
+    return { key: "ai", label: `AI ${aiDifficulty}` };
+  }
+  return includeOffline ? { key: "offline", label: "Offline" } : null;
 }

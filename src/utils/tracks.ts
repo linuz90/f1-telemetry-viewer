@@ -16,6 +16,14 @@ export function toTrackSlug(track: string): string {
     .replace(/^-|-$/g, "");
 }
 
+const englishRegionNames = new Intl.DisplayNames(["en"], { type: "region" });
+
+/** Get the English country name for a track, or null for unknown tracks. */
+export function getTrackCountryName(track: string): string | null {
+  const code = getTrackCountryCode(track);
+  return code ? (englishRegionNames.of(code.toUpperCase()) ?? null) : null;
+}
+
 export function isTrackSlugMatch(
   track: string,
   slug: string | undefined,
