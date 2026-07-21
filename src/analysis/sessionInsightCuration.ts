@@ -149,29 +149,6 @@ function sectorContext(
   return `${extractSectorLabel(insight.label)} ${roleLabel} · ${insightRank(insight)}${comparison ? ` ${comparison}` : ""}`;
 }
 
-function compactFuelLoadLine(initial: SessionInsight): string {
-  if (initial.value === "—") return initial.detail;
-  const kg = initial.detail.match(/\b\d+(?:\.\d+)?\s*kg\b/)?.[0];
-  return `Current ${initial.value}${kg ? ` · ${kg}` : ""}`;
-}
-
-function compactFuelRecommendationLine(
-  recommended: SessionInsight | undefined,
-): string | undefined {
-  if (!recommended?.detail) return undefined;
-  const spare = recommended.detail.match(
-    /([+−-]?\d+(?:\.\d+)?)\s+laps?\s+spare/i,
-  );
-  if (spare) return `Clean buffer ${spare[1]} laps`;
-  const short = recommended.detail.match(
-    /([+−-]?\d+(?:\.\d+)?)\s+laps?\s+short/i,
-  );
-  if (short)
-    return `Clean buffer −${Math.abs(Number(short[1])).toFixed(1)} laps`;
-  if (/on target/i.test(recommended.detail)) return "Clean race on target";
-  return recommended.detail.replace(/\s*\([^)]*\)\s*$/, "");
-}
-
 function mergeBestLapInsight(
   bestLap: SessionInsight | undefined,
   theoreticalBest: SessionInsight | undefined,
@@ -244,32 +221,6 @@ function timeTrialTrackPersonalBestInsight(
     ...trackPb,
     tone: /improvement|matched/i.test(trackPb.detail) ? "best" : "neutral",
     accent: "zinc",
-  };
-}
-
-function mergeFuelInsights(
-  fuelInsights: SessionInsight[],
-): SessionInsight | undefined {
-  const initial = findByLabel(fuelInsights, "Initial Fuel");
-  const recommended = findByLabel(fuelInsights, "Recommended Fuel");
-  const primary = recommended ?? initial;
-  if (!primary) return undefined;
-
-  const hasRecommendation = recommended && recommended.value !== "—";
-  // Recommended fuel is the actionable value; current load is supporting
-  // context. If recommendation is missing, keep the tile visible as a data-gap
-  // signal rather than pretending the loaded fuel is a plan.
-  return {
-    type: "fuel",
-    label: "Fuel Plan",
-    value: hasRecommendation ? recommended.value : primary.value,
-    detail: hasRecommendation ? "recommended start fuel" : "fuel data missing",
-    tooltip: recommended?.tooltip ?? initial?.tooltip,
-    accent: "amber",
-    extraDetails: uniqueLines([
-      initial ? compactFuelLoadLine(initial) : undefined,
-      compactFuelRecommendationLine(recommended),
-    ]),
   };
 }
 
@@ -537,9 +488,7 @@ export function curateSessionInsights(
   const qualifying = takeByLabel(remaining, "Qualifying");
   takeByLabel(remaining, "Consistency");
   const firstPit = takeByLabel(remaining, "First Pit Stop");
-  const fuel = mergeFuelInsights(
-    takeWhere(remaining, (insight) => insight.type === "fuel"),
-  );
+  const fuel = takeByLabel(remaining, "Fuel Margin");
   const sectors = mergeSectorInsights(
     takeWhere(remaining, (insight) => insight.type === "sector"),
   );

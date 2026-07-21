@@ -76,12 +76,17 @@ export interface TrackFuelTarget {
   recommendedDeltaLaps: number;
   /** Recommended total fuel load (kg) the delta translates to */
   recommendedFuelKg: number;
-  /** Average green-flag burn rate, kg/lap */
+  /** Pooled p75 consecutive green-flag burn rate, kg/lap */
   burnRateKgPerLap: number;
   /** Average projected excess at finish (laps). Positive = over-fueling. */
   excessAtFinishLaps: number;
-  /** Number of races in the sample */
-  raceCount: number;
+  /** Number of independently eligible attempts in the sample */
+  eligibleAttemptCount: number;
+  /** Consecutive green-flag fuel pairs behind the p75 burn estimate. */
+  consecutiveGreenPairCount: number;
+  /** Contributing attempts classified as FINISHED. */
+  completedRaceCount: number;
+  confidence: "low" | "medium" | "high";
 }
 
 export interface TrackSinceLastRaceDelta {

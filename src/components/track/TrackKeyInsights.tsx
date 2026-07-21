@@ -9,7 +9,10 @@ import {
   pluralize,
 } from "../../utils/format";
 import type { TrackRivalBenchmark } from "../../analysis/rivalStats";
-import type { TrackRaceRecommendation } from "../../analysis/trackStrategyTypes";
+import type {
+  TrackFuelTarget,
+  TrackRaceRecommendation,
+} from "../../analysis/trackStrategyTypes";
 import { CompoundBadge } from "../ui/CompoundBadge";
 import { highlightDetailValues } from "../ui/HighlightedDetailText";
 import { InsightDetail, InsightValue } from "../ui/InsightText";
@@ -154,17 +157,7 @@ function RaceVsQualiTile({ deltaMs }: { deltaMs: number }) {
   );
 }
 
-function FuelTargetTile({
-  target,
-}: {
-  target: {
-    recommendedDeltaLaps: number;
-    recommendedFuelKg: number;
-    burnRateKgPerLap: number;
-    excessAtFinishLaps: number;
-    raceCount: number;
-  };
-}) {
+function FuelTargetTile({ target }: { target: TrackFuelTarget }) {
   // Recommended delta is "carry +X laps worth of fuel beyond the bare minimum".
   // Negative = you should carry less; ~0 = on target. The amber tile accent
   // already conveys the "fuel" category — keep the number itself neutral so it
@@ -195,7 +188,16 @@ function FuelTargetTile({
       <InsightDetail className="mt-1.5">recommended initial fuel</InsightDetail>
       <InsightDetail size="sm" tone="text-zinc-500" className="mt-2">
         {highlightDetailValues(
-          `≈ ${formatFuelKg(target.recommendedFuelKg)} total · ${formatKgPerLap(target.burnRateKgPerLap)} burn`,
+          `≈ ${formatFuelKg(target.recommendedFuelKg)} total · ${formatKgPerLap(target.burnRateKgPerLap)} P75 burn`,
+        )}
+      </InsightDetail>
+      <InsightDetail size="sm" tone="text-zinc-400" className="mt-1">
+        {highlightDetailValues(
+          joinMetaParts([
+            `${target.confidence[0]!.toUpperCase()}${target.confidence.slice(1)} confidence`,
+            `${target.completedRaceCount} of ${target.eligibleAttemptCount} attempts completed`,
+            pluralize(target.consecutiveGreenPairCount, "green pair"),
+          ]),
         )}
       </InsightDetail>
       {note && (

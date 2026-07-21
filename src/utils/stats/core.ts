@@ -8,6 +8,24 @@ export function median(values: number[]): number | undefined {
     : sorted[mid];
 }
 
+/** Linearly interpolated quantile for a finite sample (q from 0 to 1). */
+export function quantile(
+  values: readonly number[],
+  q: number,
+): number | undefined {
+  if (values.length === 0 || !Number.isFinite(q) || q < 0 || q > 1) {
+    return undefined;
+  }
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const position = (sorted.length - 1) * q;
+  const lowerIndex = Math.floor(position);
+  const upperIndex = Math.ceil(position);
+  const lower = sorted[lowerIndex]!;
+  const upper = sorted[upperIndex]!;
+  return lower + (upper - lower) * (position - lowerIndex);
+}
+
 export function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;

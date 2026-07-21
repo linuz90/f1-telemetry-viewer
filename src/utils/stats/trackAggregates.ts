@@ -1,5 +1,5 @@
 import type { TelemetrySession } from "../../types/telemetry";
-import { median } from "./core";
+import { quantile } from "./core";
 import { findPlayer, isRaceSession } from "./drivers";
 import { collectGreenFlagBurnDeltas, fuelSafetyMarginLaps } from "./energy";
 import { isCompleteValidLap } from "./laps";
@@ -170,11 +170,8 @@ export function aggregateCompoundLife(
 
 /** Fuel stats aggregated across race sessions at a track */
 export interface TrackFuelStats {
-  avgBurnRateKgPerLap: number;
-  avgStartingFuelKg: number;
-  /** Average game fuel-remaining-laps at start (matches session "Initial Fuel") */
-  avgInitialFuelLaps: number;
-  /** Average recommended fuel delta in laps (matches session "Recommended Fuel") */
+  p75BurnRateKgPerLap: number;
+  /** Average game fuel-slider target implied by the track recommendation. */
   avgRecommendedFuelLaps: number;
   /** Average total fuel load (kg) implied by the recommendation — i.e. enough
    *  to cover the race distance at the pooled burn rate plus the safety
@@ -184,17 +181,50 @@ export interface TrackFuelStats {
    *  green-flag) run at the pooled burn rate. Positive = over-fuel, negative
    *  = wouldn't have finished without the SC saves that actually happened. */
   avgExcessAtFinishLaps: number;
-  raceCount: number;
+  /** Independent attempts that contributed enough consecutive fuel pairs. */
+  eligibleAttemptCount: number;
+  /** Consecutive green-flag fuel pairs behind the p75 burn estimate. */
+  consecutiveGreenPairCount: number;
+  /** Contributing attempts classified as FINISHED. */
+  completedRaceCount: number;
+  /** Confidence is intentionally session-based; laps within one run correlate. */
+  confidence: "low" | "medium" | "high";
+}
+
+interface EligibleFuelAttempt {
+  deltas: number[];
+  fuelSnapshotCount: number;
+  recordedLapCount: number;
+  startFuelKg: number;
+  startFuelRemaining: number;
+  totalLaps: number;
+  isCompleted: boolean;
+}
+
+function isMoreCompleteFuelAttempt(
+  candidate: EligibleFuelAttempt,
+  current: EligibleFuelAttempt,
+): boolean {
+  if (candidate.deltas.length !== current.deltas.length) {
+    return candidate.deltas.length > current.deltas.length;
+  }
+  if (candidate.fuelSnapshotCount !== current.fuelSnapshotCount) {
+    return candidate.fuelSnapshotCount > current.fuelSnapshotCount;
+  }
+  if (candidate.recordedLapCount !== current.recordedLapCount) {
+    return candidate.recordedLapCount > current.recordedLapCount;
+  }
+  return candidate.isCompleted && !current.isCompleted;
 }
 
 /** Aggregate fuel data across all race sessions at a track.
  *
  *  Two key choices, both aimed at making the chip safe to act on:
  *
- *  1. **Pooled burn rate.** Green-flag fuel deltas from every race at the
- *     track go into a single pool, and the pooled median is the burn rate.
- *     One race rarely has enough green-flag pairs to nail this down; pooling
- *     across (e.g.) 23 Catalunya races gives a much tighter number.
+ *  1. **Conservative pooled burn rate.** Consecutive green-flag fuel deltas
+ *     from every eligible attempt go into one pool. The 75th percentile is
+ *     deliberate: the median missed sustained push phases often enough to be
+ *     unsafe as an actionable initial-fuel target.
  *
  *  2. **Clean-race excess, not observed leftover.** Per-race excess is
  *     `startFuelKg / pooledBurnRate − totalLaps` — i.e. what the leftover
@@ -206,12 +236,12 @@ export interface TrackFuelStats {
 export function aggregateFuelData(
   sessions: TelemetrySession[],
 ): TrackFuelStats | null {
-  const pooledDeltas: number[] = [];
-  const perRace: {
-    startFuelKg: number;
-    startFuelRemaining: number;
-    totalLaps: number;
-  }[] = [];
+  const minimumPairsPerSession = 3;
+  const minimumFuelSnapshotsPerSession = 6;
+  const minimumSessionCount = 2;
+  const minimumPooledPairCount = 12;
+  const attemptsByUid = new Map<string, EligibleFuelAttempt>();
+  const unkeyedAttempts: EligibleFuelAttempt[] = [];
 
   for (const session of sessions) {
     if (!isRaceSession(session)) continue;
@@ -220,27 +250,70 @@ export function aggregateFuelData(
     const totalLaps = session["session-info"]["total-laps"];
     if (!(totalLaps > 0)) continue;
 
-    const perLap = player["per-lap-info"];
     const lapsWithFuel =
-      perLap?.filter((l) => l["car-status-data"]?.["fuel-in-tank"] > 0) ?? [];
-    if (lapsWithFuel.length < 6) continue;
-
-    pooledDeltas.push(...collectGreenFlagBurnDeltas(player));
+      player["per-lap-info"]?.filter(
+        (l) =>
+          Number.isFinite(l["car-status-data"]?.["fuel-in-tank"]) &&
+          l["car-status-data"]["fuel-in-tank"] > 0,
+      ) ?? [];
+    const deltas = collectGreenFlagBurnDeltas(player);
+    // A second session only improves confidence when it contributes a usable
+    // run of its own; one stray pair should not satisfy the independent-run
+    // evidence gate.
+    if (
+      lapsWithFuel.length < minimumFuelSnapshotsPerSession ||
+      deltas.length < minimumPairsPerSession
+    ) {
+      continue;
+    }
 
     const firstLap = lapsWithFuel[0];
-    perRace.push({
-      startFuelKg: firstLap["car-status-data"]["fuel-in-tank"],
-      startFuelRemaining: firstLap["car-status-data"]["fuel-remaining-laps"],
+    const startFuelKg = firstLap["car-status-data"]["fuel-in-tank"];
+    const startFuelRemaining =
+      firstLap["car-status-data"]["fuel-remaining-laps"];
+    if (!Number.isFinite(startFuelRemaining)) continue;
+
+    const attempt: EligibleFuelAttempt = {
+      deltas,
+      fuelSnapshotCount: lapsWithFuel.length,
+      recordedLapCount: player["per-lap-info"]?.length ?? 0,
+      startFuelKg,
+      startFuelRemaining,
       totalLaps,
-    });
+      isCompleted:
+        player["final-classification"]?.["result-status"] === "FINISHED",
+    };
+
+    const sessionUid = session.debug?.["session-uid"];
+    if (sessionUid == null) {
+      unkeyedAttempts.push(attempt);
+      continue;
+    }
+
+    // Summary deduplication intentionally preserves manual saves outside its
+    // short time window. Fuel confidence needs a stricter independence rule:
+    // one on-track session can contribute at most one attempt, so keep only
+    // its most complete eligible snapshot.
+    const key = String(sessionUid);
+    const current = attemptsByUid.get(key);
+    if (!current || isMoreCompleteFuelAttempt(attempt, current)) {
+      attemptsByUid.set(key, attempt);
+    }
   }
 
-  // Need a representative pool of green-flag pairs to trust the burn rate.
-  // 12 ≈ four races at three pairs each; below that, one weird race could
-  // swing the recommendation by a full lap.
-  if (perRace.length === 0 || pooledDeltas.length < 12) return null;
+  const perRace = [...unkeyedAttempts, ...attemptsByUid.values()];
+  const pooledDeltas = perRace.flatMap((race) => race.deltas);
 
-  const pooledBurnRateKg = median(pooledDeltas);
+  // Laps within one run share fuel load, tyres, weather, and driving intent,
+  // so raw pair count alone cannot establish an actionable recommendation.
+  if (
+    perRace.length < minimumSessionCount ||
+    pooledDeltas.length < minimumPooledPairCount
+  ) {
+    return null;
+  }
+
+  const pooledBurnRateKg = quantile(pooledDeltas, 0.75);
   if (pooledBurnRateKg == null || pooledBurnRateKg <= 0) return null;
 
   const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -265,14 +338,22 @@ export function aggregateFuelData(
   const recommendedKgPerRace = perRace.map(
     (r) => (r.totalLaps + safetyMarginLaps) * pooledBurnRateKg,
   );
+  const completedRaceCount = perRace.filter((r) => r.isCompleted).length;
+  const confidence =
+    completedRaceCount >= 2
+      ? "high"
+      : completedRaceCount === 1
+        ? "medium"
+        : "low";
 
   return {
-    avgBurnRateKgPerLap: pooledBurnRateKg,
-    avgStartingFuelKg: avg(perRace.map((r) => r.startFuelKg)),
-    avgInitialFuelLaps: avg(perRace.map((r) => r.startFuelRemaining)),
+    p75BurnRateKgPerLap: pooledBurnRateKg,
     avgRecommendedFuelLaps: avg(recommendedPerRace),
     avgRecommendedFuelKg: avg(recommendedKgPerRace),
     avgExcessAtFinishLaps: avg(excessAtFinish),
-    raceCount: perRace.length,
+    eligibleAttemptCount: perRace.length,
+    consecutiveGreenPairCount: pooledDeltas.length,
+    completedRaceCount,
+    confidence,
   };
 }

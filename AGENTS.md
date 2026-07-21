@@ -9,7 +9,9 @@ F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON ex
 - No database.
 - Local dev indexes telemetry summaries and streams raw telemetry JSON from disk.
 - Production/demo mode reads committed demo data or user-uploaded JSON/zip files.
-- A focused Node test suite covers the session-summary index. No general UI test runner or linter is configured.
+- Focused Node test suites cover the session-summary index, complete-lap timing,
+  Race Pace estimation, and fuel aggregation. No general UI test runner or
+  linter is configured.
 
 ## Commands
 
@@ -23,10 +25,12 @@ pnpm build                    # Type-check (tsc) + production build
 pnpm preview                  # Preview production build
 pnpm generate-demo            # Regenerate public/demo/
 pnpm find-session <slug-or-url> # Resolve a session URL/slug to JSON on disk
+pnpm test                     # Run all focused Node test suites
 pnpm test:session-index       # Run the focused Node session-index suite
 pnpm test:lap-stats           # Run complete-lap timing regressions
 pnpm test:race-pace           # Run Race Pace estimator/matching regressions
 pnpm test:energy-stats        # Run ERS/fuel energy-stat regressions
+pnpm test:fuel                # Run fuel aggregation and recommendation tests
 pnpm typecheck:node           # Type-check Node servers/plugins/scripts
 pnpm benchmark:session-index  # Benchmark a disposable generated corpus
 ```
@@ -168,6 +172,15 @@ Analysis layer:
 - Generic primitives belong in `src/utils/stats/`.
 - Product-specific ranking, curation, bucketing, and insight thresholds belong in `src/analysis/`.
 - Add concise why-comments for exporter quirks, thresholds, and comparison policies.
+
+Fuel recommendations:
+
+- Session pages are retrospective: lead with the game's signed lap-margin
+  estimate at the finish or last captured lap, with recorded tank kilograms
+  and observed burn as supporting evidence. Do not turn one session into a
+  future-load recommendation or present the game estimate as physical range.
+- Actionable initial-fuel targets belong on Track Progress, where they use
+  same-distance, UID-independent evidence, pooled P75 burn, and confidence.
 
 Session summary cache:
 
