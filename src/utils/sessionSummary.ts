@@ -38,7 +38,7 @@ export interface BuiltSessionSummary {
  * Bump this for `SessionSummary`, filename normalization, or any transitive
  * summary-producing policy change; final sorting and dedupe are recomputed.
  */
-export const SESSION_SUMMARY_CACHE_VERSION = 3;
+export const SESSION_SUMMARY_CACHE_VERSION = 4;
 
 function getDrivers(session: TelemetrySession | undefined): DriverData[] {
   return session?.["classification-data"] ?? [];
@@ -80,8 +80,13 @@ function isOnlineParticipant(
   // Online exports can mark disconnected human slots as AI-controlled later,
   // so use stable network/identity signals for field-size quality checks.
   const networkId = participant["network-id"];
+  // F1 25 and older use the maximum uint8 value for an unavailable network
+  // slot; F1 26 widened the field to uint16 and uses the corresponding max.
+  // Neither sentinel represents a network participant.
+  const hasNetworkId =
+    typeof networkId === "number" && networkId !== 255 && networkId !== 65_535;
   return (
-    (typeof networkId === "number" && networkId !== 255) ||
+    hasNetworkId ||
     participant["show-online-names"] === true ||
     (participant.platform != null && participant.platform !== "Unknown")
   );
