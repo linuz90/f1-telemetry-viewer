@@ -1,3 +1,4 @@
+import { CalendarDays, Route } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { SESSION_LIST_TAB_STORAGE_KEY } from "../constants/storage";
@@ -18,6 +19,7 @@ import { getSessionFormulaScopeKey } from "../utils/formulaScope";
 import { sessionSummaryPath, trackPath } from "../utils/routes";
 import { readStoredString, writeStoredString } from "../utils/storage";
 import {
+  areSessionFiltersDefault,
   DEFAULT_FILTERS,
   matchesSessionFilters,
   useSessionFilters,
@@ -25,13 +27,14 @@ import {
 import { cn } from "../utils/cn";
 import { TrackFlag } from "./TrackFlag";
 import { SessionCard } from "./SessionCard";
+import { SessionListActiveFilters } from "./SessionListActiveFilters";
 import { SessionListFilterMenu } from "./SessionListFilterMenu";
 import { HStack } from "./ui/Stack";
 import { Tabs } from "./ui/Tabs";
 
 const SIDEBAR_TABS = [
-  { value: "sessions", label: "Sessions" },
-  { value: "tracks", label: "Tracks" },
+  { value: "sessions", label: "Sessions", icon: CalendarDays },
+  { value: "tracks", label: "Tracks", icon: Route },
 ] as const;
 
 // Only Quali and Time Trial rows display a best-lap pill in the sidebar; the
@@ -135,20 +138,18 @@ export function SessionList() {
     );
   }
 
-  // First pass: type + mode. Formula scope is app-wide and applied below so the
-  // sidebar always matches the dashboard/track/session context.
+  // Formula scope is app-wide, then the sidebar filters narrow that same set so
+  // the matching/total count can make a persisted filter's impact explicit.
   // Synthetic (demo-only) entries DO appear here so the sidebar reads like a real session list;
   // clicking one lands on the SessionPage's friendly "Demo session — upload to explore detail"
   // placeholder rather than a 404.
-  const typeModeFiltered = sessions.filter((s) =>
+  const scopedSessions = activeFormulaKey
+    ? sessions.filter((s) => getSessionFormulaScopeKey(s) === activeFormulaKey)
+    : sessions;
+  const filteredSessions = scopedSessions.filter((s) =>
     matchesSessionFilters(s, filters),
   );
-
-  const filteredSessions = activeFormulaKey
-    ? typeModeFiltered.filter(
-        (s) => getSessionFormulaScopeKey(s) === activeFormulaKey,
-      )
-    : typeModeFiltered;
+  const filtersActive = !areSessionFiltersDefault(filters);
 
   const pageCount = Math.ceil(filteredSessions.length / PAGE_SIZE);
   const safePage = Math.min(page, Math.max(0, pageCount - 1));
@@ -197,6 +198,15 @@ export function SessionList() {
             <SessionListFilterMenu value={filters} onChange={updateFilters} />
           </div>
         </HStack>
+
+        {filtersActive && (
+          <SessionListActiveFilters
+            value={filters}
+            matchingCount={filteredSessions.length}
+            totalCount={scopedSessions.length}
+            onReset={() => updateFilters(DEFAULT_FILTERS)}
+          />
+        )}
 
         {tab === "sessions" && pageCount > 1 && (
           <HStack justify="between" className="mt-1 px-2 py-1">
