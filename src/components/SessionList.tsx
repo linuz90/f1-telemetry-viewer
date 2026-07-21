@@ -18,7 +18,7 @@ import {
   isTimeTrialSessionType,
 } from "../utils/sessionTypes";
 import { readStoredString, writeStoredString } from "../utils/storage";
-import { sortTracksByCalendar } from "../utils/tracks";
+import { getTrackId, sortTracksByCalendar } from "../utils/tracks";
 import { SessionListActiveFilters } from "./SessionListActiveFilters";
 import { SessionListFilterMenu } from "./SessionListFilterMenu";
 import { SessionListItem } from "./SessionListItem";
@@ -91,7 +91,7 @@ function isSessionTrackBest(
   if (!session.bestLapTimeMs) return false;
   const kind = sessionBestLapKind(session.sessionType);
   if (!kind) return false;
-  const key = `${session.track}::${getSessionFormulaScopeKey(session)}::${kind}`;
+  const key = `${getTrackId(session.track)}::${getSessionFormulaScopeKey(session)}::${kind}`;
   return session.bestLapTimeMs === bestTimeByTrack[key];
 }
 
@@ -203,23 +203,30 @@ export function SessionList() {
   );
 
   const grouped = groupByDate(pagedSessions);
+  const trackSessionsById = new Map<string, SessionSummary[]>();
+  for (const session of filteredSessions) {
+    const trackId = getTrackId(session.track);
+    const trackSessions = trackSessionsById.get(trackId) ?? [];
+    trackSessions.push(session);
+    trackSessionsById.set(trackId, trackSessions);
+  }
   const tracks = sortTracksByCalendar(
-    [...new Set(filteredSessions.map((s) => s.track))],
+    [...trackSessionsById.keys()],
     activeFormulaKey,
   );
 
   // Best lap time per track, split by session-type group. Time Trial is its
   // own leaderboard in-game, so the user expects the fastest TT lap at a
   // track to be highlighted even when a Short Quali ran faster — and vice
-  // versa. Keyed by `${track}::${scope}::${kind}` where kind is "tt" or
-  // "quali"; race sessions don't show a best lap in the sidebar row.
+  // versa. Canonical track ids keep exporter aliases in the same PB bucket;
+  // race sessions don't show a best lap in the sidebar row.
   const bestTimeByTrack: Record<string, number> = {};
   for (const s of filteredSessions) {
     if (s.isSpectator) continue;
     if (!s.bestLapTimeMs || s.bestLapTimeMs <= 0) continue;
     const kind = sessionBestLapKind(s.sessionType);
     if (!kind) continue;
-    const key = `${s.track}::${getSessionFormulaScopeKey(s)}::${kind}`;
+    const key = `${getTrackId(s.track)}::${getSessionFormulaScopeKey(s)}::${kind}`;
     const prev = bestTimeByTrack[key];
     if (!prev || s.bestLapTimeMs < prev) {
       bestTimeByTrack[key] = s.bestLapTimeMs;
@@ -331,10 +338,9 @@ export function SessionList() {
           })}
 
         {tab === "tracks" &&
-          tracks.map((track) => {
-            const trackSessions = filteredSessions.filter(
-              (s) => s.track === track,
-            );
+          tracks.map((trackId) => {
+            const trackSessions = trackSessionsById.get(trackId) ?? [];
+            const track = trackSessions[0]?.track ?? trackId;
             const count = trackSessions.length;
             const formulaKey =
               activeFormulaKey ?? representativeFormulaKey(trackSessions);
@@ -345,7 +351,7 @@ export function SessionList() {
             const isSyntheticOnly = trackSessions.every((s) => s.isSynthetic);
             return (
               <TrackListItem
-                key={track}
+                key={trackId}
                 track={track}
                 formulaKey={formulaKey}
                 totalSessionCount={count}

@@ -10,6 +10,7 @@ import {
 import { cn } from "../../utils/cn";
 import { CHART_THEME } from "../../constants/colors";
 import { msToLapTime } from "../../utils/format";
+import { getTrackDisplayName } from "../../utils/tracks";
 import { cardClassCompact } from "../Card";
 import { TrackFlag } from "../TrackFlag";
 import { HStack } from "../ui/Stack";
@@ -25,6 +26,7 @@ export interface QualifyingPaceData {
 
 export function QualifyingPaceCard({ data }: { data: QualifyingPaceData }) {
   const { track, formulaKey, points, pbMs } = data;
+  const trackName = getTrackDisplayName(track);
   return (
     <Link
       to={trackFormulaPath(track, formulaKey)}
@@ -33,7 +35,7 @@ export function QualifyingPaceCard({ data }: { data: QualifyingPaceData }) {
       <HStack justify="between" className="mb-2 gap-3">
         <HStack className="gap-1.5">
           <TrackFlag track={track} />
-          <span className="truncate text-sm font-medium">{track}</span>
+          <span className="truncate text-sm font-medium">{trackName}</span>
           <span className="ml-1 font-mono text-xs tabular-nums text-zinc-500">
             {points.length} days
           </span>

@@ -7,7 +7,12 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { ActionEmptyState } from "../components/ActionEmptyState";
 import {
   CartesianGrid,
@@ -65,7 +70,11 @@ import {
   msToSectorTime,
 } from "../utils/format";
 import { getRaceControlEvents } from "../utils/raceControl";
-import { isTrackSlugMatch } from "../utils/tracks";
+import {
+  getTrackDisplayName,
+  getTrackId,
+  isTrackSlugMatch,
+} from "../utils/tracks";
 import {
   dashboardPath,
   isTrackSessionTab,
@@ -102,6 +111,7 @@ const TRACK_TAB_META_LABEL: Record<TrackSessionKind, string> = {
 
 export function TrackProgressPage() {
   const { trackId } = useParams<{ trackId: string }>();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { sessions } = useSessionList();
   const {
@@ -119,6 +129,29 @@ export function TrackProgressPage() {
     isTrackSessionTab(requestedTab) ? requestedTab : "race",
   );
   const requestedRaceLaps = searchParams.get("raceLaps");
+  const canonicalTrackId = trackId ? getTrackId(trackId) : "";
+  const search = searchParams.toString();
+
+  useEffect(() => {
+    if (
+      !activeFormulaKey ||
+      !trackId ||
+      !canonicalTrackId ||
+      trackId === canonicalTrackId
+    ) {
+      return;
+    }
+
+    // Old exporter-derived routes remain valid, then settle on the canonical
+    // circuit id so NavLink state and copied URLs stay consistent.
+    navigate(
+      {
+        pathname: trackPath(activeFormulaKey, canonicalTrackId),
+        search: search ? `?${search}` : "",
+      },
+      { replace: true },
+    );
+  }, [activeFormulaKey, canonicalTrackId, navigate, search, trackId]);
 
   useEffect(() => {
     if (isTrackSessionTab(requestedTab)) {
@@ -126,9 +159,9 @@ export function TrackProgressPage() {
     }
   }, [requestedTab]);
 
-  // Route slugs are stable hyphenated ids (`abu-dhabi`), while telemetry keeps
-  // display names (`Abu Dhabi`). Match through the shared slug helper so future
-  // route-model changes only need to update one normalization function.
+  // Route slugs are canonical circuit ids (`yas-marina`), while telemetry may
+  // use country, city, or circuit names. Match through the shared resolver so
+  // exporter vocabulary changes cannot split one circuit's history.
   const allTrackSessions = useMemo(
     () => sessions.filter((s) => isTrackSlugMatch(s.track, trackId)),
     [sessions, trackId],
@@ -148,9 +181,10 @@ export function TrackProgressPage() {
     .map((s) => s.slug)
     .join("|");
 
-  // Resolve the original (display) track name from session data
-  const displayTrackName =
+  // Keep the exporter value for metadata lookup; presentation uses the curated name.
+  const trackSourceName =
     allTrackSessions.length > 0 ? allTrackSessions[0].track : (trackId ?? "");
+  const displayTrackName = getTrackDisplayName(trackSourceName);
   const backToDashboardPath = dashboardPath(activeFormulaKey);
 
   useEffect(() => {
@@ -330,7 +364,7 @@ export function TrackProgressPage() {
         <div className="p-6 max-w-5xl mx-auto space-y-6">
           <div>
             <h2 className="text-xl font-bold mb-1">
-              <TrackFlag track={displayTrackName} className="mr-2" />
+              <TrackFlag track={trackSourceName} className="mr-2" />
               {displayTrackName}
             </h2>
             <p className="text-sm text-zinc-500">
@@ -394,7 +428,7 @@ export function TrackProgressPage() {
                 {otherTrackScopes.map((option) => (
                   <Link
                     key={option.key}
-                    to={trackPath(option.key, displayTrackName)}
+                    to={trackPath(option.key, trackSourceName)}
                     className={buttonVariants({ variant: "secondary" })}
                   >
                     View {option.label} ({option.trackSessionCount})
@@ -492,7 +526,7 @@ export function TrackProgressPage() {
         <div className="min-w-0">
           <h2 className="text-xl font-bold mb-1">
             <TrackFlag
-              track={displayTrackName}
+              track={trackSourceName}
               size="medium"
               className="mr-2 -translate-y-px"
             />

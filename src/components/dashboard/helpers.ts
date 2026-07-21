@@ -10,6 +10,7 @@ import {
   isTimeTrialSessionType,
 } from "../../utils/sessionTypes";
 import { trackPath } from "../../utils/routes";
+import { getTrackId } from "../../utils/tracks";
 
 export interface SessionStats {
   summary: SessionSummary;
@@ -325,10 +326,13 @@ export function buildTrackGroups(
       session.summary.formula,
       session.summary.gameYear,
     );
-    const key = `${session.summary.track}::${formulaKey}`;
+    const trackId = getTrackId(session.summary.track);
+    const key = `${trackId}::${formulaKey}`;
     if (!trackGroups[key]) {
       trackGroups[key] = {
         key,
+        // Keep the exporter label for unknown/custom tracks; known tracks are
+        // still presented through getTrackDisplayName at the render boundary.
         track: session.summary.track,
         formulaKey,
         formulaLabel: getFormulaLabel(

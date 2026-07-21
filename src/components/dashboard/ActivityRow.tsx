@@ -1,6 +1,7 @@
 import type { DashboardActivityGroup } from "../../analysis/dashboardActivity";
 import { formatTime } from "../../utils/format";
 import { sessionSummaryPath } from "../../utils/routes";
+import { getTrackDisplayName } from "../../utils/tracks";
 import { SessionResultMetric } from "../SessionResultMetric";
 import { SessionResultStatusBadge } from "../SessionResultStatusBadge";
 import { SessionTypeBadge } from "../SessionTypeBadge";
@@ -33,6 +34,7 @@ export function ActivityRow({
   const result = session.playerRaceResult;
   const attempt = attemptLabel(activity);
   const isTimeTrial = activity.kind === "time-trial";
+  const trackName = getTrackDisplayName(session.track);
 
   // Time Trial is solo by definition — "Online · 1 drivers" is meaningless
   // noise. For race/quali, keep the field size when we actually have an
@@ -54,7 +56,7 @@ export function ActivityRow({
         <>
           <TrackFlag track={session.track} />
           <span className="truncate text-sm font-medium text-zinc-100">
-            {session.track}
+            {trackName}
           </span>
           <SessionTypeBadge
             sessionType={session.sessionType}

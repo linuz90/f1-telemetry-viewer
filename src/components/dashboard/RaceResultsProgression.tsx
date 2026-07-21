@@ -3,6 +3,7 @@ import type { SessionSummary } from "../../types/telemetry";
 import { cn } from "../../utils/cn";
 import { formatShortDate } from "../../utils/format";
 import { sessionSummaryPath } from "../../utils/routes";
+import { getTrackDisplayName } from "../../utils/tracks";
 import { TrackFlag } from "../TrackFlag";
 import { ScrollArea } from "../ui/ScrollArea";
 import { HStack } from "../ui/Stack";
@@ -195,7 +196,7 @@ function ProgressionColumn({ session }: { session: SessionSummary }) {
   const finishLabel = isDnf ? "×" : `P${result.position}`;
   const finishLabelClass = isDnf ? "text-behind" : "text-zinc-200";
   const gridLabel = grid ? `P${grid}` : "—";
-  const title = `${session.track} · ${formatShortDate(session.date)}\nGrid ${gridLabel} → Finish ${isDnf ? "DNF" : `P${result.position}`}`;
+  const title = `${getTrackDisplayName(session.track)} · ${formatShortDate(session.date)}\nGrid ${gridLabel} → Finish ${isDnf ? "DNF" : `P${result.position}`}`;
   const to = sessionSummaryPath(session);
 
   return (

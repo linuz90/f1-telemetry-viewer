@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { getTrackDisplayName } from "../../utils/tracks";
 import type {
   InsightKind,
   InsightScope,
@@ -111,6 +112,7 @@ const SCOPE_LABEL: Partial<Record<InsightScope, string>> = {
 };
 
 export function InsightCard({ insight }: { insight: TrackInsight }) {
+  const trackName = getTrackDisplayName(insight.track);
   const style = INSIGHT_STYLES[insight.kind];
   const tokens = ACCENT_TOKENS[style.accent];
   const to = insight.sessionSlug
@@ -150,7 +152,7 @@ export function InsightCard({ insight }: { insight: TrackInsight }) {
         <div className="min-w-0">
           <HStack className="gap-1.5 truncate text-base font-semibold">
             <TrackFlag track={insight.track} />
-            <span className="truncate">{insight.track}</span>
+            <span className="truncate">{trackName}</span>
           </HStack>
           <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
             {insight.detail}

@@ -1,6 +1,7 @@
 import type { SessionSummary } from "../types/telemetry";
 import { getSessionFormulaScopeKey } from "../utils/formulaScope";
 import { isRaceSessionType } from "../utils/sessionTypes";
+import { getTrackId } from "../utils/tracks";
 
 /**
  * Formula-scoped dashboard result aggregates: hero numbers, recent result rows,
@@ -249,14 +250,15 @@ function buildTrackResults(
 ): TrackResultSummary[] {
   const groups = new Map<string, SessionSummary[]>();
   for (const session of cleanFinishSessions) {
-    const group = groups.get(session.track) ?? [];
+    const trackId = getTrackId(session.track);
+    const group = groups.get(trackId) ?? [];
     group.push(session);
-    groups.set(session.track, group);
+    groups.set(trackId, group);
   }
 
   return [...groups.entries()]
     .filter(([, sessions]) => sessions.length >= 2)
-    .map(([track, sessions]) => {
+    .map(([, sessions]) => {
       const positions = sessions.map(
         (session) => session.playerRaceResult?.position ?? 0,
       );
@@ -264,7 +266,7 @@ function buildTrackResults(
         .map(getGridGain)
         .filter((gain): gain is number => gain != null);
       return {
-        track,
+        track: sessions[0]!.track,
         races: sessions.length,
         averageFinish: average(positions) ?? 0,
         bestFinish: Math.min(...positions),
@@ -327,7 +329,9 @@ export function getDashboardResultStats(
       (sum, session) => sum + session.validLapCount,
       0,
     ),
-    trackCount: new Set(scopedSessions.map((session) => session.track)).size,
+    trackCount: new Set(
+      scopedSessions.map((session) => getTrackId(session.track)),
+    ).size,
     sessionCount: scopedSessions.length,
     starts: resultSessions.length,
     wins: positions.filter((position) => position === 1).length,

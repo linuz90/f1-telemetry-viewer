@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { cn } from "../utils/cn";
 import { trackPath } from "../utils/routes";
-import { getTrackCountryName } from "../utils/tracks";
+import { getTrackCountryName, getTrackDisplayName } from "../utils/tracks";
 import { TrackFlag } from "./TrackFlag";
 import { HStack } from "./ui/Stack";
 
@@ -27,9 +27,11 @@ export function TrackListItem({
   bestLapSessionCount,
   isSyntheticOnly,
 }: TrackListItemProps) {
+  const displayName = getTrackDisplayName(track);
   const country = getTrackCountryName(track);
   const countryLabel =
-    country && country.localeCompare(track, "en", { sensitivity: "base" }) !== 0
+    country &&
+    country.localeCompare(displayName, "en", { sensitivity: "base" }) !== 0
       ? country
       : null;
   const supportingCount = bestLapKind
@@ -39,7 +41,7 @@ export function TrackListItem({
     <>
       <TrackFlag track={track} size="small" className="shrink-0" />
       <span className="min-w-0 flex-1 leading-tight">
-        <span className="block truncate font-medium">{track}</span>
+        <span className="block truncate font-medium">{displayName}</span>
         {countryLabel && (
           <span className="mt-0.5 block truncate text-xs font-normal text-zinc-400">
             {countryLabel}

@@ -1,5 +1,6 @@
 import { Eye } from "lucide-react";
 import { cn } from "../utils/cn";
+import { getTrackDisplayName } from "../utils/tracks";
 import { TrackFlag } from "./TrackFlag";
 import { getSessionTypeMeta } from "./sessionTypeMeta";
 import { SessionModeLabel } from "./SessionModeLabel";
@@ -39,6 +40,7 @@ export function SessionCard({
 }: SessionCardProps) {
   const typeMeta = getSessionTypeMeta(sessionType);
   const TypeIcon = typeMeta.icon;
+  const trackName = getTrackDisplayName(track);
 
   return (
     <div className="min-w-0">
@@ -48,7 +50,7 @@ export function SessionCard({
           className="min-w-0 gap-1.5 truncate text-sm font-medium"
         >
           <TrackFlag track={track} />
-          <span className="truncate">{track}</span>
+          <span className="truncate">{trackName}</span>
         </HStack>
         <HStack className="shrink-0 gap-1.5">
           <HStack

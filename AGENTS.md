@@ -26,6 +26,7 @@ pnpm preview                  # Preview production build
 pnpm generate-demo            # Regenerate public/demo/
 pnpm find-session <slug-or-url> # Resolve a session URL/slug to JSON on disk
 pnpm test                     # Run all focused Node test suites
+pnpm test:tracks              # Run canonical track identity/alias regressions
 pnpm test:session-index       # Run the focused Node session-index suite
 pnpm test:lap-stats           # Run complete-lap timing regressions
 pnpm test:race-pace           # Run Race Pace estimator/matching regressions
@@ -125,7 +126,13 @@ Formula scope:
 - F2 exports with `game-year: 25` display as `F2 25`.
 - F1 26 / 2026 Season Pack sessions compare under `f1-26`.
 - Do not add `?formula=` or new legacy alias routes.
-- Pass the active formula key to `sortTracksByCalendar()` so F1 26 uses the Madrid/Madring calendar order.
+- Pass the active formula key to `sortTracksByCalendar()` so F1 26 uses the canonical Madring calendar slot.
+
+Track identity:
+
+- `SessionSummary.track` keeps the raw exporter label; do not rewrite persisted summaries for presentation.
+- Use `getTrackId()` / `isSameTrack()` for grouping and comparison, `getTrackDisplayName()` for UI copy, and `trackPath()` for canonical URLs.
+- Keep legacy exporter-derived track slugs resolving so existing bookmarks redirect to the canonical circuit route.
 
 Start reaction:
 

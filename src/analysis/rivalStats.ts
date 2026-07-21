@@ -1,4 +1,5 @@
 import type { SessionSummary } from "../types/telemetry";
+import { getTrackDisplayName } from "../utils/tracks";
 import { isRaceSessionType } from "../utils/sessionTypes";
 
 /**
@@ -574,7 +575,10 @@ function buildFrequentRivalCards(aggregates: RivalAggregate[]): RivalCard[] {
       paceMedian != null && relation
         ? `${(Math.abs(paceMedian.deltaMs) / 1000).toFixed(3)}s ${relation}`
         : undefined;
-    const detail = [gapPhrase, `last ${winner.latestRaceTrack}`]
+    const detail = [
+      gapPhrase,
+      `last ${getTrackDisplayName(winner.latestRaceTrack)}`,
+    ]
       .filter(Boolean)
       .join(" · ");
     return {
