@@ -8,6 +8,10 @@ import {
   SIDEBAR_WIDTH_STORAGE_KEY,
 } from "../constants/storage";
 import { useTelemetry } from "../context/TelemetryContext";
+import {
+  areSessionFiltersDefault,
+  useSessionFilters,
+} from "../hooks/useSessionFilters";
 import { cn } from "../utils/cn";
 import { dashboardPath, replaceFormulaScopeInPath } from "../utils/routes";
 import {
@@ -19,13 +23,13 @@ import { AppBrand } from "./AppBrand";
 import { BrandHomeLink } from "./BrandHomeLink";
 import { cardHighlight } from "./Card";
 import { ChangelogModal } from "./ChangelogModal";
+import { FormulaScopeSelect } from "./FormulaScopeSelect";
 import { SessionList } from "./SessionList";
 import {
   scrollAxisClass,
   scrollbarClass,
   scrollbarGutterClass,
 } from "./ui/ScrollArea";
-import { SegmentedControl } from "./ui/SegmentedControl";
 
 const MIN_WIDTH = 250;
 const MAX_WIDTH = 480;
@@ -34,6 +38,7 @@ const DEFAULT_WIDTH = 288; // 72 * 4 (w-72)
 export function Layout() {
   const { mode, setShowUploadModal, formulaOptions, activeFormulaKey } =
     useTelemetry();
+  const [sessionFilters] = useSessionFilters();
   const [width, setWidth] = useState(() =>
     readStoredNumber(SIDEBAR_WIDTH_STORAGE_KEY, {
       fallback: DEFAULT_WIDTH,
@@ -52,6 +57,7 @@ export function Layout() {
       readStoredString(CHANGELOG_SEEN_STORAGE_KEY) !== latestHash,
   );
   const dragging = useRef(false);
+  const filtersActive = !areSessionFiltersDefault(sessionFilters);
 
   // Close sidebar on navigation (mobile)
   useEffect(() => {
@@ -146,7 +152,7 @@ export function Layout() {
         style={{ width }}
       >
         <div className="w-px h-full absolute right-0 top-0 z-99 pointer-events-none bg-[rgba(255,255,255,0.08)]" />
-        <div className="p-4">
+        <div className="px-4 pt-4 pb-1">
           <div className="flex items-center justify-between">
             <BrandHomeLink className="text-md font-bold tracking-tight" />
             <div className="flex items-center gap-1">
@@ -178,19 +184,11 @@ export function Layout() {
             </div>
           </div>
           {formulaOptions.length > 1 && activeFormulaKey && (
-            <div className="mt-4">
-              <SegmentedControl
-                ariaLabel="Formula scope"
-                options={formulaOptions.map((option) => ({
-                  value: option.key,
-                  label: option.label,
-                  meta: option.sessionCount,
-                }))}
+            <div className="mt-2">
+              <FormulaScopeSelect
+                options={formulaOptions}
                 value={activeFormulaKey}
                 onChange={handleFormulaScopeChange}
-                size="sm"
-                fullWidth
-                scrollable
               />
             </div>
           )}
@@ -217,9 +215,23 @@ export function Layout() {
         <div className="sticky top-0 z-10 flex items-center gap-3 bg-canvas/85 backdrop-blur px-4 py-3 md:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 transition-colors"
+            aria-label={
+              filtersActive ? "Open sidebar, filters active" : "Open sidebar"
+            }
+            className={cn(
+              "relative rounded-lg p-1.5 transition-colors",
+              filtersActive
+                ? "bg-sky-500/15 text-sky-300 ring-1 ring-inset ring-sky-400/25 hover:bg-sky-500/20"
+                : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200",
+            )}
           >
             <Menu className="h-5 w-5" />
+            {filtersActive && (
+              <span
+                aria-hidden="true"
+                className="absolute right-1 top-1 size-1.5 rounded-full bg-sky-300"
+              />
+            )}
           </button>
           <BrandHomeLink className="text-md font-bold tracking-tight" />
         </div>

@@ -51,6 +51,10 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
   const activeCount = countActive(value);
   const buttonIcon = getButtonIcon(value);
   const ButtonIcon = buttonIcon.icon;
+  const activeLabels = [
+    value.type === "all" ? null : SESSION_TYPE_FILTER_META[value.type].label,
+    value.mode === "all" ? null : SESSION_MODE_META[value.mode].label,
+  ].filter((label): label is string => label !== null);
 
   // Close on outside click and Escape
   useEffect(() => {
@@ -85,15 +89,17 @@ export function SessionListFilterMenu({ value, onChange }: Props) {
         onClick={() => setOpen((v) => !v)}
         aria-label={
           activeCount > 0
-            ? `${buttonIcon.label}, ${activeCount} active`
+            ? `${activeLabels.join(" and ")} filters active`
             : buttonIcon.label
         }
         aria-expanded={open}
         className={cn(
           "relative flex items-center justify-center rounded-md p-1.5 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600",
-          open || !isDefault
-            ? "bg-zinc-900 text-zinc-200"
-            : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-300",
+          !isDefault
+            ? "bg-sky-500/15 text-sky-300 ring-1 ring-inset ring-sky-400/25 hover:bg-sky-500/20"
+            : open
+              ? "bg-zinc-900 text-zinc-200"
+              : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-300",
         )}
       >
         <ButtonIcon className="h-3.5 w-3.5" />

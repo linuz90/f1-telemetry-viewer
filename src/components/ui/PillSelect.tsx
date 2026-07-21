@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 import { cn } from "../../utils/cn";
 import {
   FORM_CONTROL_CHROME_STYLES,
@@ -22,10 +22,11 @@ export type PillSelectSize = FormControlSize;
 
 const SIZE: Record<
   PillSelectSize,
-  { dot: string; icon: string; select: string }
+  { indicator: string; dot: string; icon: string; select: string }
 > = {
   sm: {
-    dot: "left-2.5 size-1.5",
+    indicator: "left-2.5",
+    dot: "size-1.5",
     icon: "right-2 size-3",
     select: cn(
       FORM_CONTROL_SIZE_STYLES.sm.control,
@@ -34,7 +35,8 @@ const SIZE: Record<
     ),
   },
   md: {
-    dot: "left-3 size-1.5",
+    indicator: "left-3",
+    dot: "size-1.5",
     icon: "right-2.5 size-3",
     select: cn(
       FORM_CONTROL_SIZE_STYLES.md.control,
@@ -50,6 +52,7 @@ export function PillSelect({
   options,
   ariaLabel,
   dotColor,
+  leadingIcon: LeadingIcon,
   width = "auto",
   size = "md",
   className,
@@ -59,6 +62,8 @@ export function PillSelect({
   options: readonly PillSelectOption[];
   ariaLabel: string;
   dotColor?: string;
+  /** Replaces the default color dot when set. */
+  leadingIcon?: LucideIcon;
   width?: PillSelectWidth;
   size?: PillSelectSize;
   className?: string;
@@ -74,13 +79,24 @@ export function PillSelect({
         className,
       )}
     >
-      <span
-        className={cn(
-          "pointer-events-none absolute rounded-full bg-zinc-500/60",
-          styles.dot,
-        )}
-        style={{ backgroundColor: dotColor }}
-      />
+      {LeadingIcon ? (
+        <LeadingIcon
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute size-3 text-zinc-500",
+            styles.indicator,
+          )}
+        />
+      ) : (
+        <span
+          className={cn(
+            "pointer-events-none absolute rounded-full bg-zinc-500/60",
+            styles.indicator,
+            styles.dot,
+          )}
+          style={{ backgroundColor: dotColor }}
+        />
+      )}
       <select
         value={String(value)}
         onChange={(event) => onChange(event.target.value)}
