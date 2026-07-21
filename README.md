@@ -84,6 +84,7 @@ pnpm find-session <slug-or-url>  # Resolve a session URL or slug to JSON
 pnpm test:session-index          # Run the focused Node session-index suite
 pnpm test:lap-stats              # Run complete-lap timing regressions
 pnpm test:race-pace              # Run Race Pace estimator/matching regressions
+pnpm test:energy-stats           # Run ERS/fuel energy-stat regressions
 pnpm typecheck:node              # Type-check the servers, plugins, and scripts
 pnpm benchmark:session-index     # Benchmark a disposable 1,260-file corpus
 ```

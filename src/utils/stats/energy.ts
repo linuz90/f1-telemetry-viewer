@@ -109,7 +109,17 @@ export function ersHarvestMjForLap(lap: PerLapInfo): number {
   return ersHarvestJForLap(lap) / 1_000_000;
 }
 
-/** Recorded per-lap ERS harvest allowance, in joules. */
+/** MGU-K energy harvested on a lap, in joules. The utilization denominator is
+ *  specifically an MGU-K limit, so including MGU-H would inflate older cars. */
+function ersHarvestMgukJForLap(lap: PerLapInfo): number {
+  return (
+    lap["ers-stats"]?.["ers-harv-mguk-j"] ??
+    lap["car-status-data"]?.["ers-harvested-this-lap-mguk"] ??
+    0
+  );
+}
+
+/** Recorded per-lap MGU-K harvest allowance, in joules. */
 export function ersHarvestLimitJForLap(lap: PerLapInfo): number {
   return (
     lap["ers-stats"]?.["ers-harv-limit-mguk-j"] ??
@@ -118,20 +128,13 @@ export function ersHarvestLimitJForLap(lap: PerLapInfo): number {
   );
 }
 
-function hasHarvestReading(lap: PerLapInfo): boolean {
+function hasMgukHarvestReading(lap: PerLapInfo): boolean {
   const stats = lap["ers-stats"];
-  if (
-    stats?.["ers-harv-mguk-j"] != null ||
-    stats?.["ers-harv-mguh-j"] != null
-  ) {
+  if (stats?.["ers-harv-mguk-j"] != null) {
     return true;
   }
 
-  const car = lap["car-status-data"];
-  return (
-    car?.["ers-harvested-this-lap-mguk"] != null ||
-    car?.["ers-harvested-this-lap-mguh"] != null
-  );
+  return lap["car-status-data"]?.["ers-harvested-this-lap-mguk"] != null;
 }
 
 function hasMeaningfulErsTelemetry(laps: readonly PerLapInfo[]): boolean {
@@ -142,7 +145,7 @@ function hasMeaningfulErsTelemetry(laps: readonly PerLapInfo[]): boolean {
 }
 
 /**
- * Average share of the recorded per-lap harvest allowance that was recovered.
+ * Average share of the recorded per-lap MGU-K harvest allowance recovered.
  * Explicit zero-harvest laps remain in the sample; dropping them would make the
  * percentage look artificially high. Values can be slightly above 100% when
  * the saved cumulative counter and limit snapshot straddle a packet boundary.
@@ -157,9 +160,9 @@ export function avgErsHarvestUtilization(d: DriverData): number | null {
 
   const utilization: number[] = [];
   for (const lap of eligible) {
-    if (!hasHarvestReading(lap)) continue;
+    if (!hasMgukHarvestReading(lap)) continue;
 
-    const harvestedJ = ersHarvestJForLap(lap);
+    const harvestedJ = ersHarvestMgukJForLap(lap);
     const limitJ = ersHarvestLimitJForLap(lap);
     if (
       !Number.isFinite(harvestedJ) ||

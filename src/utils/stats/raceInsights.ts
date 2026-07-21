@@ -2,7 +2,11 @@ import type { DriverData, TelemetrySession } from "../../types/telemetry";
 import { sectorTimeMs } from "../format";
 import { ordinal } from "./core";
 import { driverTopSpeed } from "./drivers";
-import { avgErsDeployMj, avgErsHarvestUtilization } from "./energy";
+import {
+  avgErsDeployMj,
+  avgErsHarvestMj,
+  avgErsHarvestUtilization,
+} from "./energy";
 import type { StrategyInsight } from "./insightTypes";
 import {
   ERS_HARVEST_UTILIZATION_TOOLTIP,
@@ -18,6 +22,8 @@ import {
 import { getCompletedStints, getDriverStints, stintWearRate } from "./tyres";
 
 const MATCHED_PACE_TIE_TOLERANCE_MS = 50;
+const ERS_HARVEST_ENERGY_TOOLTIP =
+  "Average ERS energy harvested per lap, MGU-K + MGU-H combined. Green-flag laps only; pre-race baseline and final reset snapshot excluded.";
 
 /** Generate strategy insights for the player (race) */
 export function generateInsights(
@@ -147,7 +153,7 @@ export function generateInsights(
         value: `${delta <= 0 ? "" : "+"}${delta.toFixed(1)} MJ`,
         detail: `avg per lap vs ${rivalName} (${playerErs.toFixed(1)} vs ${rivalErs.toFixed(1)} MJ)`,
         tooltip:
-          "Average ERS energy deployed per lap (green-flag laps only, excluding first and last lap).",
+          "Average ERS energy deployed per lap. Green-flag laps only; pre-race baseline and final reset snapshot excluded.",
       });
     }
 
@@ -158,13 +164,30 @@ export function generateInsights(
       const playerPercent = playerHarvest * 100;
       const rivalPercent = rivalHarvest * 100;
       const deltaPoints = playerPercent - rivalPercent;
+      const displayDeltaPoints = Math.abs(deltaPoints) < 0.05 ? 0 : deltaPoints;
       insights.push({
         type: "ers",
         label: "ERS Harvest",
-        value: `${deltaPoints <= 0 ? "" : "+"}${deltaPoints.toFixed(1)} pp`,
-        detail: `${playerPercent.toFixed(1)}% vs ${rivalPercent.toFixed(1)}% for ${rivalName}`,
+        value: `${displayDeltaPoints > 0 ? "+" : ""}${displayDeltaPoints.toFixed(1)} pp`,
+        detail: `${playerPercent.toFixed(1)}% vs ${rivalName} at ${rivalPercent.toFixed(1)}%`,
         tooltip: ERS_HARVEST_UTILIZATION_TOOLTIP,
       });
+    } else {
+      // Older exports have energy counters but no recorded per-lap harvest
+      // limit. Preserve the prior raw-energy insight rather than dropping the
+      // Harvest line entirely when utilization cannot be compared.
+      const playerHarv = avgErsHarvestMj(player);
+      const rivalHarv = avgErsHarvestMj(rival);
+      if (playerHarv > 0 && rivalHarv > 0) {
+        const delta = playerHarv - rivalHarv;
+        insights.push({
+          type: "ers",
+          label: "ERS Harv",
+          value: `${delta <= 0 ? "" : "+"}${delta.toFixed(1)} MJ`,
+          detail: `avg per lap vs ${rivalName} (${playerHarv.toFixed(1)} vs ${rivalHarv.toFixed(1)} MJ)`,
+          tooltip: ERS_HARVEST_ENERGY_TOOLTIP,
+        });
+      }
     }
   } else {
     // --- Field ranking mode (original behavior) ---
@@ -282,7 +305,7 @@ export function generateInsights(
         value: ordinal(ersPos + 1),
         detail: `of ${ersRanking.length} — ${playerErs.toFixed(1)} MJ/lap`,
         tooltip:
-          "Average ERS energy deployed per lap (green-flag laps only, excluding first and last lap).",
+          "Average ERS energy deployed per lap. Green-flag laps only; pre-race baseline and final reset snapshot excluded.",
         rank: ersPos,
         rankTotal: ersRanking.length,
       });
@@ -299,6 +322,7 @@ export function generateInsights(
     const harvestPos = harvestRanking.findIndex(
       (r) => r.driver.index === player.index,
     );
+    let hasHarvestInsight = false;
     if (harvestPos >= 0 && harvestRanking.length > 1) {
       const playerPercent = harvestRanking[harvestPos].utilization * 100;
       insights.push({
@@ -308,9 +332,34 @@ export function generateInsights(
         detail:
           harvestPos === 0
             ? `highest of ${harvestRanking.length} drivers`
-            : `${ordinal(harvestPos + 1)}-highest of ${harvestRanking.length} drivers`,
+            : `${ordinal(harvestPos + 1)} highest of ${harvestRanking.length} drivers`,
         tooltip: ERS_HARVEST_UTILIZATION_TOOLTIP,
       });
+      hasHarvestInsight = true;
+    }
+
+    if (!hasHarvestInsight) {
+      const rawHarvestRanking: { driver: DriverData; avgHarv: number }[] = [];
+      for (const d of allDrivers) {
+        const avgHarv = avgErsHarvestMj(d);
+        if (avgHarv > 0) rawHarvestRanking.push({ driver: d, avgHarv });
+      }
+      rawHarvestRanking.sort((a, b) => b.avgHarv - a.avgHarv);
+      const rawHarvestPos = rawHarvestRanking.findIndex(
+        (result) => result.driver.index === player.index,
+      );
+      if (rawHarvestPos >= 0 && rawHarvestRanking.length > 1) {
+        const playerHarv = rawHarvestRanking[rawHarvestPos].avgHarv;
+        insights.push({
+          type: "ers",
+          label: "ERS Harv",
+          value: ordinal(rawHarvestPos + 1),
+          detail: `of ${rawHarvestRanking.length} — ${playerHarv.toFixed(1)} MJ/lap`,
+          tooltip: ERS_HARVEST_ENERGY_TOOLTIP,
+          rank: rawHarvestPos,
+          rankTotal: rawHarvestRanking.length,
+        });
+      }
     }
 
     // 6. Weakest & strongest sector (avg vs avg across race-pace laps)

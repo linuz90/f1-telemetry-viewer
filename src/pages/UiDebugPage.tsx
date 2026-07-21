@@ -153,7 +153,7 @@ const sampleInsights: SessionInsight[] = [
     value: "350 km/h",
     detail: "15th of 22 top speed",
     extraDetails: [
-      "Deploy: 7.0 MJ/lap (1st of 22)",
+      "Deploy 7.0 MJ/lap · P1/22",
       "Harvest: 99.6% (highest of 22 drivers)",
     ],
     accent: "sky",

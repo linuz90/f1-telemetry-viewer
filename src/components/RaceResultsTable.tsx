@@ -217,7 +217,7 @@ export function RaceResultsTable({
                   className={thClass("right")}
                   onClick={() => toggleSort("ers")}
                 >
-                  <Tooltip text="Average ERS energy deployed per lap (green-flag laps only, excluding first and last lap).">
+                  <Tooltip text="Average ERS energy deployed per lap. Green-flag laps only; pre-race baseline and final reset snapshot excluded.">
                     <span>
                       <SortIcon
                         column="ers"
@@ -235,7 +235,7 @@ export function RaceResultsTable({
                     onClick={() => toggleSort("ersHarv")}
                   >
                     <Tooltip text="Average ERS energy recovered per lap, MGU-K + MGU-H combined. Green-flag laps only; pre-race baseline and final reset snapshot excluded.">
-                      <span>
+                      <span aria-label="ERS harvested energy">
                         <SortIcon
                           column="ersHarv"
                           sortKey={sortKey}
@@ -253,7 +253,7 @@ export function RaceResultsTable({
                     onClick={() => toggleSort("ersHarvestPct")}
                   >
                     <Tooltip text={ERS_HARVEST_UTILIZATION_TOOLTIP}>
-                      <span>
+                      <span aria-label="ERS harvest utilization percentage">
                         <SortIcon
                           column="ersHarvestPct"
                           sortKey={sortKey}
