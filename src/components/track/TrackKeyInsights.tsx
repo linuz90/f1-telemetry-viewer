@@ -24,11 +24,10 @@ import { SectionHeader } from "../ui/SectionHeader";
  * answers "what should I actually do here?". Pure presentation: all
  * derivations come from `buildTrackRaceRecommendation()`.
  *
- * Evidence gate: recommended + alternative strategy cards only render when the
- * helper can synthesize a usable shape from bucket tyre data. The always-on
- * chips (best clean race lap, race-vs-quali, ERS, fuel, since-last-race) render
- * whenever their respective data is available, so a track with only short
- * repros still gives useful signal.
+ * Strategy synthesis shares this recommendation model but renders in the
+ * dedicated Strategy section. These always-on chips (best clean race lap,
+ * race-vs-quali, ERS, fuel, since-last-race) render whenever their respective
+ * data is available, so a track with only short repros still gives useful signal.
  *
  * Each tile uses the shared `InsightTile` shell so this section reads as the
  * same family as the dashboard `Insights` cards (icon + uppercase mono eyebrow

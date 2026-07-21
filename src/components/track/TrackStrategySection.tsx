@@ -9,7 +9,7 @@ import { SectionHeader } from "../ui/SectionHeader";
 import { HStack } from "../ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
 
-const STRATEGY_EVIDENCE_TOOLTIP = `Pace and wear come from this race-length bucket. Ranking blends distance-matched compound pace, projected worst-wheel wear, pit-loss cost, and managed-tyre risk; pit loss uses same-track player stops when available, then F1 defaults. Stints still target the ${PUNCTURE_THRESHOLD}% cap.`;
+const STRATEGY_EVIDENCE_TOOLTIP = `Ranking blends compound pace, projected worst-wheel wear, pit-loss cost, and managed-tyre risk. Pit loss uses same-track player stops when available, then F1 defaults. Stints still target the ${PUNCTURE_THRESHOLD}% cap.`;
 
 /**
  * F1 broadcast-style strategy visualization for the Race tab. Shows the
@@ -45,13 +45,25 @@ export function TrackStrategySection({
   subtitleParts.push(
     `based on ${sampleCount} ${sampleKind}${sampleCount === 1 ? "" : "s"} in this bucket`,
   );
+  if (recommended.evidence?.inferredCompounds.length) {
+    subtitleParts.push(
+      `inferred ${recommended.evidence.inferredCompounds.join(" + ")} wear`,
+    );
+  }
 
   return (
     <section className={cn(cardClass, "space-y-7")}>
       <SectionHeader
         title="Strategy"
         hint={subtitleParts.join(" · ")}
-        action={<StrategyEvidenceHelp />}
+        action={
+          <StrategyEvidenceHelp
+            strategies={[recommended, alternative].filter(
+              (strategy): strategy is TrackStrategySuggestion =>
+                strategy != null,
+            )}
+          />
+        }
       />
 
       <StrategyRow
@@ -70,9 +82,33 @@ export function TrackStrategySection({
   );
 }
 
-function StrategyEvidenceHelp() {
+function StrategyEvidenceHelp({
+  strategies,
+}: {
+  strategies: TrackStrategySuggestion[];
+}) {
+  const inferredCompounds = [
+    ...new Set(
+      strategies.flatMap(
+        (strategy) => strategy.evidence?.inferredCompounds ?? [],
+      ),
+    ),
+  ];
+  const paceSources = [
+    ...new Set(
+      strategies.flatMap((strategy) =>
+        strategy.timeEstimate?.details?.paceSource
+          ? [strategy.timeEstimate.details.paceSource]
+          : [],
+      ),
+    ),
+  ];
+  const tooltip = inferredCompounds.length
+    ? `${STRATEGY_EVIDENCE_TOOLTIP} ${inferredCompounds.join(" and ")} wear is a low-confidence estimate combining your observed wear, the game’s usable-life values, and game-scoped actual-compound calibration.${paceSources.length ? ` Pace: ${paceSources.join("; ")}.` : ""}`
+    : STRATEGY_EVIDENCE_TOOLTIP;
+
   return (
-    <Tooltip text={STRATEGY_EVIDENCE_TOOLTIP}>
+    <Tooltip text={tooltip}>
       <button
         type="button"
         className="inline-flex size-7 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-white/[0.03] hover:text-zinc-300 focus-visible:outline focus-visible:outline-1 focus-visible:outline-zinc-500"

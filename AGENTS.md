@@ -29,6 +29,7 @@ pnpm test                     # Run all focused Node test suites
 pnpm test:session-index       # Run the focused Node session-index suite
 pnpm test:lap-stats           # Run complete-lap timing regressions
 pnpm test:race-pace           # Run Race Pace estimator/matching regressions
+pnpm test:strategy            # Run strategy inference/timing regressions
 pnpm test:energy-stats        # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                # Run fuel aggregation and recommendation tests
 pnpm typecheck:node           # Type-check Node servers/plugins/scripts
@@ -195,6 +196,7 @@ Session summary cache:
 Strategy timing:
 
 - Track Strategy timing must stay race-distance scoped. Tyre wear and degradation differ between 25%, 50%, and full-distance races, so do not reuse same-track tyre pace/wear evidence across `total-laps` buckets unless a future model explicitly normalizes race-distance percentage.
+- A sparse F1 bucket may synthesize a Medium/Hard one-stop from observed Medium wear plus a complete same-bucket Tyre Sets allocation. Prefer packet pace, fall back to the formula-scoped adjacent pace step, scale Hard wear from usable life with the actual-compound calibration, cap confidence at low, and do not infer a two-stop. Soft-only and Hard-only buckets abstain until their wear transfer is validated. Keep inferred profiles out of the observed tyre-life cards.
 - When same-distance strategy evidence exists, prefer same stop-count samples for strategy timing and wear projection, then fall back to the broader selected race-distance bucket.
 - Pit-loss fallbacks may cross distance because pit-lane time loss is distance-independent: infer same-track user pit loss first, reject obvious outlier stops, then use attributed Pits n' Giggles F1 defaults, then a low-confidence F1 median. Do not invent F2 pit-loss defaults.
 - Strategy alternatives should stay useful: prefer a different stop count only when it is time-competitive; otherwise show the next best distinct one-stop or pit-window shape.

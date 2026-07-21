@@ -264,6 +264,7 @@ export interface DriverData {
   "final-classification": FinalClassification | null;
   "lap-data": LapDataCurrent;
   "tyre-set-history": TyreStint[];
+  "tyre-sets"?: TyreSetsData;
   "per-lap-info": PerLapInfo[];
   "car-setup"?: CarSetup | null;
   "race-control"?: RaceControlEvent[];
@@ -404,6 +405,12 @@ export interface TyreSetData {
   "usable-life": number;
   "lap-delta-time": number;
   fitted: boolean;
+}
+
+export interface TyreSetsData {
+  "car-index": number;
+  "fitted-index": number;
+  "tyre-set-data": TyreSetData[];
 }
 
 export interface TyreWearEntry {
@@ -564,6 +571,7 @@ export interface PerLapInfo {
   "car-damage-data": CarDamage;
   "car-status-data": CarStatus;
   "ers-stats"?: ErsStats;
+  "tyre-sets-data"?: TyreSetsData;
   "max-safety-car-status": string;
   "track-position"?: number;
   "top-speed-kmph"?: number;

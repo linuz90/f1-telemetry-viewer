@@ -23,18 +23,17 @@ export function isDryCompound(compound: string): boolean {
  *  their best Medium lap simply because the Hard stint ran on lower fuel.
  *  The compound names are themselves relative-pace labels for the track,
  *  so the priority ordering matches F1 fresh-lap pace assumptions directly. */
-export function rankDryCompoundsByPace(
-  compoundLifeStats: CompoundLifeStats[],
-): CompoundLifeStats[] {
+export function rankDryCompoundsByPace<T extends CompoundLifeStats>(
+  compoundLifeStats: T[],
+): T[] {
   const dry = compoundLifeStats.filter(
-    (c) =>
-      isDryCompound(c.compound) && c.stintCount > 0 && c.avgWearRatePerLap > 0,
+    (c) => isDryCompound(c.compound) && c.avgWearRatePerLap > 0,
   );
   return dry.sort((a, b) => {
     const aPri = DRY_COMPOUND_PRIORITY[a.compound] ?? Number.POSITIVE_INFINITY;
     const bPri = DRY_COMPOUND_PRIORITY[b.compound] ?? Number.POSITIVE_INFINITY;
     if (aPri !== bPri) return aPri - bPri;
-    // Tie-break by stint sample size — more evidence wins.
+    // Tie-break by stint sample size so real evidence wins over inferred rows.
     return b.stintCount - a.stintCount;
   });
 }

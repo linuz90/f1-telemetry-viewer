@@ -7,6 +7,7 @@ import {
   DRY_COMPOUND_PRIORITY,
   rankDryCompoundsByPace,
 } from "./trackStrategyCompounds";
+import { buildStrategyCompoundEvidence } from "./trackStrategyEvidence";
 import {
   buildTimingContext,
   findRaceTimeAnchor,
@@ -283,6 +284,7 @@ function suggestionFromShape(
   fullDistanceRaceCount: number,
   fastStart?: boolean,
   timeEstimate?: TrackStrategyTimeEstimate,
+  inferredCompoundNames: Set<string> = new Set(),
 ): TrackStrategySuggestion {
   const pitWindows: { earliest: number; latest: number; target: number }[] = [];
   let cumulative = 0;
@@ -290,6 +292,25 @@ function suggestionFromShape(
     cumulative += shape.stintLaps[i];
     pitWindows.push(buildPitWindow(cumulative, totalLaps));
   }
+  const inferredCompounds = [
+    ...new Set(
+      shape.compounds.filter((compound) => inferredCompoundNames.has(compound)),
+    ),
+  ];
+  const usesInferredWear = inferredCompounds.length > 0;
+  const adjustedTimeEstimate =
+    usesInferredWear && timeEstimate
+      ? {
+          ...timeEstimate,
+          confidence: "low" as const,
+          details: {
+            ...timeEstimate.details,
+            wearSource:
+              "missing compound scaled from game usable life and actual-compound calibration",
+          },
+        }
+      : timeEstimate;
+
   return {
     compounds: shape.compounds,
     stintLaps: shape.stintLaps,
@@ -300,7 +321,14 @@ function suggestionFromShape(
     isEvidenceBacked: true,
     fastStart,
     risk: shape.risk,
-    timeEstimate,
+    timeEstimate: adjustedTimeEstimate,
+    evidence: usesInferredWear
+      ? {
+          inferredCompounds,
+          wearSource:
+            "observed + game usable-life + actual-compound calibration",
+        }
+      : undefined,
   };
 }
 
@@ -355,7 +383,8 @@ export function synthesizeStrategies(
   recommended: TrackStrategySuggestion | null;
   alternative: TrackStrategySuggestion | null;
 } {
-  const ranked = rankDryCompoundsByPace(compoundLifeStats);
+  const evidence = buildStrategyCompoundEvidence(compoundLifeStats, entries);
+  const ranked = rankDryCompoundsByPace(evidence.compounds);
   if (ranked.length < 2) return { recommended: null, alternative: null };
 
   const candidates = new Map<string, StrategyCandidate>();
@@ -410,18 +439,28 @@ export function synthesizeStrategies(
     }
   }
 
-  // The two-stop sandwich stays in the candidate set even when a one-stop is
-  // feasible, because the timing model can now answer whether the extra stop is
-  // paid back by lower wear plus a fresh final stint.
-  const twoStop = buildTwoStopShape(ranked[0], ranked[1], totalLaps);
-  addCandidate(twoStop, "two-stop");
+  // A single observed compound is enough to sketch an adjacent one-stopper,
+  // but too thin to claim an inferred extra stop pays back its pit loss. Keep
+  // two-stop ranking on the fully observed path only.
+  if (evidence.inferredCompounds.size === 0) {
+    const twoStop = buildTwoStopShape(ranked[0], ranked[1], totalLaps);
+    addCandidate(twoStop, "two-stop");
+  }
 
   const candidateList = [...candidates.values()];
   if (candidateList.length === 0) {
     return { recommended: null, alternative: null };
   }
 
-  const timingContext = buildTimingContext(entries, pitLossEntries, ranked);
+  const timingContext = buildTimingContext(
+    entries,
+    pitLossEntries,
+    ranked,
+    evidence,
+  );
+  if (evidence.inferredCompounds.size > 0 && !timingContext) {
+    return { recommended: null, alternative: null };
+  }
   if (timingContext) {
     for (const candidate of candidateList) {
       candidate.score = scoreShape(candidate.shape, timingContext);
@@ -466,6 +505,7 @@ export function synthesizeStrategies(
             anchor,
           )
         : undefined,
+      evidence.inferredCompounds,
     ),
   );
 

@@ -1,4 +1,5 @@
 import type { DriverData } from "../types/telemetry";
+import { getActualCompoundLapTimeMultipliers } from "../constants/compoundPace";
 import {
   F1_PIT_LOSS_FAMILY_MEDIAN_MS,
   getF1PitLossDefaultMs,
@@ -17,6 +18,10 @@ import {
   DRY_COMPOUND_PRIORITY,
   isDryCompound,
 } from "./trackStrategyCompounds";
+import type {
+  StrategyCompoundEvidence,
+  StrategyCompoundStats,
+} from "./trackStrategyEvidence";
 import type {
   BucketRaceEntry,
   TrackStrategyShape,
@@ -400,6 +405,90 @@ function buildDefaultPaceModel(
   };
 }
 
+function buildPacketPaceModel(
+  evidence: StrategyCompoundEvidence,
+  rankedCompounds: StrategyCompoundStats[],
+): CompoundPaceModel | null {
+  const packetOffsets = evidence.allocation?.packetPaceOffsetsMs;
+  if (!packetOffsets) return null;
+  if (
+    rankedCompounds.some((compound) => !packetOffsets.has(compound.compound))
+  ) {
+    return null;
+  }
+
+  return {
+    offsetsMs: new Map(
+      rankedCompounds.map((compound) => [
+        compound.compound,
+        packetOffsets.get(compound.compound)!,
+      ]),
+    ),
+    confidence: "medium",
+    source: "same-bucket fresh Tyre Sets packet",
+  };
+}
+
+function buildActualCompoundPriorPaceModel(
+  entries: BucketRaceEntry[],
+  evidence: StrategyCompoundEvidence,
+  rankedCompounds: StrategyCompoundStats[],
+): CompoundPaceModel | null {
+  const formulaKey = evidence.allocation?.formulaKey;
+  if (!formulaKey) return null;
+  const multipliers = getActualCompoundLapTimeMultipliers(formulaKey);
+  if (!multipliers) return null;
+
+  const referenceLapMs = median(
+    entries.flatMap((entry) =>
+      getRacePaceLapSamples(entry.player).map((sample) => sample.timeMs),
+    ),
+  );
+  if (referenceLapMs == null || referenceLapMs <= 0) return null;
+
+  const compoundMultipliers = rankedCompounds.map((compound) => {
+    const actualCompound = compound.actualCompound;
+    const multiplier = actualCompound
+      ? multipliers.get(actualCompound)
+      : undefined;
+    return multiplier == null
+      ? null
+      : { compound: compound.compound, multiplier };
+  });
+  if (compoundMultipliers.some((value) => value == null)) return null;
+
+  const complete = compoundMultipliers.filter(
+    (value): value is NonNullable<typeof value> => value != null,
+  );
+  const fastestMultiplier = Math.min(
+    ...complete.map((value) => value.multiplier),
+  );
+  return {
+    offsetsMs: new Map(
+      complete.map(({ compound, multiplier }) => [
+        compound,
+        (multiplier / fastestMultiplier - 1) * referenceLapMs,
+      ]),
+    ),
+    confidence: "low",
+    source: `${formulaKey} actual-compound pace prior`,
+  };
+}
+
+function buildInferredCompoundPaceModel(
+  entries: BucketRaceEntry[],
+  evidence: StrategyCompoundEvidence,
+  rankedCompounds: StrategyCompoundStats[],
+): CompoundPaceModel | null {
+  // Target-session packet deltas retain circuit-specific information. The
+  // rounded cross-track constants are deliberately only the missing-delta
+  // fallback, never an override for the better local estimate.
+  return (
+    buildPacketPaceModel(evidence, rankedCompounds) ??
+    buildActualCompoundPriorPaceModel(entries, evidence, rankedCompounds)
+  );
+}
+
 function resolveEvidenceCompoundPaceModel(
   entries: BucketRaceEntry[],
 ): CompoundPaceModel | null {
@@ -637,19 +726,28 @@ export function findRaceTimeAnchor(
 export function buildTimingContext(
   entries: BucketRaceEntry[],
   pitLossEntries: BucketRaceEntry[],
-  rankedCompounds: CompoundLifeStats[],
+  rankedCompounds: StrategyCompoundStats[],
+  evidence: StrategyCompoundEvidence,
 ): StrategyTimingContext | null {
   const representative = entries[0];
   if (!representative) return null;
 
   const pitLoss = resolvePitLoss(pitLossEntries, representative);
   if (!pitLoss) return null;
-  const paceModel = resolveCompoundPaceModel(entries, rankedCompounds);
+  const hasInferredCompound = evidence.inferredCompounds.size > 0;
+  const paceModel = hasInferredCompound
+    ? buildInferredCompoundPaceModel(entries, evidence, rankedCompounds)
+    : resolveCompoundPaceModel(entries, rankedCompounds);
+  if (!paceModel) return null;
 
   return {
     pitLoss,
     paceModel,
-    strategyPaceModels: buildStrategyPaceModels(entries, paceModel),
+    // Stop-count-specific models only contain compounds the user actually ran.
+    // They cannot coherently score a synthesized missing compound.
+    strategyPaceModels: hasInferredCompound
+      ? new Map()
+      : buildStrategyPaceModels(entries, paceModel),
   };
 }
 

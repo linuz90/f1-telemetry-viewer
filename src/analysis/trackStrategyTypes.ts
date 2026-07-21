@@ -38,6 +38,13 @@ export interface TrackStrategySuggestion {
   risk?: TrackStrategyRisk;
   /** Relative/absolute timing estimate used to rank strategy rows. */
   timeEstimate?: TrackStrategyTimeEstimate;
+  /** Present when one or more compounds were synthesized from sparse evidence. */
+  evidence?: TrackStrategyEvidence;
+}
+
+export interface TrackStrategyEvidence {
+  inferredCompounds: string[];
+  wearSource: "observed + game usable-life + actual-compound calibration";
 }
 
 export interface TrackStrategyRisk {
@@ -68,6 +75,7 @@ export interface TrackStrategyTimeEstimate {
     pitLossSource?: string;
     paceSource?: string;
     anchorSource?: string;
+    wearSource?: string;
   };
 }
 
