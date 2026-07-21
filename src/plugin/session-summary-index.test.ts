@@ -537,6 +537,66 @@ test("classified races remain valid without timed lap history", async (t) => {
   assert.ok(snapshot.sessions[0]?.playerRaceResult);
 });
 
+test("F1 26 sentinel AI slots do not inflate online driver or human rival counts", async () => {
+  const session = JSON.parse(
+    await readFile(RACE_DEMO, "utf8"),
+  ) as TelemetrySession;
+  session["packet-format"] = 2026;
+  session["session-info"].formula = "F1 26";
+  const player = session["classification-data"].find(
+    (driver) => driver["is-player"],
+  );
+  const otherDrivers = session["classification-data"].filter(
+    (driver) => !driver["is-player"],
+  );
+  const sentinelAi = otherDrivers[0];
+  const disconnectedHuman = otherDrivers[1];
+  assert.ok(player);
+  assert.ok(sentinelAi?.["participant-data"]);
+  assert.ok(disconnectedHuman?.["participant-data"]);
+
+  sentinelAi["driver-name"] = "VERSTAPPEN";
+  sentinelAi["participant-data"] = {
+    ...sentinelAi["participant-data"],
+    "ai-controlled": true,
+    "network-id": 65_535,
+    "show-online-names": false,
+    platform: "Unknown",
+  };
+  disconnectedHuman["driver-name"] = "Former Human";
+  disconnectedHuman["participant-data"] = {
+    ...disconnectedHuman["participant-data"],
+    "ai-controlled": true,
+    "network-id": 42,
+    "show-online-names": false,
+    platform: "Unknown",
+  };
+  session["classification-data"] = [
+    player,
+    sentinelAi,
+    disconnectedHuman,
+  ];
+
+  const { summary } = buildSessionSummary(RACE_FILE, session);
+  assert.equal(summary.isOnline, true);
+  assert.equal(summary.onlineDriverCount, 2);
+  assert.equal(summary.activeHumanDriverCount, 1);
+  assert.equal(
+    summary.rivals?.find((rival) => rival.name === "VERSTAPPEN")?.isAi,
+    true,
+  );
+  assert.equal(
+    summary.rivals?.find((rival) => rival.name === "Former Human")?.isAi,
+    false,
+  );
+  assert.deepEqual(
+    summary.rivals
+      ?.filter((rival) => rival.isAi !== true)
+      .map((rival) => rival.name),
+    ["Former Human"],
+  );
+});
+
 test("symlink files and directories are ignored and cannot become detail paths", async (t) => {
   if (process.platform === "win32") {
     t.skip(

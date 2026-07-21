@@ -176,9 +176,9 @@ function ProgressionColumn({ session }: { session: SessionSummary }) {
   if (!result) return <div className="min-w-0 flex-1" />;
 
   const fieldSize =
-    session.onlineDriverCount ||
-    session.classifiedDriverCount ||
     result.fieldSize ||
+    session.classifiedDriverCount ||
+    session.onlineDriverCount ||
     20;
   const isDnf = isProblemStatus(result.status);
   const tier = raceResultTier(result.position, isDnf);
