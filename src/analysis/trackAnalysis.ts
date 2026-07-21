@@ -56,6 +56,7 @@ export interface TrackSessionData {
   summary: SessionSummary;
   session: TelemetrySession;
   kind: TrackSessionKind;
+  isRace: boolean;
   bestLapMs: number;
   bestS1: number;
   bestS2: number;
@@ -66,6 +67,7 @@ export interface TrackSessionData {
   weather: string;
   trackTemp: number;
   airTemp: number;
+  aiDifficulty: number;
   topSpeed: number;
   attemptCount: number;
 }
@@ -145,6 +147,7 @@ export interface TrackAnalysisData {
   timeTrial: TrackPaceAnalysis;
   raceData: TrackSessionData[];
   raceSessions: TelemetrySession[];
+  bestRaceLapMs: number;
   sessionHistory: TrackSessionData[];
   availableTabs: TrackSessionKind[];
   qualifyingInsights: TrackQualifyingInsights | null;
@@ -186,6 +189,7 @@ export function buildTrackSessionData(
     summary,
     session,
     kind,
+    isRace: kind === "race",
     bestLapMs: sessionDriverBestLapTimeMs(session, player),
     bestS1: bestSectorTimeMs(valid, 1),
     bestS2: bestSectorTimeMs(valid, 2),
@@ -206,6 +210,7 @@ export function buildTrackSessionData(
     weather: info.weather,
     trackTemp: info["track-temperature"],
     airTemp: info["air-temperature"],
+    aiDifficulty: info["ai-difficulty"],
     topSpeed: player["top-speed-kmph"],
     attemptCount: 1,
   };
@@ -556,6 +561,7 @@ export function buildTrackAnalysisData(
     timeTrial,
     raceData,
     raceSessions: raceData.map((session) => session.session),
+    bestRaceLapMs: minPositive(raceData.map((session) => session.bestLapMs)),
     sessionHistory: [...sessions].reverse(),
     availableTabs: [
       // Keep the visible tab order stable even when the data arrives from file

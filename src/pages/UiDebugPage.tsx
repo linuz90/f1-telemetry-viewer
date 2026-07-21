@@ -673,7 +673,7 @@ export function UiDebugPage() {
               {(["tiny", "smaller", "small", "medium", "large"] as const).map(
                 (size) => (
                   <HStack key={size} className="gap-2">
-                    <TrackFlag track="monza" size={size} />
+                    <TrackFlag track="Monza" size={size} />
                     <DebugVariantLabel className="w-auto">
                       {size}
                     </DebugVariantLabel>

@@ -11,7 +11,7 @@ import {
 import { useSessionList } from "../hooks/useSessionList";
 import type { SessionSummary } from "../types/telemetry";
 import { cn } from "../utils/cn";
-import { formatRelativeDate } from "../utils/format";
+import { formatRelativeDate, msToLapTime } from "../utils/format";
 import { getSessionFormulaScopeKey } from "../utils/formulaScope";
 import {
   isQualifyingSessionType,
@@ -95,6 +95,46 @@ function isSessionTrackBest(
   return session.bestLapTimeMs === bestTimeByTrack[key];
 }
 
+interface TrackListBestLap {
+  time: string;
+  kind: TrackListBestLapKind;
+  sessionCount: number;
+}
+
+function getTrackListBestLap(
+  sessions: readonly SessionSummary[],
+  formulaKey: string | undefined,
+): TrackListBestLap | null {
+  const counts: Record<TrackListBestLapKind, number> = { quali: 0, tt: 0 };
+  let best:
+    | { session: SessionSummary; kind: TrackListBestLapKind; timeMs: number }
+    | undefined;
+
+  for (const session of sessions) {
+    const kind = sessionBestLapKind(session.sessionType);
+    const timeMs = session.bestLapTimeMs;
+    if (
+      getSessionFormulaScopeKey(session) !== formulaKey ||
+      session.isSpectator === true ||
+      !kind ||
+      timeMs == null ||
+      timeMs <= 0
+    ) {
+      continue;
+    }
+
+    counts[kind] += 1;
+    if (!best || timeMs < best.timeMs) best = { session, kind, timeMs };
+  }
+
+  if (!best) return null;
+  return {
+    time: best.session.bestLapTime ?? msToLapTime(best.timeMs),
+    kind: best.kind,
+    sessionCount: counts[best.kind],
+  };
+}
+
 export function SessionList() {
   const { sessions, loading, error } = useSessionList();
   const { activeFormulaKey, formulaOptions } = useTelemetry();
@@ -145,9 +185,8 @@ export function SessionList() {
 
   // Formula scope is app-wide, then the sidebar filters narrow that same set so
   // the matching/total count can make a persisted filter's impact explicit.
-  // Synthetic (demo-only) entries DO appear here so the sidebar reads like a real session list;
-  // clicking one lands on the SessionPage's friendly "Demo session — upload to explore detail"
-  // placeholder rather than a 404.
+  // Synthetic demo entries still populate the sidebar, but their extracted row
+  // components keep them static because no detail JSON exists to navigate to.
   const scopedSessions = activeFormulaKey
     ? sessions.filter((s) => getSessionFormulaScopeKey(s) === activeFormulaKey)
     : sessions;
@@ -299,22 +338,7 @@ export function SessionList() {
             const count = trackSessions.length;
             const formulaKey =
               activeFormulaKey ?? representativeFormulaKey(trackSessions);
-            const bestLapSession = trackSessions
-              .filter(
-                (s) =>
-                  getSessionFormulaScopeKey(s) === formulaKey &&
-                  s.isSpectator !== true &&
-                  s.bestLapTimeMs &&
-                  sessionBestLapKind(s.sessionType),
-              )
-              .sort(
-                (a, b) =>
-                  (a.bestLapTimeMs ?? Infinity) - (b.bestLapTimeMs ?? Infinity),
-              )[0];
-            const bestTime = bestLapSession?.bestLapTime;
-            const bestLapKind = bestLapSession
-              ? sessionBestLapKind(bestLapSession.sessionType)
-              : undefined;
+            const bestLap = getTrackListBestLap(trackSessions, formulaKey);
             // A track whose every session is synthetic has no usable detail
             // page (the TrackPage filters those out, so navigation lands on
             // "No sessions found"). Render as a dim, non-interactive row.
@@ -324,9 +348,10 @@ export function SessionList() {
                 key={track}
                 track={track}
                 formulaKey={formulaKey}
-                sessionCount={count}
-                bestLapTime={bestTime}
-                bestLapKind={bestLapKind}
+                totalSessionCount={count}
+                bestLapTime={bestLap?.time}
+                bestLapKind={bestLap?.kind}
+                bestLapSessionCount={bestLap?.sessionCount}
                 isSyntheticOnly={isSyntheticOnly}
               />
             );

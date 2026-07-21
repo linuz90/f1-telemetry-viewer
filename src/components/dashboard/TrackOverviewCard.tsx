@@ -6,6 +6,7 @@ import { formatShortDate } from "../../utils/format";
 import { cardClass } from "../Card";
 import { TrackFlag } from "../TrackFlag";
 import { TrackLayout } from "../TrackLayout";
+import { resolveSessionMode } from "../sessionModeMeta";
 import {
   isProblemStatus,
   podiumIcon,
@@ -20,11 +21,10 @@ import {
 } from "./helpers";
 
 function modeLabel(session: SessionSummary): string {
-  if (session.isOnline) return "Online";
-  if (session.aiDifficulty != null && session.aiDifficulty > 0) {
-    return `AI ${session.aiDifficulty}`;
-  }
-  return "Offline";
+  return (
+    resolveSessionMode(session.isOnline, session.aiDifficulty, true)?.label ??
+    "Offline"
+  );
 }
 
 function MetricShell({

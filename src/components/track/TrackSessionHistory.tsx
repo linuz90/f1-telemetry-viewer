@@ -49,6 +49,8 @@ interface HistoryRow {
   bestLapMs: number;
   bestLapLabel: string;
   weather?: string;
+  trackTemp?: number;
+  airTemp?: number;
   topSpeed?: number;
   wearRate?: number;
 }
@@ -61,23 +63,25 @@ function HistoryDateTime({ date }: { date: string }) {
   return (
     <span className="shrink-0 text-sm font-medium text-zinc-200">
       {formatRelativeDate(date)}
-      <span className="ml-1.5 font-mono text-xs font-normal tabular-nums text-zinc-500">
+      <span className="ml-1.5 font-mono text-xs font-normal tabular-nums text-zinc-500 max-sm:hidden">
         {formatTime(date)}
       </span>
     </span>
   );
 }
 
-function historyComparisonLabel(session: HistoryRow): string | null {
-  if (session.kind === "race") {
-    return session.wearRate != null && session.wearRate > 0
+function historyComparisonLabels(session: HistoryRow): string[] {
+  return [
+    session.trackTemp != null && session.trackTemp > 0
+      ? `T:${session.trackTemp}° A:${session.airTemp ?? "—"}°`
+      : null,
+    session.topSpeed != null && session.topSpeed > 0
+      ? `${session.topSpeed} km/h`
+      : null,
+    session.wearRate != null && session.wearRate > 0
       ? `${session.wearRate.toFixed(1)}% wear/lap`
-      : null;
-  }
-
-  return session.topSpeed != null && session.topSpeed > 0
-    ? `${session.topSpeed} km/h`
-    : null;
+      : null,
+  ].filter((label): label is string => label != null);
 }
 
 function summaryHistoryRow(summary: SessionSummary): HistoryRow {
@@ -112,6 +116,8 @@ function detailedHistoryRow(session: TrackSessionData): HistoryRow {
     bestLapMs: session.bestLapMs,
     bestLapLabel: session.bestLapMs > 0 ? msToLapTime(session.bestLapMs) : "—",
     weather: session.weather,
+    trackTemp: session.trackTemp,
+    airTemp: session.airTemp,
     topSpeed: session.topSpeed,
     wearRate: session.wearRate,
   };
@@ -169,21 +175,15 @@ export function TrackSessionHistory({
       ? requestedFilter
       : contextualKind;
 
+  // Counts describe the rows the filter reveals. Grouped qualifying saves keep
+  // their raw save count on the row's ×N badge instead of inflating this total.
   const kindCount = (kind: TrackSessionKind) =>
-    sessionRows
-      .filter((session) => session.kind === kind)
-      .reduce((total, session) => total + session.attemptCount, 0) +
+    sessionRows.filter((session) => session.kind === kind).length +
     allSpectatorSessions.filter((summary) => spectatorKind(summary) === kind)
       .length;
-  // Deduplicated qualifying rows retain the number of source saves in
-  // `attemptCount`; include those attempts so the control agrees with the
-  // track header's session total while the row badge explains the grouping.
-  const totalCount =
-    sessionRows.reduce((total, session) => total + session.attemptCount, 0) +
-    allSpectatorSessions.length;
   const totalRowCount = sessionRows.length + allSpectatorSessions.length;
   const filterOptions: SegmentedOption<HistoryFilter>[] = [
-    { value: "all", label: "All", meta: totalCount },
+    { value: "all", label: "All", meta: totalRowCount },
     ...availableKinds.map((kind) => ({
       value: kind,
       label: HISTORY_KIND_META[kind].label,
@@ -261,26 +261,31 @@ export function TrackSessionHistory({
                   <SessionTypeBadge
                     sessionType={session.summary.sessionType}
                     formula={session.summary.formula}
+                    compactLabel={HISTORY_KIND_META[session.kind].label}
                   />
                   {session.attemptCount > 1 && (
-                    <Badge tone="amber">×{session.attemptCount}</Badge>
+                    <Badge tone="amber" className="max-sm:hidden">
+                      ×{session.attemptCount}
+                    </Badge>
                   )}
                   <SessionModeLabel
                     isOnline={session.summary.isOnline}
                     aiDifficulty={session.summary.aiDifficulty}
                     showOffline={showOffline}
-                    className="shrink-0 text-xs"
+                    className="shrink-0 text-xs max-sm:hidden"
                   />
                 </>
               }
               meta={joinMetaParts([
                 session.weather || null,
-                historyComparisonLabel(session),
+                ...historyComparisonLabels(session),
               ])}
               trailing={
                 <SessionResultMetric
                   session={session.summary}
-                  kind={session.kind}
+                  // History compares pace between saves; race position remains
+                  // the primary result only in Recent Activity.
+                  kind="session"
                   lapTime={session.bestLapLabel}
                   lapTimeMs={session.bestLapMs}
                   lapTone={
@@ -296,13 +301,14 @@ export function TrackSessionHistory({
           );
         })}
 
-        {filteredSpectatorSessions.length > 0 && sessionRows.length > 0 && (
-          <div className="px-3 pb-1 pt-4 text-xs text-zinc-600">
-            Spectator saves are shown for inspection only and do not affect
-            player PBs, setup picks, tyre life, fuel, or race-result
-            calculations.
-          </div>
-        )}
+        {filteredSpectatorSessions.length > 0 &&
+          filteredSessions.length > 0 && (
+            <div className="px-3 pb-1 pt-4 text-xs text-zinc-600">
+              Spectator saves are shown for inspection only and do not affect
+              player PBs, setup picks, tyre life, fuel, or race-result
+              calculations.
+            </div>
+          )}
 
         {filteredSpectatorSessions.map((summary) => {
           const kind = spectatorKind(summary);
@@ -320,13 +326,17 @@ export function TrackSessionHistory({
                   <SessionTypeBadge
                     sessionType={summary.sessionType}
                     formula={summary.formula}
+                    compactLabel={HISTORY_KIND_META[kind].label}
                   />
-                  <Badge tone="zinc">Spectator</Badge>
+                  <Badge tone="zinc">
+                    <span className="sm:hidden">Spec.</span>
+                    <span className="max-sm:hidden">Spectator</span>
+                  </Badge>
                   <SessionModeLabel
                     isOnline={summary.isOnline}
                     aiDifficulty={summary.aiDifficulty}
                     showOffline={showOffline}
-                    className="shrink-0 text-xs"
+                    className="shrink-0 text-xs max-sm:hidden"
                   />
                 </>
               }

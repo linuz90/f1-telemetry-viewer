@@ -10,9 +10,10 @@ export type TrackListBestLapKind = "quali" | "tt";
 interface TrackListItemProps {
   track: string;
   formulaKey?: string;
-  sessionCount: number;
+  totalSessionCount: number;
   bestLapTime?: string;
   bestLapKind?: TrackListBestLapKind;
+  bestLapSessionCount?: number;
   isSyntheticOnly: boolean;
 }
 
@@ -20,19 +21,23 @@ interface TrackListItemProps {
 export function TrackListItem({
   track,
   formulaKey,
-  sessionCount,
+  totalSessionCount,
   bestLapTime,
   bestLapKind,
+  bestLapSessionCount,
   isSyntheticOnly,
 }: TrackListItemProps) {
   const country = getTrackCountryName(track);
+  const supportingCount = bestLapKind
+    ? (bestLapSessionCount ?? 0)
+    : totalSessionCount;
   const content = (
     <>
       <TrackFlag track={track} size="small" className="shrink-0" />
       <span className="min-w-0 flex-1 leading-tight">
         <span className="block truncate font-medium">{track}</span>
         {country && (
-          <span className="mt-0.5 block truncate text-xs font-normal text-zinc-600">
+          <span className="mt-0.5 block truncate text-xs font-normal text-zinc-400">
             {country}
           </span>
         )}
@@ -46,9 +51,9 @@ export function TrackListItem({
         >
           {bestLapTime ?? "—"}
         </span>
-        <span className="mt-0.5 block text-[11px] text-zinc-600 tabular-nums">
+        <span className="mt-0.5 block text-[11px] text-zinc-400 tabular-nums">
           {bestLapKind ? `${bestLapKind === "tt" ? "TT" : "Quali"} PB · ` : ""}
-          {sessionCount} {sessionCount === 1 ? "session" : "sessions"}
+          {supportingCount} {supportingCount === 1 ? "session" : "sessions"}
         </span>
       </span>
     </>
@@ -58,7 +63,7 @@ export function TrackListItem({
     return (
       <HStack
         title="Demo data — upload your telemetry to explore this track"
-        className="rounded-xl px-2 py-2.5 text-sm text-zinc-400"
+        className="gap-3 rounded-xl px-2 py-2.5 text-sm text-zinc-400"
       >
         {content}
       </HStack>

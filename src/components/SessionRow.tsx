@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { cn } from "../utils/cn";
 import { cardHighlight } from "./Card";
 import { HStack } from "./ui/Stack";
@@ -23,7 +23,7 @@ interface SessionRowProps {
 export function SessionRow({ to, leading, meta, trailing }: SessionRowProps) {
   const inner = (
     <>
-      <HStack>{leading}</HStack>
+      <HStack className="flex-1 overflow-hidden">{leading}</HStack>
       <div className="ml-auto hidden min-w-0 flex-1 truncate text-right text-xs text-zinc-500 sm:block">
         {meta}
       </div>
@@ -44,15 +44,20 @@ export function SessionRow({ to, leading, meta, trailing }: SessionRowProps) {
     );
   }
   return (
-    <HStack
-      as={Link}
-      to={to}
-      className={cn(
-        "gap-3 rounded-xl bg-zinc-900/60 px-3 py-2 transition-colors hover:bg-zinc-800/60",
-        cardHighlight,
+    <NavLink to={to} className="block rounded-xl">
+      {({ isActive }) => (
+        <HStack
+          className={cn(
+            "gap-3 rounded-xl px-3 py-2 transition-colors",
+            isActive
+              ? "bg-zinc-800/70 text-white"
+              : "bg-zinc-900/60 hover:bg-zinc-800/60",
+            cardHighlight,
+          )}
+        >
+          {inner}
+        </HStack>
       )}
-    >
-      {inner}
-    </HStack>
+    </NavLink>
   );
 }

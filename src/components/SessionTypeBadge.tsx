@@ -6,6 +6,7 @@ import { Badge } from "./ui/Badge";
 interface SessionTypeBadgeProps {
   sessionType: string;
   formula?: string;
+  compactLabel?: string;
   className?: string;
 }
 
@@ -13,6 +14,7 @@ interface SessionTypeBadgeProps {
 export function SessionTypeBadge({
   sessionType,
   formula,
+  compactLabel,
   className,
 }: SessionTypeBadgeProps) {
   const label = formatSessionType(sessionType, formula);
@@ -22,7 +24,14 @@ export function SessionTypeBadge({
   return (
     <Badge tone={meta.badgeTone} className={cn("shrink-0 gap-1", className)}>
       <Icon className="size-3" />
-      {label}
+      {compactLabel ? (
+        <>
+          <span className="sm:hidden">{compactLabel}</span>
+          <span className="max-sm:hidden">{label}</span>
+        </>
+      ) : (
+        label
+      )}
     </Badge>
   );
 }
