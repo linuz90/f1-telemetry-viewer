@@ -7,7 +7,11 @@ import type {
   TyreStintHistoryV2Entry,
 } from "../types/telemetry";
 import { bestSectorTimeMs, sectorTimeMs } from "../utils/format";
-import { avgErsDeployMj, avgErsHarvestMj } from "../utils/stats/energy";
+import {
+  avgErsDeployMj,
+  avgErsHarvestMj,
+  avgErsHarvestUtilization,
+} from "../utils/stats/energy";
 import {
   driverBestLapTimeMs,
   driverTopSpeed,
@@ -53,7 +57,8 @@ export type RaceResultSortKey =
   | "gap"
   | "topSpeed"
   | "ers"
-  | "ersHarv";
+  | "ersHarv"
+  | "ersHarvestPct";
 export type SortDirection = "asc" | "desc";
 
 export interface RaceDriverStats {
@@ -66,6 +71,7 @@ export interface RaceDriverStats {
   topSpeed: number;
   ers: number;
   ersHarv: number;
+  ersHarvestPct: number | null;
 }
 
 export interface RaceResultHighlights {
@@ -75,6 +81,7 @@ export interface RaceResultHighlights {
   bestErs: number;
   bestErsHarv: number;
   hasErsHarv: boolean;
+  hasErsHarvestPct: boolean;
 }
 
 export interface QualifyingTableRow {
@@ -165,6 +172,7 @@ export function buildRaceDriverStats(
       topSpeed: driverTopSpeed(driver),
       ers: avgErsDeployMj(driver),
       ersHarv: avgErsHarvestMj(driver),
+      ersHarvestPct: avgErsHarvestUtilization(driver),
     });
   }
   return map;
@@ -185,6 +193,7 @@ export function buildRaceResultHighlights(
     bestErs: maxPositive(values.map((stats) => stats.ers)),
     bestErsHarv: maxPositive(values.map((stats) => stats.ersHarv)),
     hasErsHarv: values.some((stats) => stats.ersHarv > 0),
+    hasErsHarvestPct: values.some((stats) => stats.ersHarvestPct != null),
   };
 }
 
@@ -250,6 +259,15 @@ export function sortRaceStintHistoryRows({
       return statsA?.racePaceRankEligible ? -1 : 1;
     }
 
+    if (sortKey === "ersHarvestPct") {
+      const valueA = statsA?.ersHarvestPct;
+      const valueB = statsB?.ersHarvestPct;
+
+      // Missing diagnostic data stays at the bottom in both directions.
+      if (valueA == null && valueB != null) return 1;
+      if (valueA != null && valueB == null) return -1;
+    }
+
     let comparison = 0;
 
     switch (sortKey) {
@@ -272,6 +290,10 @@ export function sortRaceStintHistoryRows({
         break;
       case "ersHarv":
         comparison = (statsB?.ersHarv || 0) - (statsA?.ersHarv || 0);
+        break;
+      case "ersHarvestPct":
+        comparison =
+          (statsB?.ersHarvestPct ?? 0) - (statsA?.ersHarvestPct ?? 0);
         break;
       case "gap":
         // Gap comes from the exporter summary and may be a final-classification

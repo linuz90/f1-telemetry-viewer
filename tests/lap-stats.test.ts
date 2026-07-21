@@ -195,6 +195,7 @@ test("race stats use official best laps but do not invent sparse race pace", () 
     topSpeed: 0,
     ers: 0,
     ersHarv: 0,
+    ersHarvestPct: null,
   });
   assert.deepEqual(buildRaceResultHighlights(stats), {
     bestLapMs: 107_538,
@@ -203,6 +204,7 @@ test("race stats use official best laps but do not invent sparse race pace", () 
     bestErs: 0,
     bestErsHarv: 0,
     hasErsHarv: false,
+    hasErsHarvestPct: false,
   });
 });
 

@@ -26,3 +26,6 @@ export interface StrategyInsight {
 
 export const RACE_PACE_TOOLTIP =
   "Average of all complete green-flag laps after excluding lap 1, pit in/out laps, and abnormal per-stint outliers. At least 3 laps are required; rankings require half the session's reference evidence.";
+
+export const ERS_HARVEST_UTILIZATION_TOOLTIP =
+  "Average of each eligible lap's recorded MGU-K harvest divided by the exporter-recorded MGU-K limit. 100% means the saved harvest counter matched that recorded limit; it is not remaining battery charge or a physical efficiency rating. Green-flag laps only; pre-race baseline and final reset snapshot excluded. Slightly over 100% can occur because telemetry counters reset between packets.";

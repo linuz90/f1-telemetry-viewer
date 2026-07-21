@@ -26,6 +26,7 @@ pnpm find-session <slug-or-url> # Resolve a session URL/slug to JSON on disk
 pnpm test:session-index       # Run the focused Node session-index suite
 pnpm test:lap-stats           # Run complete-lap timing regressions
 pnpm test:race-pace           # Run Race Pace estimator/matching regressions
+pnpm test:energy-stats        # Run ERS/fuel energy-stat regressions
 pnpm typecheck:node           # Type-check Node servers/plugins/scripts
 pnpm benchmark:session-index  # Benchmark a disposable generated corpus
 ```
@@ -136,6 +137,9 @@ ERS:
 - F1 26 can deploy more than 4 MJ/lap; show deployment as energy (`MJ/lap`), not battery percentage.
 - Prefer `per-lap-info[].ers-stats["ers-deployed-j"]`.
 - Fall back to `car-status-data["ers-deployed-this-lap"]` for older exports.
+- Harvest utilization uses `ers-stats["ers-harv-mguk-j"] / ers-stats["ers-harv-limit-mguk-j"]`, falling back to the matching car-status fields; do not include MGU-H in that ratio.
+- Keep explicit zero-harvest laps in the average, exclude pre-race/final-reset and neutralized laps, and allow slight values above 100% from packet timing.
+- Older exports without a harvest limit should retain raw harvested energy (`MJ/lap`) instead of inventing a utilization percentage.
 - Show battery-store values as percentages only when explicitly displaying remaining store.
 
 Tyre wear:
