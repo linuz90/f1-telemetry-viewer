@@ -858,7 +858,7 @@ export interface TrackRivalBenchmark {
   /** Online races at this track shared with the rival. */
   raceCount: number;
   /**
-   * Total race-pace laps that contributed to the same-compound pace mean.
+   * Shared same-compound evidence weight (minimum driver count per compound).
    * Undefined for the best-lap fallback (one sample per race).
    */
   lapSamples?: number;

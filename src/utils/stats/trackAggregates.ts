@@ -1,8 +1,8 @@
 import type { TelemetrySession } from "../../types/telemetry";
-import { isLapValid } from "../format";
 import { median } from "./core";
 import { findPlayer, isRaceSession } from "./drivers";
 import { collectGreenFlagBurnDeltas, fuelSafetyMarginLaps } from "./energy";
+import { isCompleteValidLap } from "./laps";
 import type { StintWearCurvePoint } from "./tyres";
 import { estimateMaxLife, getStintWearCurve, stintWearRate } from "./tyres";
 
@@ -138,10 +138,7 @@ export function aggregateCompoundLife(
         if (l["lap-time-in-ms"] > 0) {
           lapNum++;
           if (lapNum >= stint["start-lap"] && lapNum <= stint["end-lap"]) {
-            if (
-              isLapValid(l["lap-valid-bit-flags"]) &&
-              l["lap-time-in-ms"] > 0
-            ) {
+            if (isCompleteValidLap(l)) {
               const cur = byCompound[compound].bestLapMs;
               if (cur === 0 || l["lap-time-in-ms"] < cur) {
                 byCompound[compound].bestLapMs = l["lap-time-in-ms"];

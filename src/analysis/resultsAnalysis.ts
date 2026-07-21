@@ -8,14 +8,24 @@ import type {
 } from "../types/telemetry";
 import { bestSectorTimeMs, sectorTimeMs } from "../utils/format";
 import { avgErsDeployMj, avgErsHarvestMj } from "../utils/stats/energy";
-import { driverTopSpeed } from "../utils/stats/drivers";
+import {
+  driverBestLapTimeMs,
+  driverTopSpeed,
+  sessionDriverBestLapTimeMs,
+} from "../utils/stats/drivers";
 import {
   filterOutlierLaps,
   getBestLapTime,
-  getRacePaceLaps,
   getValidLaps,
   medianLapTimeMs,
 } from "../utils/stats/laps";
+import {
+  getRacePaceEstimate,
+  getRacePaceRankingSampleThreshold,
+  getRacePaceReferenceSampleCount,
+  isRacePaceRankEligible,
+  type RacePaceConfidence,
+} from "../utils/stats/racePace";
 import {
   getBestDriverOnCompound,
   medianPaceInRange,
@@ -49,6 +59,10 @@ export type SortDirection = "asc" | "desc";
 export interface RaceDriverStats {
   bestLap: number;
   racePace: number;
+  racePaceLapCount: number;
+  racePaceConfidence: RacePaceConfidence | null;
+  racePaceRankEligible: boolean;
+  racePaceRankingSampleThreshold: number;
   topSpeed: number;
   ers: number;
   ersHarv: number;
@@ -120,22 +134,34 @@ function maxPositive(values: Iterable<number>): number {
 export function buildRaceDriverStats(
   drivers: readonly DriverData[],
 ): Map<string, RaceDriverStats> {
+  const paceEstimates = new Map(
+    drivers.map((driver) => [
+      driver["driver-name"],
+      getRacePaceEstimate(driver),
+    ]),
+  );
+  const referenceSampleCount = getRacePaceReferenceSampleCount(
+    paceEstimates.values(),
+  );
+  const rankingSampleThreshold =
+    getRacePaceRankingSampleThreshold(referenceSampleCount);
   const map = new Map<string, RaceDriverStats>();
   for (const driver of drivers) {
-    const laps = driver["session-history"]["lap-history-data"];
-    const bestLap = getBestLapTime(laps);
-    const racePaceLaps = getRacePaceLaps(driver);
-    const racePace =
-      racePaceLaps.length > 0
-        ? racePaceLaps.reduce((sum, lap) => sum + lap["lap-time-in-ms"], 0) /
-          racePaceLaps.length
-        : 0;
+    const bestLap = driverBestLapTimeMs(driver);
+    const racePaceEstimate = paceEstimates.get(driver["driver-name"])!;
 
     // Race pace uses eligible racing laps, not all valid laps, because pit
     // transitions and neutralized laps are valid telemetry but poor pace samples.
     map.set(driver["driver-name"], {
       bestLap,
-      racePace,
+      racePace: racePaceEstimate.timeMs ?? 0,
+      racePaceLapCount: racePaceEstimate.sampleCount,
+      racePaceConfidence: racePaceEstimate.confidence,
+      racePaceRankEligible: isRacePaceRankEligible(
+        racePaceEstimate,
+        referenceSampleCount,
+      ),
+      racePaceRankingSampleThreshold: rankingSampleThreshold,
       topSpeed: driverTopSpeed(driver),
       ers: avgErsDeployMj(driver),
       ersHarv: avgErsHarvestMj(driver),
@@ -150,7 +176,11 @@ export function buildRaceResultHighlights(
   const values = [...driverStats.values()];
   return {
     bestLapMs: minPositive(values.map((stats) => stats.bestLap)),
-    bestPaceMs: minPositive(values.map((stats) => stats.racePace)),
+    bestPaceMs: minPositive(
+      values
+        .filter((stats) => stats.racePaceRankEligible)
+        .map((stats) => stats.racePace),
+    ),
     bestSpeedKmh: maxPositive(values.map((stats) => stats.topSpeed)),
     bestErs: maxPositive(values.map((stats) => stats.ers)),
     bestErsHarv: maxPositive(values.map((stats) => stats.ersHarv)),
@@ -210,6 +240,16 @@ export function sortRaceStintHistoryRows({
   return [...filtered].sort((a, b) => {
     const statsA = driverStats.get(a.name);
     const statsB = driverStats.get(b.name);
+
+    // Limited-evidence values stay inspectable but never lead a user-sorted
+    // pace table in either direction; they are not part of the ranked field.
+    if (
+      sortKey === "racePace" &&
+      statsA?.racePaceRankEligible !== statsB?.racePaceRankEligible
+    ) {
+      return statsA?.racePaceRankEligible ? -1 : 1;
+    }
+
     let comparison = 0;
 
     switch (sortKey) {
@@ -313,12 +353,23 @@ export function buildQualifyingTableModel({
 }): QualifyingTableModel {
   const rows = session["classification-data"]
     .map((driver) => {
-      const bestLap = driverBestLap(driver);
+      const historyBestLap = driverBestLap(driver);
+      const bestTime =
+        sessionDriverBestLapTimeMs(session, driver) || Number.POSITIVE_INFINITY;
+      // Sector cells must describe the displayed lap. When the exporter only
+      // gives us an official classification time, do not attach sectors from a
+      // different (slower) history lap.
+      const bestLap =
+        historyBestLap &&
+        Math.abs(historyBestLap["lap-time-in-ms"] - bestTime) < 1
+          ? historyBestLap
+          : null;
       return {
         driver,
         bestLap,
-        bestTime: bestLap?.["lap-time-in-ms"] ?? Infinity,
-        allInvalid: hasOnlyInvalidLaps(driver),
+        bestTime,
+        allInvalid:
+          bestTime === Number.POSITIVE_INFINITY && hasOnlyInvalidLaps(driver),
         position: 0,
         sectorTimes: bestLap
           ? ([
@@ -329,7 +380,9 @@ export function buildQualifyingTableModel({
           : ([0, 0, 0] as [number, number, number]),
       };
     })
-    .filter((row) => row.bestLap || row.allInvalid)
+    .filter(
+      (row) => row.bestTime !== Number.POSITIVE_INFINITY || row.allInvalid,
+    )
     .filter((row) => !focusedOnly || row.driver.index === focusedDriverIndex)
     .sort((a, b) => a.bestTime - b.bestTime)
     .map((row, index) => ({ ...row, position: index + 1 }));
@@ -337,14 +390,14 @@ export function buildQualifyingTableModel({
   const allBestLaps = rows
     .filter((row) => row.bestLap)
     .map((row) => row.bestLap!);
+  const allBestTimes = rows
+    .map((row) => row.bestTime)
+    .filter((time) => time !== Number.POSITIVE_INFINITY);
 
   return {
     rows,
-    p1Time: rows[0]?.bestTime ?? 0,
-    bestLapTime:
-      allBestLaps.length > 0
-        ? Math.min(...allBestLaps.map((lap) => lap["lap-time-in-ms"]))
-        : null,
+    p1Time: allBestTimes.length > 0 ? Math.min(...allBestTimes) : 0,
+    bestLapTime: allBestTimes.length > 0 ? Math.min(...allBestTimes) : null,
     bestS1:
       allBestLaps.length > 0 ? bestSectorTimeMs(allBestLaps, 1) || null : null,
     bestS2:

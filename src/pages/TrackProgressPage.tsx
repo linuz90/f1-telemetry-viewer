@@ -505,7 +505,7 @@ export function TrackProgressPage() {
   const qualifyingScatter = trackAnalysis.qualifying.scatter;
   const timeTrialScatter = trackAnalysis.timeTrial.scatter;
 
-  // Race-on-race representative pace per compound — feeds the Pace Evolution
+  // Race-on-race peak three-lap pace per compound — feeds 3-Lap Pace Evolution
   // chart. Uses bucket-scoped sessions so a 5-lap repro doesn't get plotted
   // against a 30-lap race in the same line. The set identity match is by
   // TelemetrySession reference, which is stable across renders here.
@@ -1386,7 +1386,7 @@ export function TrackProgressPage() {
                 />
               )}
 
-              {/* Pace evolution (race-on-race race-pace window per compound) */}
+              {/* Peak three-lap pace evolution, race-on-race by compound. */}
               {paceEvolutionData.length > 1 && (
                 <PaceEvolutionChart data={paceEvolutionData} />
               )}

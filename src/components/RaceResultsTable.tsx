@@ -9,6 +9,7 @@ import {
   sortRaceStintHistoryRows,
   type RaceResultSortKey,
   type SortDirection,
+  type RaceDriverStats,
 } from "../analysis/resultsAnalysis";
 import type { RaceControlEvent, TelemetrySession } from "../types/telemetry";
 import { getTeamColor, getTeamName } from "../utils/colors";
@@ -65,6 +66,19 @@ function SortIcon({
   ) : (
     <ChevronUp className={cn("inline w-3 h-3", margin, "text-active")} />
   );
+}
+
+function racePaceEvidenceLabel(stats: RaceDriverStats | undefined): string {
+  const sampleCount = stats?.racePaceLapCount ?? 0;
+  const laps = `${sampleCount} ${sampleCount === 1 ? "lap" : "laps"}`;
+
+  if (!stats || stats.racePace <= 0) {
+    return sampleCount > 0 ? `${laps} · need 3` : "0 clean laps";
+  }
+  if (!stats.racePaceRankEligible) {
+    return `${laps} · need ${stats.racePaceRankingSampleThreshold}`;
+  }
+  return `${laps} · ${stats.racePaceConfidence}`;
 }
 
 /**
@@ -253,6 +267,7 @@ export function RaceResultsTable({
                 const isBestLap =
                   bestLap > 0 && Math.abs(bestLap - highlights.bestLapMs) < 1;
                 const isBestPace =
+                  stats?.racePaceRankEligible === true &&
                   racePace > 0 &&
                   Math.abs(racePace - highlights.bestPaceMs) < 1;
                 const isBestSpeed =
@@ -309,9 +324,15 @@ export function RaceResultsTable({
                       className={cn(
                         tableCellClass({ align: "right", mono: true }),
                         isBestPace && "text-best",
+                        racePace > 0 &&
+                          !stats?.racePaceRankEligible &&
+                          "text-zinc-500",
                       )}
                     >
-                      {racePace > 0 ? msToLapTime(racePace) : "–"}
+                      <div>{racePace > 0 ? msToLapTime(racePace) : "–"}</div>
+                      <div className="mt-0.5 whitespace-nowrap font-sans text-2xs font-normal text-zinc-500">
+                        {racePaceEvidenceLabel(stats)}
+                      </div>
                     </td>
                     <td
                       className={cn(

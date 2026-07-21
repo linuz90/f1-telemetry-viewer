@@ -1,5 +1,5 @@
 import type { LapHistoryEntry, TyreStint } from "../types/telemetry";
-import { isLapValid } from "../utils/format";
+import { isCompleteValidLap } from "../utils/stats/laps";
 import {
   estimateMaxLife,
   getWorstStintEndWear,
@@ -67,7 +67,7 @@ function buildValidLapTimesByNumber(laps: readonly LapHistoryEntry[]) {
   for (const lap of laps) {
     if (lap["lap-time-in-ms"] <= 0) continue;
     lapNumber++;
-    if (isLapValid(lap["lap-valid-bit-flags"])) {
+    if (isCompleteValidLap(lap)) {
       validLapTimes.set(lapNumber, lap["lap-time-in-ms"]);
     }
   }

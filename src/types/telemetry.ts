@@ -111,7 +111,7 @@ export interface RivalEntry {
   penaltyCount?: number;
   /** Best valid lap time (ms) for this driver in this race. */
   bestLapMs?: number;
-  /** Count of valid laps (lap-time>0, lap-valid-bit-flags=15). */
+  /** Count of structurally complete laps with valid timing flags. */
   validLapCount: number;
   /** Mean valid lap time (ms). */
   meanLapMs?: number;
@@ -124,7 +124,7 @@ export interface RivalEntry {
    * best laps across different tyres.
    */
   compoundMatchedPaceDeltaMs?: number;
-  /** Evidence count for compoundMatchedPaceDeltaMs: sum of shared race-pace lap samples. */
+  /** Shared evidence weight for compoundMatchedPaceDeltaMs (minimum driver count per compound). */
   compoundMatchedPaceLapCount?: number;
   /** Visual compounds that contributed to compoundMatchedPaceDeltaMs. */
   compoundMatchedPaceCompounds?: string[];
@@ -485,7 +485,7 @@ export interface FinalClassification {
   points: number;
   "num-pit-stops": number;
   "result-status": string;
-  "best-lap-time-in-ms": number;
+  "best-lap-time-in-ms"?: number;
   "best-lap-time-ms"?: number;
   "best-lap-time-str": string;
   "total-race-time": number;

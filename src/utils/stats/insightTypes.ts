@@ -25,4 +25,4 @@ export interface StrategyInsight {
 }
 
 export const RACE_PACE_TOOLTIP =
-  "Average race-pace lap time: valid green-flag laps excluding lap 1, pit in/out laps, and abnormal outliers.";
+  "Average of all complete green-flag laps after excluding lap 1, pit in/out laps, and abnormal per-stint outliers. At least 3 laps are required; rankings require half the session's reference evidence.";

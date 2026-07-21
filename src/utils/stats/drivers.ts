@@ -1,5 +1,48 @@
-import type { DriverData, TelemetrySession } from "../../types/telemetry";
-import { isRaceSession as isRaceTelemetrySession } from "../sessionTypes";
+import type {
+  DriverData,
+  FinalClassification,
+  TelemetrySession,
+} from "../../types/telemetry";
+import {
+  isRaceSession as isRaceTelemetrySession,
+  isTimeTrialSessionType,
+} from "../sessionTypes";
+import { getBestLapTime } from "./laps";
+
+export function classificationBestLapTimeMs(
+  classification: FinalClassification | null | undefined,
+): number {
+  const newerField = classification?.["best-lap-time-ms"];
+  if (typeof newerField === "number" && newerField > 0) return newerField;
+
+  const legacyField = classification?.["best-lap-time-in-ms"];
+  return typeof legacyField === "number" && legacyField > 0 ? legacyField : 0;
+}
+
+/** Prefer the official race/quali result because remote histories may be sparse. */
+export function driverBestLapTimeMs(driver: DriverData): number {
+  return (
+    classificationBestLapTimeMs(driver["final-classification"]) ||
+    getBestLapTime(driver["session-history"]["lap-history-data"])
+  );
+}
+
+/**
+ * Session-aware best lap for current-run UI.
+ *
+ * Time Trial final classification can contain the game's persistent PB/ghost
+ * rather than a lap completed in this save, so only its complete history can
+ * establish a current-run time. Race and qualifying classification remains the
+ * authoritative fallback for sparse remote drivers.
+ */
+export function sessionDriverBestLapTimeMs(
+  session: TelemetrySession,
+  driver: DriverData,
+): number {
+  return isTimeTrialSessionType(session["session-info"]["session-type"])
+    ? getBestLapTime(driver["session-history"]["lap-history-data"])
+    : driverBestLapTimeMs(driver);
+}
 
 export function findPlayer(session: TelemetrySession): DriverData | undefined {
   return session["classification-data"]?.find((d) => d["is-player"]);

@@ -97,14 +97,13 @@ export function QualifyingTable({
                   <td
                     className={cn(
                       tableCellClass({ align: "right", mono: true }),
-                      row.bestLap &&
-                        model.bestLapTime !== null &&
-                        row.bestLap["lap-time-in-ms"] === model.bestLapTime &&
+                      model.bestLapTime !== null &&
+                        row.bestTime === model.bestLapTime &&
                         "text-best font-bold",
                     )}
                   >
-                    {row.bestLap
-                      ? msToLapTime(row.bestLap["lap-time-in-ms"])
+                    {row.bestTime !== Infinity
+                      ? msToLapTime(row.bestTime)
                       : "–"}
                   </td>
                   <td

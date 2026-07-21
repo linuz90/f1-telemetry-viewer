@@ -116,7 +116,7 @@ const sampleInsights: SessionInsight[] = [
     rank: 1,
     rankTotal: 22,
     tooltip:
-      "Average race-pace lap excluding lap 1, pit laps, SC, and outliers.",
+      "Average of all complete green-flag laps after excluding lap 1, pit laps, SC, and per-stint outliers. Rankings also require enough session-relative evidence.",
   },
   {
     type: "tyre",

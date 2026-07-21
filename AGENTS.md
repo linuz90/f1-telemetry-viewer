@@ -24,6 +24,8 @@ pnpm preview                  # Preview production build
 pnpm generate-demo            # Regenerate public/demo/
 pnpm find-session <slug-or-url> # Resolve a session URL/slug to JSON on disk
 pnpm test:session-index       # Run the focused Node session-index suite
+pnpm test:lap-stats           # Run complete-lap timing regressions
+pnpm test:race-pace           # Run Race Pace estimator/matching regressions
 pnpm typecheck:node           # Type-check Node servers/plugins/scripts
 pnpm benchmark:session-index  # Benchmark a disposable generated corpus
 ```
@@ -142,6 +144,18 @@ Tyre wear:
 - Compact `session-history.tyre-stints-history-data[].end-lap` is one lap before the detailed outgoing stint boundary; use `getDriverStints()` instead of raw compact data so pit-in/out filtering stays aligned.
 - PnG may emit a fresh incoming-tyre `0%` snapshot on the previous pit-boundary lap. Normalize duplicate lap wear via shared tyre helpers so outgoing worn tyres are not overwritten by incoming fresh tyres.
 - Absolute strategy timing anchors require real tyre-wear history; synthesized/basic-only stints can describe compound sequence and pit laps but must not anchor race-duration estimates as zero-wear stints.
+
+Lap timing validity:
+
+- PnG can mark a partial sector fragment as a valid lap while copying that sector into `lap-time-in-ms`. Use `hasCompleteLapTiming()` / `isCompleteValidLap()` for full-lap stats instead of checking only the bit flags and positive total.
+- Prefer final-classification best-lap fields for classified race/quali drivers; fall back to complete lap history when classification is unavailable. Time Trial is the exception: its classification can contain a persistent PB/ghost, so current-run UI must use complete history. Never derive race pace from classification totals or partial history.
+
+Race pace:
+
+- Bare `Race Pace` means the arithmetic mean returned by `getRacePaceEstimate()`: every eligible complete green-flag lap after lap-one, SC/VSC, pit-transition, and per-stint outlier filtering.
+- At least three eligible laps are required to show Race Pace. Rankings, highlights, and PBs additionally require at least half the session's maximum eligible sample count.
+- Carry sample counts/confidence into user-facing evidence. Keep same-compound rival pace, stint pace, strategy modelling, and three-lap peak pace explicitly named because they answer different questions.
+- Historical Race Pace PBs compare only within the same race-distance lap count.
 
 Analysis layer:
 

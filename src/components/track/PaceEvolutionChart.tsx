@@ -21,9 +21,9 @@ import { SectionHeader } from "../ui/SectionHeader";
 import { HStack } from "../ui/Stack";
 
 /**
- * Pace Evolution — race-on-race best 3-lap pace window by compound. Replaces
+ * Pace Evolution — race-on-race three-fastest-lap pace by compound. Replaces
  * the old "Tyre Management" and "Top Speed Trend" charts: those plotted a
- * single noisy number per race; this one plots representative pace itself,
+ * single noisy number per race; this one plots peak multi-lap pace,
  * split by compound, so the comparison is the one drivers actually care about
  * ("is my Hard pace improving here?").
  *
@@ -103,8 +103,8 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
   return (
     <section className={cardClass}>
       <SectionHeader
-        title="Pace Evolution"
-        hint="Avg. of fastest 3 race-pace laps by compound, race-on-race"
+        title="3-Lap Pace Evolution"
+        hint="Fastest-three clean-lap average by compound, race-on-race"
         action={
           showFilter ? (
             <SegmentedControl<ContextFilter>

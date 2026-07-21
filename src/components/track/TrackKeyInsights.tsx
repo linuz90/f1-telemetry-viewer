@@ -23,7 +23,7 @@ import { SectionHeader } from "../ui/SectionHeader";
  *
  * Evidence gate: recommended + alternative strategy cards only render when the
  * helper can synthesize a usable shape from bucket tyre data. The always-on
- * chips (best race lap, race-vs-quali, ERS, fuel, since-last-race) render
+ * chips (best clean race lap, race-vs-quali, ERS, fuel, since-last-race) render
  * whenever their respective data is available, so a track with only short
  * repros still gives useful signal.
  *
@@ -121,7 +121,7 @@ function BestRaceLapTile({
 }) {
   return (
     <InsightTile
-      title="Best Race Lap"
+      title="Best Clean Race Lap"
       icon={Timer}
       accent="purple"
       badge={compound ? <CompoundBadge compound={compound} /> : undefined}
@@ -148,7 +148,7 @@ function RaceVsQualiTile({ deltaMs }: { deltaMs: number }) {
         {msToSectorTime(abs)}
       </InsightValue>
       <InsightDetail className="mt-1.5">
-        best race lap vs. best quali lap
+        best clean race lap vs. best quali lap
       </InsightDetail>
     </InsightTile>
   );

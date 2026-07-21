@@ -1,7 +1,5 @@
 import type {
   DriverData,
-  FinalClassification,
-  LapHistoryEntry,
   ParticipantData,
   PlayerRaceResult,
   PlayerStintSummary,
@@ -21,7 +19,13 @@ import {
   resolveSessionMeta,
   toSlug,
 } from "./parseFilename";
-import { getRacePaceLapSamples, medianLapTimeMs } from "./stats/laps";
+import { classificationBestLapTimeMs } from "./stats/drivers";
+import {
+  getValidLaps,
+  hasCompleteLapTiming,
+  isCompleteValidLap,
+} from "./stats/laps";
+import { compareCompoundMatchedRacePace } from "./stats/matchedPace";
 import { getWorstStintEndWear } from "./stats/tyres";
 
 export interface BuiltSessionSummary {
@@ -34,7 +38,7 @@ export interface BuiltSessionSummary {
  * Bump this for `SessionSummary`, filename normalization, or any transitive
  * summary-producing policy change; final sorting and dedupe are recomputed.
  */
-export const SESSION_SUMMARY_CACHE_VERSION = 1;
+export const SESSION_SUMMARY_CACHE_VERSION = 3;
 
 function getDrivers(session: TelemetrySession | undefined): DriverData[] {
   return session?.["classification-data"] ?? [];
@@ -130,14 +134,6 @@ function getTotalLaps(
   return finalLaps.length > 0 ? Math.max(...finalLaps) : undefined;
 }
 
-function getBestLapMs(classification: FinalClassification): number | undefined {
-  const newerField = classification["best-lap-time-ms"];
-  if (typeof newerField === "number" && newerField > 0) return newerField;
-
-  const olderField = classification["best-lap-time-in-ms"];
-  return olderField > 0 ? olderField : undefined;
-}
-
 function getSessionUid(
   session: TelemetrySession | undefined,
 ): string | undefined {
@@ -176,12 +172,7 @@ function computeLapStats(driver: DriverData): {
   stddevLapMs?: number;
 } {
   const laps = driver["session-history"]?.["lap-history-data"] ?? [];
-  const validTimes: number[] = [];
-  for (const lap of laps) {
-    if (lap["lap-time-in-ms"] > 0 && lap["lap-valid-bit-flags"] === 15) {
-      validTimes.push(lap["lap-time-in-ms"]);
-    }
-  }
+  const validTimes = getValidLaps(laps).map((lap) => lap["lap-time-in-ms"]);
   if (validTimes.length === 0) return { validLapCount: 0 };
   const mean = validTimes.reduce((sum, v) => sum + v, 0) / validTimes.length;
   let std = 0;
@@ -200,19 +191,6 @@ function computeLapStats(driver: DriverData): {
   };
 }
 
-function racePaceLapsByCompound(
-  driver: DriverData,
-): Map<string, LapHistoryEntry[]> {
-  const byCompound = new Map<string, LapHistoryEntry[]>();
-  for (const sample of getRacePaceLapSamples(driver)) {
-    if (!sample.compound) continue;
-    const laps = byCompound.get(sample.compound) ?? [];
-    laps.push(sample.lap);
-    byCompound.set(sample.compound, laps);
-  }
-  return byCompound;
-}
-
 function compoundMatchedPaceDelta(
   player: DriverData,
   rival: DriverData,
@@ -222,38 +200,14 @@ function compoundMatchedPaceDelta(
   | "compoundMatchedPaceLapCount"
   | "compoundMatchedPaceCompounds"
 > {
-  const playerByCompound = racePaceLapsByCompound(player);
-  const rivalByCompound = racePaceLapsByCompound(rival);
-  const compounds = [...playerByCompound.keys()].filter((compound) =>
-    rivalByCompound.has(compound),
-  );
-
-  let weightedDelta = 0;
-  let totalWeight = 0;
-  const contributingCompounds: string[] = [];
-
-  for (const compound of compounds) {
-    const playerLaps = playerByCompound.get(compound) ?? [];
-    const rivalLaps = rivalByCompound.get(compound) ?? [];
-    // One matching lap would still behave like a best-lap comparison. Requiring
-    // a small sample on both drivers keeps the dashboard pace card honest.
-    const sharedLapEvidence = Math.min(playerLaps.length, rivalLaps.length);
-    if (sharedLapEvidence < 3) continue;
-
-    const playerMedian = medianLapTimeMs(playerLaps);
-    const rivalMedian = medianLapTimeMs(rivalLaps);
-    if (playerMedian <= 0 || rivalMedian <= 0) continue;
-
-    weightedDelta += (rivalMedian - playerMedian) * sharedLapEvidence;
-    totalWeight += sharedLapEvidence;
-    contributingCompounds.push(compound);
-  }
-
-  if (totalWeight === 0) return {};
+  const comparison = compareCompoundMatchedRacePace(player, rival);
+  if (!comparison) return {};
   return {
-    compoundMatchedPaceDeltaMs: Math.round(weightedDelta / totalWeight),
-    compoundMatchedPaceLapCount: totalWeight,
-    compoundMatchedPaceCompounds: contributingCompounds,
+    // RivalEntry stores rival minus player; the shared helper returns its
+    // first argument minus its second argument for direct comparison use.
+    compoundMatchedPaceDeltaMs: Math.round(-comparison.deltaMs),
+    compoundMatchedPaceLapCount: comparison.evidenceWeight,
+    compoundMatchedPaceCompounds: comparison.compounds,
   };
 }
 
@@ -368,10 +322,8 @@ function buildRivalsRoster(
         ? avgPositionGap(playerPositionMap, rivalPositionMap)
         : { samples: 0 };
     const classification = driver["final-classification"];
-    const bestFromClassification = classification
-      ? getBestLapMs(classification)
-      : undefined;
-    const bestLapMs = lapStats.bestLapMs ?? bestFromClassification;
+    const bestFromClassification = classificationBestLapTimeMs(classification);
+    const bestLapMs = bestFromClassification || lapStats.bestLapMs;
     const compoundPace = compoundMatchedPaceDelta(player, driver);
 
     roster.push({
@@ -527,9 +479,9 @@ function buildQualifyingExtras(
     const poleDriver = drivers.find(
       (d) => d["final-classification"]?.position === 1,
     );
-    const poleMs = poleDriver?.["final-classification"]
-      ? getBestLapMs(poleDriver["final-classification"])
-      : undefined;
+    const poleMs = classificationBestLapTimeMs(
+      poleDriver?.["final-classification"],
+    );
     const poleStr = poleDriver?.["final-classification"]?.["best-lap-time-str"];
     if (poleMs && poleStr) {
       extras.poleLapTime = poleStr;
@@ -584,7 +536,7 @@ function buildPlayerRaceResult(
     lapRatio,
     fieldSize,
     bestLapTime: classification?.["best-lap-time-str"],
-    bestLapTimeMs: classification ? getBestLapMs(classification) : undefined,
+    bestLapTimeMs: classificationBestLapTimeMs(classification) || undefined,
   };
 }
 
@@ -635,12 +587,13 @@ export function buildSessionSummary(
 
   if (focusDriver) {
     const laps = focusDriver["session-history"]?.["lap-history-data"] ?? [];
-    validLapCount = laps.filter((lap) => lap["lap-time-in-ms"] > 0).length;
+    validLapCount = laps.filter(hasCompleteLapTiming).length;
 
     if (
       isQualifyingSessionType(parsed.sessionType) ||
       isTimeTrialSessionType(parsed.sessionType)
     ) {
+      const isTimeTrial = isTimeTrialSessionType(parsed.sessionType);
       const recordedBestLapNum =
         focusDriver["session-history"]?.["best-lap-time-lap-num"] ?? -1;
       // Time Trial saves frequently report a bogus best-lap-time-lap-num
@@ -649,18 +602,16 @@ export function buildSessionSummary(
       // scanning the lap history for the fastest valid lap so the dashboard
       // pill always has a number to show.
       let bestLapNum =
-        recordedBestLapNum > 0 && recordedBestLapNum <= laps.length
+        recordedBestLapNum > 0 &&
+        recordedBestLapNum <= laps.length &&
+        isCompleteValidLap(laps[recordedBestLapNum - 1])
           ? recordedBestLapNum
           : -1;
       if (bestLapNum < 0) {
         let bestMs = Number.POSITIVE_INFINITY;
         for (let i = 0; i < laps.length; i += 1) {
           const lap = laps[i];
-          if (
-            lap["lap-time-in-ms"] > 0 &&
-            lap["lap-valid-bit-flags"] === 15 &&
-            lap["lap-time-in-ms"] < bestMs
-          ) {
+          if (isCompleteValidLap(lap) && lap["lap-time-in-ms"] < bestMs) {
             bestMs = lap["lap-time-in-ms"];
             bestLapNum = i + 1;
           }
@@ -672,7 +623,7 @@ export function buildSessionSummary(
         .map((lap, index) => {
           const lapNum = index + 1;
           if (lapNum === bestLapNum) return "best" as const;
-          return lap["lap-valid-bit-flags"] === 15 ? "valid" : "invalid";
+          return isCompleteValidLap(lap) ? "valid" : "invalid";
         });
 
       if (bestLapNum > 0) {
@@ -680,6 +631,17 @@ export function buildSessionSummary(
         if (bestLap?.["lap-time-str"]) {
           bestLapTime = bestLap["lap-time-str"];
           bestLapTimeMs = bestLap["lap-time-in-ms"];
+        }
+      }
+
+      // Time Trial classification can contain the game's persistent PB/ghost,
+      // not a lap completed in this save. Its summaries must stay history-only.
+      if (bestLapTimeMs == null && !isTimeTrial) {
+        const classification = focusDriver["final-classification"];
+        const classifiedBestMs = classificationBestLapTimeMs(classification);
+        if (classifiedBestMs > 0) {
+          bestLapTimeMs = classifiedBestMs;
+          bestLapTime = classification?.["best-lap-time-str"] || undefined;
         }
       }
     }
