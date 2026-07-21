@@ -164,6 +164,19 @@ test("lap zero alone cannot describe a fuel outcome", () => {
   );
 });
 
+test("restricted all-zero telemetry cannot invent a fuel margin", () => {
+  const insight = generateFuelMarginInsight(
+    playerWithFuel([
+      fuelLap({ fuelKg: 0, lap: 0, remainingLaps: 0 }),
+      fuelLap({ fuelKg: 0, lap: 1, remainingLaps: 0 }),
+      fuelLap({ fuelKg: 0, lap: 2, remainingLaps: 0 }),
+    ]),
+    22,
+  );
+
+  assert.equal(insight, null);
+});
+
 test("missing game margin keeps kilograms as supporting data", () => {
   const insight = generateFuelMarginInsight(
     playerWithFuel([

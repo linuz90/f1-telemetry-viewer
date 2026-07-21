@@ -239,6 +239,20 @@ export function generateFuelMarginInsight(
     (lap) =>
       Number.isFinite(lap["lap-number"]) && lap["car-status-data"] != null,
   );
+  // Restricted spectator telemetry is exported as plausible-looking rows whose
+  // fuel fields are all zero. Require one positive tank or capacity reading so
+  // those placeholders cannot become a fake +0.0-lap outcome. Earlier positive
+  // readings still allow a legitimate car that reaches zero fuel at the line.
+  const hasRealFuelTelemetry = statusSnapshots.some((lap) => {
+    const status = lap["car-status-data"];
+    if (!status) return false;
+    return (
+      (Number.isFinite(status["fuel-in-tank"]) && status["fuel-in-tank"] > 0) ||
+      (Number.isFinite(status["fuel-capacity"]) && status["fuel-capacity"]! > 0)
+    );
+  });
+  if (!hasRealFuelTelemetry) return null;
+
   // Lap 0 alone only describes the starting state. A later snapshot is needed
   // before the session can say anything about the resulting fuel margin.
   const firstLap = statusSnapshots.find((lap) => lap["lap-number"] === 0);
