@@ -6,7 +6,15 @@ import { avgErsDeployMj, avgErsHarvestMj } from "./energy";
 import type { StrategyInsight } from "./insightTypes";
 import { RACE_PACE_TOOLTIP } from "./insightTypes";
 import { getRacePaceLaps } from "./laps";
+import { compareCompoundMatchedRacePace } from "./matchedPace";
+import {
+  getRacePaceEstimate,
+  getRacePaceReferenceSampleCount,
+  isRacePaceRankEligible,
+} from "./racePace";
 import { getCompletedStints, getDriverStints, stintWearRate } from "./tyres";
+
+const MATCHED_PACE_TIE_TOLERANCE_MS = 50;
 
 /** Generate strategy insights for the player (race) */
 export function generateInsights(
@@ -21,26 +29,24 @@ export function generateInsights(
     // --- Head-to-head mode ---
     const rivalName = rival["driver-name"];
 
-    // 1. Pace delta vs rival (race-pace laps — SC/pit/outlier excluded)
-    const playerRacePaceLaps = getRacePaceLaps(player);
-    const rivalRacePaceLaps = getRacePaceLaps(rival);
-    if (playerRacePaceLaps.length > 0 && rivalRacePaceLaps.length > 0) {
-      const playerAvg =
-        playerRacePaceLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
-        playerRacePaceLaps.length;
-      const rivalAvg =
-        rivalRacePaceLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
-        rivalRacePaceLaps.length;
-      const delta = (playerAvg - rivalAvg) / 1000;
+    // Direct comparisons control for tyre compound instead of presenting two
+    // independently sampled whole-race averages as an apples-to-apples delta.
+    const matchedPace = compareCompoundMatchedRacePace(player, rival);
+    if (matchedPace) {
+      const delta = matchedPace.deltaMs / 1000;
+      const isEven =
+        Math.abs(matchedPace.deltaMs) <= MATCHED_PACE_TIE_TOLERANCE_MS;
       insights.push({
         type: "pace",
-        label: "Race Pace",
-        value: `${delta <= 0 ? "" : "+"}${delta.toFixed(3)}s`,
-        detail:
-          delta <= 0
-            ? `faster per lap on average vs ${rivalName}`
-            : `slower per lap on average vs ${rivalName}`,
-        tooltip: RACE_PACE_TOOLTIP,
+        label: "Matched Pace",
+        value: isEven ? "Even" : `${delta < 0 ? "" : "+"}${delta.toFixed(3)}s`,
+        detail: isEven
+          ? `matched on the same tyres vs ${rivalName} · ${matchedPace.firstSampleCount} vs ${matchedPace.secondSampleCount} laps`
+          : delta < 0
+            ? `faster on the same tyres vs ${rivalName} · ${matchedPace.firstSampleCount} vs ${matchedPace.secondSampleCount} laps`
+            : `slower on the same tyres vs ${rivalName} · ${matchedPace.firstSampleCount} vs ${matchedPace.secondSampleCount} laps`,
+        tooltip:
+          "Weighted same-compound median pace. Each compound requires at least 3 clean laps per driver, and the smaller sample must cover at least half the larger one.",
       });
     }
 
@@ -68,13 +74,9 @@ export function generateInsights(
       });
     }
 
-    // 3. Sector deltas vs rival (all 3 sectors, race-pace laps only)
-    const playerRacePaceSectorLaps = getRacePaceLaps(player);
-    const rivalRacePaceSectorLaps = getRacePaceLaps(rival);
-    if (
-      playerRacePaceSectorLaps.length > 0 &&
-      rivalRacePaceSectorLaps.length > 0
-    ) {
+    // 3. Sector deltas use the headline's same-compound, coverage-balanced
+    // sample pool so the breakdown cannot contradict the evidence policy.
+    if (matchedPace) {
       const sectorKeys = [
         { sector: 1, label: "S1" },
         { sector: 2, label: "S2" },
@@ -82,22 +84,10 @@ export function generateInsights(
       ] as const;
 
       const sectorRows: string[] = [];
-      let netDelta = 0;
       let gains = 0;
       let losses = 0;
       for (const { sector, label } of sectorKeys) {
-        const pAvg =
-          playerRacePaceSectorLaps.reduce(
-            (s, l) => s + sectorTimeMs(l, sector),
-            0,
-          ) / playerRacePaceSectorLaps.length;
-        const rAvg =
-          rivalRacePaceSectorLaps.reduce(
-            (s, l) => s + sectorTimeMs(l, sector),
-            0,
-          ) / rivalRacePaceSectorLaps.length;
-        const d = (pAvg - rAvg) / 1000;
-        netDelta += d;
+        const d = matchedPace.sectorDeltasMs[sector - 1] / 1000;
         const delta = `${d <= 0 ? "" : "+"}${d.toFixed(3)}s`;
         const direction = d < -0.001 ? "faster" : d > 0.001 ? "slower" : "even";
         sectorRows.push(`${label} · ${delta} ${direction}`);
@@ -108,7 +98,9 @@ export function generateInsights(
       insights.push({
         type: "sector",
         label: "Sector Analysis",
-        value: `${netDelta <= 0 ? "" : "+"}${netDelta.toFixed(3)}s`,
+        value: `${matchedPace.deltaMs <= 0 ? "" : "+"}${(
+          matchedPace.deltaMs / 1000
+        ).toFixed(3)}s`,
         detail:
           gains > 0 && losses > 0
             ? `${gains} sectors faster · ${losses} slower vs ${rivalName}`
@@ -118,6 +110,8 @@ export function generateInsights(
                 ? `slower in all sectors vs ${rivalName}`
                 : `even by sector vs ${rivalName}`,
         extraDetails: sectorRows,
+        tooltip:
+          "Same-compound median sectors using the same coverage-balanced clean laps as Matched Pace.",
       });
     }
 
@@ -172,15 +166,24 @@ export function generateInsights(
     // --- Field ranking mode (original behavior) ---
 
     // 1. Pace ranking (race-pace laps — SC/pit/outlier excluded)
-    const paceRanking: { driver: DriverData; avgPace: number }[] = [];
-    for (const d of allDrivers) {
-      const racePaceLaps = getRacePaceLaps(d);
-      if (racePaceLaps.length === 0) continue;
-      const avg =
-        racePaceLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
-        racePaceLaps.length;
-      paceRanking.push({ driver: d, avgPace: avg });
-    }
+    const paceEstimates = new Map(
+      allDrivers.map((driver) => [driver.index, getRacePaceEstimate(driver)]),
+    );
+    const referenceSampleCount = getRacePaceReferenceSampleCount(
+      paceEstimates.values(),
+    );
+    const paceRanking: { driver: DriverData; avgPace: number }[] = allDrivers
+      .map((driver) => ({
+        driver,
+        estimate: paceEstimates.get(driver.index)!,
+      }))
+      .filter(({ estimate }) =>
+        isRacePaceRankEligible(estimate, referenceSampleCount),
+      )
+      .map(({ driver, estimate }) => ({
+        driver,
+        avgPace: estimate.timeMs!,
+      }));
     paceRanking.sort((a, b) => a.avgPace - b.avgPace);
     const pacePos = paceRanking.findIndex(
       (r) => r.driver.index === player.index,
@@ -193,8 +196,8 @@ export function generateInsights(
         value: ordinal(pacePos + 1),
         detail:
           delta < 10
-            ? `of ${paceRanking.length}`
-            : `of ${paceRanking.length} — +${(delta / 1000).toFixed(3)}s vs P1`,
+            ? `of ${paceRanking.length} · ${paceEstimates.get(player.index)!.sampleCount} clean laps`
+            : `of ${paceRanking.length} — +${(delta / 1000).toFixed(3)}s vs P1 · ${paceEstimates.get(player.index)!.sampleCount} laps`,
         tooltip: RACE_PACE_TOOLTIP,
         rank: pacePos,
         rankTotal: paceRanking.length,
@@ -306,8 +309,14 @@ export function generateInsights(
     }
 
     // 6. Weakest & strongest sector (avg vs avg across race-pace laps)
+    const rankEligibleDriverIndices = new Set(
+      paceRanking.map(({ driver }) => driver.index),
+    );
     const playerRacePaceLapsForSectors = getRacePaceLaps(player);
-    if (playerRacePaceLapsForSectors.length > 0) {
+    if (
+      rankEligibleDriverIndices.has(player.index) &&
+      playerRacePaceLapsForSectors.length > 0
+    ) {
       const sectorKeys = [
         { sector: 1, label: "S1" },
         { sector: 2, label: "S2" },
@@ -327,6 +336,7 @@ export function generateInsights(
       for (const { sector, label } of sectorKeys) {
         const ranking: { driver: DriverData; avg: number }[] = [];
         for (const d of allDrivers) {
+          if (!rankEligibleDriverIndices.has(d.index)) continue;
           const racePaceLaps = getRacePaceLaps(d);
           if (!racePaceLaps.length) continue;
           const avg =

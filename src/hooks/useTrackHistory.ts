@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { useSessionList } from "./useSessionList";
 import { useTelemetry } from "../context/TelemetryContext";
 import { findPlayer, isRaceSession } from "../utils/stats/drivers";
+import { getBestLapTime, getValidLaps } from "../utils/stats/laps";
 import {
-  getBestLapTime,
-  getRacePaceLaps,
-  getValidLaps,
-} from "../utils/stats/laps";
+  getRacePaceEstimate,
+  getRacePaceReferenceSampleCount,
+  hasSufficientRacePaceCompletion,
+  isRacePaceRankEligible,
+} from "../utils/stats/racePace";
 import { bestSectorTimeMs } from "../utils/format";
 import {
   getFormulaComparisonKey,
@@ -29,7 +31,7 @@ export interface TrackPBs {
   timeTrialSessionCount: number;
   /** All-time best single race lap (ms) on this track */
   bestRaceLapMs: number;
-  /** Best average race pace (ms) on this track */
+  /** Best evidence-qualified average race pace (ms) at the same race distance. */
   bestRacePaceMs: number;
   /** Number of previous sessions on this track (excluding current) */
   sessionCount: number;
@@ -44,6 +46,7 @@ export function useTrackHistory(
   currentSlug: string | undefined,
   formula: string | undefined,
   gameYear: number | undefined,
+  raceDistanceLaps?: number,
 ): { pbs: TrackPBs | null; loading: boolean } {
   const { sessions } = useSessionList();
   const { getSession } = useTelemetry();
@@ -127,15 +130,24 @@ export function useTrackHistory(
             if (best > 0 && (bestRaceLapMs === 0 || best < bestRaceLapMs)) {
               bestRaceLapMs = best;
             }
-            // Best average race pace (race-pace laps — SC/pit/outlier excluded)
-            const racePaceLaps = getRacePaceLaps(player);
-            if (racePaceLaps.length > 0) {
-              const avg =
-                racePaceLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
-                racePaceLaps.length;
-              if (bestRacePaceMs === 0 || avg < bestRacePaceMs) {
-                bestRacePaceMs = avg;
-              }
+            // Fuel load and degradation differ materially by race distance, so
+            // only sufficiently complete, same-distance races can establish a PB.
+            const sessionDistance = sessionData["session-info"]["total-laps"];
+            const isComparableDistance =
+              raceDistanceLaps == null || sessionDistance === raceDistanceLaps;
+            const estimates =
+              sessionData["classification-data"].map(getRacePaceEstimate);
+            const referenceSampleCount =
+              getRacePaceReferenceSampleCount(estimates);
+            const playerEstimate = getRacePaceEstimate(player);
+            if (
+              isComparableDistance &&
+              hasSufficientRacePaceCompletion(player, sessionDistance) &&
+              playerEstimate.timeMs != null &&
+              isRacePaceRankEligible(playerEstimate, referenceSampleCount) &&
+              (bestRacePaceMs === 0 || playerEstimate.timeMs < bestRacePaceMs)
+            ) {
+              bestRacePaceMs = playerEstimate.timeMs;
             }
           } else {
             // Keep the long-standing qualifying-style bucket for existing
@@ -205,7 +217,14 @@ export function useTrackHistory(
     return () => {
       cancelled = true;
     };
-  }, [trackName, formula, gameYear, trackSessionKey, getSession]);
+  }, [
+    trackName,
+    formula,
+    gameYear,
+    raceDistanceLaps,
+    trackSessionKey,
+    getSession,
+  ]);
 
   return { pbs, loading };
 }

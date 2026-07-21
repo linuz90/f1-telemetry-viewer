@@ -5,9 +5,13 @@ import type {
   TelemetrySession,
   TyreStintBasic,
 } from "../types/telemetry";
-import { bestSectorTimeMs, isLapValid, sectorTimeMs } from "../utils/format";
+import { bestSectorTimeMs, sectorTimeMs } from "../utils/format";
 import { ersDeployMjForLap, ersHarvestMjForLap } from "../utils/stats/energy";
-import { getValidLaps } from "../utils/stats/laps";
+import {
+  getValidLaps,
+  hasCompleteLapTiming,
+  isCompleteValidLap,
+} from "../utils/stats/laps";
 
 /**
  * Sector-level analysis for qualifying/session detail views.
@@ -90,11 +94,7 @@ interface BestLapSample {
 function validLapSamples(driver: DriverData): ValidLapSample[] {
   return driver["session-history"]["lap-history-data"]
     .map((lap, index) => ({ driver, lap, lapNumber: index + 1 }))
-    .filter(
-      (sample) =>
-        isLapValid(sample.lap["lap-valid-bit-flags"]) &&
-        sample.lap["lap-time-in-ms"] > 0,
-    );
+    .filter((sample) => isCompleteValidLap(sample.lap));
 }
 
 function findBestSample(
@@ -168,7 +168,7 @@ export function buildSectorBreakdownModel({
   const breakdownLaps = laps
     .map((lap, index): SectorBreakdownLap | null => {
       const lapNumber = index + 1;
-      if (lap["lap-time-in-ms"] <= 0) return null;
+      if (!hasCompleteLapTiming(lap)) return null;
       const ers = ersByLap.get(lapNumber);
       return {
         lap: lapNumber,
@@ -177,7 +177,7 @@ export function buildSectorBreakdownModel({
         s3: sectorTimeMs(lap, 3) / 1000,
         total: lap["lap-time-in-ms"] / 1000,
         totalStr: lap["lap-time-str"],
-        valid: isLapValid(lap["lap-valid-bit-flags"]),
+        valid: isCompleteValidLap(lap),
         compound: compoundByLap.get(lapNumber),
         deployMj: ers?.deployMj,
         harvMj: ers?.harvMj,

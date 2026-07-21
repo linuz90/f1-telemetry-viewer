@@ -1,9 +1,15 @@
-import type { DriverData } from "../../types/telemetry";
+import type { DriverData, TelemetrySession } from "../../types/telemetry";
 import { bestSectorTimeMs } from "../format";
 import { msToLapTimeLocal } from "./core";
 import type { StrategyInsight } from "./insightTypes";
 import { RACE_PACE_TOOLTIP } from "./insightTypes";
-import { getBestLapTime, getRacePaceLaps, getValidLaps } from "./laps";
+import { getBestLapTime, getValidLaps } from "./laps";
+import {
+  getRacePaceEstimate,
+  getRacePaceReferenceSampleCount,
+  hasSufficientRacePaceCompletion,
+  isRacePaceRankEligible,
+} from "./racePace";
 
 /** Historical PB data for a track */
 export interface TrackPBData {
@@ -217,13 +223,16 @@ export function generateTimeTrialTrackPbInsight(
 
 /** Generate race insights comparing to historical data on this track */
 export function generateRaceHistoryInsights(
+  session: TelemetrySession,
   player: DriverData,
   pbs: TrackPBData,
 ): StrategyInsight[] {
   const insights: StrategyInsight[] = [];
   const laps = player["session-history"]["lap-history-data"];
-  const racePaceLaps = getRacePaceLaps(player);
-  if (racePaceLaps.length === 0) return insights;
+  const racePaceEstimate = getRacePaceEstimate(player);
+  const referenceSampleCount = getRacePaceReferenceSampleCount(
+    session["classification-data"].map(getRacePaceEstimate),
+  );
 
   const bestRaceLap = getBestLapTime(laps);
 
@@ -250,12 +259,18 @@ export function generateRaceHistoryInsights(
     }
   }
 
-  // 2. Race pace vs best-ever race pace (race-pace laps only)
-  if (pbs.bestRacePaceMs > 0) {
-    const avgPace =
-      racePaceLaps.reduce((s, l) => s + l["lap-time-in-ms"], 0) /
-      racePaceLaps.length;
-    const delta = avgPace - pbs.bestRacePaceMs;
+  // 2. Race pace vs the best evidence-qualified, same-distance race pace.
+  if (
+    pbs.bestRacePaceMs > 0 &&
+    hasSufficientRacePaceCompletion(
+      player,
+      session["session-info"]["total-laps"],
+    ) &&
+    racePaceEstimate.timeMs != null &&
+    isRacePaceRankEligible(racePaceEstimate, referenceSampleCount)
+  ) {
+    const delta = racePaceEstimate.timeMs - pbs.bestRacePaceMs;
+    const evidenceTooltip = `${RACE_PACE_TOOLTIP} Compared with completed races at the same configured distance. Current estimate: ${racePaceEstimate.sampleCount} clean laps.`;
     if (delta <= 0) {
       insights.push({
         type: "history",
@@ -265,7 +280,7 @@ export function generateRaceHistoryInsights(
           delta < 0
             ? `-${(Math.abs(delta) / 1000).toFixed(3)}s/lap improvement`
             : "matched your best pace",
-        tooltip: RACE_PACE_TOOLTIP,
+        tooltip: evidenceTooltip,
       });
     } else {
       insights.push({
@@ -273,7 +288,7 @@ export function generateRaceHistoryInsights(
         label: "Race Pace vs Best",
         value: `+${(delta / 1000).toFixed(3)}s/lap`,
         detail: "off your best average pace",
-        tooltip: RACE_PACE_TOOLTIP,
+        tooltip: evidenceTooltip,
       });
     }
   }

@@ -523,7 +523,9 @@ export function curateSessionInsights(
       (insight) => insight.type === "incident" || insight.type === "context",
     ),
   );
-  const racePace = takeByLabel(remaining, "Race Pace");
+  const racePace =
+    takeByLabel(remaining, "Race Pace") ??
+    takeByLabel(remaining, "Matched Pace");
   const tyre = takeByLabel(remaining, "Tyre Management");
   const qualifying = takeByLabel(remaining, "Qualifying");
   takeByLabel(remaining, "Consistency");

@@ -177,6 +177,7 @@ export function RaceSessionView({
     slug,
     info.formula,
     session["game-year"],
+    info["total-laps"] > 0 ? info["total-laps"] : undefined,
   );
 
   const stints = getCompletedStints(
@@ -248,7 +249,7 @@ export function RaceSessionView({
         ),
       );
       if (pbs) {
-        base.push(...generateRaceHistoryInsights(focusedDriver, pbs));
+        base.push(...generateRaceHistoryInsights(session, focusedDriver, pbs));
       }
     }
     return base;

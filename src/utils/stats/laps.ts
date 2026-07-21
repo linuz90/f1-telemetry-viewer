@@ -3,10 +3,40 @@ import { isLapValid, sectorTimeMs } from "../format";
 import { median } from "./core";
 import { getDriverStints, getLapCompoundMap } from "./tyres";
 
-export function getValidLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
-  return laps.filter(
-    (l) => isLapValid(l["lap-valid-bit-flags"]) && l["lap-time-in-ms"] > 0,
-  );
+const LAP_SECTOR_SUM_TOLERANCE_MS = 10;
+
+/**
+ * Whether a history row contains a complete lap rather than a sector fragment.
+ *
+ * PnG can mark sparse online-driver rows as fully valid while copying only the
+ * final recorded sector into `lap-time-in-ms`. Requiring all sectors and a
+ * matching total prevents those 29–33 second fragments from becoming lap-time
+ * records. Complete exports differ from their sector sum by at most 2ms, so a
+ * small tolerance preserves normal packet rounding.
+ */
+export function hasCompleteLapTiming(lap: LapHistoryEntry): boolean {
+  const lapTimeMs = lap["lap-time-in-ms"];
+  if (lapTimeMs <= 0) return false;
+
+  const sectors = [
+    sectorTimeMs(lap, 1),
+    sectorTimeMs(lap, 2),
+    sectorTimeMs(lap, 3),
+  ];
+  if (sectors.some((sector) => sector <= 0)) return false;
+
+  const sectorTotalMs = sectors.reduce((sum, sector) => sum + sector, 0);
+  return Math.abs(lapTimeMs - sectorTotalMs) <= LAP_SECTOR_SUM_TOLERANCE_MS;
+}
+
+export function isCompleteValidLap(lap: LapHistoryEntry): boolean {
+  return isLapValid(lap["lap-valid-bit-flags"]) && hasCompleteLapTiming(lap);
+}
+
+export function getValidLaps(
+  laps: readonly LapHistoryEntry[],
+): LapHistoryEntry[] {
+  return laps.filter(isCompleteValidLap);
 }
 
 export function medianLapTimeMs(laps: LapHistoryEntry[]): number {
@@ -149,9 +179,9 @@ export function getRacePaceLapSamples(d: DriverData): RacePaceLapSample[] {
     const lap = laps[i];
     const lapNum = i + 1; // lap-history-data is 0-indexed, lap numbers are 1-indexed
 
-    // Must be a valid lap with a recorded time
-    if (!isLapValid(lap["lap-valid-bit-flags"]) || lap["lap-time-in-ms"] <= 0)
-      continue;
+    // The exporter can flag a sector-only fragment as valid for sparse remote
+    // drivers, so eligibility must include structural lap completeness.
+    if (!isCompleteValidLap(lap)) continue;
 
     // Exclude SC/VSC/formation laps
     const pli = perLapInfo.find((p) => p["lap-number"] === lapNum);

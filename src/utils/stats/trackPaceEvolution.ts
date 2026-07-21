@@ -3,21 +3,21 @@ import { findPlayer } from "./drivers";
 import { getRacePaceLapSamples } from "./laps";
 
 // ────────────────────────────────────────────────────────────────────────────
-// Pace Evolution — race-on-race representative pace per compound at one track.
+// 3-Lap Pace Evolution — race-on-race peak pace per compound at one track.
 //
-// Why "best window" pace (not median, not best lap):
+// Why three-fastest-lap pace (not median, not best lap):
 //   • A median across a whole stint is biased against long stints — tyre
 //     degradation in the tail drags the number down, so a 5-lap stint looks
-//     faster than a 25-lap stint even when the long stint's best window is
+//     faster than a 25-lap stint even when the long stint's peak laps are
 //     actually quicker. Unfair race-to-race comparison.
 //   • A single best lap is too sensitive to slipstream and one-off flyers.
-//   • Averaging the FASTEST N race-pace laps on that compound treats short and
-//     long stints fairly (both contribute their best N-lap window) and
-//     filters single-lap noise.
+//   • Averaging the FASTEST N race-pace laps filters single-lap noise while
+//     retaining peak multi-lap pace on that compound.
 //
-// N = REPRESENTATIVE_PACE_WINDOW. 3 is the standard F1-strategy choice for a
-// "best representative pace" window: small enough that a 5-lap stint still
-// contributes meaningfully, large enough to defang single-flyer slipstream.
+// This intentionally measures pace potential, not overall Race Pace. Longer
+// runs have more opportunities to supply a fast window, which is why the UI
+// names the three-lap method explicitly rather than presenting it as the
+// canonical all-clean-lap average.
 //
 // Pit/SC/incident outliers are already filtered by `getRacePaceLapSamples`.
 // `minLapsPerCompound` gates noisy single-lap samples (default 3).

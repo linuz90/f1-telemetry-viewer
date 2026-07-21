@@ -9,6 +9,7 @@ import {
   sortRaceStintHistoryRows,
   type RaceResultSortKey,
   type SortDirection,
+  type RaceDriverStats,
 } from "../analysis/resultsAnalysis";
 import type { RaceControlEvent, TelemetrySession } from "../types/telemetry";
 import { getTeamColor, getTeamName } from "../utils/colors";
@@ -65,6 +66,21 @@ function SortIcon({
   ) : (
     <ChevronUp className={cn("inline w-3 h-3", margin, "text-active")} />
   );
+}
+
+function racePaceEvidenceTooltip(stats: RaceDriverStats | undefined): string {
+  const sampleCount = stats?.racePaceLapCount ?? 0;
+  const laps = `${sampleCount} clean ${sampleCount === 1 ? "lap" : "laps"}`;
+
+  if (!stats || stats.racePace <= 0) {
+    return sampleCount > 0
+      ? `${laps}; at least 3 are required for Race Pace.`
+      : "No eligible clean laps for Race Pace.";
+  }
+  if (!stats.racePaceRankEligible) {
+    return `Average of ${laps} · limited evidence · ${stats.racePaceRankingSampleThreshold} required for this session's ranking.`;
+  }
+  return `Average of ${laps} · ${stats.racePaceConfidence} confidence · included in the session ranking.`;
 }
 
 /**
@@ -253,6 +269,7 @@ export function RaceResultsTable({
                 const isBestLap =
                   bestLap > 0 && Math.abs(bestLap - highlights.bestLapMs) < 1;
                 const isBestPace =
+                  stats?.racePaceRankEligible === true &&
                   racePace > 0 &&
                   Math.abs(racePace - highlights.bestPaceMs) < 1;
                 const isBestSpeed =
@@ -309,9 +326,16 @@ export function RaceResultsTable({
                       className={cn(
                         tableCellClass({ align: "right", mono: true }),
                         isBestPace && "text-best",
+                        racePace > 0 &&
+                          !stats?.racePaceRankEligible &&
+                          "text-zinc-500",
                       )}
                     >
-                      {racePace > 0 ? msToLapTime(racePace) : "–"}
+                      <Tooltip text={racePaceEvidenceTooltip(stats)}>
+                        <span className="inline-block">
+                          {racePace > 0 ? msToLapTime(racePace) : "–"}
+                        </span>
+                      </Tooltip>
                     </td>
                     <td
                       className={cn(

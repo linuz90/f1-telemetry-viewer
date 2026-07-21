@@ -215,7 +215,7 @@ export function RaceResultsHero({
 
       <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-white/[0.05] pt-5 sm:grid-cols-3 lg:grid-cols-6">
         <MicroStat
-          label="Race pace"
+          label="Pace vs rivals"
           value={
             stats.racePace != null
               ? averagePositionLabel(stats.racePace.averageRank)
@@ -223,7 +223,7 @@ export function RaceResultsHero({
           }
           detail={
             stats.racePace != null && paceBeatRate != null
-              ? `beats ${paceBeatRate}%`
+              ? `beats ${paceBeatRate}% · same tyres`
               : undefined
           }
           tone={paceTone(stats.racePace?.averageBeatRate)}

@@ -7,14 +7,18 @@ import type {
   TelemetrySession,
   TyreStintHistoryV2Entry,
 } from "../types/telemetry";
-import { isLapValid, msToLapTime, msToSectorTime } from "../utils/format";
+import { msToLapTime, msToSectorTime } from "../utils/format";
 import {
   eventMatchesRaceControlFocus,
   humanizeRaceControlType,
 } from "../utils/raceControl";
 import { isRaceSession, isTimeTrialSessionType } from "../utils/sessionTypes";
 import type { StrategyInsight } from "../utils/stats/insightTypes";
-import { getBestLapTime, getValidLaps } from "../utils/stats/laps";
+import {
+  getBestLapTime,
+  getValidLaps,
+  isCompleteValidLap,
+} from "../utils/stats/laps";
 import { getLapCompoundMap } from "../utils/stats/tyres";
 
 /**
@@ -263,7 +267,7 @@ function bestLapNumberForDriver(
   const laps = driver["session-history"]["lap-history-data"] ?? [];
   const matchingIndex = laps.findIndex(
     (lap) =>
-      isLapValid(lap["lap-valid-bit-flags"]) &&
+      isCompleteValidLap(lap) &&
       Math.abs(lap["lap-time-in-ms"] - bestLapMs) < 1,
   );
   if (matchingIndex !== -1) return matchingIndex + 1;

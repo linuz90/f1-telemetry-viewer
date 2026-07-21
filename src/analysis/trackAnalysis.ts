@@ -10,6 +10,8 @@ import { findPlayer, isRaceSession } from "../utils/stats/drivers";
 import {
   getBestLapTime,
   getValidLaps,
+  hasCompleteLapTiming,
+  isCompleteValidLap,
   lapTimeStdDev,
 } from "../utils/stats/laps";
 import {
@@ -22,7 +24,6 @@ import {
   formatDate,
   formatSessionType,
   formatTime,
-  isLapValid,
 } from "../utils/format";
 import {
   buildTrackQualifyingInsights,
@@ -189,15 +190,13 @@ export function buildTrackSessionData(
     bestS3: bestSectorTimeMs(valid, 3),
     stdDevMs: lapTimeStdDev(laps),
     wearRate: avgWearRate(player),
-    allLaps: laps
-      .filter((lap) => lap["lap-time-in-ms"] > 0)
-      .map((lap, index) => ({
-        // Track trend charts only need timed laps; zero-time placeholders from
-        // aborted exports would otherwise compress the scatter scale.
-        timeSec: lap["lap-time-in-ms"] / 1000,
-        valid: isLapValid(lap["lap-valid-bit-flags"]),
-        lapNum: index + 1,
-      })),
+    allLaps: laps.filter(hasCompleteLapTiming).map((lap, index) => ({
+      // Track trend charts only need timed laps; zero-time placeholders from
+      // aborted exports would otherwise compress the scatter scale.
+      timeSec: lap["lap-time-in-ms"] / 1000,
+      valid: isCompleteValidLap(lap),
+      lapNum: index + 1,
+    })),
     weather: info.weather,
     trackTemp: info["track-temperature"],
     airTemp: info["air-temperature"],

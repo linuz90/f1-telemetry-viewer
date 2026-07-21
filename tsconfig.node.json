@@ -16,6 +16,7 @@
     "scripts/benchmark-session-index.ts",
     "scripts/dev-port.ts",
     "scripts/dev-server-port.ts",
+    "tests/**/*",
     "src/plugin/**/*",
     "src/utils/parseFilename.ts"
   ]

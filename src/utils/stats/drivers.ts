@@ -1,5 +1,28 @@
-import type { DriverData, TelemetrySession } from "../../types/telemetry";
+import type {
+  DriverData,
+  FinalClassification,
+  TelemetrySession,
+} from "../../types/telemetry";
 import { isRaceSession as isRaceTelemetrySession } from "../sessionTypes";
+import { getBestLapTime } from "./laps";
+
+export function classificationBestLapTimeMs(
+  classification: FinalClassification | null | undefined,
+): number {
+  const newerField = classification?.["best-lap-time-ms"];
+  if (typeof newerField === "number" && newerField > 0) return newerField;
+
+  const legacyField = classification?.["best-lap-time-in-ms"];
+  return typeof legacyField === "number" && legacyField > 0 ? legacyField : 0;
+}
+
+/** Prefer the official result because remote-driver lap histories may be sparse. */
+export function driverBestLapTimeMs(driver: DriverData): number {
+  return (
+    classificationBestLapTimeMs(driver["final-classification"]) ||
+    getBestLapTime(driver["session-history"]["lap-history-data"])
+  );
+}
 
 export function findPlayer(session: TelemetrySession): DriverData | undefined {
   return session["classification-data"]?.find((d) => d["is-player"]);

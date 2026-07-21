@@ -3,8 +3,9 @@ import type {
   PerLapInfo,
   TyreStint,
 } from "../types/telemetry";
-import { isLapValid, sectorTimeMs } from "../utils/format";
+import { sectorTimeMs } from "../utils/format";
 import { ersDeployMjForLap, ersHarvestMjForLap } from "../utils/stats/energy";
+import { hasCompleteLapTiming, isCompleteValidLap } from "../utils/stats/laps";
 import { buildWorstWearByLap } from "../utils/stats/tyres";
 import {
   buildSafetyCarRanges,
@@ -181,7 +182,7 @@ function buildRivalLapMap(rivalLaps: readonly LapHistoryEntry[] | undefined) {
   const map = new Map<number, number>();
   let lapNumber = 0;
   for (const lap of rivalLaps ?? []) {
-    if (lap["lap-time-in-ms"] > 0) {
+    if (hasCompleteLapTiming(lap)) {
       // Rival histories can include zero-time placeholders; count only timed
       // laps so player/rival overlays stay aligned by completed lap.
       lapNumber++;
@@ -234,7 +235,7 @@ export function buildLapAnalysis({
   const wearByLap = buildWorstWearByLap(stints);
 
   const rows = laps
-    .filter((lap) => lap["lap-time-in-ms"] > 0)
+    .filter(hasCompleteLapTiming)
     .map((lap, index): LapAnalysisRow => {
       const lapNumber = index + 1;
       const info = lapInfoByNumber.get(lapNumber);
@@ -244,7 +245,7 @@ export function buildLapAnalysis({
         timeMs: lap["lap-time-in-ms"],
         timeStr: lap["lap-time-str"],
         timeSec: lap["lap-time-in-ms"] / 1000,
-        valid: isLapValid(lap["lap-valid-bit-flags"]),
+        valid: isCompleteValidLap(lap),
         s1: sectorTimeMs(lap, 1) / 1000,
         s2: sectorTimeMs(lap, 2) / 1000,
         s3: sectorTimeMs(lap, 3) / 1000,
