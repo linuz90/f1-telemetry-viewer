@@ -171,9 +171,6 @@ export function aggregateCompoundLife(
 /** Fuel stats aggregated across race sessions at a track */
 export interface TrackFuelStats {
   p75BurnRateKgPerLap: number;
-  avgStartingFuelKg: number;
-  /** Average game fuel-remaining-laps at start (matches session "Initial Fuel") */
-  avgInitialFuelLaps: number;
   /** Average recommended fuel delta in laps (matches session "Recommended Fuel") */
   avgRecommendedFuelLaps: number;
   /** Average total fuel load (kg) implied by the recommendation — i.e. enough
@@ -192,6 +189,32 @@ export interface TrackFuelStats {
   completedRaceCount: number;
   /** Confidence is intentionally session-based; laps within one run correlate. */
   confidence: "low" | "medium" | "high";
+}
+
+interface EligibleFuelAttempt {
+  deltas: number[];
+  fuelSnapshotCount: number;
+  recordedLapCount: number;
+  startFuelKg: number;
+  startFuelRemaining: number;
+  totalLaps: number;
+  isCompleted: boolean;
+}
+
+function isMoreCompleteFuelAttempt(
+  candidate: EligibleFuelAttempt,
+  current: EligibleFuelAttempt,
+): boolean {
+  if (candidate.deltas.length !== current.deltas.length) {
+    return candidate.deltas.length > current.deltas.length;
+  }
+  if (candidate.fuelSnapshotCount !== current.fuelSnapshotCount) {
+    return candidate.fuelSnapshotCount > current.fuelSnapshotCount;
+  }
+  if (candidate.recordedLapCount !== current.recordedLapCount) {
+    return candidate.recordedLapCount > current.recordedLapCount;
+  }
+  return candidate.isCompleted && !current.isCompleted;
 }
 
 /** Aggregate fuel data across all race sessions at a track.
@@ -217,13 +240,8 @@ export function aggregateFuelData(
   const minimumFuelSnapshotsPerSession = 6;
   const minimumSessionCount = 2;
   const minimumPooledPairCount = 12;
-  const pooledDeltas: number[] = [];
-  const perRace: {
-    startFuelKg: number;
-    startFuelRemaining: number;
-    totalLaps: number;
-    isCompleted: boolean;
-  }[] = [];
+  const attemptsByUid = new Map<string, EligibleFuelAttempt>();
+  const unkeyedAttempts: EligibleFuelAttempt[] = [];
 
   for (const session of sessions) {
     if (!isRaceSession(session)) continue;
@@ -255,15 +273,36 @@ export function aggregateFuelData(
       firstLap["car-status-data"]["fuel-remaining-laps"];
     if (!Number.isFinite(startFuelRemaining)) continue;
 
-    pooledDeltas.push(...deltas);
-    perRace.push({
+    const attempt: EligibleFuelAttempt = {
+      deltas,
+      fuelSnapshotCount: lapsWithFuel.length,
+      recordedLapCount: player["per-lap-info"]?.length ?? 0,
       startFuelKg,
       startFuelRemaining,
       totalLaps,
       isCompleted:
         player["final-classification"]?.["result-status"] === "FINISHED",
-    });
+    };
+
+    const sessionUid = session.debug?.["session-uid"];
+    if (sessionUid == null) {
+      unkeyedAttempts.push(attempt);
+      continue;
+    }
+
+    // Summary deduplication intentionally preserves manual saves outside its
+    // short time window. Fuel confidence needs a stricter independence rule:
+    // one on-track session can contribute at most one attempt, so keep only
+    // its most complete eligible snapshot.
+    const key = String(sessionUid);
+    const current = attemptsByUid.get(key);
+    if (!current || isMoreCompleteFuelAttempt(attempt, current)) {
+      attemptsByUid.set(key, attempt);
+    }
   }
+
+  const perRace = [...unkeyedAttempts, ...attemptsByUid.values()];
+  const pooledDeltas = perRace.flatMap((race) => race.deltas);
 
   // Laps within one run share fuel load, tyres, weather, and driving intent,
   // so raw pair count alone cannot establish an actionable recommendation.
@@ -309,8 +348,6 @@ export function aggregateFuelData(
 
   return {
     p75BurnRateKgPerLap: pooledBurnRateKg,
-    avgStartingFuelKg: avg(perRace.map((r) => r.startFuelKg)),
-    avgInitialFuelLaps: avg(perRace.map((r) => r.startFuelRemaining)),
     avgRecommendedFuelLaps: avg(recommendedPerRace),
     avgRecommendedFuelKg: avg(recommendedKgPerRace),
     avgExcessAtFinishLaps: avg(excessAtFinish),

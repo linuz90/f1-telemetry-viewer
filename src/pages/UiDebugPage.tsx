@@ -237,7 +237,7 @@ const trackRecommendation: TrackRaceRecommendation = {
     recommendedFuelKg: 32.9,
     burnRateKgPerLap: 1.2,
     excessAtFinishLaps: 2.2,
-    eligibleAttemptCount: 1,
+    eligibleAttemptCount: 2,
     consecutiveGreenPairCount: 36,
     completedRaceCount: 1,
     confidence: "medium",

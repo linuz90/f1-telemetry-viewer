@@ -77,10 +77,7 @@ import {
   trackPath,
 } from "../utils/routes";
 import { TRACK_TAB_QUERY_PARAM } from "../constants/routes";
-import {
-  aggregateCompoundLife,
-  aggregateFuelData,
-} from "../utils/stats/trackAggregates";
+import { aggregateCompoundLife } from "../utils/stats/trackAggregates";
 import { buildPaceEvolution } from "../utils/stats/trackPaceEvolution";
 import { buildTrackRaceRecommendation } from "../analysis/trackRaceRecommendation";
 import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
@@ -249,16 +246,13 @@ export function TrackProgressPage() {
   const selectedCompoundLifeStats = selectedRaceAnalysisBucket
     ? selectedRaceAnalysisBucket.compoundLifeStats
     : compoundLifeStats;
-  // Race sessions in the selected length bucket, used by the Key Insights
-  // recommendation and the bucket-scoped fuel stats. Use the bucket object even
-  // when the selector is hidden so every Race-tab model shares one distance.
+  // Race sessions in the selected length bucket, used by Key Insights and
+  // strategy. Fuel stays null without an eligible bucket so sparse evidence
+  // from incompatible race distances can never be pooled as a fallback.
   const selectedRaceSessions = selectedRaceAnalysisBucket
     ? selectedRaceAnalysisBucket.sessions
     : raceSessions;
-  const selectedTrackFuelStats = useMemo(
-    () => aggregateFuelData(selectedRaceSessions),
-    [selectedRaceSessions],
-  );
+  const selectedTrackFuelStats = selectedRaceAnalysisBucket?.fuelStats ?? null;
   // Fastest online rival at this track — computed off raw session summaries
   // (not the race-length bucket) because pace comparisons stay valid across
   // short and long races, and at single-track scope we want all the evidence

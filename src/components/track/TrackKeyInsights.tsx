@@ -191,7 +191,7 @@ function FuelTargetTile({ target }: { target: TrackFuelTarget }) {
           `≈ ${formatFuelKg(target.recommendedFuelKg)} total · ${formatKgPerLap(target.burnRateKgPerLap)} P75 burn`,
         )}
       </InsightDetail>
-      <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
+      <InsightDetail size="sm" tone="text-zinc-400" className="mt-1">
         {highlightDetailValues(
           joinMetaParts([
             `${target.confidence[0]!.toUpperCase()}${target.confidence.slice(1)} confidence`,

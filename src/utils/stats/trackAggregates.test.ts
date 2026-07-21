@@ -16,6 +16,7 @@ import { aggregateFuelData } from "./trackAggregates";
 interface AttemptOptions {
   deltas: number[];
   completed?: boolean;
+  sessionUid?: number;
   startFuelKg?: number;
   startFuelRemaining?: number;
   totalLaps?: number;
@@ -65,13 +66,21 @@ function buildPlayer(
 }
 
 function buildAttempt(options: AttemptOptions): TelemetrySession {
-  return {
+  const session = {
     "session-info": {
       "session-type": "Race",
       "total-laps": options.totalLaps ?? 22,
     },
     "classification-data": [buildPlayer(options)],
   } as TelemetrySession;
+
+  if (options.sessionUid != null) {
+    session.debug = {
+      "session-uid": options.sessionUid,
+    } as TelemetrySession["debug"];
+  }
+
+  return session;
 }
 
 function buildTrackRace(
@@ -156,6 +165,40 @@ test("fuel target needs two independently usable attempts and 12 pairs", () => {
   assert.equal(result.consecutiveGreenPairCount, 12);
 });
 
+test("repeated saves from one session count as one fuel attempt", () => {
+  assert.equal(
+    aggregateFuelData([
+      buildAttempt({ deltas: sixStablePairs, sessionUid: 123 }),
+      buildAttempt({ deltas: sixStablePairs, sessionUid: 123 }),
+    ]),
+    null,
+  );
+});
+
+test("fuel UID dedup keeps the strongest snapshot and its completion state", () => {
+  const result = aggregateFuelData([
+    buildAttempt({
+      deltas: [2, 2, 2, 2, 2, 2],
+      completed: true,
+      sessionUid: 123,
+    }),
+    buildAttempt({ deltas: [1, 1, 1, 1, 1, 1, 1], sessionUid: 123 }),
+    buildAttempt({ deltas: sixStablePairs, sessionUid: 456 }),
+    buildAttempt({
+      deltas: sixStablePairs,
+      completed: true,
+      sessionUid: 456,
+    }),
+  ]);
+
+  assert.ok(result);
+  assert.equal(result.eligibleAttemptCount, 2);
+  assert.equal(result.consecutiveGreenPairCount, 13);
+  assert.equal(result.p75BurnRateKgPerLap, 1);
+  assert.equal(result.completedRaceCount, 1);
+  assert.equal(result.confidence, "medium");
+});
+
 test("fuel target uses the pooled p75 burn rate", () => {
   const result = aggregateFuelData([
     buildAttempt({ deltas: sixStablePairs, totalLaps: 10 }),
@@ -181,7 +224,7 @@ test("race analysis keeps fuel-only distances isolated", () => {
     buckets.map((bucket) => bucket.totalLaps),
     [10, 22],
   );
-  assert.ok(buckets.every((bucket) => bucket.hasFuelEvidence));
+  assert.ok(buckets.every((bucket) => bucket.fuelStats !== null));
   assert.ok(buckets.every((bucket) => bucket.compoundLifeStats.length === 0));
   assert.ok(buckets.every((bucket) => bucket.setupCandidates.length === 0));
   assert.ok(
@@ -191,6 +234,21 @@ test("race analysis keeps fuel-only distances isolated", () => {
       ),
     ),
   );
+});
+
+test("race analysis does not pool below-gate evidence across distances", () => {
+  const races = [
+    buildAttempt({
+      deltas: [...sixStablePairs, ...sixStablePairs],
+      totalLaps: 10,
+    }),
+    buildAttempt({
+      deltas: [...sixStablePairs, ...sixStablePairs],
+      totalLaps: 22,
+    }),
+  ].map(buildTrackRace);
+
+  assert.deepEqual(buildRaceAnalysisBuckets(races), []);
 });
 
 test("fuel confidence counts completed contributing attempts", () => {
