@@ -9,9 +9,9 @@ import type {
 import { bestSectorTimeMs, sectorTimeMs } from "../utils/format";
 import { avgErsDeployMj, avgErsHarvestMj } from "../utils/stats/energy";
 import {
-  classificationBestLapTimeMs,
   driverBestLapTimeMs,
   driverTopSpeed,
+  sessionDriverBestLapTimeMs,
 } from "../utils/stats/drivers";
 import {
   filterOutlierLaps,
@@ -354,13 +354,8 @@ export function buildQualifyingTableModel({
   const rows = session["classification-data"]
     .map((driver) => {
       const historyBestLap = driverBestLap(driver);
-      const classificationBestLap = classificationBestLapTimeMs(
-        driver["final-classification"],
-      );
       const bestTime =
-        classificationBestLap ||
-        historyBestLap?.["lap-time-in-ms"] ||
-        Number.POSITIVE_INFINITY;
+        sessionDriverBestLapTimeMs(session, driver) || Number.POSITIVE_INFINITY;
       // Sector cells must describe the displayed lap. When the exporter only
       // gives us an official classification time, do not attach sectors from a
       // different (slower) history lap.

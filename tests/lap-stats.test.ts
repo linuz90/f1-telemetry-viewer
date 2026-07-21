@@ -6,6 +6,8 @@ import {
   buildRaceResultHighlights,
   sortRaceStintHistoryRows,
 } from "../src/analysis/resultsAnalysis";
+import { buildLapAnalysis } from "../src/analysis/lapAnalysis";
+import { buildSessionSummaryInsights } from "../src/analysis/sessionInsightSummary";
 import type {
   DriverData,
   FinalClassification,
@@ -13,8 +15,11 @@ import type {
   TelemetrySession,
   TyreStintHistoryV2Entry,
 } from "../src/types/telemetry";
+import { buildSessionSummary } from "../src/utils/sessionSummary";
 import { driverBestLapTimeMs } from "../src/utils/stats/drivers";
+import { generateQualiInsights } from "../src/utils/stats/qualifyingInsights";
 import {
+  calculateCumulativeDeltas,
   getBestLapTime,
   getRacePaceLaps,
   getValidLaps,
@@ -114,6 +119,52 @@ test("sector fragments are not complete valid laps", () => {
     laps: [zeroLap(), fragment],
   });
   assert.deepEqual(getRacePaceLaps(sparseDriver), []);
+});
+
+test("cumulative deltas ignore sector fragments", () => {
+  const complete = lap(108_000, 31_000, 47_000, 30_000, 0);
+  const fragment = lap(29_191, 0, 0, 29_191);
+
+  assert.deepEqual(
+    calculateCumulativeDeltas(
+      [complete, complete],
+      [complete, fragment],
+      [],
+      [],
+    ),
+    [
+      {
+        lap: 1,
+        delta: 0,
+        lapDelta: 0,
+        s1Delta: 0,
+        s2Delta: 0,
+        s3Delta: 0,
+        playerPit: false,
+        rivalPit: false,
+      },
+    ],
+  );
+});
+
+test("incomplete timed rows do not renumber later lap analysis", () => {
+  const completeOne = lap(108_000, 31_000, 47_000, 30_000);
+  const fragment = lap(29_191, 0, 0, 29_191);
+  const completeThree = lap(107_000, 30_500, 46_500, 30_000);
+  const rivalThree = lap(109_000, 31_500, 47_500, 30_000);
+
+  const model = buildLapAnalysis({
+    laps: [completeOne, fragment, completeThree],
+    rivalLaps: [completeOne, fragment, rivalThree],
+  });
+
+  assert.deepEqual(
+    model.rows.map((row) => [row.lap, row.rivalTimeSec]),
+    [
+      [1, 108],
+      [3, 109],
+    ],
+  );
 });
 
 test("race stats use official best laps but do not invent sparse race pace", () => {
@@ -223,6 +274,93 @@ test("official best-lap fallback supports legacy exports", () => {
   assert.equal(driverBestLapTimeMs(unavailableDriver), 0);
 });
 
+test("focused-driver insight uses an official best when history is partial", () => {
+  const sparseDriver = driver({
+    index: 1,
+    name: "Sparse rival",
+    laps: [zeroLap(), lap(31_680, 0, 0, 31_680)],
+    finalClassification: classification(2, 108_066),
+  });
+  const session = {
+    "session-info": { "session-type": "Race", "total-laps": 2 },
+    "classification-data": [sparseDriver],
+    "tyre-stint-history-v2": [],
+    records: {},
+  } as unknown as TelemetrySession;
+
+  const bestLap = buildSessionSummaryInsights({
+    session,
+    focusedDriver: sparseDriver,
+  }).find((insight) => insight.label === "Best Lap");
+
+  assert.equal(bestLap?.value, "1:48.066");
+  assert.equal(bestLap?.detail, "session fastest lap");
+  assert.equal(bestLap?.compound, undefined);
+});
+
+test("qualifying insight ranks official best laps for sparse drivers", () => {
+  const pole = driver({
+    index: 0,
+    name: "Pole",
+    laps: [lap(30_000, 30_000, 0, 0)],
+    finalClassification: classification(1, 104_047),
+  });
+  const second = driver({
+    index: 1,
+    name: "Second",
+    laps: [lap(31_000, 0, 31_000, 0)],
+    finalClassification: classification(2, 104_699),
+  });
+  const session = {
+    "session-info": { "session-type": "Qualifying" },
+    "classification-data": [second, pole],
+  } as unknown as TelemetrySession;
+
+  const insight = generateQualiInsights(session, pole).find(
+    (candidate) => candidate.label === "Qualifying",
+  );
+
+  assert.equal(insight?.value, "1st");
+  assert.equal(insight?.detail, "of 2");
+});
+
+test("time trial current-run surfaces ignore classification ghost times", () => {
+  const player = driver({
+    index: 0,
+    name: "Time Trial player",
+    laps: [lap(31_000, 31_000, 0, 0)],
+    finalClassification: classification(1, 64_818),
+  });
+  const session = {
+    "session-info": { "session-type": "Time Trial" },
+    "classification-data": [player],
+    records: {
+      fastest: {
+        lap: { time: 64_818, "driver-index": player.index },
+      },
+    },
+  } as unknown as TelemetrySession;
+
+  const table = buildQualifyingTableModel({
+    session,
+    focusedOnly: false,
+    focusedDriverIndex: player.index,
+  });
+  const bestLap = buildSessionSummaryInsights({
+    session,
+    focusedDriver: player,
+  }).find((insight) => insight.label === "Best Lap");
+  const summary = buildSessionSummary(
+    "Time_Trial_Austria_2026_06_25_16_45_32.json",
+    session,
+  ).summary;
+
+  assert.equal(table.rows[0]?.bestTime, Number.POSITIVE_INFINITY);
+  assert.equal(bestLap?.value, "No Time");
+  assert.equal(summary.bestLapTimeMs, undefined);
+  assert.equal(summary.bestLapTime, undefined);
+});
+
 test("qualifying ranks official times and withholds unrelated sectors", () => {
   const pole = driver({
     index: 0,
@@ -237,6 +375,7 @@ test("qualifying ranks official times and withholds unrelated sectors", () => {
     finalClassification: classification(2, 104_699),
   });
   const session = {
+    "session-info": { "session-type": "Qualifying" },
     "classification-data": [sparseRival, pole],
   } as unknown as TelemetrySession;
 

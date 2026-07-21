@@ -1,10 +1,10 @@
 import type { DriverData, TelemetrySession } from "../../types/telemetry";
 import { bestSectorTimeMs } from "../format";
 import { msToLapTimeLocal, ordinal } from "./core";
-import { driverTopSpeed } from "./drivers";
+import { driverTopSpeed, sessionDriverBestLapTimeMs } from "./drivers";
 import { ersHarvestMjForLap } from "./energy";
 import type { StrategyInsight } from "./insightTypes";
-import { getBestLapTime, getValidLaps, lapTimeStdDev } from "./laps";
+import { getValidLaps, lapTimeStdDev } from "./laps";
 
 /** Generate qualifying-specific insights for the player */
 export function generateQualiInsights(
@@ -17,7 +17,7 @@ export function generateQualiInsights(
   // 1. Best lap ranking
   const lapRanking: { driver: DriverData; bestTime: number }[] = [];
   for (const d of allDrivers) {
-    const best = getBestLapTime(d["session-history"]["lap-history-data"]);
+    const best = sessionDriverBestLapTimeMs(session, d);
     if (best > 0) lapRanking.push({ driver: d, bestTime: best });
   }
   lapRanking.sort((a, b) => a.bestTime - b.bestTime);
@@ -152,9 +152,7 @@ export function generateQualiInsights(
     const bestS2 = bestSectorTimeMs(playerValid, 2);
     const bestS3 = bestSectorTimeMs(playerValid, 3);
     const theoretical = bestS1 + bestS2 + bestS3;
-    const actualBest = getBestLapTime(
-      player["session-history"]["lap-history-data"],
-    );
+    const actualBest = sessionDriverBestLapTimeMs(session, player);
     if (
       bestS1 > 0 &&
       bestS2 > 0 &&

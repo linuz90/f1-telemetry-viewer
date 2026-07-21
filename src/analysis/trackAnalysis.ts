@@ -6,9 +6,12 @@ import type {
 import type { RaceSetupCandidate, RaceSetupRunInput } from "./setupComparison";
 import { buildRaceSetupComparison } from "./setupComparison";
 import type { TrackSessionTab } from "../constants/routes";
-import { findPlayer, isRaceSession } from "../utils/stats/drivers";
 import {
-  getBestLapTime,
+  findPlayer,
+  isRaceSession,
+  sessionDriverBestLapTimeMs,
+} from "../utils/stats/drivers";
+import {
   getValidLaps,
   hasCompleteLapTiming,
   isCompleteValidLap,
@@ -184,19 +187,23 @@ export function buildTrackSessionData(
     session,
     kind,
     isRace: kind === "race",
-    bestLapMs: getBestLapTime(laps),
+    bestLapMs: sessionDriverBestLapTimeMs(session, player),
     bestS1: bestSectorTimeMs(valid, 1),
     bestS2: bestSectorTimeMs(valid, 2),
     bestS3: bestSectorTimeMs(valid, 3),
     stdDevMs: lapTimeStdDev(laps),
     wearRate: avgWearRate(player),
-    allLaps: laps.filter(hasCompleteLapTiming).map((lap, index) => ({
-      // Track trend charts only need timed laps; zero-time placeholders from
-      // aborted exports would otherwise compress the scatter scale.
-      timeSec: lap["lap-time-in-ms"] / 1000,
-      valid: isCompleteValidLap(lap),
-      lapNum: index + 1,
-    })),
+    allLaps: laps
+      // Preserve the historical positive-time ordinal before dropping partial
+      // rows, or a later complete lap can inherit the wrong lap number.
+      .filter((lap) => lap["lap-time-in-ms"] > 0)
+      .map((lap, index) => ({ lap, lapNum: index + 1 }))
+      .filter(({ lap }) => hasCompleteLapTiming(lap))
+      .map(({ lap, lapNum }) => ({
+        timeSec: lap["lap-time-in-ms"] / 1000,
+        valid: isCompleteValidLap(lap),
+        lapNum,
+      })),
     weather: info.weather,
     trackTemp: info["track-temperature"],
     airTemp: info["air-temperature"],

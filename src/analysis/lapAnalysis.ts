@@ -182,12 +182,12 @@ function buildRivalLapMap(rivalLaps: readonly LapHistoryEntry[] | undefined) {
   const map = new Map<number, number>();
   let lapNumber = 0;
   for (const lap of rivalLaps ?? []) {
-    if (hasCompleteLapTiming(lap)) {
-      // Rival histories can include zero-time placeholders; count only timed
-      // laps so player/rival overlays stay aligned by completed lap.
-      lapNumber++;
-      map.set(lapNumber, lap["lap-time-in-ms"] / 1000);
-    }
+    if (lap["lap-time-in-ms"] <= 0) continue;
+    // Keep the pre-filter timed-lap ordinal: an incomplete timed row still
+    // represents a lap and must not shift every later rival overlay backward.
+    lapNumber++;
+    if (!hasCompleteLapTiming(lap)) continue;
+    map.set(lapNumber, lap["lap-time-in-ms"] / 1000);
   }
   return map;
 }
@@ -235,9 +235,10 @@ export function buildLapAnalysis({
   const wearByLap = buildWorstWearByLap(stints);
 
   const rows = laps
-    .filter(hasCompleteLapTiming)
-    .map((lap, index): LapAnalysisRow => {
-      const lapNumber = index + 1;
+    .filter((lap) => lap["lap-time-in-ms"] > 0)
+    .map((lap, index) => ({ lap, lapNumber: index + 1 }))
+    .filter(({ lap }) => hasCompleteLapTiming(lap))
+    .map(({ lap, lapNumber }): LapAnalysisRow => {
       const info = lapInfoByNumber.get(lapNumber);
       const scStatus = info?.["max-safety-car-status"] ?? "NO_SAFETY_CAR";
       return {

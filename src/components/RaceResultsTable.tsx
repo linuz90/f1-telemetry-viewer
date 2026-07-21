@@ -68,19 +68,17 @@ function SortIcon({
   );
 }
 
-function racePaceEvidenceTooltip(stats: RaceDriverStats | undefined): string {
+function racePaceEvidenceLabel(stats: RaceDriverStats | undefined): string {
   const sampleCount = stats?.racePaceLapCount ?? 0;
-  const laps = `${sampleCount} clean ${sampleCount === 1 ? "lap" : "laps"}`;
+  const laps = `${sampleCount} ${sampleCount === 1 ? "lap" : "laps"}`;
 
   if (!stats || stats.racePace <= 0) {
-    return sampleCount > 0
-      ? `${laps}; at least 3 are required for Race Pace.`
-      : "No eligible clean laps for Race Pace.";
+    return sampleCount > 0 ? `${laps} · need 3` : "0 clean laps";
   }
   if (!stats.racePaceRankEligible) {
-    return `Average of ${laps} · limited evidence · ${stats.racePaceRankingSampleThreshold} required for this session's ranking.`;
+    return `${laps} · need ${stats.racePaceRankingSampleThreshold}`;
   }
-  return `Average of ${laps} · ${stats.racePaceConfidence} confidence · included in the session ranking.`;
+  return `${laps} · ${stats.racePaceConfidence}`;
 }
 
 /**
@@ -331,11 +329,10 @@ export function RaceResultsTable({
                           "text-zinc-500",
                       )}
                     >
-                      <Tooltip text={racePaceEvidenceTooltip(stats)}>
-                        <span className="inline-block">
-                          {racePace > 0 ? msToLapTime(racePace) : "–"}
-                        </span>
-                      </Tooltip>
+                      <div>{racePace > 0 ? msToLapTime(racePace) : "–"}</div>
+                      <div className="mt-0.5 whitespace-nowrap font-sans text-2xs font-normal text-zinc-500">
+                        {racePaceEvidenceLabel(stats)}
+                      </div>
                     </td>
                     <td
                       className={cn(

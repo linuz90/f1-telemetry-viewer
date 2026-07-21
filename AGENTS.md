@@ -148,7 +148,7 @@ Tyre wear:
 Lap timing validity:
 
 - PnG can mark a partial sector fragment as a valid lap while copying that sector into `lap-time-in-ms`. Use `hasCompleteLapTiming()` / `isCompleteValidLap()` for full-lap stats instead of checking only the bit flags and positive total.
-- Prefer final-classification best-lap fields for classified drivers; fall back to complete lap history when classification is unavailable. Never derive race pace from classification totals or partial history.
+- Prefer final-classification best-lap fields for classified race/quali drivers; fall back to complete lap history when classification is unavailable. Time Trial is the exception: its classification can contain a persistent PB/ghost, so current-run UI must use complete history. Never derive race pace from classification totals or partial history.
 
 Race pace:
 

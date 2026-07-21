@@ -256,7 +256,10 @@ export function calculateCumulativeDeltas(
   for (let i = 0; i < len; i++) {
     const pLap = playerLaps[i];
     const rLap = rivalLaps[i];
-    if (pLap["lap-time-in-ms"] <= 0 || rLap["lap-time-in-ms"] <= 0) continue;
+    // Cumulative race deltas may include invalidated laps, but both rows still
+    // need full timing. Otherwise a sparse rival's sector fragment looks like
+    // a 30-second lap and creates a fictitious minute-plus swing in the chart.
+    if (!hasCompleteLapTiming(pLap) || !hasCompleteLapTiming(rLap)) continue;
 
     const lapDelta = pLap["lap-time-in-ms"] - rLap["lap-time-in-ms"];
     cumulative += lapDelta;

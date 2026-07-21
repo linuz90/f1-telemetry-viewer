@@ -38,7 +38,7 @@ export interface BuiltSessionSummary {
  * Bump this for `SessionSummary`, filename normalization, or any transitive
  * summary-producing policy change; final sorting and dedupe are recomputed.
  */
-export const SESSION_SUMMARY_CACHE_VERSION = 2;
+export const SESSION_SUMMARY_CACHE_VERSION = 3;
 
 function getDrivers(session: TelemetrySession | undefined): DriverData[] {
   return session?.["classification-data"] ?? [];
@@ -593,6 +593,7 @@ export function buildSessionSummary(
       isQualifyingSessionType(parsed.sessionType) ||
       isTimeTrialSessionType(parsed.sessionType)
     ) {
+      const isTimeTrial = isTimeTrialSessionType(parsed.sessionType);
       const recordedBestLapNum =
         focusDriver["session-history"]?.["best-lap-time-lap-num"] ?? -1;
       // Time Trial saves frequently report a bogus best-lap-time-lap-num
@@ -633,7 +634,9 @@ export function buildSessionSummary(
         }
       }
 
-      if (bestLapTimeMs == null) {
+      // Time Trial classification can contain the game's persistent PB/ghost,
+      // not a lap completed in this save. Its summaries must stay history-only.
+      if (bestLapTimeMs == null && !isTimeTrial) {
         const classification = focusDriver["final-classification"];
         const classifiedBestMs = classificationBestLapTimeMs(classification);
         if (classifiedBestMs > 0) {

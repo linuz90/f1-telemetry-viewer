@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { useSessionList } from "./useSessionList";
 import { useTelemetry } from "../context/TelemetryContext";
-import { findPlayer, isRaceSession } from "../utils/stats/drivers";
-import { getBestLapTime, getValidLaps } from "../utils/stats/laps";
+import {
+  findPlayer,
+  isRaceSession,
+  sessionDriverBestLapTimeMs,
+} from "../utils/stats/drivers";
+import { getValidLaps } from "../utils/stats/laps";
 import {
   getRacePaceEstimate,
   getRacePaceReferenceSampleCount,
@@ -126,7 +130,7 @@ export function useTrackHistory(
 
           if (isRaceSession(sessionData)) {
             // Best single race lap
-            const best = getBestLapTime(laps);
+            const best = sessionDriverBestLapTimeMs(sessionData, player);
             if (best > 0 && (bestRaceLapMs === 0 || best < bestRaceLapMs)) {
               bestRaceLapMs = best;
             }
@@ -153,7 +157,7 @@ export function useTrackHistory(
             // Keep the long-standing qualifying-style bucket for existing
             // history cards, then mirror TT into dedicated fields so TT-only
             // cards avoid quali laps with different fuel/traffic assumptions.
-            const best = getBestLapTime(laps);
+            const best = sessionDriverBestLapTimeMs(sessionData, player);
             if (best > 0 && (bestQualiLapMs === 0 || best < bestQualiLapMs)) {
               bestQualiLapMs = best;
             }

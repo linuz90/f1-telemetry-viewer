@@ -1,6 +1,7 @@
 import type { DriverData, TelemetrySession } from "../../types/telemetry";
 import { bestSectorTimeMs } from "../format";
 import { msToLapTimeLocal } from "./core";
+import { driverBestLapTimeMs } from "./drivers";
 import type { StrategyInsight } from "./insightTypes";
 import { RACE_PACE_TOOLTIP } from "./insightTypes";
 import { getBestLapTime, getValidLaps } from "./laps";
@@ -33,16 +34,14 @@ function minPositive(values: readonly number[]): number {
 }
 
 /** Generate qualifying insights comparing to personal bests on this track */
-export function generateQualiHistoryInsights(
+function generateQualifyingHistoryInsights(
   player: DriverData,
   pbs: TrackPBData,
+  currentBest: number,
 ): StrategyInsight[] {
   const insights: StrategyInsight[] = [];
   const laps = player["session-history"]["lap-history-data"];
   const valid = getValidLaps(laps);
-  if (valid.length === 0) return insights;
-
-  const currentBest = getBestLapTime(laps);
 
   // 1. vs Personal Best lap
   if (currentBest > 0 && pbs.bestQualiLapMs > 0) {
@@ -70,6 +69,8 @@ export function generateQualiHistoryInsights(
       });
     }
   }
+
+  if (valid.length === 0) return insights;
 
   // 2. Sector vs PB sectors — show the sector furthest from PB
   const currentS1 = bestSectorTimeMs(valid, 1);
@@ -119,18 +120,33 @@ export function generateQualiHistoryInsights(
   return insights;
 }
 
+export function generateQualiHistoryInsights(
+  player: DriverData,
+  pbs: TrackPBData,
+): StrategyInsight[] {
+  return generateQualifyingHistoryInsights(
+    player,
+    pbs,
+    driverBestLapTimeMs(player),
+  );
+}
+
 /** Generate Time Trial history insights without mixing in qualifying sessions. */
 export function generateTimeTrialHistoryInsights(
   player: DriverData,
   pbs: TrackPBData,
 ): StrategyInsight[] {
-  return generateQualiHistoryInsights(player, {
-    ...pbs,
-    bestQualiLapMs: pbs.bestTimeTrialLapMs ?? 0,
-    bestS1Ms: pbs.bestTimeTrialS1Ms ?? 0,
-    bestS2Ms: pbs.bestTimeTrialS2Ms ?? 0,
-    bestS3Ms: pbs.bestTimeTrialS3Ms ?? 0,
-  });
+  return generateQualifyingHistoryInsights(
+    player,
+    {
+      ...pbs,
+      bestQualiLapMs: pbs.bestTimeTrialLapMs ?? 0,
+      bestS1Ms: pbs.bestTimeTrialS1Ms ?? 0,
+      bestS2Ms: pbs.bestTimeTrialS2Ms ?? 0,
+      bestS3Ms: pbs.bestTimeTrialS3Ms ?? 0,
+    },
+    getBestLapTime(player["session-history"]["lap-history-data"]),
+  );
 }
 
 function signedDelta(seconds: number): string {
@@ -228,13 +244,12 @@ export function generateRaceHistoryInsights(
   pbs: TrackPBData,
 ): StrategyInsight[] {
   const insights: StrategyInsight[] = [];
-  const laps = player["session-history"]["lap-history-data"];
   const racePaceEstimate = getRacePaceEstimate(player);
   const referenceSampleCount = getRacePaceReferenceSampleCount(
     session["classification-data"].map(getRacePaceEstimate),
   );
 
-  const bestRaceLap = getBestLapTime(laps);
+  const bestRaceLap = driverBestLapTimeMs(player);
 
   // 1. Best race lap vs all-time best race lap
   if (bestRaceLap > 0 && pbs.bestRaceLapMs > 0) {

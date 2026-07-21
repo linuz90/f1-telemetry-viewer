@@ -13,12 +13,9 @@ import {
   humanizeRaceControlType,
 } from "../utils/raceControl";
 import { isRaceSession, isTimeTrialSessionType } from "../utils/sessionTypes";
+import { sessionDriverBestLapTimeMs } from "../utils/stats/drivers";
 import type { StrategyInsight } from "../utils/stats/insightTypes";
-import {
-  getBestLapTime,
-  getValidLaps,
-  isCompleteValidLap,
-} from "../utils/stats/laps";
+import { getValidLaps, isCompleteValidLap } from "../utils/stats/laps";
 import { getLapCompoundMap } from "../utils/stats/tyres";
 
 /**
@@ -233,7 +230,10 @@ function getDriverResult(
 
 function scanBestLap(session: TelemetrySession): SessionBestLap | undefined {
   const record = session.records?.fastest?.lap;
-  if (typeof record?.time === "number" && record.time > 0) {
+  const isTimeTrial = isTimeTrialSessionType(
+    session["session-info"]["session-type"],
+  );
+  if (!isTimeTrial && typeof record?.time === "number" && record.time > 0) {
     return {
       timeMs: record.time,
       driverIndex: record["driver-index"],
@@ -241,13 +241,12 @@ function scanBestLap(session: TelemetrySession): SessionBestLap | undefined {
     };
   }
 
-  // Older/sparse exports may not carry records.fastest; scanning keeps the
-  // summary tile useful without depending on a newer Pits n' Giggles schema.
+  // Older/sparse exports may not carry records.fastest. Classification is the
+  // authoritative fallback because remote-driver history can contain only a
+  // sector fragment even though the game classified a valid best lap.
   let best: SessionBestLap | undefined;
   for (const driver of session["classification-data"] ?? []) {
-    const timeMs = getBestLapTime(
-      driver["session-history"]["lap-history-data"],
-    );
+    const timeMs = sessionDriverBestLapTimeMs(session, driver);
     if (timeMs <= 0) continue;
     if (!best || timeMs < best.timeMs) {
       best = {
@@ -270,10 +269,7 @@ function bestLapNumberForDriver(
       isCompleteValidLap(lap) &&
       Math.abs(lap["lap-time-in-ms"] - bestLapMs) < 1,
   );
-  if (matchingIndex !== -1) return matchingIndex + 1;
-
-  const reportedLap = driver["session-history"]["best-lap-time-lap-num"];
-  return reportedLap > 0 ? reportedLap : undefined;
+  return matchingIndex !== -1 ? matchingIndex + 1 : undefined;
 }
 
 function compoundForLap(
@@ -351,9 +347,7 @@ function buildQualifyingResultInsight(
   const ranking = (session["classification-data"] ?? [])
     .map((candidate) => ({
       driver: candidate,
-      bestLapMs: getBestLapTime(
-        candidate["session-history"]["lap-history-data"],
-      ),
+      bestLapMs: sessionDriverBestLapTimeMs(session, candidate),
     }))
     .filter((entry) => entry.bestLapMs > 0)
     .sort((a, b) => a.bestLapMs - b.bestLapMs);
@@ -389,8 +383,7 @@ function buildBestLapInsight(
   session: TelemetrySession,
   driver: DriverData,
 ): SessionInsight | null {
-  const laps = driver["session-history"]["lap-history-data"];
-  const bestLapMs = getBestLapTime(laps);
+  const bestLapMs = sessionDriverBestLapTimeMs(session, driver);
   const sessionBest = scanBestLap(session);
   const isTimeTrial = isTimeTrialSessionType(
     session["session-info"]["session-type"],
