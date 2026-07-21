@@ -2,9 +2,12 @@ import type { DriverData, TelemetrySession } from "../../types/telemetry";
 import { sectorTimeMs } from "../format";
 import { ordinal } from "./core";
 import { driverTopSpeed } from "./drivers";
-import { avgErsDeployMj, avgErsHarvestMj } from "./energy";
+import { avgErsDeployMj, avgErsHarvestUtilization } from "./energy";
 import type { StrategyInsight } from "./insightTypes";
-import { RACE_PACE_TOOLTIP } from "./insightTypes";
+import {
+  ERS_HARVEST_UTILIZATION_TOOLTIP,
+  RACE_PACE_TOOLTIP,
+} from "./insightTypes";
 import { getRacePaceLaps } from "./laps";
 import { compareCompoundMatchedRacePace } from "./matchedPace";
 import {
@@ -148,18 +151,19 @@ export function generateInsights(
       });
     }
 
-    // 6. ERS harvest delta vs rival (lift-and-coast signal in F1 26)
-    const playerHarv = avgErsHarvestMj(player);
-    const rivalHarv = avgErsHarvestMj(rival);
-    if (playerHarv > 0 && rivalHarv > 0) {
-      const delta = playerHarv - rivalHarv;
+    // 6. ERS harvest utilization vs rival
+    const playerHarvest = avgErsHarvestUtilization(player);
+    const rivalHarvest = avgErsHarvestUtilization(rival);
+    if (playerHarvest != null && rivalHarvest != null) {
+      const playerPercent = playerHarvest * 100;
+      const rivalPercent = rivalHarvest * 100;
+      const deltaPoints = playerPercent - rivalPercent;
       insights.push({
         type: "ers",
-        label: "ERS Harv",
-        value: `${delta <= 0 ? "" : "+"}${delta.toFixed(1)} MJ`,
-        detail: `avg per lap vs ${rivalName} (${playerHarv.toFixed(1)} vs ${rivalHarv.toFixed(1)} MJ)`,
-        tooltip:
-          "Average ERS energy harvested per lap, MGU-K + MGU-H combined. Higher values indicate more lift-and-coast.",
+        label: "ERS Harvest",
+        value: `${deltaPoints <= 0 ? "" : "+"}${deltaPoints.toFixed(1)} pp`,
+        detail: `${playerPercent.toFixed(1)}% vs ${rivalPercent.toFixed(1)}% for ${rivalName}`,
+        tooltip: ERS_HARVEST_UTILIZATION_TOOLTIP,
       });
     }
   } else {
@@ -284,27 +288,28 @@ export function generateInsights(
       });
     }
 
-    // 5. ERS harvest ranking (lift-and-coast signal in F1 26)
-    const harvRanking: { driver: DriverData; avgHarv: number }[] = [];
+    // 5. ERS harvest utilization ranking. Keep the card neutral because fully
+    // using the available harvest allowance is descriptive, not always faster.
+    const harvestRanking: { driver: DriverData; utilization: number }[] = [];
     for (const d of allDrivers) {
-      const avg = avgErsHarvestMj(d);
-      if (avg > 0) harvRanking.push({ driver: d, avgHarv: avg });
+      const utilization = avgErsHarvestUtilization(d);
+      if (utilization != null) harvestRanking.push({ driver: d, utilization });
     }
-    harvRanking.sort((a, b) => b.avgHarv - a.avgHarv); // highest first
-    const harvPos = harvRanking.findIndex(
+    harvestRanking.sort((a, b) => b.utilization - a.utilization);
+    const harvestPos = harvestRanking.findIndex(
       (r) => r.driver.index === player.index,
     );
-    if (harvPos >= 0 && harvRanking.length > 1) {
-      const playerHarv = harvRanking[harvPos].avgHarv;
+    if (harvestPos >= 0 && harvestRanking.length > 1) {
+      const playerPercent = harvestRanking[harvestPos].utilization * 100;
       insights.push({
         type: "ers",
-        label: "ERS Harv",
-        value: ordinal(harvPos + 1),
-        detail: `of ${harvRanking.length} — ${playerHarv.toFixed(1)} MJ/lap`,
-        tooltip:
-          "Average ERS energy harvested per lap, MGU-K + MGU-H combined. Higher values indicate more lift-and-coast.",
-        rank: harvPos,
-        rankTotal: harvRanking.length,
+        label: "ERS Harvest",
+        value: `${playerPercent.toFixed(1)}%`,
+        detail:
+          harvestPos === 0
+            ? `highest of ${harvestRanking.length} drivers`
+            : `${ordinal(harvestPos + 1)}-highest of ${harvestRanking.length} drivers`,
+        tooltip: ERS_HARVEST_UTILIZATION_TOOLTIP,
       });
     }
 

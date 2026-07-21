@@ -26,3 +26,6 @@ export interface StrategyInsight {
 
 export const RACE_PACE_TOOLTIP =
   "Average of all complete green-flag laps after excluding lap 1, pit in/out laps, and abnormal per-stint outliers. At least 3 laps are required; rankings require half the session's reference evidence.";
+
+export const ERS_HARVEST_UTILIZATION_TOOLTIP =
+  "Average percentage of the game's recorded per-lap ERS harvesting limit that the car recovered. 100% means it harvested roughly the full available allowance; it is not remaining battery charge. Green-flag laps only; pre-race baseline and final reset snapshot excluded. Slightly over 100% can occur because telemetry counters reset between packets.";

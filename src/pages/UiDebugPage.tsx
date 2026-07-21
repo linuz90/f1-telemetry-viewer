@@ -154,7 +154,7 @@ const sampleInsights: SessionInsight[] = [
     detail: "15th of 22 top speed",
     extraDetails: [
       "Deploy: 7.0 MJ/lap (1st of 22)",
-      "Harvest: 6.9 MJ/lap (1st of 22)",
+      "Harvest: 99.6% (highest of 22 drivers)",
     ],
     accent: "sky",
     tone: "negative",

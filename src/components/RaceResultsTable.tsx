@@ -15,7 +15,10 @@ import type { RaceControlEvent, TelemetrySession } from "../types/telemetry";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { msToLapTime } from "../utils/format";
 import { driverTopSpeed } from "../utils/stats/drivers";
-import { RACE_PACE_TOOLTIP } from "../utils/stats/insightTypes";
+import {
+  ERS_HARVEST_UTILIZATION_TOOLTIP,
+  RACE_PACE_TOOLTIP,
+} from "../utils/stats/insightTypes";
 import { usePlayerOnly } from "../hooks/usePlayerOnly";
 import { cn } from "../utils/cn";
 import { AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
@@ -231,7 +234,7 @@ export function RaceResultsTable({
                     className={thClass("right")}
                     onClick={() => toggleSort("ersHarv")}
                   >
-                    <Tooltip text="Average ERS energy harvested per lap, MGU-K + MGU-H combined (green-flag laps only, excluding first and last lap). Higher values indicate more lift-and-coast.">
+                    <Tooltip text="Average ERS energy recovered per lap, MGU-K + MGU-H combined. Green-flag laps only; pre-race baseline and final reset snapshot excluded.">
                       <span>
                         <SortIcon
                           column="ersHarv"
@@ -240,6 +243,24 @@ export function RaceResultsTable({
                           side="left"
                         />
                         ERS Harv
+                      </span>
+                    </Tooltip>
+                  </th>
+                )}
+                {highlights.hasErsHarvestPct && (
+                  <th
+                    className={thClass("right")}
+                    onClick={() => toggleSort("ersHarvestPct")}
+                  >
+                    <Tooltip text={ERS_HARVEST_UTILIZATION_TOOLTIP}>
+                      <span>
+                        <SortIcon
+                          column="ersHarvestPct"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          side="left"
+                        />
+                        Harv %
                       </span>
                     </Tooltip>
                   </th>
@@ -264,6 +285,7 @@ export function RaceResultsTable({
                 const topSpeed = stats?.topSpeed ?? 0;
                 const ers = stats?.ers ?? 0;
                 const ersHarv = stats?.ersHarv ?? 0;
+                const ersHarvestPct = stats?.ersHarvestPct ?? null;
                 const isBestLap =
                   bestLap > 0 && Math.abs(bestLap - highlights.bestLapMs) < 1;
                 const isBestPace =
@@ -358,6 +380,18 @@ export function RaceResultsTable({
                         )}
                       >
                         {ersHarv > 0 ? ersHarv.toFixed(1) : "–"}
+                      </td>
+                    )}
+                    {highlights.hasErsHarvestPct && (
+                      <td
+                        className={tableCellClass({
+                          align: "right",
+                          mono: true,
+                        })}
+                      >
+                        {ersHarvestPct != null
+                          ? `${(ersHarvestPct * 100).toFixed(1)}%`
+                          : "–"}
                       </td>
                     )}
                     <td

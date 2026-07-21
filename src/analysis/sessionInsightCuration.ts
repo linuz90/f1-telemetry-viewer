@@ -336,9 +336,15 @@ function mergePowerInsights(
   ersInsights: SessionInsight[],
 ): SessionInsight | undefined {
   const deploy = findByLabel(ersInsights, "ERS Deploy");
-  const harvest = findByLabel(ersInsights, "ERS Harv");
+  const harvest =
+    findByLabel(ersInsights, "ERS Harvest") ??
+    findByLabel(ersInsights, "ERS Harv");
   const primary = speed ?? deploy ?? harvest;
   if (!primary) return undefined;
+  const tooltip =
+    uniqueLines([speed?.tooltip, deploy?.tooltip, harvest?.tooltip])
+      .map((line) => (/[.!?]$/.test(line) ? line : `${line}.`))
+      .join(" ") || undefined;
 
   if (!speed) {
     // Qualifying/time-trial exports sometimes have ERS but no reliable speed
@@ -352,6 +358,7 @@ function mergePowerInsights(
         deploy && harvest
           ? rankedMetricLine("Harvest", harvest)
           : primary.detail,
+      tooltip,
       extraDetails: uniqueLines([
         deploy ? rankedMetricLine("Deploy", deploy) : undefined,
       ]),
@@ -368,7 +375,7 @@ function mergePowerInsights(
     label: deploy || harvest ? "Speed & ERS" : "Top Speed",
     value: speedValue,
     detail: `${speedRank} top speed`,
-    tooltip: speed.tooltip ?? deploy?.tooltip ?? harvest?.tooltip,
+    tooltip,
     rank: speed.rank,
     rankTotal: speed.rankTotal,
     accent: "sky",

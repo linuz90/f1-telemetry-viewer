@@ -462,6 +462,7 @@ export interface ErsStats {
   "ers-deployed-j"?: number;
   "ers-harv-mguk-j"?: number;
   "ers-harv-mguh-j"?: number;
+  "ers-harv-limit-mguk-j"?: number;
 }
 
 export interface LapDataCurrent {

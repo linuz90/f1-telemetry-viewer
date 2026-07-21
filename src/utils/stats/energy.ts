@@ -109,11 +109,80 @@ export function ersHarvestMjForLap(lap: PerLapInfo): number {
   return ersHarvestJForLap(lap) / 1_000_000;
 }
 
+/** Recorded per-lap ERS harvest allowance, in joules. */
+export function ersHarvestLimitJForLap(lap: PerLapInfo): number {
+  return (
+    lap["ers-stats"]?.["ers-harv-limit-mguk-j"] ??
+    lap["car-status-data"]?.["ers-harvested-limit-per-lap"] ??
+    0
+  );
+}
+
+function hasHarvestReading(lap: PerLapInfo): boolean {
+  const stats = lap["ers-stats"];
+  if (
+    stats?.["ers-harv-mguk-j"] != null ||
+    stats?.["ers-harv-mguh-j"] != null
+  ) {
+    return true;
+  }
+
+  const car = lap["car-status-data"];
+  return (
+    car?.["ers-harvested-this-lap-mguk"] != null ||
+    car?.["ers-harvested-this-lap-mguh"] != null
+  );
+}
+
+function hasMeaningfulErsTelemetry(laps: readonly PerLapInfo[]): boolean {
+  return laps.some(
+    (lap) =>
+      ersDeployJForLap(lap) >= 200_000 || ersHarvestJForLap(lap) >= 200_000,
+  );
+}
+
 /**
- * Average ERS deployment in MJ per lap (green-flag laps only, excluding first
- * and last lap). Pits n' Giggles' per-lap `ers-stats` is more reliable than
- * the end-of-lap car-status snapshot for F1 26 and remains optional for older
- * exports.
+ * Average share of the recorded per-lap harvest allowance that was recovered.
+ * Explicit zero-harvest laps remain in the sample; dropping them would make the
+ * percentage look artificially high. Values can be slightly above 100% when
+ * the saved cumulative counter and limit snapshot straddle a packet boundary.
+ */
+export function avgErsHarvestUtilization(d: DriverData): number | null {
+  const perLap = d["per-lap-info"] ?? [];
+  if (perLap.length < 3) return null;
+
+  // Entry 0 is the pre-race baseline and the final entry can contain a reset.
+  const eligible = perLap.slice(1, -1).filter(isGreenFlagLap);
+  if (!hasMeaningfulErsTelemetry(eligible)) return null;
+
+  const utilization: number[] = [];
+  for (const lap of eligible) {
+    if (!hasHarvestReading(lap)) continue;
+
+    const harvestedJ = ersHarvestJForLap(lap);
+    const limitJ = ersHarvestLimitJForLap(lap);
+    if (
+      !Number.isFinite(harvestedJ) ||
+      harvestedJ < 0 ||
+      !Number.isFinite(limitJ) ||
+      limitJ < 200_000
+    ) {
+      continue;
+    }
+    utilization.push(harvestedJ / limitJ);
+  }
+
+  if (utilization.length === 0) return null;
+  return (
+    utilization.reduce((sum, value) => sum + value, 0) / utilization.length
+  );
+}
+
+/**
+ * Average ERS deployment in MJ per lap. Uses green-flag entries after the
+ * pre-race baseline and before the final reset snapshot. Pits n' Giggles'
+ * per-lap `ers-stats` is more reliable than the end-of-lap car-status snapshot
+ * for F1 26 and remains optional for older exports.
  */
 export function avgErsDeployMj(d: DriverData): number {
   const perLap = d["per-lap-info"] ?? [];
@@ -131,8 +200,8 @@ export function avgErsDeployMj(d: DriverData): number {
   return deployMj.reduce((a, b) => a + b, 0) / deployMj.length;
 }
 
-/** Average ERS harvested in MJ per lap (green-flag laps only, excluding first
- *  and last lap). In F1 26 this is the key signal for lift-and-coast usage. */
+/** Average ERS harvested in MJ per lap. Uses green-flag entries after the
+ *  pre-race baseline and before the final reset snapshot. */
 export function avgErsHarvestMj(d: DriverData): number {
   const perLap = d["per-lap-info"] ?? [];
   if (perLap.length < 3) return 0;
