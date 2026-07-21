@@ -42,7 +42,7 @@ import {
   raceControlEventsToOvertakes,
 } from "../utils/raceControl";
 import { findFocusedDriver } from "../utils/stats/drivers";
-import { generateFuelInsights } from "../utils/stats/energy";
+import { generateFuelMarginInsight } from "../utils/stats/energy";
 import { generateRaceHistoryInsights } from "../utils/stats/historyInsights";
 import { calculateCumulativeDeltas } from "../utils/stats/laps";
 import { generateInsights } from "../utils/stats/raceInsights";
@@ -240,14 +240,13 @@ export function RaceSessionView({
   const insights = useMemo(() => {
     if (!focusedDriver) return [];
     const base = generateInsights(session, focusedDriver, rival);
-    // Fuel and historical PB insights are only relevant when NOT comparing h2h
+    // Fuel margin and historical PB insights are only relevant when NOT comparing h2h
     if (!rival) {
-      base.push(
-        ...generateFuelInsights(
-          focusedDriver,
-          session["session-info"]["total-laps"],
-        ),
+      const fuelMargin = generateFuelMarginInsight(
+        focusedDriver,
+        session["session-info"]["total-laps"],
       );
+      if (fuelMargin) base.push(fuelMargin);
       if (pbs) {
         base.push(...generateRaceHistoryInsights(session, focusedDriver, pbs));
       }

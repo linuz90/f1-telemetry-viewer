@@ -173,6 +173,15 @@ Analysis layer:
 - Product-specific ranking, curation, bucketing, and insight thresholds belong in `src/analysis/`.
 - Add concise why-comments for exporter quirks, thresholds, and comparison policies.
 
+Fuel recommendations:
+
+- Session pages are retrospective: lead with the game's signed lap-margin
+  estimate at the finish or last captured lap, with recorded tank kilograms
+  and observed burn as supporting evidence. Do not turn one session into a
+  future-load recommendation or present the game estimate as physical range.
+- Actionable initial-fuel targets belong on Track Progress, where they use
+  same-distance, UID-independent evidence, pooled P75 burn, and confidence.
+
 Session summary cache:
 
 - `SESSION_INDEX_FORMAT_VERSION` covers the persisted index envelope; bump it when that shape changes.

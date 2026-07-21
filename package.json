@@ -22,7 +22,7 @@
     "test:lap-stats": "tsx --test tests/lap-stats.test.ts",
     "test:race-pace": "tsx --test tests/race-pace.test.ts tests/matched-pace.test.ts",
     "test:energy-stats": "tsx --test tests/energy-stats.test.ts",
-    "test:fuel": "tsx --test src/utils/stats/trackAggregates.test.ts",
+    "test:fuel": "tsx --test src/utils/stats/energy.test.ts src/utils/stats/trackAggregates.test.ts",
     "benchmark:session-index": "tsx scripts/benchmark-session-index.ts",
     "format": "prettier . --write --ignore-unknown",
     "format:check": "prettier . --check --ignore-unknown",

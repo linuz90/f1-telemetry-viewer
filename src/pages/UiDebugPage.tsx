@@ -129,12 +129,12 @@ const sampleInsights: SessionInsight[] = [
   },
   {
     type: "fuel",
-    label: "Fuel Plan",
-    value: "-2.7 laps",
-    detail: "fuel slider recommendation",
+    label: "Fuel Margin",
+    value: "+0.3 laps",
+    detail: "game estimate at finish",
     extraDetails: [
-      "Loaded -0.9 laps (35 kg - 1.20 kg/lap avg)",
-      "+2.2 laps spare in a clean race (27 green pairs)",
+      "0.1 kg in tank · 33.1 kg at start",
+      "Median green burn 1.52 kg/lap · 20 green pairs",
     ],
     accent: "amber",
   },

@@ -171,7 +171,7 @@ export function aggregateCompoundLife(
 /** Fuel stats aggregated across race sessions at a track */
 export interface TrackFuelStats {
   p75BurnRateKgPerLap: number;
-  /** Average recommended fuel delta in laps (matches session "Recommended Fuel") */
+  /** Average game fuel-slider target implied by the track recommendation. */
   avgRecommendedFuelLaps: number;
   /** Average total fuel load (kg) implied by the recommendation — i.e. enough
    *  to cover the race distance at the pooled burn rate plus the safety

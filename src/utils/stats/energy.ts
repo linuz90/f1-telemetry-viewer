@@ -1,13 +1,19 @@
 import type { DriverData, PerLapInfo } from "../../types/telemetry";
+import {
+  formatFuelKg,
+  formatKgPerLap,
+  joinMetaParts,
+  pluralize,
+} from "../format";
 import { formatLapDelta, median } from "./core";
 import type { StrategyInsight } from "./insightTypes";
 
 // ─── Fuel safety knobs ───────────────────────────────────────────────────────
 //
-// We frame the fuel recommendation as "what slider value would *just* finish
-// the race assuming every lap is green-flag" and then add two small safety
-// buffers on top, so a literal reading of the chip in a clean race doesn't
-// leave you crossing the line on fumes (or DSQ-risk territory).
+// Track Progress frames its fuel recommendation as "what slider value would
+// *just* finish the race assuming every lap is green-flag" and then adds two
+// small safety buffers on top. These knobs do not apply to the retrospective
+// Fuel Margin shown on a single session.
 //
 // Both buffers mirror the Pits n' Giggles in-app Fuel Strategy Calculator:
 //   https://github.com/ashwin-nat/pits-n-giggles/blob/hotfix-v4.3.0/apps/frontend/js/fuelCalculator.js
@@ -29,21 +35,6 @@ const FUEL_SURPLUS_LAPS = 0.25;
  *  and the surplus-laps buffer. */
 export function fuelSafetyMarginLaps(burnRateKg: number): number {
   return FUEL_SURPLUS_LAPS + MIN_FUEL_LEVEL_KG / burnRateKg;
-}
-
-/** Result of a fuel burn-rate calculation for a single race session */
-export interface FuelCalcResult {
-  burnRateKg: number;
-  greenFlagPairCount: number;
-  startFuelKg: number;
-  startFuelLaps: number;
-  /** Game's fuel-remaining-laps at lap 0 — what the player loaded */
-  startFuelRemaining: number;
-  /** Fuel in tank (kg) at last recorded lap */
-  endFuelKg: number;
-  /** Game's fuel-remaining-laps at last recorded lap */
-  fuelRemainingLaps: number;
-  lastLapNumber: number;
 }
 
 /** True when a lap ran under normal green-flag racing conditions */
@@ -230,122 +221,91 @@ export function avgErsHarvestMj(d: DriverData): number {
   return harvMj.reduce((a, b) => a + b, 0) / harvMj.length;
 }
 
-/** Calculate fuel burn rate and related metrics for a player in a race.
- *  Uses the median of per-lap fuel deltas (green-flag laps only) for a burn
- *  rate that's robust against outliers and not skewed by SC/VSC/formation laps. */
-export function calculateBurnRate(player: DriverData): FuelCalcResult | null {
+/** Build a factual fuel summary for one race session.
+ *
+ * A single run cannot reliably distinguish deliberate saving from normal burn,
+ * so it must not produce an initial-fuel recommendation. The same-distance
+ * Track Progress model owns that decision; this summary only reports what the
+ * telemetry actually recorded.
+ */
+export function generateFuelMarginInsight(
+  player: DriverData,
+  totalRaceLaps: number,
+): StrategyInsight | null {
   const perLap = player["per-lap-info"];
   if (!perLap?.length) return null;
 
-  const lapsWithFuel = perLap.filter(
-    (l) =>
-      Number.isFinite(l["car-status-data"]?.["fuel-in-tank"]) &&
-      l["car-status-data"]["fuel-in-tank"] > 0,
+  const statusSnapshots = perLap.filter(
+    (lap) =>
+      Number.isFinite(lap["lap-number"]) && lap["car-status-data"] != null,
   );
-  if (lapsWithFuel.length < 6) return null;
+  // Lap 0 alone only describes the starting state. A later snapshot is needed
+  // before the session can say anything about the resulting fuel margin.
+  const firstLap = statusSnapshots.find((lap) => lap["lap-number"] === 0);
+  const lastLap = statusSnapshots.reduce<PerLapInfo | undefined>(
+    (latest, lap) =>
+      lap["lap-number"] > 0 &&
+      (!latest || lap["lap-number"] >= latest["lap-number"])
+        ? lap
+        : latest,
+    undefined,
+  );
+  if (!lastLap) return null;
 
-  const deltas = collectGreenFlagBurnDeltas(player);
-  if (deltas.length < 3) return null;
-
-  const burnRateKg = median(deltas);
-  if (burnRateKg == null || burnRateKg <= 0) return null;
-
-  const firstLap = lapsWithFuel[0];
-  const lastLap = lapsWithFuel[lapsWithFuel.length - 1];
-
-  const startFuelKg = firstLap["car-status-data"]["fuel-in-tank"];
-  const startFuelLaps = startFuelKg / burnRateKg;
-  const startFuelRemaining = firstLap["car-status-data"]["fuel-remaining-laps"];
-  const endFuelKg = lastLap["car-status-data"]["fuel-in-tank"];
-  const fuelRemainingLaps = lastLap["car-status-data"]["fuel-remaining-laps"];
+  const startFuelKg = firstLap?.["car-status-data"]?.["fuel-in-tank"];
+  const endFuelKg = lastLap["car-status-data"]?.["fuel-in-tank"];
+  // This signed value is the game's MFD estimate at the recorded snapshot. It
+  // is useful outcome evidence, but is neither physical tank range nor a fuel
+  // recommendation derived by the viewer.
+  const fuelMarginLaps = lastLap["car-status-data"]?.["fuel-remaining-laps"];
   const lastLapNumber = lastLap["lap-number"] as number;
+  const classification = player["final-classification"];
+  const classifiedLaps = classification?.["num-laps"];
+  // Lapped finishers and shortened races legitimately complete fewer than the
+  // scheduled distance, so official completed laps define the finish when set.
+  const finishLap =
+    typeof classifiedLaps === "number" &&
+    Number.isFinite(classifiedLaps) &&
+    classifiedLaps > 0
+      ? classifiedLaps
+      : totalRaceLaps;
+  const isFinished =
+    classification?.["result-status"] === "FINISHED" &&
+    lastLapNumber >= finishLap;
+  const deltas = collectGreenFlagBurnDeltas(player);
+  const burnRateKg = deltas.length >= 3 ? median(deltas) : undefined;
+  const fuelTelemetry = joinMetaParts([
+    Number.isFinite(endFuelKg) && endFuelKg! >= 0
+      ? `${formatFuelKg(endFuelKg!)} in tank`
+      : undefined,
+    Number.isFinite(startFuelKg) && startFuelKg! >= 0
+      ? `${formatFuelKg(startFuelKg!)} at start`
+      : undefined,
+  ]);
+  const burnTelemetry =
+    burnRateKg != null && burnRateKg > 0
+      ? joinMetaParts([
+          `Median green burn ${formatKgPerLap(burnRateKg)}`,
+          pluralize(deltas.length, "green pair"),
+        ])
+      : undefined;
+  const extraDetails = [fuelTelemetry, burnTelemetry].filter(
+    (detail): detail is string => Boolean(detail),
+  );
+  const hasFuelMargin = Number.isFinite(fuelMarginLaps);
+  if (!hasFuelMargin && extraDetails.length === 0) return null;
 
   return {
-    burnRateKg,
-    greenFlagPairCount: deltas.length,
-    startFuelKg,
-    startFuelLaps,
-    startFuelRemaining,
-    endFuelKg,
-    fuelRemainingLaps,
-    lastLapNumber,
-  };
-}
-
-/** Generate fuel insights for race sessions */
-export function generateFuelInsights(
-  player: DriverData,
-  totalRaceLaps: number,
-): StrategyInsight[] {
-  const result = calculateBurnRate(player);
-
-  // Not enough data — show placeholder rows explaining why
-  if (!result) {
-    const perLap = player["per-lap-info"];
-    const lapsWithFuel =
-      perLap?.filter((l) => l["car-status-data"]?.["fuel-in-tank"] > 0)
-        .length ?? 0;
-    const detail =
-      lapsWithFuel < 6
-        ? `need 6+ laps with fuel data, got ${lapsWithFuel}`
-        : "need 3+ green-flag lap pairs";
-    return [
-      { type: "fuel", label: "Initial Fuel", value: "—", detail },
-      { type: "fuel", label: "Recommended Fuel", value: "—", detail },
-    ];
-  }
-
-  const { burnRateKg, greenFlagPairCount, startFuelRemaining } = result;
-
-  const insights: StrategyInsight[] = [];
-
-  // Row 1: Fuel Load — always shown
-  insights.push({
     type: "fuel",
-    label: "Initial Fuel",
-    value: `${formatLapDelta(startFuelRemaining)} laps`,
-    detail: `${Math.round(result.startFuelKg)} kg — ${burnRateKg.toFixed(2)} kg/lap avg`,
-  });
-
-  // Row 2: Fuel Recommendation — clean-race projection.
-  //
-  // We deliberately ignore the actual fuel remaining at the chequered flag.
-  // Safety-car / VSC laps burn much less than green-flag laps (this race at
-  // Catalunya: ~0.7 kg/lap under FSC vs ~1.05 kg/lap green), so any real
-  // leftover at the line bakes in fuel saved by SCs that the *next* race
-  // probably won't have. The recommendation assumes a worst-case all-green
-  // race at the measured green-flag burn rate, then keeps a small safety
-  // margin on top (see MIN_FUEL_LEVEL_KG + FUEL_SURPLUS_LAPS) so following
-  // it never leaves you stranded in a clean race.
-  if (greenFlagPairCount >= 5) {
-    // Raw "clean race" excess — what would be left over if every lap burned
-    // at the measured green-flag rate. Shown verbatim in the detail line.
-    const rawExcessLaps = result.startFuelKg / burnRateKg - totalRaceLaps;
-    // Recommendation bakes in a small safety buffer above the bare minimum.
-    const recommended =
-      startFuelRemaining - (rawExcessLaps - fuelSafetyMarginLaps(burnRateKg));
-    let detail: string;
-    if (Math.abs(rawExcessLaps) < 0.3) {
-      detail = `clean-race fuel load was spot on (${greenFlagPairCount} green pairs)`;
-    } else if (rawExcessLaps > 0) {
-      detail = `${formatLapDelta(rawExcessLaps)} laps spare in a clean race (${greenFlagPairCount} green pairs)`;
-    } else {
-      detail = `${formatLapDelta(rawExcessLaps)} laps short in a clean race (${greenFlagPairCount} green pairs)`;
-    }
-    insights.push({
-      type: "fuel",
-      label: "Recommended Fuel",
-      value: `${formatLapDelta(recommended)} laps`,
-      detail,
-    });
-  } else {
-    insights.push({
-      type: "fuel",
-      label: "Recommended Fuel",
-      value: "—",
-      detail: `need 5+ green-flag lap pairs, got ${greenFlagPairCount}`,
-    });
-  }
-
-  return insights;
+    label: "Fuel Margin",
+    value: hasFuelMargin ? `${formatLapDelta(fuelMarginLaps!)} laps` : "—",
+    detail: hasFuelMargin
+      ? isFinished
+        ? "game estimate at finish"
+        : `game projection from lap ${lastLapNumber}/${totalRaceLaps}`
+      : isFinished
+        ? "finish estimate unavailable"
+        : `projection unavailable from lap ${lastLapNumber}/${totalRaceLaps}`,
+    extraDetails,
+  };
 }
