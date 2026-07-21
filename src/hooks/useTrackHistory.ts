@@ -18,6 +18,8 @@ import {
   getFormulaComparisonKey,
   isTimeTrialSessionType,
 } from "../utils/sessionTypes";
+import type { SessionSummary } from "../types/telemetry";
+import { toTrackSlug } from "../utils/tracks";
 
 export interface TrackPBs {
   /** All-time best qualifying-style lap time (ms) on this track. */
@@ -51,19 +53,25 @@ export function useTrackHistory(
   formula: string | undefined,
   gameYear: number | undefined,
   raceDistanceLaps?: number,
-): { pbs: TrackPBs | null; loading: boolean } {
+): {
+  pbs: TrackPBs | null;
+  loading: boolean;
+  historySessions: SessionSummary[];
+} {
   const { sessions } = useSessionList();
   const { getSession } = useTelemetry();
   const [pbs, setPbs] = useState<TrackPBs | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const trackSessions = sessions.filter(
+  const trackSlug = trackName ? toTrackSlug(trackName) : "";
+  const historySessions = sessions.filter(
     (s) =>
-      s.track === trackName &&
-      s.slug !== currentSlug &&
+      trackSlug !== "" &&
+      toTrackSlug(s.track) === trackSlug &&
       getFormulaComparisonKey(s.formula, s.gameYear) ===
         getFormulaComparisonKey(formula, gameYear),
   );
+  const trackSessions = historySessions.filter((s) => s.slug !== currentSlug);
   const trackSessionKey = trackSessions.map((s) => s.slug).join("|");
 
   useEffect(() => {
@@ -230,5 +238,5 @@ export function useTrackHistory(
     getSession,
   ]);
 
-  return { pbs, loading };
+  return { pbs, loading, historySessions };
 }

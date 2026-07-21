@@ -12,6 +12,7 @@ import { SectorComparison } from "../components/SectorComparison";
 import { SectorVsBest } from "../components/SectorVsBest";
 import { SessionHeader } from "../components/SessionHeader";
 import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
+import { TrackSessionHistory } from "../components/track/TrackSessionHistory";
 import { useSessionList } from "../hooks/useSessionList";
 import { useTrackHistory } from "../hooks/useTrackHistory";
 import type { TelemetrySession } from "../types/telemetry";
@@ -23,6 +24,7 @@ import {
   generateTimeTrialTrackPbInsight,
 } from "../utils/stats/historyInsights";
 import { generateQualiInsights } from "../utils/stats/qualifyingInsights";
+import { trackTabForSessionType } from "../utils/routes";
 
 export function QualifyingSessionView({
   session,
@@ -59,7 +61,7 @@ export function QualifyingSessionView({
     [allSessions, slug],
   );
   const trackName = sessionMeta?.track ?? session["session-info"]["track-id"];
-  const { pbs } = useTrackHistory(
+  const { pbs, historySessions } = useTrackHistory(
     trackName,
     slug,
     session["session-info"].formula,
@@ -146,6 +148,14 @@ export function QualifyingSessionView({
           <CarSetupCard setup={focusedDriver["car-setup"]} />
         </Card>
       )}
+
+      <TrackSessionHistory
+        key={slug}
+        summarySessions={historySessions}
+        activeKind={trackTabForSessionType(
+          session["session-info"]["session-type"],
+        )}
+      />
 
       <DuplicateNotice
         count={sessionMeta?.duplicateCount ?? 0}

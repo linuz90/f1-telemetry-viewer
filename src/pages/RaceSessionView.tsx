@@ -26,6 +26,7 @@ import { StintComparisonTable } from "../components/StintComparisonTable";
 import { StintDetailCards, StintTimeline } from "../components/StintTimeline";
 import { StartReactionCard } from "../components/StartReactionCard";
 import { TyreWearChart } from "../components/TyreWearChart";
+import { TrackSessionHistory } from "../components/track/TrackSessionHistory";
 import { Badge } from "../components/ui/Badge";
 import {
   PillSelect,
@@ -47,6 +48,7 @@ import { generateRaceHistoryInsights } from "../utils/stats/historyInsights";
 import { calculateCumulativeDeltas } from "../utils/stats/laps";
 import { generateInsights } from "../utils/stats/raceInsights";
 import { getCompletedStints, getDriverStints } from "../utils/stats/tyres";
+import { trackTabForSessionType } from "../utils/routes";
 
 function timedRaceDrivers(drivers: DriverData[]): DriverData[] {
   return [...drivers]
@@ -172,7 +174,7 @@ export function RaceSessionView({
     [allSessions, slug],
   );
   const trackName = sessionMeta?.track ?? info["track-id"];
-  const { pbs } = useTrackHistory(
+  const { pbs, historySessions } = useTrackHistory(
     trackName,
     slug,
     info.formula,
@@ -482,6 +484,12 @@ export function RaceSessionView({
             </Card>
           </div>
         )}
+
+        <TrackSessionHistory
+          key={slug}
+          summarySessions={historySessions}
+          activeKind={trackTabForSessionType(info["session-type"])}
+        />
 
         <DuplicateNotice
           count={sessionMeta?.duplicateCount ?? 0}

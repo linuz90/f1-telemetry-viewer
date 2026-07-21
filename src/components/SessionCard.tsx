@@ -1,8 +1,9 @@
 import { Eye } from "lucide-react";
 import { cn } from "../utils/cn";
-import { SESSION_MODE_META } from "./sessionModeMeta";
+import { getTrackDisplayName } from "../utils/tracks";
 import { TrackFlag } from "./TrackFlag";
 import { getSessionTypeMeta } from "./sessionTypeMeta";
+import { SessionModeLabel } from "./SessionModeLabel";
 import { HStack } from "./ui/Stack";
 
 interface SessionCardProps {
@@ -39,8 +40,7 @@ export function SessionCard({
 }: SessionCardProps) {
   const typeMeta = getSessionTypeMeta(sessionType);
   const TypeIcon = typeMeta.icon;
-  const AiIcon = SESSION_MODE_META.ai.icon;
-  const OnlineIcon = SESSION_MODE_META.online.icon;
+  const trackName = getTrackDisplayName(track);
 
   return (
     <div className="min-w-0">
@@ -50,7 +50,7 @@ export function SessionCard({
           className="min-w-0 gap-1.5 truncate text-sm font-medium"
         >
           <TrackFlag track={track} />
-          <span className="truncate">{track}</span>
+          <span className="truncate">{trackName}</span>
         </HStack>
         <HStack className="shrink-0 gap-1.5">
           <HStack
@@ -68,29 +68,8 @@ export function SessionCard({
       <HStack justify="between" className="mt-0.5 gap-1">
         <HStack className="shrink-0 gap-1">
           <span className="text-xs text-zinc-500">{time}</span>
-          {!hideMode && aiDifficulty != null && aiDifficulty > 0 && (
-            <HStack
-              as="span"
-              className={cn(
-                "gap-0.5 text-2xs font-medium",
-                SESSION_MODE_META.ai.color,
-              )}
-            >
-              <AiIcon className="size-3" />
-              AI {aiDifficulty}
-            </HStack>
-          )}
-          {!hideMode && isOnline === true && (
-            <HStack
-              as="span"
-              className={cn(
-                "gap-0.5 text-2xs font-medium",
-                SESSION_MODE_META.online.color,
-              )}
-            >
-              <OnlineIcon className="size-3" />
-              Online
-            </HStack>
+          {!hideMode && (
+            <SessionModeLabel isOnline={isOnline} aiDifficulty={aiDifficulty} />
           )}
         </HStack>
         <HStack className="min-w-0 flex-1 justify-end gap-1">

@@ -1,34 +1,29 @@
 import { CalendarDays, Route } from "lucide-react";
 import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
 import { SESSION_LIST_TAB_STORAGE_KEY } from "../constants/storage";
 import { useTelemetry } from "../context/TelemetryContext";
-import { useSessionList } from "../hooks/useSessionList";
-import type { SessionSummary } from "../types/telemetry";
-import {
-  formatRelativeDate,
-  formatSessionType,
-  formatTime,
-} from "../utils/format";
-import { sortTracksByCalendar } from "../utils/tracks";
-import {
-  isQualifyingSessionType,
-  isTimeTrialSessionType,
-} from "../utils/sessionTypes";
-import { getSessionFormulaScopeKey } from "../utils/formulaScope";
-import { sessionSummaryPath, trackPath } from "../utils/routes";
-import { readStoredString, writeStoredString } from "../utils/storage";
 import {
   areSessionFiltersDefault,
   DEFAULT_FILTERS,
   matchesSessionFilters,
   useSessionFilters,
 } from "../hooks/useSessionFilters";
+import { useSessionList } from "../hooks/useSessionList";
+import type { SessionSummary } from "../types/telemetry";
 import { cn } from "../utils/cn";
-import { TrackFlag } from "./TrackFlag";
-import { SessionCard } from "./SessionCard";
+import { formatRelativeDate, msToLapTime } from "../utils/format";
+import { getSessionFormulaScopeKey } from "../utils/formulaScope";
+import {
+  isQualifyingSessionType,
+  isTimeTrialSessionType,
+} from "../utils/sessionTypes";
+import { readStoredString, writeStoredString } from "../utils/storage";
+import { getTrackId, sortTracksByCalendar } from "../utils/tracks";
 import { SessionListActiveFilters } from "./SessionListActiveFilters";
 import { SessionListFilterMenu } from "./SessionListFilterMenu";
+import { SessionListItem } from "./SessionListItem";
+import { resolveSessionMode } from "./sessionModeMeta";
+import { TrackListItem, type TrackListBestLapKind } from "./TrackListItem";
 import { HStack } from "./ui/Stack";
 import { Tabs } from "./ui/Tabs";
 
@@ -40,7 +35,9 @@ const SIDEBAR_TABS = [
 // Only Quali and Time Trial rows display a best-lap pill in the sidebar; the
 // helper lets us bucket those two kinds into separate per-track bests so a
 // fast Quali lap doesn't steal the purple highlight from the user's best TT.
-function sessionBestLapKind(sessionType: string): "quali" | "tt" | undefined {
+function sessionBestLapKind(
+  sessionType: string,
+): TrackListBestLapKind | undefined {
   if (isTimeTrialSessionType(sessionType)) return "tt";
   if (isQualifyingSessionType(sessionType)) return "quali";
   return undefined;
@@ -59,10 +56,7 @@ function groupByDate(sessions: SessionSummary[]) {
 
 /** Per-row mode label — null when the session has no applicable mode (e.g. offline Time Trial). */
 function sessionModeLabel(s: SessionSummary): string | null {
-  if (s.isOnline === true) return "Online";
-  if (s.aiDifficulty != null && s.aiDifficulty > 0)
-    return `AI ${s.aiDifficulty}`;
-  return null;
+  return resolveSessionMode(s.isOnline, s.aiDifficulty)?.label ?? null;
 }
 
 /**
@@ -88,6 +82,57 @@ function representativeFormulaKey(
   sessions: SessionSummary[],
 ): string | undefined {
   return sessions[0] ? getSessionFormulaScopeKey(sessions[0]) : undefined;
+}
+
+function isSessionTrackBest(
+  session: SessionSummary,
+  bestTimeByTrack: Readonly<Record<string, number>>,
+): boolean {
+  if (!session.bestLapTimeMs) return false;
+  const kind = sessionBestLapKind(session.sessionType);
+  if (!kind) return false;
+  const key = `${getTrackId(session.track)}::${getSessionFormulaScopeKey(session)}::${kind}`;
+  return session.bestLapTimeMs === bestTimeByTrack[key];
+}
+
+interface TrackListBestLap {
+  time: string;
+  kind: TrackListBestLapKind;
+  sessionCount: number;
+}
+
+function getTrackListBestLap(
+  sessions: readonly SessionSummary[],
+  formulaKey: string | undefined,
+): TrackListBestLap | null {
+  const counts: Record<TrackListBestLapKind, number> = { quali: 0, tt: 0 };
+  let best:
+    | { session: SessionSummary; kind: TrackListBestLapKind; timeMs: number }
+    | undefined;
+
+  for (const session of sessions) {
+    const kind = sessionBestLapKind(session.sessionType);
+    const timeMs = session.bestLapTimeMs;
+    if (
+      getSessionFormulaScopeKey(session) !== formulaKey ||
+      session.isSpectator === true ||
+      !kind ||
+      timeMs == null ||
+      timeMs <= 0
+    ) {
+      continue;
+    }
+
+    counts[kind] += 1;
+    if (!best || timeMs < best.timeMs) best = { session, kind, timeMs };
+  }
+
+  if (!best) return null;
+  return {
+    time: best.session.bestLapTime ?? msToLapTime(best.timeMs),
+    kind: best.kind,
+    sessionCount: counts[best.kind],
+  };
 }
 
 export function SessionList() {
@@ -140,9 +185,8 @@ export function SessionList() {
 
   // Formula scope is app-wide, then the sidebar filters narrow that same set so
   // the matching/total count can make a persisted filter's impact explicit.
-  // Synthetic (demo-only) entries DO appear here so the sidebar reads like a real session list;
-  // clicking one lands on the SessionPage's friendly "Demo session — upload to explore detail"
-  // placeholder rather than a 404.
+  // Synthetic demo entries still populate the sidebar, but their extracted row
+  // components keep them static because no detail JSON exists to navigate to.
   const scopedSessions = activeFormulaKey
     ? sessions.filter((s) => getSessionFormulaScopeKey(s) === activeFormulaKey)
     : sessions;
@@ -159,23 +203,30 @@ export function SessionList() {
   );
 
   const grouped = groupByDate(pagedSessions);
+  const trackSessionsById = new Map<string, SessionSummary[]>();
+  for (const session of filteredSessions) {
+    const trackId = getTrackId(session.track);
+    const trackSessions = trackSessionsById.get(trackId) ?? [];
+    trackSessions.push(session);
+    trackSessionsById.set(trackId, trackSessions);
+  }
   const tracks = sortTracksByCalendar(
-    [...new Set(filteredSessions.map((s) => s.track))],
+    [...trackSessionsById.keys()],
     activeFormulaKey,
   );
 
   // Best lap time per track, split by session-type group. Time Trial is its
   // own leaderboard in-game, so the user expects the fastest TT lap at a
   // track to be highlighted even when a Short Quali ran faster — and vice
-  // versa. Keyed by `${track}::${scope}::${kind}` where kind is "tt" or
-  // "quali"; race sessions don't show a best lap in the sidebar row.
+  // versa. Canonical track ids keep exporter aliases in the same PB bucket;
+  // race sessions don't show a best lap in the sidebar row.
   const bestTimeByTrack: Record<string, number> = {};
   for (const s of filteredSessions) {
     if (s.isSpectator) continue;
     if (!s.bestLapTimeMs || s.bestLapTimeMs <= 0) continue;
     const kind = sessionBestLapKind(s.sessionType);
     if (!kind) continue;
-    const key = `${s.track}::${getSessionFormulaScopeKey(s)}::${kind}`;
+    const key = `${getTrackId(s.track)}::${getSessionFormulaScopeKey(s)}::${kind}`;
     const prev = bestTimeByTrack[key];
     if (!prev || s.bestLapTimeMs < prev) {
       bestTimeByTrack[key] = s.bestLapTimeMs;
@@ -270,135 +321,45 @@ export function SessionList() {
                   )}
                 </h3>
                 <div className="space-y-0.5">
-                  {dateSessions.map((s) => {
-                    const card = (
-                      <SessionCard
-                        sessionType={formatSessionType(
-                          s.sessionType,
-                          s.formula,
-                        )}
-                        track={s.track}
-                        time={formatTime(s.date)}
-                        lapIndicators={s.lapIndicators}
-                        bestLapTime={s.bestLapTime}
-                        isTrackBest={(() => {
-                          if (!s.bestLapTimeMs) return false;
-                          const kind = sessionBestLapKind(s.sessionType);
-                          if (!kind) return false;
-                          return (
-                            s.bestLapTimeMs ===
-                            bestTimeByTrack[
-                              `${s.track}::${getSessionFormulaScopeKey(s)}::${kind}`
-                            ]
-                          );
-                        })()}
-                        aiDifficulty={s.aiDifficulty}
-                        isOnline={s.isOnline}
-                        isSpectator={s.isSpectator}
-                        hideMode={
-                          modeLabel != null && sessionModeLabel(s) === modeLabel
-                        }
-                      />
-                    );
-                    // Synthetic (demo) entries have no detail JSON, so they
-                    // render as static rows — visible to populate the sidebar
-                    // but not clickable. Real sessions stay as NavLinks.
-                    if (s.isSynthetic) {
-                      return (
-                        <div
-                          key={s.relativePath}
-                          title="Demo data — upload your telemetry to explore detail"
-                          className="block rounded-xl px-2 py-2 text-zinc-400"
-                        >
-                          {card}
-                        </div>
-                      );
-                    }
-                    return (
-                      <NavLink
-                        key={s.relativePath}
-                        to={sessionSummaryPath(s)}
-                        className={({ isActive }) =>
-                          cn(
-                            "block rounded-xl px-2 py-2 transition-colors",
-                            isActive
-                              ? "bg-zinc-800/70 text-white"
-                              : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200",
-                          )
-                        }
-                      >
-                        {card}
-                      </NavLink>
-                    );
-                  })}
+                  {dateSessions.map((session) => (
+                    <SessionListItem
+                      key={session.relativePath}
+                      session={session}
+                      isTrackBest={isSessionTrackBest(session, bestTimeByTrack)}
+                      hideMode={
+                        modeLabel != null &&
+                        sessionModeLabel(session) === modeLabel
+                      }
+                    />
+                  ))}
                 </div>
               </div>
             );
           })}
 
         {tab === "tracks" &&
-          tracks.map((track) => {
-            const trackSessions = filteredSessions.filter(
-              (s) => s.track === track,
-            );
+          tracks.map((trackId) => {
+            const trackSessions = trackSessionsById.get(trackId) ?? [];
+            const track = trackSessions[0]?.track ?? trackId;
             const count = trackSessions.length;
             const formulaKey =
               activeFormulaKey ?? representativeFormulaKey(trackSessions);
-            const bestTime = trackSessions
-              .filter(
-                (s) =>
-                  getSessionFormulaScopeKey(s) === formulaKey &&
-                  s.isSpectator !== true &&
-                  s.bestLapTimeMs,
-              )
-              .sort(
-                (a, b) =>
-                  (a.bestLapTimeMs ?? Infinity) - (b.bestLapTimeMs ?? Infinity),
-              )[0]?.bestLapTime;
+            const bestLap = getTrackListBestLap(trackSessions, formulaKey);
             // A track whose every session is synthetic has no usable detail
             // page (the TrackPage filters those out, so navigation lands on
             // "No sessions found"). Render as a dim, non-interactive row.
             const isSyntheticOnly = trackSessions.every((s) => s.isSynthetic);
-            const trackContent = (
-              <>
-                <TrackFlag track={track} />
-                <span className="flex-1 truncate font-medium">{track}</span>
-                {bestTime && (
-                  <span className="text-xs font-mono text-best">
-                    {bestTime}
-                  </span>
-                )}
-                <span className="text-xs text-zinc-500 tabular-nums w-5 text-right">
-                  {count}
-                </span>
-              </>
-            );
-            if (isSyntheticOnly) {
-              return (
-                <HStack
-                  key={track}
-                  title="Demo data — upload your telemetry to explore this track"
-                  className="rounded-xl px-2 py-1.5 text-sm text-zinc-400"
-                >
-                  {trackContent}
-                </HStack>
-              );
-            }
             return (
-              <NavLink
-                key={track}
-                to={formulaKey ? trackPath(formulaKey, track) : "#"}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors",
-                    isActive
-                      ? "bg-zinc-800/70 text-white"
-                      : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200",
-                  )
-                }
-              >
-                {trackContent}
-              </NavLink>
+              <TrackListItem
+                key={trackId}
+                track={track}
+                formulaKey={formulaKey}
+                totalSessionCount={count}
+                bestLapTime={bestLap?.time}
+                bestLapKind={bestLap?.kind}
+                bestLapSessionCount={bestLap?.sessionCount}
+                isSyntheticOnly={isSyntheticOnly}
+              />
             );
           })}
       </div>

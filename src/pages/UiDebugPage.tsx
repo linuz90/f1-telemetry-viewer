@@ -670,14 +670,16 @@ export function UiDebugPage() {
           <div>
             <DebugComponentLabel>TrackFlag.tsx</DebugComponentLabel>
             <HStack align="end" wrap className="gap-6">
-              {(["tiny", "small", "medium", "large"] as const).map((size) => (
-                <HStack key={size} className="gap-2">
-                  <TrackFlag track="monza" size={size} />
-                  <DebugVariantLabel className="w-auto">
-                    {size}
-                  </DebugVariantLabel>
-                </HStack>
-              ))}
+              {(["tiny", "smaller", "small", "medium", "large"] as const).map(
+                (size) => (
+                  <HStack key={size} className="gap-2">
+                    <TrackFlag track="Monza" size={size} />
+                    <DebugVariantLabel className="w-auto">
+                      {size}
+                    </DebugVariantLabel>
+                  </HStack>
+                ),
+              )}
             </HStack>
           </div>
           <div>

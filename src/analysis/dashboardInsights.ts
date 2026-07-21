@@ -1,6 +1,7 @@
 import type { SessionSummary } from "../types/telemetry";
 import { getSessionFormulaScopeKey } from "../utils/formulaScope";
 import { isRaceSessionType } from "../utils/sessionTypes";
+import { getTrackDisplayName, getTrackId, isSameTrack } from "../utils/tracks";
 import type {
   DashboardResultStats,
   ResultDataMode,
@@ -85,7 +86,9 @@ function buildBestTrackInsight(
   cleanFinishSessions: SessionSummary[],
   scope: InsightScope,
 ): TrackInsight {
-  const sessions = cleanFinishSessions.filter((s) => s.track === result.track);
+  const sessions = cleanFinishSessions.filter((s) =>
+    isSameTrack(s.track, result.track),
+  );
   return {
     kind: "best-track",
     track: result.track,
@@ -102,7 +105,9 @@ function buildToughestTrackInsight(
   cleanFinishSessions: SessionSummary[],
   scope: InsightScope,
 ): TrackInsight {
-  const sessions = cleanFinishSessions.filter((s) => s.track === result.track);
+  const sessions = cleanFinishSessions.filter((s) =>
+    isSameTrack(s.track, result.track),
+  );
   return {
     kind: "toughest-track",
     track: result.track,
@@ -123,13 +128,13 @@ function buildQualifierInsights(
       s.playerRaceResult?.gridPosition != null &&
       s.playerRaceResult.gridPosition > 0,
   );
-  const byTrack = groupBy(withGrid, (s) => s.track);
+  const byTrack = groupBy(withGrid, (s) => getTrackId(s.track));
   const candidates = [...byTrack.entries()]
     .filter(([, sessions]) => sessions.length >= 2)
-    .map(([track, sessions]) => {
+    .map(([, sessions]) => {
       const grids = sessions.map((s) => s.playerRaceResult!.gridPosition!);
       return {
-        track,
+        track: sessions[0]!.track,
         sessions,
         avg: grids.reduce((a, b) => a + b, 0) / grids.length,
         best: Math.min(...grids),
@@ -173,15 +178,15 @@ function buildRaceCraftInsight(
       s.playerRaceResult.gridPosition > 0 &&
       s.playerRaceResult?.position != null,
   );
-  const byTrack = groupBy(withGain, (s) => s.track);
+  const byTrack = groupBy(withGain, (s) => getTrackId(s.track));
   const candidates = [...byTrack.entries()]
     .filter(([, sessions]) => sessions.length >= 2)
-    .map(([track, sessions]) => {
+    .map(([, sessions]) => {
       const gains = sessions.map(
         (s) => s.playerRaceResult!.gridPosition! - s.playerRaceResult!.position,
       );
       return {
-        track,
+        track: sessions[0]!.track,
         sessions,
         avgGain: gains.reduce((a, b) => a + b, 0) / gains.length,
       };
@@ -204,10 +209,10 @@ function buildMostImprovedInsight(
   cleanFinishSessions: SessionSummary[],
   scope: InsightScope,
 ): TrackInsight | undefined {
-  const byTrack = groupBy(cleanFinishSessions, (s) => s.track);
+  const byTrack = groupBy(cleanFinishSessions, (s) => getTrackId(s.track));
   const candidates = [...byTrack.entries()]
     .filter(([, sessions]) => sessions.length >= 4)
-    .map(([track, sessions]) => {
+    .map(([, sessions]) => {
       const sorted = [...sessions].sort(
         (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
       );
@@ -221,7 +226,7 @@ function buildMostImprovedInsight(
       const oldAvg = olderPos.reduce((a, b) => a + b, 0) / olderPos.length;
       const newAvg = newerPos.reduce((a, b) => a + b, 0) / newerPos.length;
       return {
-        track,
+        track: sessions[0]!.track,
         sessions: sorted,
         oldAvg,
         newAvg,
@@ -253,7 +258,7 @@ function buildMostConsistentInsight(
   );
   const byKey = groupBy(
     qualiSessions,
-    (s) => `${s.track}::${getSessionFormulaScopeKey(s)}`,
+    (s) => `${getTrackId(s.track)}::${getSessionFormulaScopeKey(s)}`,
   );
   const candidates = [...byKey.entries()]
     .filter(([, sessions]) => sessions.length >= 3)
@@ -358,14 +363,19 @@ function buildPodiumSpecialistInsight(
   cleanFinishSessions: SessionSummary[],
   scope: InsightScope,
 ): TrackInsight | undefined {
-  const byTrack = groupBy(cleanFinishSessions, (s) => s.track);
+  const byTrack = groupBy(cleanFinishSessions, (s) => getTrackId(s.track));
   const candidates = [...byTrack.entries()]
     .filter(([, sessions]) => sessions.length >= 2)
-    .map(([track, sessions]) => {
+    .map(([, sessions]) => {
       const podiums = sessions.filter(
         (s) => (s.playerRaceResult?.position ?? 99) <= 3,
       ).length;
-      return { track, sessions, podiums, rate: podiums / sessions.length };
+      return {
+        track: sessions[0]!.track,
+        sessions,
+        podiums,
+        rate: podiums / sessions.length,
+      };
     })
     .filter((c) => c.podiums >= 2);
   if (candidates.length === 0) return undefined;
@@ -391,13 +401,13 @@ function buildPenaltyMagnetInsight(
   const withPenalty = resultSessions.filter(
     (s) => s.playerRaceResult?.penaltyCount != null,
   );
-  const byTrack = groupBy(withPenalty, (s) => s.track);
+  const byTrack = groupBy(withPenalty, (s) => getTrackId(s.track));
   const candidates = [...byTrack.entries()]
     .filter(([, sessions]) => sessions.length >= 2)
-    .map(([track, sessions]) => {
+    .map(([, sessions]) => {
       const counts = sessions.map((s) => s.playerRaceResult!.penaltyCount ?? 0);
       const avg = counts.reduce((a, b) => a + b, 0) / counts.length;
-      return { track, sessions, avg };
+      return { track: sessions[0]!.track, sessions, avg };
     })
     // 1 penalty/race is normal racing — only flag when the user is meaningfully
     // accumulating penalties at a track (≥2 avg).
@@ -452,12 +462,16 @@ function buildRaceConsistencyInsight(
   cleanFinishSessions: SessionSummary[],
   scope: InsightScope,
 ): TrackInsight | undefined {
-  const byTrack = groupBy(cleanFinishSessions, (s) => s.track);
+  const byTrack = groupBy(cleanFinishSessions, (s) => getTrackId(s.track));
   const candidates = [...byTrack.entries()]
     .filter(([, sessions]) => sessions.length >= 3)
-    .map(([track, sessions]) => {
+    .map(([, sessions]) => {
       const positions = sessions.map((s) => s.playerRaceResult!.position);
-      return { track, sessions, std: stddev(positions) };
+      return {
+        track: sessions[0]!.track,
+        sessions,
+        std: stddev(positions),
+      };
     });
   if (candidates.length < 2) return undefined;
   const winner = candidates.sort((a, b) => a.std - b.std)[0]!;
@@ -491,7 +505,7 @@ function buildFastestLapKingInsight(
     formulaKey: getSessionFormulaScopeKey(mostRecent),
     scope,
     headline: `${flSessions.length}`,
-    detail: `races with fastest lap · last at ${mostRecent.track}`,
+    detail: `races with fastest lap · last at ${getTrackDisplayName(mostRecent.track)}`,
     sessionSlug: mostRecent.slug,
     sampleSize: flSessions.length,
   };
@@ -723,7 +737,7 @@ export function buildTrackInsights(
   if (stats.trackResults.length >= 2) {
     const best = stats.trackResults[0]!;
     const worst = stats.trackResults.at(-1)!;
-    if (best.track !== worst.track) {
+    if (!isSameTrack(best.track, worst.track)) {
       insights.push(
         buildBestTrackInsight(best, stats.cleanFinishSessions, raceScope),
       );

@@ -9,6 +9,7 @@ import {
   shouldShowFormulaLabel,
 } from "../utils/sessionTypes";
 import { trackPath, trackTabForSessionType } from "../utils/routes";
+import { getTrackDisplayName } from "../utils/tracks";
 import { TrackFlag } from "./TrackFlag";
 import { TrackLayout } from "./TrackLayout";
 import { SessionDriverSelect } from "./SessionDriverSelect";
@@ -54,6 +55,7 @@ export function SessionHeader({
     session["game-year"],
   );
   const trackTab = trackTabForSessionType(info["session-type"]);
+  const trackName = getTrackDisplayName(info["track-id"]);
 
   return (
     <HStack align="start" className="gap-4">
@@ -66,7 +68,7 @@ export function SessionHeader({
               className="hover:text-best transition-colors"
             >
               <TrackFlag track={info["track-id"]} className="mr-1" />{" "}
-              {info["track-id"]}
+              {trackName}
             </Link>
           </h2>
           <HStack as="span" className="gap-1 text-sm text-zinc-400">

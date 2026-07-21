@@ -5,6 +5,7 @@ import {
   isRaceSessionType,
   isTimeTrialSessionType,
 } from "../utils/sessionTypes";
+import { getTrackId, isSameTrack } from "../utils/tracks";
 
 /**
  * Recent-activity grouping for the dashboard.
@@ -63,7 +64,7 @@ function isSameActivityGroup(
   session: SessionSummary,
 ): boolean {
   return (
-    group.track === session.track &&
+    isSameTrack(group.track, session.track) &&
     group.kind === getDashboardActivityKind(session) &&
     group.modeKey === getActivityModeKey(session) &&
     group.dayKey === getActivityDayKey(session)
@@ -154,7 +155,7 @@ export function buildDashboardActivity(
     }
 
     groups.push({
-      track: session.track,
+      track: getTrackId(session.track),
       kind: getDashboardActivityKind(session),
       modeKey: getActivityModeKey(session),
       dayKey: getActivityDayKey(session),

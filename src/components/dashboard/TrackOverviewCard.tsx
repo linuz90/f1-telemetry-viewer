@@ -5,7 +5,9 @@ import { cn } from "../../utils/cn";
 import { formatShortDate } from "../../utils/format";
 import { cardClass } from "../Card";
 import { TrackFlag } from "../TrackFlag";
+import { getTrackDisplayName } from "../../utils/tracks";
 import { TrackLayout } from "../TrackLayout";
+import { resolveSessionMode } from "../sessionModeMeta";
 import {
   isProblemStatus,
   podiumIcon,
@@ -20,11 +22,10 @@ import {
 } from "./helpers";
 
 function modeLabel(session: SessionSummary): string {
-  if (session.isOnline) return "Online";
-  if (session.aiDifficulty != null && session.aiDifficulty > 0) {
-    return `AI ${session.aiDifficulty}`;
-  }
-  return "Offline";
+  return (
+    resolveSessionMode(session.isOnline, session.aiDifficulty, true)?.label ??
+    "Offline"
+  );
 }
 
 function MetricShell({
@@ -125,6 +126,7 @@ export function TrackOverviewCard({
   activeFormulaKey: string | undefined;
   records: TrackRecords;
 }) {
+  const trackName = getTrackDisplayName(track);
   const lastDriven = sessions
     .map((session) => new Date(session.date).getTime())
     .sort((a, b) => b - a)[0];
@@ -142,7 +144,7 @@ export function TrackOverviewCard({
       <div className="relative pr-20">
         <div className="flex min-w-0 items-center gap-1.5 text-base font-semibold">
           <TrackFlag track={track} />
-          <span className="truncate">{track}</span>
+          <span className="truncate">{trackName}</span>
         </div>
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs tabular-nums text-zinc-400">
           <span>

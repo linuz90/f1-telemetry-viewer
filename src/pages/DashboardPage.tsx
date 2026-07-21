@@ -28,10 +28,11 @@ import {
   useSessionFilters,
 } from "../hooks/useSessionFilters";
 import { useSessionList } from "../hooks/useSessionList";
+import type { SessionSummary } from "../types/telemetry";
 import { cn } from "../utils/cn";
 import { getSessionFormulaScopeKey } from "../utils/formulaScope";
 import { formatRelativeDate } from "../utils/format";
-import { sortTracksByCalendar } from "../utils/tracks";
+import { getTrackId, sortTracksByCalendar } from "../utils/tracks";
 import { isRaceSessionType } from "../utils/sessionTypes";
 
 const RECENT_ACTIVITY_COLLAPSED = 3;
@@ -103,10 +104,17 @@ export function DashboardPage() {
   const bestResultPosition =
     resultPositions.length > 0 ? Math.min(...resultPositions) : undefined;
   const tracksWithResults = new Set(
-    dashboardStats.resultSessions.map((session) => session.track),
+    dashboardStats.resultSessions.map((session) => getTrackId(session.track)),
   ).size;
+  const scopedSessionsByTrack = new Map<string, SessionSummary[]>();
+  for (const session of scopedSessions) {
+    const trackId = getTrackId(session.track);
+    const trackSessions = scopedSessionsByTrack.get(trackId) ?? [];
+    trackSessions.push(session);
+    scopedSessionsByTrack.set(trackId, trackSessions);
+  }
   const uniqueTracks = sortTracksByCalendar(
-    [...new Set(scopedSessions.map((session) => session.track))],
+    [...scopedSessionsByTrack.keys()],
     activeFormulaKey,
   );
   const hasScopedData = scopedSessions.length > 0;
@@ -276,13 +284,13 @@ export function DashboardPage() {
             <section>
               <SectionHeader title="Tracks" />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {uniqueTracks.map((track) => {
-                  const trackSessions = scopedSessions.filter(
-                    (session) => session.track === track,
-                  );
+                {uniqueTracks.map((trackId) => {
+                  const trackSessions =
+                    scopedSessionsByTrack.get(trackId) ?? [];
+                  const track = trackSessions[0]?.track ?? trackId;
                   return (
                     <TrackOverviewCard
-                      key={track}
+                      key={trackId}
                       track={track}
                       sessions={trackSessions}
                       activeFormulaKey={activeFormulaKey}

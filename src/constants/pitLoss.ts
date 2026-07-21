@@ -1,3 +1,5 @@
+import { getTrackId } from "../utils/tracks";
+
 /**
  * F1 pit-loss defaults adapted from Pits n' Giggles:
  * /lib/config/schema/pit_time_loss_f1.py
@@ -37,37 +39,20 @@ const F1_PIT_LOSS_DEFAULT_SECONDS: Record<string, number> = {
 };
 
 const F1_PIT_LOSS_ALIASES: Record<string, string> = {
-  australia: "melbourne",
-  bahrain: "sakhir",
-  saudiarabia: "jeddah",
-  japan: "suzuka",
-  china: "shanghai",
-  spain: "catalunya",
-  barcelona: "catalunya",
-  canada: "montreal",
   spielberg: "austria",
-  hungary: "hungaroring",
-  budapest: "hungaroring",
-  belgium: "spa",
-  netherlands: "zandvoort",
-  italy: "monza",
-  azerbaijan: "baku",
-  marina: "singapore",
+  spielbergreverse: "austriareverse",
   marinabay: "singapore",
   austin: "texas",
-  cota: "texas",
-  saopaulo: "brazil",
-  vegas: "lasvegas",
-  qatar: "losail",
+  mexicocity: "mexico",
+  interlagos: "brazil",
   lusail: "losail",
   yasmarina: "abudhabi",
 };
 
 function normalizePitLossTrackKey(trackId: string): string {
-  const compact = trackId
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
+  // Resolve the exporter vocabulary first so every alias registered for the
+  // circuit inherits the same Pits n' Giggles fallback.
+  const compact = getTrackId(trackId).replace(/[^a-z0-9]/g, "");
   return F1_PIT_LOSS_ALIASES[compact] ?? compact;
 }
 

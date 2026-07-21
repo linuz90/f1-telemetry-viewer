@@ -7,7 +7,12 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { ActionEmptyState } from "../components/ActionEmptyState";
 import {
   CartesianGrid,
@@ -22,16 +27,16 @@ import {
   YAxis,
   ZAxis,
 } from "recharts";
-import { accentCardClass, cardClass } from "../components/Card";
+import { cardClass } from "../components/Card";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { EventLocationPieChart } from "../components/EventLocationPieChart";
 import { RaceSetupComparison } from "../components/RaceSetupComparison";
-import { SessionRow } from "../components/SessionRow";
 import { getSessionTypeMeta } from "../components/sessionTypeMeta";
 import { PaceEvolutionChart } from "../components/track/PaceEvolutionChart";
 import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
 import { TrackQualifyingInsights } from "../components/track/TrackQualifyingInsights";
+import { TrackSessionHistory } from "../components/track/TrackSessionHistory";
 import { TrackStrategySection } from "../components/track/TrackStrategySection";
 import { TrackFlag } from "../components/TrackFlag";
 import { Badge } from "../components/ui/Badge";
@@ -56,20 +61,20 @@ import {
 } from "../analysis/trackAnalysis";
 import { buildTrackLocationBreakdowns } from "../analysis/eventLocationBreakdown";
 import { buildTrackRivalBenchmark } from "../analysis/rivalStats";
-import type { SessionSummary } from "../types/telemetry";
-import { cn } from "../utils/cn";
 import { CHART_THEME, SECTOR_COLORS, TOOLTIP_STYLE } from "../constants/colors";
 import { getSessionFormulaScopeKey } from "../utils/formulaScope";
 import {
   formatDate,
   formatSessionType,
-  formatTime,
-  getSessionIcon,
   msToLapTime,
   msToSectorTime,
 } from "../utils/format";
 import { getRaceControlEvents } from "../utils/raceControl";
-import { isTrackSlugMatch } from "../utils/tracks";
+import {
+  getTrackDisplayName,
+  getTrackId,
+  isTrackSlugMatch,
+} from "../utils/tracks";
 import {
   dashboardPath,
   isTrackSessionTab,
@@ -106,6 +111,7 @@ const TRACK_TAB_META_LABEL: Record<TrackSessionKind, string> = {
 
 export function TrackProgressPage() {
   const { trackId } = useParams<{ trackId: string }>();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { sessions } = useSessionList();
   const {
@@ -123,6 +129,29 @@ export function TrackProgressPage() {
     isTrackSessionTab(requestedTab) ? requestedTab : "race",
   );
   const requestedRaceLaps = searchParams.get("raceLaps");
+  const canonicalTrackId = trackId ? getTrackId(trackId) : "";
+  const search = searchParams.toString();
+
+  useEffect(() => {
+    if (
+      !activeFormulaKey ||
+      !trackId ||
+      !canonicalTrackId ||
+      trackId === canonicalTrackId
+    ) {
+      return;
+    }
+
+    // Old exporter-derived routes remain valid, then settle on the canonical
+    // circuit id so NavLink state and copied URLs stay consistent.
+    navigate(
+      {
+        pathname: trackPath(activeFormulaKey, canonicalTrackId),
+        search: search ? `?${search}` : "",
+      },
+      { replace: true },
+    );
+  }, [activeFormulaKey, canonicalTrackId, navigate, search, trackId]);
 
   useEffect(() => {
     if (isTrackSessionTab(requestedTab)) {
@@ -130,9 +159,9 @@ export function TrackProgressPage() {
     }
   }, [requestedTab]);
 
-  // Route slugs are stable hyphenated ids (`abu-dhabi`), while telemetry keeps
-  // display names (`Abu Dhabi`). Match through the shared slug helper so future
-  // route-model changes only need to update one normalization function.
+  // Route slugs are canonical circuit ids (`yas-marina`), while telemetry may
+  // use country, city, or circuit names. Match through the shared resolver so
+  // exporter vocabulary changes cannot split one circuit's history.
   const allTrackSessions = useMemo(
     () => sessions.filter((s) => isTrackSlugMatch(s.track, trackId)),
     [sessions, trackId],
@@ -152,9 +181,10 @@ export function TrackProgressPage() {
     .map((s) => s.slug)
     .join("|");
 
-  // Resolve the original (display) track name from session data
-  const displayTrackName =
+  // Keep the exporter value for metadata lookup; presentation uses the curated name.
+  const trackSourceName =
     allTrackSessions.length > 0 ? allTrackSessions[0].track : (trackId ?? "");
+  const displayTrackName = getTrackDisplayName(trackSourceName);
   const backToDashboardPath = dashboardPath(activeFormulaKey);
 
   useEffect(() => {
@@ -290,46 +320,6 @@ export function TrackProgressPage() {
   const spectatorHistory = [...spectatorTrackSessions].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
-  const renderSpectatorSessionRow = (summary: SessionSummary) => {
-    const metaParts = [
-      `${formatDate(summary.date)} · ${formatTime(summary.date)}`,
-      summary.weather,
-      summary.isOnline
-        ? "Online"
-        : summary.aiDifficulty
-          ? `AI ${summary.aiDifficulty}`
-          : undefined,
-      summary.classifiedDriverCount
-        ? `${summary.classifiedDriverCount} drivers`
-        : undefined,
-    ].filter(Boolean);
-    const trailingValue =
-      summary.bestLapTime ?? `${summary.validLapCount} laps`;
-
-    return (
-      <SessionRow
-        key={summary.relativePath}
-        to={summary.isSynthetic ? null : sessionSummaryPath(summary)}
-        leading={
-          <>
-            <span className="text-sm leading-none">
-              {getSessionIcon(summary.sessionType)}
-            </span>
-            <span className="truncate text-sm font-medium text-zinc-100">
-              {formatSessionType(summary.sessionType, summary.formula)}
-            </span>
-            <Badge tone="zinc">Spectator</Badge>
-          </>
-        }
-        meta={metaParts.join(" · ")}
-        trailing={
-          <div className="inline-flex h-9 items-center justify-center rounded-lg bg-zinc-900/70 px-2.5 font-mono text-sm font-bold tabular-nums text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
-            {trailingValue}
-          </div>
-        }
-      />
-    );
-  };
 
   if (loading) {
     return (
@@ -374,7 +364,7 @@ export function TrackProgressPage() {
         <div className="p-6 max-w-5xl mx-auto space-y-6">
           <div>
             <h2 className="text-xl font-bold mb-1">
-              <TrackFlag track={displayTrackName} className="mr-2" />
+              <TrackFlag track={trackSourceName} className="mr-2" />
               {displayTrackName}
             </h2>
             <p className="text-sm text-zinc-500">
@@ -398,14 +388,10 @@ export function TrackProgressPage() {
             </p>
           </section>
 
-          <div>
-            <div className="mb-3">
-              <SectionHeader title="Session History" />
-            </div>
-            <div className="space-y-1.5">
-              {spectatorHistory.map(renderSpectatorSessionRow)}
-            </div>
-          </div>
+          <TrackSessionHistory
+            activeKind={activeTab}
+            spectatorSessions={spectatorHistory}
+          />
         </div>
       );
     }
@@ -442,7 +428,7 @@ export function TrackProgressPage() {
                 {otherTrackScopes.map((option) => (
                   <Link
                     key={option.key}
-                    to={trackPath(option.key, displayTrackName)}
+                    to={trackPath(option.key, trackSourceName)}
                     className={buttonVariants({ variant: "secondary" })}
                   >
                     View {option.label} ({option.trackSessionCount})
@@ -478,7 +464,6 @@ export function TrackProgressPage() {
   const actualBestQualiMs = trackAnalysis.qualifying.bestLapMs;
   const latestQuali = trackAnalysis.qualifying.latest;
   const qualifyingInsights = trackAnalysis.qualifyingInsights;
-  const bestRaceLapMs = trackAnalysis.bestRaceLapMs;
   const bestQualiSession = trackAnalysis.qualifying.bestSession;
   const bestQualiSetup = trackAnalysis.qualifying.bestSetup;
   const theoreticalTimeTrialS1 = trackAnalysis.timeTrial.theoreticalS1;
@@ -512,7 +497,6 @@ export function TrackProgressPage() {
 
   const tooltipStyle = TOOLTIP_STYLE;
 
-  const sessionHistory = trackAnalysis.sessionHistory;
   const availableTabs = trackAnalysis.availableTabs;
   const selectedTab = availableTabs.includes(activeTab)
     ? activeTab
@@ -542,7 +526,7 @@ export function TrackProgressPage() {
         <div className="min-w-0">
           <h2 className="text-xl font-bold mb-1">
             <TrackFlag
-              track={displayTrackName}
+              track={trackSourceName}
               size="medium"
               className="mr-2 -translate-y-px"
             />
@@ -1432,85 +1416,11 @@ export function TrackProgressPage() {
           );
         })()}
 
-      {/* ── Session History ── */}
-      <div>
-        <div className="mb-3">
-          <SectionHeader title="Session History" />
-        </div>
-        <div className="space-y-1.5">
-          {sessionHistory.map((d) => {
-            const metaParts: string[] = [
-              `${formatDate(d.summary.date)} · ${formatTime(d.summary.date)}`,
-            ];
-            if (d.weather) metaParts.push(d.weather);
-            if (d.trackTemp > 0)
-              metaParts.push(`T:${d.trackTemp}° A:${d.airTemp}°`);
-            if (d.aiDifficulty > 0) metaParts.push(`AI ${d.aiDifficulty}`);
-            if (d.topSpeed > 0) metaParts.push(`${d.topSpeed} km/h`);
-            if (d.wearRate > 0)
-              metaParts.push(`${d.wearRate.toFixed(1)}%/lap wear`);
-
-            // Purple = all-time best at this track for the row's session category
-            // (pole for qualifying, fastest race lap for races). Matches the
-            // "session best" purple convention used elsewhere (LapTimeChart, etc.).
-            const isAllTimeBest =
-              d.bestLapMs > 0 &&
-              (d.isRace
-                ? d.bestLapMs === bestRaceLapMs
-                : d.kind === "time-trial"
-                  ? d.bestLapMs === bestTimeTrialMs
-                  : d.bestLapMs === actualBestQualiMs);
-
-            return (
-              <SessionRow
-                key={d.summary.relativePath}
-                to={sessionSummaryPath(d.summary)}
-                leading={
-                  <>
-                    <span className="text-sm leading-none">
-                      {getSessionIcon(d.summary.sessionType)}
-                    </span>
-                    <span className="truncate text-sm font-medium text-zinc-100">
-                      {formatSessionType(
-                        d.summary.sessionType,
-                        d.summary.formula,
-                      )}
-                    </span>
-                    {d.attemptCount > 1 && (
-                      <Badge tone="amber">×{d.attemptCount}</Badge>
-                    )}
-                  </>
-                }
-                meta={metaParts.join(" · ")}
-                trailing={
-                  <div
-                    className={cn(
-                      "inline-flex h-9 items-center justify-center rounded-lg px-2.5 font-mono text-sm font-bold tabular-nums",
-                      d.bestLapMs <= 0
-                        ? "ring-1 ring-inset ring-white/[0.06] bg-zinc-900/70 text-zinc-500"
-                        : isAllTimeBest
-                          ? cn(accentCardClass("purple"), "text-best")
-                          : cn(accentCardClass("cyan"), "text-cyan-300"),
-                    )}
-                  >
-                    {d.bestLapMs > 0 ? msToLapTime(d.bestLapMs) : "—"}
-                  </div>
-                }
-              />
-            );
-          })}
-          {spectatorHistory.length > 0 && (
-            <>
-              <div className="px-3 pb-1 pt-4 text-xs text-zinc-600">
-                Spectator saves are shown for inspection only and do not affect
-                player PBs, setup picks, tyre life, fuel, or race-result
-                calculations.
-              </div>
-              {spectatorHistory.map(renderSpectatorSessionRow)}
-            </>
-          )}
-        </div>
-      </div>
+      <TrackSessionHistory
+        activeKind={selectedTab}
+        sessions={trackAnalysis.sessionHistory}
+        spectatorSessions={spectatorHistory}
+      />
     </div>
   );
 }

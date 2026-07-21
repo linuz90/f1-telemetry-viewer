@@ -1,6 +1,7 @@
 import type { DriverData, TelemetrySession } from "../types/telemetry";
 import { bestSectorTimeMs } from "../utils/format";
 import { getFormulaComparisonKey } from "../utils/sessionTypes";
+import { isSameTrack } from "../utils/tracks";
 import { findPlayer, isRaceSession } from "../utils/stats/drivers";
 import { avgErsDeployMj } from "../utils/stats/energy";
 import type {
@@ -131,7 +132,12 @@ export function buildTrackRaceRecommendation(
   const sameTrackPitLossEntries = buildBucketEntries(
     options.pitLossRaceSessions ?? bucketRaceSessions,
   ).filter((entry) => {
-    if (entry.session["session-info"]["track-id"] !== representativeTrackId) {
+    if (
+      !isSameTrack(
+        entry.session["session-info"]["track-id"],
+        representativeTrackId,
+      )
+    ) {
       return false;
     }
     return (
