@@ -12,6 +12,7 @@ import type {
   DriverData,
   FinalClassification,
   LapHistoryEntry,
+  PerLapInfo,
   TelemetrySession,
   TyreStintHistoryV2Entry,
 } from "../src/types/telemetry";
@@ -298,6 +299,46 @@ test("focused-driver insight uses an official best when history is partial", () 
   assert.equal(bestLap?.value, "1:48.066");
   assert.equal(bestLap?.detail, "session fastest lap");
   assert.equal(bestLap?.compound, undefined);
+});
+
+test("neutralized-lap insight ignores formation laps", () => {
+  const player = driver({
+    index: 0,
+    name: "Player",
+    laps: [zeroLap(), lap(108_000, 31_000, 47_000, 30_000)],
+  });
+  const perLapInfo = (status: string, lapNumber: number) =>
+    ({
+      "lap-number": lapNumber,
+      "max-safety-car-status": status,
+    }) as PerLapInfo;
+  const session = {
+    "session-info": { "session-type": "Race", "total-laps": 3 },
+    "classification-data": [player],
+    "tyre-stint-history-v2": [],
+    records: {},
+  } as unknown as TelemetrySession;
+
+  player["per-lap-info"] = [perLapInfo("FORMATION_LAP", 1)];
+  assert.equal(
+    buildSessionSummaryInsights({ session, focusedDriver: player }).some(
+      (insight) => insight.label === "Neutralized Laps",
+    ),
+    false,
+  );
+
+  player["per-lap-info"] = [
+    perLapInfo("FORMATION_LAP", 1),
+    perLapInfo("FULL_SAFETY_CAR", 2),
+    perLapInfo("VIRTUAL_SAFETY_CAR", 3),
+  ];
+  const neutralized = buildSessionSummaryInsights({
+    session,
+    focusedDriver: player,
+  }).find((insight) => insight.label === "Neutralized Laps");
+
+  assert.equal(neutralized?.value, "2 laps");
+  assert.equal(neutralized?.detail, "Full Safety Car, Virtual Safety Car");
 });
 
 test("qualifying insight ranks official best laps for sparse drivers", () => {

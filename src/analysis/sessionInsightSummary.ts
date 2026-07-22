@@ -17,6 +17,7 @@ import { sessionDriverBestLapTimeMs } from "../utils/stats/drivers";
 import type { StrategyInsight } from "../utils/stats/insightTypes";
 import { getValidLaps, isCompleteValidLap } from "../utils/stats/laps";
 import { getLapCompoundMap } from "../utils/stats/tyres";
+import { isSafetyCarStatus } from "./safetyCar";
 
 /**
  * Raw per-session insight facts: result, best lap, incidents, weather, damage,
@@ -556,8 +557,7 @@ function isPenaltyAssignedToDriver(
 
 function buildSafetyCarInsight(driver: DriverData): SessionInsight | null {
   const safetyLaps = (driver["per-lap-info"] ?? []).filter(
-    (lap) =>
-      (lap["max-safety-car-status"] ?? "NO_SAFETY_CAR") !== "NO_SAFETY_CAR",
+    (lap) => isSafetyCarStatus(lap["max-safety-car-status"]),
   );
   if (safetyLaps.length === 0) return null;
 
