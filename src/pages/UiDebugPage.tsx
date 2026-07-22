@@ -154,7 +154,7 @@ const sampleInsights: SessionInsight[] = [
     label: "Speed Profile",
     value: "350 km/h",
     detail: "session peak - 15th of 22",
-    extraDetails: ["Speed trap: 342.5 km/h - 10th of 22"],
+    extraDetails: ["Speed trap: 342.5 km/h · P10/22"],
     accent: "sky",
     tone: "negative",
     tooltip:
@@ -224,6 +224,7 @@ const speedComparisonFixture: DriverSpeedComparison = {
   speedTrapDeltaKmh: -15.2,
   comparableLapCount: 11,
   pairedErsDeltaMj: 0.8,
+  pairedErsLapCount: 11,
   matchedPaceDeltaMs: -1_039,
   matchedSectorDeltasMs: [-425, -124, -404],
   interpretation: {

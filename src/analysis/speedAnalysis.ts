@@ -2,6 +2,7 @@ import type { DriverData, TelemetrySession } from "../types/telemetry";
 import { isRaceSession } from "../utils/sessionTypes";
 import { median } from "../utils/stats/core";
 import { ersDeployMjForLap } from "../utils/stats/energy";
+import { hasCompleteLapTiming } from "../utils/stats/laps";
 import { compareCompoundMatchedRacePace } from "../utils/stats/matchedPace";
 import type { CompoundMatchedPaceComparison } from "../utils/stats/matchedPace";
 import {
@@ -22,6 +23,9 @@ const MIN_AERO_DELTA_KMH = 5;
 const MIN_DIRECTION_AGREEMENT = 0.7;
 const MAX_TYRE_AGE_DELTA_LAPS = 3;
 const MATERIAL_ERS_DELTA_MJ = 1;
+// A single surviving deployment packet must not unlock Medium confidence.
+// Reuse the directional-agreement threshold plus the five-lap evidence floor.
+const MIN_ERS_COVERAGE = 0.7;
 const PACE_TIE_TOLERANCE_MS = 50;
 
 export type SpeedQuality = "good" | "limited" | "suspect";
@@ -42,7 +46,8 @@ export type AeroTendencyReason =
   | "unequal-cars"
   | "equal-cars-unknown"
   | "missing-trap"
-  | "material-ers-difference";
+  | "material-ers-difference"
+  | "limited-ers-coverage";
 
 export interface LapPeakSample {
   lap: number;
@@ -101,6 +106,7 @@ export interface DriverSpeedComparison {
   comparableLapCount: number;
   /** Median focused-minus-rival deployment across the paired speed laps. */
   pairedErsDeltaMj: number | null;
+  pairedErsLapCount: number;
   /** Same-compound focused-minus-rival race-pace context. */
   matchedPaceDeltaMs: number | null;
   matchedSectorDeltasMs: [number, number, number] | null;
@@ -151,25 +157,30 @@ function fullyDry(session: TelemetrySession): boolean {
   );
 }
 
-function isPartialRace(session: TelemetrySession): boolean {
+function isPartialRace(
+  session: TelemetrySession,
+  comparedDrivers: readonly DriverData[],
+): boolean {
   if (!isRaceSession(session)) return false;
-  const drivers = session["classification-data"] ?? [];
-  if (drivers.some((driver) => driver["final-classification"] != null)) {
+  if (
+    comparedDrivers.length > 0 &&
+    comparedDrivers.every((driver) => driver["final-classification"] != null)
+  ) {
     return false;
   }
 
   const totalLaps = session["session-info"]?.["total-laps"];
-  if (!Number.isFinite(totalLaps) || (totalLaps ?? 0) <= 0) return false;
-  const furthestRecordedLap = Math.max(
-    0,
-    ...drivers.map((driver) =>
-      Math.max(
-        driver["current-lap"] ?? 0,
-        driver["session-history"]?.["num-laps"] ?? 0,
-      ),
-    ),
+  if (!Number.isFinite(totalLaps) || (totalLaps ?? 0) <= 0) return true;
+
+  // `current-lap` advances when a lap starts, and an unrelated AI car can be
+  // farther through the race. Without final classification, only complete
+  // timing for both compared drivers proves this export reached the distance.
+  return comparedDrivers.some(
+    (driver) =>
+      (driver["session-history"]?.["lap-history-data"] ?? []).filter(
+        hasCompleteLapTiming,
+      ).length < totalLaps!,
   );
-  return furthestRecordedLap < totalLaps!;
 }
 
 function comparablePairs(
@@ -227,11 +238,11 @@ function comparablePairs(
   return { pairs, excludedForTyres };
 }
 
-function pairedErsDeltaMj(
+function pairedErsEvidence(
   focused: DriverData,
   rival: DriverData,
   pairs: ComparablePair[],
-): number | null {
+): { deltaMj: number | null; lapCount: number } {
   const focusedRows = perLapMap(focused);
   const rivalRows = perLapMap(rival);
   const deltas = pairs.flatMap(({ lap }) => {
@@ -243,7 +254,10 @@ function pairedErsDeltaMj(
     // Near-zero values in old car-status exports are usually lap-reset gaps.
     return focusedMj >= 0.2 && rivalMj >= 0.2 ? [focusedMj - rivalMj] : [];
   });
-  return median(deltas) ?? null;
+  return {
+    deltaMj: median(deltas) ?? null,
+    lapCount: deltas.length,
+  };
 }
 
 function overallPaceExplainsSpeed(
@@ -322,12 +336,16 @@ export function buildDriverSpeedComparison(
   const restricted = isRestricted(focusedDriver) || isRestricted(rivalDriver);
   const equalCars = equalCarPerformance(session);
   const dry = fullyDry(session);
-  const partial = isPartialRace(session);
-  const pairedErsDelta = pairedErsDeltaMj(
+  const partial = isPartialRace(session, [focusedDriver, rivalDriver]);
+  const pairedErs = pairedErsEvidence(
     focusedDriver,
     rivalDriver,
     pairResult.pairs,
   );
+  const representativeErsCoverage =
+    pairResult.pairs.length > 0 &&
+    pairedErs.lapCount >= MIN_AERO_LAPS &&
+    pairedErs.lapCount / pairResult.pairs.length >= MIN_ERS_COVERAGE;
   const matchedPace = compareCompoundMatchedRacePace(
     focusedDriver,
     rivalDriver,
@@ -402,18 +420,22 @@ export function buildDriverSpeedComparison(
       addReason(reasons, "low-direction-agreement");
     } else if (trapEligible && trapDirection === direction) {
       if (
-        pairedErsDelta != null &&
-        Math.abs(pairedErsDelta) >= MATERIAL_ERS_DELTA_MJ
+        representativeErsCoverage &&
+        pairedErs.deltaMj != null &&
+        Math.abs(pairedErs.deltaMj) >= MATERIAL_ERS_DELTA_MJ
       ) {
         addReason(reasons, "material-ers-difference");
       } else if (overallPaceExplainsSpeed(matchedPace, direction)) {
         addReason(reasons, "overall-pace-advantage");
       } else {
         verdict = direction > 0 ? "rival-higher-load" : "rival-lower-drag";
+        if (!representativeErsCoverage) {
+          addReason(reasons, "limited-ers-coverage");
+        }
         confidence =
           deltas.length >= MEDIUM_CONFIDENCE_LAPS &&
           !restricted &&
-          pairedErsDelta != null
+          representativeErsCoverage
             ? "medium"
             : "low";
       }
@@ -432,7 +454,8 @@ export function buildDriverSpeedComparison(
     pairedDirectionAgreement: directionAgreement,
     speedTrapDeltaKmh,
     comparableLapCount: deltas.length,
-    pairedErsDeltaMj: pairedErsDelta,
+    pairedErsDeltaMj: pairedErs.deltaMj,
+    pairedErsLapCount: pairedErs.lapCount,
     matchedPaceDeltaMs: matchedPace?.deltaMs ?? null,
     matchedSectorDeltasMs: matchedPace?.sectorDeltasMs ?? null,
     interpretation: {

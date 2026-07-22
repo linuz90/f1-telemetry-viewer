@@ -750,7 +750,7 @@ function buildSpeedProfileInsight(
     peak.rank != null && peak.fieldSize != null
       ? ` · P${peak.rank}/${peak.fieldSize}`
       : peak.quality === "limited"
-        ? " · unranked"
+        ? " · Limited · unranked"
         : "";
   const trap = profile?.speedTrap;
   const trapRank =
@@ -764,7 +764,7 @@ function buildSpeedProfileInsight(
     value: `${Math.round(peak.kmh)} km/h`,
     detail: `session peak${peakRank}`,
     tooltip:
-      "Session peak is the highest credible speed observed in the session. It is normally completed-lap-backed; a Limited session-only fallback stays unranked. Speed trap is the best fixed measurement-point crossing.",
+      "Session peak is the highest credible speed observed in the session. Its rank includes only drivers with credible completed-lap-backed peaks, so the denominator can differ from Classification and the speed-trap field. A Limited session-only fallback stays unranked. Speed trap is the best fixed measurement-point crossing.",
     rank: peak.rank != null ? peak.rank - 1 : undefined,
     rankTotal: peak.fieldSize,
     accent: "sky",

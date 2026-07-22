@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildFallbackRaceRows,
   buildQualifyingTableModel,
   buildRaceDriverStats,
   buildRaceResultHighlights,
@@ -187,19 +188,22 @@ test("incomplete timed rows do not renumber later lap analysis", () => {
 test("lap analysis uses canonical lap peaks and suppresses rejected glitches", () => {
   const model = buildLapAnalysis({
     laps: [
-      lap(108_000, 31_000, 47_000, 30_000),
+      lap(108_000, 31_000, 47_000, 30_000, 0),
       lap(107_000, 30_500, 46_500, 30_000),
+      lap(106_000, 30_000, 46_000, 30_000),
     ],
     lapPeaks: [
-      { lap: 1, kmh: 332, accepted: true },
-      { lap: 2, kmh: 497, accepted: false },
+      { lap: 1, kmh: 340, accepted: true },
+      { lap: 2, kmh: 332, accepted: true },
+      { lap: 3, kmh: 497, accepted: false },
     ],
   });
 
-  assert.equal(model.rows[0]?.lapPeakKmh, 332);
-  assert.equal(model.rows[1]?.lapPeakKmh, undefined);
+  assert.equal(model.rows[0]?.lapPeakKmh, 340);
+  assert.equal(model.rows[1]?.lapPeakKmh, 332);
+  assert.equal(model.rows[2]?.lapPeakKmh, undefined);
   assert.equal(model.hasLapPeak, true);
-  assert.equal(model.bestLapPeakKmh, 332);
+  assert.equal(model.bestLapPeakKmh, 340);
 });
 
 test("race stats use official best laps but do not invent sparse race pace", () => {
@@ -328,6 +332,7 @@ test("race result speed stats use indexed profiles and rank peak and trap indepe
     index: 11,
     name: "Limited peak",
     laps: [],
+    finalClassification: classification(4, 0),
   });
   limitedPeakDriver["top-speed-kmph"] = 400;
   const session = raceSession(
@@ -387,6 +392,17 @@ test("race result speed stats use indexed profiles and rank peak and trap indepe
     driverStats: stats,
   });
   assert.equal(sortedPeaks.at(-1)?.name, "Limited peak");
+
+  const fallbackPeaks = buildFallbackRaceRows({
+    drivers: [limitedPeakDriver, rival, player],
+    focusedOnly: false,
+    focusedDriverIndex: player.index,
+    sortKey: "sessionPeak",
+    sortDir: "asc",
+    driverStats: stats,
+  });
+  assert.equal(fallbackPeaks[0]?.["driver-name"], "Rival");
+  assert.equal(fallbackPeaks.at(-1)?.["driver-name"], "Limited peak");
 
   const summary = buildSessionSummary(
     "Race_Test_2026_07_21_12_00_00.json",

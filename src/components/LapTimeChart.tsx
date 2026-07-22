@@ -668,9 +668,7 @@ export function LapTimeChart({
                         size: "sm",
                         mono: true,
                       }),
-                      d.valid &&
-                        d.lapPeakKmh != null &&
-                        d.lapPeakKmh === bestLapPeakKmh
+                      d.lapPeakKmh != null && d.lapPeakKmh === bestLapPeakKmh
                         ? "text-best font-semibold"
                         : "",
                     )}

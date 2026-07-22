@@ -66,6 +66,8 @@ const REASON_COPY: Record<DisplayReason, string> = {
     "The paired speed difference is too small to suggest an aero tendency.",
   "material-ers-difference":
     "A material ERS deployment difference could explain the straight-line result.",
+  "limited-ers-coverage":
+    "Too few paired laps include usable ERS deployment data for Medium confidence.",
   "missing-speed": "There is not enough credible speed data for both drivers.",
 };
 
@@ -100,6 +102,13 @@ function lapSuffix(lap: number | undefined): string | undefined {
   return lap == null ? undefined : `Lap ${lap}`;
 }
 
+function sessionPeakSuffix(
+  peak: DriverSpeedComparison["focused"]["sessionPeak"],
+): string | undefined {
+  if (peak?.quality === "limited") return "Limited · session-only";
+  return lapSuffix(peak?.lap);
+}
+
 function EvidenceRow({
   label,
   hint,
@@ -117,31 +126,32 @@ function EvidenceRow({
       <div className="mb-2 flex items-center gap-1.5">
         <p className="text-xs font-semibold text-zinc-300">{label}</p>
         <Tooltip text={hint}>
-          <span
-            tabIndex={0}
+          <button
+            type="button"
+            aria-label={`About ${label}`}
             className="inline-flex size-5 items-center justify-center text-zinc-600 transition-colors hover:text-zinc-400 focus-visible:outline focus-visible:outline-1 focus-visible:outline-zinc-500"
           >
             <CircleHelp className="size-3" aria-hidden="true" />
-          </span>
+          </button>
         </Tooltip>
       </div>
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
         <div className="min-w-0">
-          <p className="break-words text-2xs text-zinc-600">{focusedName}</p>
+          <p className="break-words text-2xs text-zinc-400">{focusedName}</p>
           <p className="font-mono text-sm font-semibold tabular-nums text-zinc-100">
             {formatSpeed(focusedValue)}
           </p>
           {focusedSuffix && (
-            <p className="text-2xs text-zinc-600">{focusedSuffix}</p>
+            <p className="text-2xs text-zinc-500">{focusedSuffix}</p>
           )}
         </div>
         <div className="min-w-0">
-          <p className="break-words text-2xs text-zinc-600">{rivalName}</p>
+          <p className="break-words text-2xs text-zinc-400">{rivalName}</p>
           <p className="font-mono text-sm font-semibold tabular-nums text-zinc-100">
             {formatSpeed(rivalValue)}
           </p>
           {rivalSuffix && (
-            <p className="text-2xs text-zinc-600">{rivalSuffix}</p>
+            <p className="text-2xs text-zinc-500">{rivalSuffix}</p>
           )}
         </div>
         <div className="sm:text-right">
@@ -250,8 +260,8 @@ export function SpeedAeroComparison({
             focusedValue={comparison.focused.sessionPeak?.kmh ?? null}
             rivalValue={comparison.rival.sessionPeak?.kmh ?? null}
             delta={comparison.sessionPeakDeltaKmh}
-            focusedSuffix={lapSuffix(comparison.focused.sessionPeak?.lap)}
-            rivalSuffix={lapSuffix(comparison.rival.sessionPeak?.lap)}
+            focusedSuffix={sessionPeakSuffix(comparison.focused.sessionPeak)}
+            rivalSuffix={sessionPeakSuffix(comparison.rival.sessionPeak)}
             focusedName={focusedName}
             rivalName={rivalName}
           />
@@ -275,13 +285,13 @@ export function SpeedAeroComparison({
           {comparison && (
             <div className="mt-2 space-y-1 text-xs leading-relaxed text-zinc-500">
               <p>
-                Paired ERS deploy:{" "}
+                Paired ERS deploy (same-lap median):{" "}
                 {comparison.pairedErsDeltaMj == null
                   ? "unavailable"
-                  : `${formatContextDelta(comparison.pairedErsDeltaMj, 1, " MJ/lap")} focused − rival`}
+                  : `${formatContextDelta(comparison.pairedErsDeltaMj, 1, " MJ/lap")} focused − rival · ${comparison.pairedErsLapCount} lap${comparison.pairedErsLapCount === 1 ? "" : "s"}`}
               </p>
               <p>
-                Matched pace:{" "}
+                Matched pace (focused − rival):{" "}
                 {comparison.matchedSectorDeltasMs == null
                   ? "unavailable"
                   : [
@@ -311,7 +321,7 @@ export function SpeedAeroComparison({
         </div>
       </div>
 
-      <p className="mt-4 text-xs leading-relaxed text-zinc-600">
+      <p className="mt-4 text-xs leading-relaxed text-zinc-400">
         Inference from race telemetry, not recorded setup data. Traffic, tow,
         ERS use, active aero, and driver execution can still affect the result.
       </p>

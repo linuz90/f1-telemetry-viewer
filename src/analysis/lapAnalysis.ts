@@ -350,7 +350,7 @@ export function buildLapAnalysis({
     bestLapPeakKmh: hasLapPeak
       ? maxOrZero(
           rows
-            .filter((row) => row.valid && row.lapPeakKmh != null)
+            .filter((row) => row.lapPeakKmh != null)
             .map((row) => row.lapPeakKmh!),
         )
       : 0,

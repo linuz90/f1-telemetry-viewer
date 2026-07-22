@@ -149,6 +149,13 @@ function session(
       "session-type": options.sessionType ?? "Race",
       weather: options.weather ?? "Clear",
       "equal-car-performance": options.equalCars ?? true,
+      "total-laps": Math.max(
+        0,
+        ...drivers.map(
+          (driver) =>
+            driver["session-history"]?.["lap-history-data"]?.length ?? 0,
+        ),
+      ),
     },
     "classification-data": drivers,
     "speed-trap-records": (options.traps ?? []).map((trap, index) => ({
@@ -395,7 +402,23 @@ test("equal cars enable aero language while Restricted telemetry caps confidence
   const missingErs = buildDriverSpeedComparison(missingErsRace, 0, 1)!;
   assert.equal(missingErs.interpretation.verdict, "rival-higher-load");
   assert.equal(missingErs.pairedErsDeltaMj, null);
+  assert.equal(missingErs.pairedErsLapCount, 0);
   assert.equal(missingErs.interpretation.confidence, "low");
+
+  const sparseErsRace = makeRace(true, "Public");
+  for (const candidate of sparseErsRace["classification-data"]) {
+    for (const lap of candidate["per-lap-info"] ?? []) {
+      delete lap["ers-stats"];
+    }
+    candidate["per-lap-info"]!.find((lap) => lap["lap-number"] === 2)![
+      "ers-stats"
+    ] = { "ers-deployed-j": 2_000_000 };
+  }
+  const sparseErs = buildDriverSpeedComparison(sparseErsRace, 0, 1)!;
+  assert.equal(sparseErs.pairedErsLapCount, 1);
+  assert.equal(sparseErs.interpretation.verdict, "rival-higher-load");
+  assert.equal(sparseErs.interpretation.confidence, "low");
+  assert.ok(sparseErs.interpretation.reasons.includes("limited-ers-coverage"));
 
   const restricted = buildDriverSpeedComparison(
     makeRace(true, "Restricted"),
@@ -453,6 +476,48 @@ test("wet, non-race, and partial sessions make the aero verdict unavailable", ()
   const partial = buildDriverSpeedComparison(partialSession, 0, 1)!;
   assert.equal(partial.interpretation.verdict, "unavailable");
   assert.ok(partial.interpretation.reasons.includes("partial-session"));
+});
+
+test("partial detection is driver-local and requires complete final-lap timing", () => {
+  const traps = [
+    { name: "Focused", speed: 330 },
+    { name: "Rival", speed: 320 },
+  ];
+  const focused = driver(0, "Focused", Array(9).fill(330), {
+    trap: { speed: 330, lap: 2 },
+  });
+  const rival = driver(1, "Rival", Array(9).fill(320), {
+    trap: { speed: 320, lap: 2 },
+  });
+  const finishedAi = driver(2, "Finished AI", Array(10).fill(315));
+  const maskedByOtherDriver = buildDriverSpeedComparison(
+    session([focused, rival, finishedAi], { traps }),
+    0,
+    1,
+  )!;
+  assert.equal(maskedByOtherDriver.interpretation.verdict, "unavailable");
+  assert.ok(
+    maskedByOtherDriver.interpretation.reasons.includes("partial-session"),
+  );
+
+  const finalLapFocused = driver(0, "Focused", Array(10).fill(330), {
+    trap: { speed: 330, lap: 2 },
+  });
+  const finalLapRival = driver(1, "Rival", Array(10).fill(320), {
+    trap: { speed: 320, lap: 2 },
+  });
+  finalLapFocused["session-history"]["lap-history-data"][9]![
+    "sector-3-time-in-ms"
+  ] = 0;
+  const unfinishedFinalLap = buildDriverSpeedComparison(
+    session([finalLapFocused, finalLapRival], { traps }),
+    0,
+    1,
+  )!;
+  assert.equal(unfinishedFinalLap.interpretation.verdict, "unavailable");
+  assert.ok(
+    unfinishedFinalLap.interpretation.reasons.includes("partial-session"),
+  );
 });
 
 test("five to seven clean pairs support only a Low-confidence tendency", () => {
@@ -676,6 +741,23 @@ test("dashboard speed-trap rank normalizes placement across field sizes", () => 
   );
   assert.equal(insight?.headline, "72%");
   assert.equal(insight?.detail, "speed-trap field percentile · 3 races");
+
+  const invalidSummaries = summaries.map((summary, index) => ({
+    ...summary,
+    topSpeedTrapRank: [0, 2, 5][index],
+    topSpeedTrapTotal: [10, 1, 4][index],
+  }));
+  const invalidStats = {
+    ...stats,
+    scopedSessions: invalidSummaries,
+    resultSessions: invalidSummaries,
+  } satisfies DashboardResultStats;
+  assert.equal(
+    buildTrackInsights(invalidStats).find(
+      ({ kind }) => kind === "speed-trap-rank",
+    ),
+    undefined,
+  );
 });
 
 test("dense race curation preserves separate speed and ERS cards", () => {

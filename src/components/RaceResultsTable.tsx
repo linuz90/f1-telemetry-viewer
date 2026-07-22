@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type KeyboardEvent } from "react";
 import {
   buildFallbackRaceRows,
   buildPenaltiesByDriver,
@@ -45,6 +45,14 @@ interface RaceResultsTableProps {
   raceControlEvents?: RaceControlEvent[];
 }
 
+const HIGH_VALUE_FIRST_SORT_KEYS = new Set<RaceResultSortKey>([
+  "sessionPeak",
+  "speedTrap",
+  "ers",
+  "ersHarv",
+  "ersHarvestPct",
+]);
+
 function SortIcon({
   column,
   sortKey,
@@ -85,6 +93,25 @@ function racePaceEvidenceLabel(stats: RaceDriverStats | undefined): string {
     return `${laps} · need ${stats.racePaceRankingSampleThreshold}`;
   }
   return `${laps} · ${stats.racePaceConfidence}`;
+}
+
+function SessionPeakValue({
+  kmh,
+  limited,
+}: {
+  kmh: number | null;
+  limited: boolean;
+}) {
+  return (
+    <span className="inline-flex items-center justify-end gap-1.5">
+      {kmh != null ? Math.round(kmh) : "–"}
+      {limited && (
+        <Badge size="xs" shape="square" tone="zinc">
+          Limited
+        </Badge>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -153,6 +180,29 @@ export function RaceResultsTable({
     }
   }
 
+  function sortableHeaderProps(key: RaceResultSortKey) {
+    const highValueFirst = HIGH_VALUE_FIRST_SORT_KEYS.has(key);
+    const visuallyAscending = highValueFirst
+      ? sortDir === "desc"
+      : sortDir === "asc";
+    const ariaSort: "none" | "ascending" | "descending" =
+      sortKey === key
+        ? visuallyAscending
+          ? "ascending"
+          : "descending"
+        : "none";
+    return {
+      tabIndex: 0,
+      "aria-sort": ariaSort,
+      onClick: () => toggleSort(key),
+      onKeyDown: (event: KeyboardEvent<HTMLTableCellElement>) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        toggleSort(key);
+      },
+    };
+  }
+
   const thClass = (align: "left" | "right" = "left") =>
     tableHeadCellClass({ align, sortable: true });
   const highlights = buildRaceResultHighlights(driverStats);
@@ -172,7 +222,7 @@ export function RaceResultsTable({
           <table className={tableClass}>
             <thead className={tableHeadClass}>
               <tr>
-                <th className={thClass()} onClick={() => toggleSort("pos")}>
+                <th className={thClass()} {...sortableHeaderProps("pos")}>
                   Pos
                   <SortIcon column="pos" sortKey={sortKey} sortDir={sortDir} />
                 </th>
@@ -180,7 +230,7 @@ export function RaceResultsTable({
                 <th className={tableHeadCellClass()}>Team</th>
                 <th
                   className={thClass("right")}
-                  onClick={() => toggleSort("gap")}
+                  {...sortableHeaderProps("gap")}
                 >
                   <SortIcon
                     column="gap"
@@ -192,7 +242,7 @@ export function RaceResultsTable({
                 </th>
                 <th
                   className={thClass("right")}
-                  onClick={() => toggleSort("bestLap")}
+                  {...sortableHeaderProps("bestLap")}
                 >
                   <SortIcon
                     column="bestLap"
@@ -204,7 +254,7 @@ export function RaceResultsTable({
                 </th>
                 <th
                   className={thClass("right")}
-                  onClick={() => toggleSort("racePace")}
+                  {...sortableHeaderProps("racePace")}
                 >
                   <Tooltip text={RACE_PACE_TOOLTIP}>
                     <span>
@@ -220,7 +270,7 @@ export function RaceResultsTable({
                 </th>
                 <th
                   className={thClass("right")}
-                  onClick={() => toggleSort("sessionPeak")}
+                  {...sortableHeaderProps("sessionPeak")}
                 >
                   <Tooltip text="Highest credible speed recorded anywhere in the session. Session-only fallback values remain visible but are not ranked.">
                     <span>
@@ -237,7 +287,7 @@ export function RaceResultsTable({
                 {highlights.hasSpeedTrap && (
                   <th
                     className={thClass("right")}
-                    onClick={() => toggleSort("speedTrap")}
+                    {...sortableHeaderProps("speedTrap")}
                   >
                     <Tooltip text="Best speed recorded at the circuit's fixed speed-trap point.">
                       <span>
@@ -254,7 +304,7 @@ export function RaceResultsTable({
                 )}
                 <th
                   className={thClass("right")}
-                  onClick={() => toggleSort("ers")}
+                  {...sortableHeaderProps("ers")}
                 >
                   <Tooltip text="Average ERS energy deployed per lap. Green-flag laps only; pre-race baseline and final reset snapshot excluded.">
                     <span>
@@ -271,7 +321,7 @@ export function RaceResultsTable({
                 {highlights.hasErsHarv && (
                   <th
                     className={thClass("right")}
-                    onClick={() => toggleSort("ersHarv")}
+                    {...sortableHeaderProps("ersHarv")}
                   >
                     <Tooltip text="Average ERS energy recovered per lap, MGU-K + MGU-H combined. Green-flag laps only; pre-race baseline and final reset snapshot excluded.">
                       <span aria-label="ERS harvested energy">
@@ -289,7 +339,7 @@ export function RaceResultsTable({
                 {highlights.hasErsHarvestPct && (
                   <th
                     className={thClass("right")}
-                    onClick={() => toggleSort("ersHarvestPct")}
+                    {...sortableHeaderProps("ersHarvestPct")}
                   >
                     <Tooltip text={ERS_HARVEST_UTILIZATION_TOOLTIP}>
                       <span aria-label="ERS harvest utilization percentage">
@@ -419,9 +469,10 @@ export function RaceResultsTable({
                           : undefined
                       }
                     >
-                      {sessionPeakKmh != null
-                        ? `${Math.round(sessionPeakKmh)}`
-                        : "–"}
+                      <SessionPeakValue
+                        kmh={sessionPeakKmh}
+                        limited={stats?.sessionPeakQuality === "limited"}
+                      />
                     </td>
                     {highlights.hasSpeedTrap && (
                       <td
@@ -504,7 +555,7 @@ export function RaceResultsTable({
         <table className={tableClass}>
           <thead className={tableHeadClass}>
             <tr>
-              <th className={thClass()} onClick={() => toggleSort("pos")}>
+              <th className={thClass()} {...sortableHeaderProps("pos")}>
                 Pos
                 <SortIcon column="pos" sortKey={sortKey} sortDir={sortDir} />
               </th>
@@ -512,7 +563,7 @@ export function RaceResultsTable({
               <th className={tableHeadCellClass()}>Team</th>
               <th
                 className={thClass("right")}
-                onClick={() => toggleSort("bestLap")}
+                {...sortableHeaderProps("bestLap")}
               >
                 <SortIcon
                   column="bestLap"
@@ -524,7 +575,7 @@ export function RaceResultsTable({
               </th>
               <th
                 className={thClass("right")}
-                onClick={() => toggleSort("sessionPeak")}
+                {...sortableHeaderProps("sessionPeak")}
               >
                 <Tooltip text="Highest credible speed recorded anywhere in the session. Session-only fallback values remain visible but are not ranked.">
                   <span>
@@ -541,7 +592,7 @@ export function RaceResultsTable({
               {highlights.hasSpeedTrap && (
                 <th
                   className={thClass("right")}
-                  onClick={() => toggleSort("speedTrap")}
+                  {...sortableHeaderProps("speedTrap")}
                 >
                   <Tooltip text="Best speed recorded at the circuit's fixed speed-trap point.">
                     <span>
@@ -608,9 +659,10 @@ export function RaceResultsTable({
                         : undefined
                     }
                   >
-                    {sessionPeakKmh != null
-                      ? `${Math.round(sessionPeakKmh)}`
-                      : "–"}
+                    <SessionPeakValue
+                      kmh={sessionPeakKmh}
+                      limited={stats?.sessionPeakQuality === "limited"}
+                    />
                   </td>
                   {highlights.hasSpeedTrap && (
                     <td

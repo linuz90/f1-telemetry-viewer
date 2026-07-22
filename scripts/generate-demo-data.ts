@@ -3,6 +3,7 @@
  * Keeps the player + top 5 other drivers to reduce file size.
  *
  * Usage: TELEMETRY_DIR=/path/to/data pnpm generate-demo
+ *        (or set TELEMETRY_DIR in .env)
  *
  * Source files are hardcoded below — update paths if the originals move.
  */
@@ -16,8 +17,6 @@ import type {
 import { toSlug } from "../src/utils/parseFilename.ts";
 import { buildSessionSummary } from "../src/utils/sessionSummary.ts";
 import { buildSyntheticOnlineRaces } from "./generate-demo-synthetic.ts";
-
-const FALLBACK_TELEMETRY_DIR = "/Users/linuz90/PC Stuff/Pits & Giggles/data";
 
 function unquote(value: string): string {
   return value.trim().replace(/^['"]|['"]$/g, "");
@@ -34,7 +33,9 @@ function readTelemetryDir(): string {
     if (match?.[1]) return unquote(match[1]);
   }
 
-  return FALLBACK_TELEMETRY_DIR;
+  throw new Error(
+    "TELEMETRY_DIR is not set. Export it or add it to .env before generating demo data.",
+  );
 }
 
 const TELEMETRY_DIR = readTelemetryDir();
