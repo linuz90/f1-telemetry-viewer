@@ -212,6 +212,8 @@ export interface SessionInfo {
   "dynamic-racing-line-hi-vis"?: number;
   "dynamic-racing-line-colour-blind"?: string | number;
   "recurring-rewind-prompt"?: number;
+  /** Whether multiplayer cars use equal performance. Older exports may encode this flag numerically. */
+  "equal-car-performance"?: boolean | number | string;
 }
 
 export interface WeatherForecastSample {
@@ -257,7 +259,8 @@ export interface DriverData {
   team: string;
   "participant-data"?: ParticipantData;
   "current-lap": number;
-  "top-speed-kmph": number;
+  /** Session-wide peak. Older PnG exports can emit null or a stale live value. */
+  "top-speed-kmph": number | null;
   "car-damage": CarDamage;
   "car-status": CarStatus;
   "session-history": SessionHistory;
@@ -477,6 +480,10 @@ export interface LapDataCurrent {
   "current-lap-num": number;
   "pit-status": string;
   "driver-status": string;
+  /** Best fixed speed-trap value observed for this driver, when exported. */
+  "speed-trap-fastest-speed"?: number;
+  /** Lap for speed-trap-fastest-speed; only trustworthy when its value matches the session record. */
+  "speed-trap-fastest-lap"?: number;
 }
 
 export interface FinalClassification {

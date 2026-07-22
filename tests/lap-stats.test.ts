@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildFallbackRaceRows,
   buildQualifyingTableModel,
   buildRaceDriverStats,
   buildRaceResultHighlights,
@@ -13,6 +14,7 @@ import type {
   FinalClassification,
   LapHistoryEntry,
   PerLapInfo,
+  SpeedTrapRecord,
   TelemetrySession,
   TyreStintHistoryV2Entry,
 } from "../src/types/telemetry";
@@ -105,6 +107,21 @@ function driver({
   } as unknown as DriverData;
 }
 
+function raceSession(
+  drivers: DriverData[],
+  speedTrapRecords: SpeedTrapRecord[] = [],
+): TelemetrySession {
+  return {
+    "session-info": {
+      "session-type": "Race",
+      weather: "Clear",
+      "network-game": 1,
+    },
+    "classification-data": drivers,
+    "speed-trap-records": speedTrapRecords,
+  } as unknown as TelemetrySession;
+}
+
 test("sector fragments are not complete valid laps", () => {
   const fragment = lap(29_191, 0, 0, 29_191);
   const complete = lap(107_538, 31_878, 46_539, 29_119);
@@ -168,6 +185,27 @@ test("incomplete timed rows do not renumber later lap analysis", () => {
   );
 });
 
+test("lap analysis uses canonical lap peaks and suppresses rejected glitches", () => {
+  const model = buildLapAnalysis({
+    laps: [
+      lap(108_000, 31_000, 47_000, 30_000, 0),
+      lap(107_000, 30_500, 46_500, 30_000),
+      lap(106_000, 30_000, 46_000, 30_000),
+    ],
+    lapPeaks: [
+      { lap: 1, kmh: 340, accepted: true },
+      { lap: 2, kmh: 332, accepted: true },
+      { lap: 3, kmh: 497, accepted: false },
+    ],
+  });
+
+  assert.equal(model.rows[0]?.lapPeakKmh, 340);
+  assert.equal(model.rows[1]?.lapPeakKmh, 332);
+  assert.equal(model.rows[2]?.lapPeakKmh, undefined);
+  assert.equal(model.hasLapPeak, true);
+  assert.equal(model.bestLapPeakKmh, 340);
+});
+
 test("race stats use official best laps but do not invent sparse race pace", () => {
   const player = driver({
     index: 0,
@@ -185,15 +223,20 @@ test("race stats use official best laps but do not invent sparse race pace", () 
     finalClassification: classification(2, 108_066),
   });
 
-  const stats = buildRaceDriverStats([player, sparseRival]);
-  assert.deepEqual(stats.get("Sparse rival"), {
+  const stats = buildRaceDriverStats(raceSession([player, sparseRival]));
+  assert.deepEqual(stats.get(sparseRival.index), {
     bestLap: 108_066,
     racePace: 0,
     racePaceLapCount: 0,
     racePaceConfidence: null,
     racePaceRankEligible: false,
     racePaceRankingSampleThreshold: 3,
-    topSpeed: 0,
+    sessionPeakKmh: null,
+    sessionPeakQuality: null,
+    sessionPeakRank: null,
+    speedTrapKmh: null,
+    speedTrapQuality: null,
+    speedTrapRank: null,
     ers: 0,
     ersHarv: 0,
     ersHarvestPct: null,
@@ -201,7 +244,9 @@ test("race stats use official best laps but do not invent sparse race pace", () 
   assert.deepEqual(buildRaceResultHighlights(stats), {
     bestLapMs: 107_538,
     bestPaceMs: 0,
-    bestSpeedKmh: 0,
+    bestSessionPeakKmh: 0,
+    bestSpeedTrapKmh: 0,
+    hasSpeedTrap: false,
     bestErs: 0,
     bestErsHarv: 0,
     hasErsHarv: false,
@@ -230,9 +275,9 @@ test("race pace stays visible but cannot rank without relative evidence", () => 
     finalClassification: classification(2, 107_000),
   });
 
-  const stats = buildRaceDriverStats([fullRace, shortRace]);
-  const fullStats = stats.get("Full race")!;
-  const shortStats = stats.get("Short race")!;
+  const stats = buildRaceDriverStats(raceSession([fullRace, shortRace]));
+  const fullStats = stats.get(fullRace.index)!;
+  const shortStats = stats.get(shortRace.index)!;
 
   assert.equal(fullStats.racePaceLapCount, 19);
   assert.equal(fullStats.racePaceRankEligible, true);
@@ -253,11 +298,118 @@ test("race pace stays visible but cannot rank without relative evidence", () => 
         focusedOnly: false,
         sortKey: "racePace",
         sortDir,
+        drivers: [fullRace, shortRace],
         driverStats: stats,
       })[0]?.name,
       "Full race",
     );
   }
+});
+
+test("race result speed stats use indexed profiles and rank peak and trap independently", () => {
+  const player = driver({
+    index: 0,
+    name: "Pílot One",
+    laps: [lap(108_000, 31_000, 47_000, 30_000)],
+    finalClassification: classification(1, 108_000),
+  });
+  player["per-lap-info"] = [
+    { "lap-number": 1, "top-speed-kmph": 320 } as never,
+  ];
+  const rival = driver({
+    index: 7,
+    name: "Rival",
+    laps: [lap(109_000, 31_500, 47_500, 30_000)],
+    finalClassification: classification(2, 109_000),
+  });
+  rival["per-lap-info"] = [{ "lap-number": 1, "top-speed-kmph": 330 } as never];
+  const tiedTrapDriver = driver({
+    index: 9,
+    name: "Trap tie",
+    laps: [lap(110_000, 32_000, 48_000, 30_000)],
+  });
+  const limitedPeakDriver = driver({
+    index: 11,
+    name: "Limited peak",
+    laps: [],
+    finalClassification: classification(4, 0),
+  });
+  limitedPeakDriver["top-speed-kmph"] = 400;
+  const session = raceSession(
+    [player, rival, tiedTrapDriver, limitedPeakDriver],
+    [
+      {
+        name: "  PI\u0301LOT   ONE ",
+        team: "Test Team",
+        "driver-number": 1,
+        "speed-trap-record-kmph": 340,
+      },
+      {
+        name: "Rival",
+        team: "Test Team",
+        "driver-number": 2,
+        "speed-trap-record-kmph": 330,
+      },
+      {
+        name: "Trap tie",
+        team: "Test Team",
+        "driver-number": 3,
+        "speed-trap-record-kmph": 340,
+      },
+    ],
+  );
+  const stats = buildRaceDriverStats(session);
+  const highlights = buildRaceResultHighlights(stats);
+
+  assert.equal(stats.get(rival.index)?.sessionPeakRank, 1);
+  assert.equal(stats.get(player.index)?.speedTrapRank, 1);
+  assert.equal(highlights.bestSessionPeakKmh, 330);
+  assert.equal(highlights.bestSpeedTrapKmh, 340);
+
+  const sorted = sortRaceStintHistoryRows({
+    entries: [
+      { name: "wrong legacy name", index: rival.index, position: 2 },
+      { name: " pílot one ", position: 1 },
+    ] as TyreStintHistoryV2Entry[],
+    focusedOnly: false,
+    sortKey: "speedTrap",
+    sortDir: "asc",
+    drivers: [player, rival, tiedTrapDriver],
+    driverStats: stats,
+  });
+  assert.equal(sorted[0]?.name, " pílot one ");
+
+  const sortedPeaks = sortRaceStintHistoryRows({
+    entries: [
+      { name: "Limited peak", position: 4 },
+      { name: "Rival", position: 2 },
+      { name: "Pílot One", position: 1 },
+    ] as TyreStintHistoryV2Entry[],
+    focusedOnly: false,
+    sortKey: "sessionPeak",
+    sortDir: "asc",
+    drivers: [player, rival, tiedTrapDriver, limitedPeakDriver],
+    driverStats: stats,
+  });
+  assert.equal(sortedPeaks.at(-1)?.name, "Limited peak");
+
+  const fallbackPeaks = buildFallbackRaceRows({
+    drivers: [limitedPeakDriver, rival, player],
+    focusedOnly: false,
+    focusedDriverIndex: player.index,
+    sortKey: "sessionPeak",
+    sortDir: "asc",
+    driverStats: stats,
+  });
+  assert.equal(fallbackPeaks[0]?.["driver-name"], "Rival");
+  assert.equal(fallbackPeaks.at(-1)?.["driver-name"], "Limited peak");
+
+  const summary = buildSessionSummary(
+    "Race_Test_2026_07_21_12_00_00.json",
+    session,
+  ).summary;
+  assert.equal(summary.topSpeedTrapRank, 1);
+  assert.equal(summary.topSpeedTrapTotal, 3);
 });
 
 test("official best-lap fallback supports legacy exports", () => {

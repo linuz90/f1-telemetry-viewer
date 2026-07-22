@@ -27,6 +27,7 @@ import {
 } from "./stats/laps";
 import { compareCompoundMatchedRacePace } from "./stats/matchedPace";
 import { getWorstStintEndWear } from "./stats/tyres";
+import { buildSessionSpeedAnalysis } from "../analysis/speedAnalysis";
 
 export interface BuiltSessionSummary {
   summary: SessionSummary & { fileSize: number };
@@ -38,7 +39,7 @@ export interface BuiltSessionSummary {
  * Bump this for `SessionSummary`, filename normalization, or any transitive
  * summary-producing policy change; final sorting and dedupe are recomputed.
  */
-export const SESSION_SUMMARY_CACHE_VERSION = 4;
+export const SESSION_SUMMARY_CACHE_VERSION = 5;
 
 function getDrivers(session: TelemetrySession | undefined): DriverData[] {
   return session?.["classification-data"] ?? [];
@@ -387,19 +388,17 @@ function buildRaceTelemetryExtras(
     extras.lapOnePosition = lapOne;
   }
 
-  const trap = session["speed-trap-records"] ?? [];
-  if (trap.length > 0) {
-    const sorted = [...trap].sort(
-      (a, b) =>
-        (b["speed-trap-record-kmph"] ?? 0) - (a["speed-trap-record-kmph"] ?? 0),
-    );
-    const idx = sorted.findIndex(
-      (entry) => entry.name === player["driver-name"],
-    );
-    if (idx >= 0) {
-      extras.topSpeedTrapRank = idx + 1;
-      extras.topSpeedTrapTotal = sorted.length;
-    }
+  const playerTrap = buildSessionSpeedAnalysis(session).profiles.get(
+    player.index,
+  )?.speedTrap;
+  if (
+    playerTrap &&
+    playerTrap.quality !== "suspect" &&
+    playerTrap.rank > 0 &&
+    playerTrap.fieldSize >= playerTrap.rank
+  ) {
+    extras.topSpeedTrapRank = playerTrap.rank;
+    extras.topSpeedTrapTotal = playerTrap.fieldSize;
   }
 
   const stints = player["tyre-set-history"] ?? [];

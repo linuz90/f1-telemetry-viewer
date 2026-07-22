@@ -17,6 +17,7 @@ import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
 import { PositionChart } from "../components/PositionChart";
 import { SectorComparison } from "../components/SectorComparison";
 import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
+import { SpeedAeroComparison } from "../components/SpeedAeroComparison";
 import { StartReactionCard } from "../components/StartReactionCard";
 import { StintDetailCards, StintTimeline } from "../components/StintTimeline";
 import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
@@ -51,6 +52,7 @@ import { cn } from "../utils/cn";
 import { msToLapTime, msToSectorTime } from "../utils/format";
 import type { TrackRivalBenchmark } from "../analysis/rivalStats";
 import type { SessionInsight } from "../analysis/sessionInsightSummary";
+import type { DriverSpeedComparison } from "../analysis/speedAnalysis";
 import {
   buildStartReactionModelFromSeconds,
   type StartReactionModel,
@@ -149,19 +151,89 @@ const sampleInsights: SessionInsight[] = [
   },
   {
     type: "speed",
-    label: "Speed & ERS",
+    label: "Speed Profile",
     value: "350 km/h",
-    detail: "15th of 22 top speed",
-    extraDetails: [
-      "Deploy 7.0 MJ/lap · P1/22",
-      "Harvest: 99.6% (highest of 22 drivers)",
-    ],
+    detail: "session peak - 15th of 22",
+    extraDetails: ["Speed trap: 342.5 km/h · P10/22"],
     accent: "sky",
     tone: "negative",
     tooltip:
-      "Top speed is the best non-glitched speed sample for the focused driver.",
+      "Session peak is the highest credible speed observed in the session. It is normally backed by a completed lap; a Limited session-only fallback stays unranked. Speed trap is the fixed circuit measurement point.",
   },
 ];
+
+const speedComparisonFixture: DriverSpeedComparison = {
+  focused: {
+    driverIndex: 0,
+    lapPeaks: [],
+    sessionPeak: {
+      kmh: 343,
+      lap: 8,
+      source: "combined",
+      quality: "good",
+      rank: 2,
+      fieldSize: 15,
+    },
+    representativeHighSpeed: {
+      kmh: 335,
+      percentile: 80,
+      eligibleLapCount: 21,
+      quality: "good",
+    },
+    speedTrap: {
+      kmh: 322.6,
+      lap: 22,
+      rank: 9,
+      fieldSize: 15,
+      quality: "good",
+    },
+  },
+  rival: {
+    driverIndex: 1,
+    lapPeaks: [],
+    sessionPeak: {
+      kmh: 340,
+      lap: 17,
+      source: "combined",
+      quality: "good",
+      rank: 4,
+      fieldSize: 15,
+    },
+    representativeHighSpeed: {
+      kmh: 330,
+      percentile: 80,
+      eligibleLapCount: 14,
+      quality: "good",
+    },
+    speedTrap: {
+      kmh: 337.8,
+      lap: 17,
+      rank: 1,
+      fieldSize: 15,
+      quality: "good",
+    },
+  },
+  sessionPeakDeltaKmh: 3,
+  pairedRepresentative: {
+    focusedKmh: 331,
+    rivalKmh: 330,
+    percentile: 80,
+  },
+  pairedMedianDeltaKmh: 5,
+  pairedDirectionAgreement: 0.55,
+  speedTrapDeltaKmh: -15.2,
+  comparableLapCount: 11,
+  pairedErsDeltaMj: 0.8,
+  pairedErsLapCount: 11,
+  matchedPaceDeltaMs: -1_039,
+  matchedSectorDeltasMs: [-425, -124, -404],
+  interpretation: {
+    mode: "aero-tendency",
+    verdict: "inconclusive",
+    confidence: null,
+    reasons: ["signals-conflict", "low-direction-agreement"],
+  },
+};
 
 const trackStrategy: TrackStrategySuggestion = {
   compounds: ["Medium", "Hard", "Medium"],
@@ -275,6 +347,11 @@ const rivalStints = [
   makeStint("Hard", 6, 12, 0, 6.5),
 ];
 const perLapInfo = buildPerLapInfo();
+const lapPeaks = perLapInfo.map((lap) => ({
+  lap: lap["lap-number"],
+  kmh: lap["top-speed-kmph"] ?? 0,
+  accepted: lap["top-speed-kmph"] !== 486,
+}));
 const basicStints: TyreStintBasic[] = [
   {
     "tyre-actual-compound": "C3",
@@ -375,6 +452,14 @@ export function UiDebugPage() {
         />
       </DebugSection>
 
+      <DebugSection file="src/components/SpeedAeroComparison.tsx">
+        <SpeedAeroComparison
+          comparison={speedComparisonFixture}
+          focusedName="Fabrizio Rinaldi"
+          rivalName="Maupainz"
+        />
+      </DebugSection>
+
       <DebugSection file="src/components/track/TrackKeyInsights.tsx">
         <TrackKeyInsights
           recommendation={trackRecommendation}
@@ -434,7 +519,7 @@ export function UiDebugPage() {
           <InsightTile title="Sky Speed" icon={Gauge} accent="sky">
             <DebugHero
               value="350 km/h"
-              detail="15th of 22 top speed"
+              detail="session peak - P15/22"
               tone="text-sky-300"
             />
           </InsightTile>
@@ -750,6 +835,7 @@ export function UiDebugPage() {
           rivalName="LECLERC"
           pitLaps={[7]}
           perLapInfo={perLapInfo}
+          lapPeaks={lapPeaks}
           damageLaps={[8]}
           stints={stints}
         />
@@ -970,7 +1056,9 @@ function buildPerLapInfo(): PerLapInfo[] {
       "max-safety-car-status":
         lap === 5 || lap === 6 ? "VIRTUAL_SAFETY_CAR" : "NO_SAFETY_CAR",
       "track-position": Math.max(1, 20 - lap * 2),
-      "top-speed-kmph": 322 + lap * 2 + (lap === 9 ? 12 : 0),
+      // Deliberately impossible sample exercises the canonical glitch filter
+      // and ensures debug UI never leaks a rejected peak.
+      "top-speed-kmph": lap === 9 ? 486 : 322 + lap * 2,
     };
   });
 }

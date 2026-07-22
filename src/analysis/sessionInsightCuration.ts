@@ -93,10 +93,6 @@ function extractSectorLabel(label: string): string {
   return label.match(/S[1-3]/)?.[0] ?? label;
 }
 
-function extractSpeedValue(insight: SessionInsight): string | undefined {
-  return insight.detail.match(/\b\d+\s*km\/h\b/)?.[0];
-}
-
 function extractTimeDelta(text: string): string | undefined {
   return text.match(/[+-]\d+(?:\.\d+)?s(?:\/lap)?/)?.[0];
 }
@@ -282,57 +278,31 @@ function mergeSectorInsights(
   };
 }
 
-function mergePowerInsights(
-  speed: SessionInsight | undefined,
+function mergeErsInsights(
   ersInsights: SessionInsight[],
 ): SessionInsight | undefined {
   const deploy = findByLabel(ersInsights, "ERS Deploy");
   const harvest =
     findByLabel(ersInsights, "ERS Harvest") ??
     findByLabel(ersInsights, "ERS Harv");
-  const primary = speed ?? deploy ?? harvest;
+  const primary = deploy ?? harvest;
   if (!primary) return undefined;
   const tooltip =
-    uniqueLines([speed?.tooltip, deploy?.tooltip, harvest?.tooltip])
+    uniqueLines([deploy?.tooltip, harvest?.tooltip])
       .map((line) => (/[.!?]$/.test(line) ? line : `${line}.`))
       .join(" ") || undefined;
 
-  if (!speed) {
-    // Qualifying/time-trial exports sometimes have ERS but no reliable speed
-    // sample; keep the power tile rather than dropping useful deploy/harvest
-    // data.
-    return {
-      ...primary,
-      label: deploy && harvest ? "ERS Usage" : primary.label,
-      value: deploy ? deploy.value : primary.value,
-      detail:
-        deploy && harvest
-          ? rankedMetricLine("Harvest", harvest)
-          : primary.detail,
-      tooltip,
-      extraDetails: uniqueLines([
-        deploy ? rankedMetricLine("Deploy", deploy) : undefined,
-      ]),
-    };
-  }
-
-  const speedValue = extractSpeedValue(speed) ?? speed.value;
-  const speedRank =
-    speed.rank != null && speed.rankTotal != null
-      ? `${insightRank(speed)}`
-      : speed.detail;
+  // Speed owns a separate, typed card. Keeping ERS independent avoids deriving
+  // one metric's semantics by parsing another metric's presentation copy.
   return {
-    type: "speed",
-    label: deploy || harvest ? "Speed & ERS" : "Top Speed",
-    value: speedValue,
-    detail: `${speedRank} top speed`,
+    ...primary,
+    label: deploy && harvest ? "ERS Usage" : primary.label,
+    value: deploy ? deploy.value : primary.value,
+    detail:
+      deploy && harvest ? rankedMetricLine("Harvest", harvest) : primary.detail,
     tooltip,
-    rank: speed.rank,
-    rankTotal: speed.rankTotal,
-    accent: "sky",
     extraDetails: uniqueLines([
       deploy ? rankedMetricLine("Deploy", deploy) : undefined,
-      harvest ? rankedMetricLine("Harvest", harvest) : undefined,
     ]),
   };
 }
@@ -442,7 +412,7 @@ function appendIfPresent(
 export function curateSessionInsights(
   session: TelemetrySession,
   insights: SessionInsight[],
-  limit = MAX_SESSION_INSIGHTS,
+  limit?: number,
 ): SessionInsight[] {
   const isTimeTrial = isTimeTrialSessionType(
     session["session-info"]["session-type"],
@@ -492,8 +462,8 @@ export function curateSessionInsights(
   const sectors = mergeSectorInsights(
     takeWhere(remaining, (insight) => insight.type === "sector"),
   );
-  const power = mergePowerInsights(
-    takeByLabel(remaining, "Top Speed"),
+  const speed = takeByLabel(remaining, "Speed Profile");
+  const power = mergeErsInsights(
     takeWhere(remaining, (insight) => insight.type === "ers"),
   );
   const history = mergeHistoryInsights(
@@ -517,6 +487,7 @@ export function curateSessionInsights(
     appendIfPresent(curated, tyre);
     appendIfPresent(curated, fuel);
     appendIfPresent(curated, sectors);
+    appendIfPresent(curated, speed);
     appendIfPresent(curated, power);
     appendIfPresent(curated, firstPit);
     // Race screens already have many tactical cards, so history only earns a
@@ -531,10 +502,12 @@ export function curateSessionInsights(
     appendIfPresent(curated, timeTrialTrackPb);
     appendIfPresent(curated, result);
     appendIfPresent(curated, sectors);
+    appendIfPresent(curated, speed);
     appendIfPresent(curated, power);
     curated.push(...events);
   } else {
     appendIfPresent(curated, sectors);
+    appendIfPresent(curated, speed);
     appendIfPresent(curated, power);
     appendIfPresent(curated, history);
     if (!result) appendIfPresent(curated, qualifying);
@@ -542,5 +515,13 @@ export function curateSessionInsights(
 
   curated.push(...remaining);
 
-  return curated.slice(0, limit);
+  const requestedLimit = limit ?? MAX_SESSION_INSIGHTS;
+  // Speed and ERS used to share one presentation-driven card. They now have
+  // distinct semantics, so the default budget grows by one only when both are
+  // present instead of silently discarding either metric on dense race pages.
+  const semanticLimit =
+    limit == null && speed != null && power != null
+      ? requestedLimit + 1
+      : requestedLimit;
+  return curated.slice(0, semanticLimit);
 }

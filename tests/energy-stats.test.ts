@@ -162,19 +162,28 @@ test("harvest utilization sort keeps missing telemetry last in both directions",
     racePaceConfidence: null,
     racePaceRankEligible: false,
     racePaceRankingSampleThreshold: 3,
-    topSpeed: 0,
+    sessionPeakKmh: null,
+    sessionPeakQuality: null,
+    sessionPeakRank: null,
+    speedTrapKmh: null,
+    speedTrapQuality: null,
+    speedTrapRank: null,
     ers: 0,
     ersHarv: 0,
     ersHarvestPct,
   });
   const entries = ["Lower", "Missing", "Higher"].map(
-    (name, index) => ({ name, position: index + 1 }) as TyreStintHistoryV2Entry,
+    (name, index) =>
+      ({ name, index, position: index + 1 }) as TyreStintHistoryV2Entry,
   );
   const driverStats = new Map([
-    ["Lower", raceStats(0.5)],
-    ["Missing", raceStats(null)],
-    ["Higher", raceStats(0.9)],
+    [0, raceStats(0.5)],
+    [1, raceStats(null)],
+    [2, raceStats(0.9)],
   ]);
+  const drivers = entries.map(
+    ({ index, name }) => ({ index, "driver-name": name }) as DriverData,
+  );
 
   for (const sortDir of ["asc", "desc"] as const) {
     const sorted = sortRaceStintHistoryRows({
@@ -182,6 +191,7 @@ test("harvest utilization sort keeps missing telemetry last in both directions",
       focusedOnly: false,
       sortKey: "ersHarvestPct",
       sortDir,
+      drivers,
       driverStats,
     });
     assert.equal(sorted.at(-1)?.name, "Missing");

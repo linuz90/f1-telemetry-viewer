@@ -33,7 +33,7 @@ export type InsightKind =
   | "race-consistency"
   | "fastest-lap-king"
   | "lap-one-starter"
-  | "top-speed-king"
+  | "speed-trap-rank"
   | "tyre-whisperer"
   | "sector-specialist"
   | "net-overtakes";
@@ -551,29 +551,35 @@ function buildLapOneStarterInsight(
   };
 }
 
-function buildTopSpeedKingInsight(
+function buildSpeedTrapRankInsight(
   resultSessions: SessionSummary[],
   scope: InsightScope,
 ): TrackInsight | undefined {
   const entries = resultSessions.filter(
     (session) =>
-      typeof session.topSpeedTrapRank === "number" &&
-      session.topSpeedTrapRank > 0,
+      Number.isInteger(session.topSpeedTrapRank) &&
+      Number.isInteger(session.topSpeedTrapTotal) &&
+      (session.topSpeedTrapTotal ?? 0) > 1 &&
+      (session.topSpeedTrapRank ?? 0) > 0 &&
+      (session.topSpeedTrapRank ?? 0) <= (session.topSpeedTrapTotal ?? 0),
   );
   if (entries.length < 3) return undefined;
-  const avgRank =
-    entries.reduce((sum, session) => sum + (session.topSpeedTrapRank ?? 0), 0) /
-    entries.length;
-  // Only celebrate top-half results.
-  if (avgRank > 8) return undefined;
+  const averageFieldPercentile =
+    entries.reduce((sum, session) => {
+      const rank = session.topSpeedTrapRank!;
+      const total = session.topSpeedTrapTotal!;
+      return sum + (total - rank) / (total - 1);
+    }, 0) / entries.length;
+  // Field-normalized placement stays comparable between small and full grids.
+  if (averageFieldPercentile < 0.5) return undefined;
   const mostRecent = pickMostRecentSession(entries);
   return {
-    kind: "top-speed-king",
+    kind: "speed-trap-rank",
     track: mostRecent.track,
     formulaKey: getSessionFormulaScopeKey(mostRecent),
     scope,
-    headline: `P${avgRank.toFixed(1)}`,
-    detail: `avg speed-trap rank · ${entries.length} races`,
+    headline: `${Math.round(averageFieldPercentile * 100)}%`,
+    detail: `speed-trap field percentile · ${entries.length} races`,
     sampleSize: entries.length,
   };
 }
@@ -717,7 +723,7 @@ const INSIGHT_KIND_PRIORITY: Record<InsightKind, number> = {
   "sector-specialist": 12,
   "net-overtakes": 13,
   "lap-one-starter": 14,
-  "top-speed-king": 15,
+  "speed-trap-rank": 15,
   "fastest-lap-king": 16,
   "wet-weather": 17,
   "penalty-magnet": 18,
@@ -791,8 +797,11 @@ export function buildTrackInsights(
   const lapOne = buildLapOneStarterInsight(stats.resultSessions, raceScope);
   if (lapOne) insights.push(lapOne);
 
-  const topSpeed = buildTopSpeedKingInsight(stats.resultSessions, raceScope);
-  if (topSpeed) insights.push(topSpeed);
+  const speedTrapRank = buildSpeedTrapRankInsight(
+    stats.resultSessions,
+    raceScope,
+  );
+  if (speedTrapRank) insights.push(speedTrapRank);
 
   const tyres = buildTyreWhispererInsight(stats.resultSessions, raceScope);
   if (tyres) insights.push(tyres);

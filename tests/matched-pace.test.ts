@@ -122,6 +122,13 @@ test("head-to-head insights name same-tyre evidence Matched Pace", () => {
     "S2 · 0.000s even",
     "S3 · -0.500s faster",
   ]);
+
+  assert.equal(
+    generateInsights(session, player, rival).some(
+      ({ type, label }) => type === "speed" || label === "Top Speed",
+    ),
+    false,
+  );
 });
 
 test("matched pace renders exact and near ties as even", () => {

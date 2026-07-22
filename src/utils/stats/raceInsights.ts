@@ -1,7 +1,6 @@
 import type { DriverData, TelemetrySession } from "../../types/telemetry";
 import { sectorTimeMs } from "../format";
 import { ordinal } from "./core";
-import { driverTopSpeed } from "./drivers";
 import {
   avgErsDeployMj,
   avgErsHarvestMj,
@@ -124,25 +123,7 @@ export function generateInsights(
       });
     }
 
-    // 4. Top speed delta vs rival
-    const playerTopSpeed = driverTopSpeed(player);
-    const rivalTopSpeed = driverTopSpeed(rival);
-    if (playerTopSpeed > 0 && rivalTopSpeed > 0) {
-      const delta = Math.round(playerTopSpeed) - Math.round(rivalTopSpeed);
-      insights.push({
-        type: "speed",
-        label: "Top Speed",
-        value: `${delta <= 0 ? "" : "+"}${delta} km/h`,
-        detail:
-          delta < 0
-            ? `slower than ${rivalName} (${Math.round(playerTopSpeed)} vs ${Math.round(rivalTopSpeed)})`
-            : delta > 0
-              ? `faster than ${rivalName} (${Math.round(playerTopSpeed)} vs ${Math.round(rivalTopSpeed)})`
-              : `same as ${rivalName} (${Math.round(playerTopSpeed)} km/h)`,
-      });
-    }
-
-    // 5. ERS deployment delta vs rival
+    // 4. ERS deployment delta vs rival
     const playerErs = avgErsDeployMj(player);
     const rivalErs = avgErsDeployMj(rival);
     if (playerErs > 0 && rivalErs > 0) {
@@ -262,34 +243,7 @@ export function generateInsights(
       });
     }
 
-    // 3. Top speed ranking
-    const speedRanking: { driver: DriverData; topSpeed: number }[] = [];
-    for (const d of allDrivers) {
-      const spd = driverTopSpeed(d);
-      if (spd > 0) speedRanking.push({ driver: d, topSpeed: spd });
-    }
-    speedRanking.sort((a, b) => b.topSpeed - a.topSpeed);
-    const speedPos = speedRanking.findIndex(
-      (r) => r.driver.index === player.index,
-    );
-    if (speedPos >= 0 && speedRanking.length > 1) {
-      const playerSpd = speedRanking[speedPos].topSpeed;
-      const delta = speedRanking[0].topSpeed - playerSpd;
-      insights.push({
-        type: "speed",
-        label: "Top Speed",
-        value: ordinal(speedPos + 1),
-        detail:
-          delta < 1
-            ? `of ${speedRanking.length} — ${Math.round(playerSpd)} km/h`
-            : `of ${speedRanking.length} — ${Math.round(playerSpd)} km/h (${Math.round(delta)} off P1)`,
-        tooltip: "Session top speed ranking across all drivers",
-        rank: speedPos,
-        rankTotal: speedRanking.length,
-      });
-    }
-
-    // 4. ERS deployment ranking
+    // 3. ERS deployment ranking
     const ersRanking: { driver: DriverData; avgErs: number }[] = [];
     for (const d of allDrivers) {
       const avg = avgErsDeployMj(d);

@@ -1,7 +1,7 @@
 import type { DriverData, TelemetrySession } from "../../types/telemetry";
 import { bestSectorTimeMs } from "../format";
 import { msToLapTimeLocal, ordinal } from "./core";
-import { driverTopSpeed, sessionDriverBestLapTimeMs } from "./drivers";
+import { sessionDriverBestLapTimeMs } from "./drivers";
 import { ersHarvestMjForLap } from "./energy";
 import type { StrategyInsight } from "./insightTypes";
 import { getValidLaps, lapTimeStdDev } from "./laps";
@@ -38,34 +38,7 @@ export function generateQualiInsights(
     });
   }
 
-  // 2. Top speed ranking
-  const qualiSpeedRanking: { driver: DriverData; topSpeed: number }[] = [];
-  for (const d of allDrivers) {
-    const spd = driverTopSpeed(d);
-    if (spd > 0) qualiSpeedRanking.push({ driver: d, topSpeed: spd });
-  }
-  qualiSpeedRanking.sort((a, b) => b.topSpeed - a.topSpeed);
-  const qualiSpeedPos = qualiSpeedRanking.findIndex(
-    (r) => r.driver.index === player.index,
-  );
-  if (qualiSpeedPos >= 0 && qualiSpeedRanking.length > 1) {
-    const playerSpd = qualiSpeedRanking[qualiSpeedPos].topSpeed;
-    const delta = qualiSpeedRanking[0].topSpeed - playerSpd;
-    insights.push({
-      type: "speed",
-      label: "Top Speed",
-      value: ordinal(qualiSpeedPos + 1),
-      detail:
-        delta < 1
-          ? `of ${qualiSpeedRanking.length} — ${Math.round(playerSpd)} km/h`
-          : `of ${qualiSpeedRanking.length} — ${Math.round(playerSpd)} km/h (${Math.round(delta)} off P1)`,
-      tooltip: "Session top speed ranking across all drivers",
-      rank: qualiSpeedPos,
-      rankTotal: qualiSpeedRanking.length,
-    });
-  }
-
-  // 3. Sector rankings
+  // 2. Sector rankings
   const playerValid = getValidLaps(
     player["session-history"]["lap-history-data"],
   );
@@ -147,7 +120,7 @@ export function generateQualiInsights(
       }
     }
 
-    // 4. Theoretical best lap
+    // 3. Theoretical best lap
     const bestS1 = bestSectorTimeMs(playerValid, 1);
     const bestS2 = bestSectorTimeMs(playerValid, 2);
     const bestS3 = bestSectorTimeMs(playerValid, 3);
@@ -174,7 +147,7 @@ export function generateQualiInsights(
     }
   }
 
-  // 5. Consistency
+  // 4. Consistency
   if (playerValid.length > 1) {
     const stdDev = lapTimeStdDev(playerValid);
     if (stdDev > 0) {
@@ -202,7 +175,7 @@ export function generateQualiInsights(
     }
   }
 
-  // 6. ERS harvest ranking — in quali, signals out-lap charging discipline (F1 26)
+  // 5. ERS harvest ranking — in quali, signals out-lap charging discipline (F1 26)
   const qualiHarv = qualiAvgErsHarvestMj(player);
   if (qualiHarv > 0) {
     const harvRanking: { driver: DriverData; avgHarv: number }[] = [];

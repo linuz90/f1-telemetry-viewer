@@ -2,7 +2,8 @@
  * Generates trimmed demo telemetry files from real session data.
  * Keeps the player + top 5 other drivers to reduce file size.
  *
- * Usage: npx tsx scripts/generate-demo-data.ts
+ * Usage: TELEMETRY_DIR=/path/to/data pnpm generate-demo
+ *        (or set TELEMETRY_DIR in .env)
  *
  * Source files are hardcoded below — update paths if the originals move.
  */
@@ -16,9 +17,6 @@ import type {
 import { toSlug } from "../src/utils/parseFilename.ts";
 import { buildSessionSummary } from "../src/utils/sessionSummary.ts";
 import { buildSyntheticOnlineRaces } from "./generate-demo-synthetic.ts";
-
-const FALLBACK_TELEMETRY_DIR =
-  "/Users/linuz90/Library/CloudStorage/OneDrive-Personal/Pits & Giggles/data";
 
 function unquote(value: string): string {
   return value.trim().replace(/^['"]|['"]$/g, "");
@@ -35,7 +33,9 @@ function readTelemetryDir(): string {
     if (match?.[1]) return unquote(match[1]);
   }
 
-  return FALLBACK_TELEMETRY_DIR;
+  throw new Error(
+    "TELEMETRY_DIR is not set. Export it or add it to .env before generating demo data.",
+  );
 }
 
 const TELEMETRY_DIR = readTelemetryDir();
@@ -199,7 +199,7 @@ fullManifest.sort(
 );
 
 const manifestPath = path.join(OUT_DIR, "sessions.json");
-fs.writeFileSync(manifestPath, JSON.stringify(fullManifest, null, 2));
+fs.writeFileSync(manifestPath, `${JSON.stringify(fullManifest, null, 2)}\n`);
 console.log(
   `Manifest written to ${manifestPath} (${fullManifest.length} sessions)`,
 );
