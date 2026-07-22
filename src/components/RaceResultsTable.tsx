@@ -312,12 +312,12 @@ export function RaceResultsTable({
                   >
                     <td className={tableCellClass()}>{entry.position}</td>
                     <td className={tableCellClass()}>
-                      <span
-                        className="inline-block w-1 h-3 rounded-sm mr-1.5 align-middle"
-                        style={{ backgroundColor: getTeamColor(entry.team) }}
-                      />
-                      <span className="inline-flex items-center gap-1.5">
-                        {entry.name}
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <span
+                          className="h-3 w-1 shrink-0 rounded-sm"
+                          style={{ backgroundColor: getTeamColor(entry.team) }}
+                        />
+                        <span>{entry.name}</span>
                         <PenaltyBadge penalties={penalties} />
                       </span>
                     </td>
@@ -458,12 +458,12 @@ export function RaceResultsTable({
                 >
                   <td className={tableCellClass()}>{fc.position}</td>
                   <td className={tableCellClass()}>
-                    <span
-                      className="inline-block w-1 h-3 rounded-sm mr-1.5 align-middle"
-                      style={{ backgroundColor: getTeamColor(d.team) }}
-                    />
-                    <span className="inline-flex items-center gap-1.5">
-                      {d["driver-name"]}
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                      <span
+                        className="h-3 w-1 shrink-0 rounded-sm"
+                        style={{ backgroundColor: getTeamColor(d.team) }}
+                      />
+                      <span>{d["driver-name"]}</span>
                       <PenaltyBadge penalties={penalties} />
                     </span>
                   </td>

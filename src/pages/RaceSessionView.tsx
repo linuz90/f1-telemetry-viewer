@@ -376,6 +376,15 @@ export function RaceSessionView({
           />
         </Card>
 
+        {/* Results table */}
+        <Card as="section">
+          <RaceResultsTable
+            session={session}
+            focusedDriverIndex={focusedDriverIndex}
+            raceControlEvents={raceControlEvents}
+          />
+        </Card>
+
         {/* Car setup */}
         {showSetup && focusedDriver["car-setup"] && (
           <Card as="section">
@@ -430,15 +439,6 @@ export function RaceSessionView({
             />
           </Card>
         )}
-
-        {/* Results table */}
-        <Card as="section">
-          <RaceResultsTable
-            session={session}
-            focusedDriverIndex={focusedDriverIndex}
-            raceControlEvents={raceControlEvents}
-          />
-        </Card>
 
         {/* Where overtakes and collisions happened on track. Gated on total
             (not located) events so sessions missing location fields still
