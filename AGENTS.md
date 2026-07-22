@@ -32,6 +32,7 @@ pnpm test:lap-stats           # Run complete-lap timing regressions
 pnpm test:race-pace           # Run Race Pace estimator/matching regressions
 pnpm test:energy-stats        # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                # Run fuel aggregation and recommendation tests
+pnpm test:speed               # Run canonical speed/aero inference regressions
 pnpm typecheck:node           # Type-check Node servers/plugins/scripts
 pnpm benchmark:session-index  # Benchmark a disposable generated corpus
 ```
@@ -152,6 +153,14 @@ ERS:
 - Keep explicit zero-harvest laps in the average, exclude pre-race/final-reset and neutralized laps, and allow slight values above 100% from packet timing.
 - Older exports without a harvest limit should retain raw harvested energy (`MJ/lap`) instead of inventing a utilization percentage.
 - Show battery-store values as percentages only when explicitly displaying remaining store.
+
+Speed:
+
+- Use `src/analysis/speedAnalysis.ts` for every product-facing speed value; do not read raw `top-speed-kmph` fields directly in pages or components.
+- Keep the meanings explicit: Session peak is the highest credible session observation, Lap peak is one completed lap's maximum, Representative high speed is the upper end of repeated eligible laps, and Speed trap is the best fixed-gate crossing.
+- `speed-trap-records` is authoritative for trap value/rank. Attach its lap only when `lap-data` reports a matching trap speed; race numbers are not unique enough for identity.
+- Aero tendency is a conservative race-only inference from repeated same-lap comparisons, not recorded setup truth. Keep absolute speeds and deltas typed separately, cap current-export confidence at Medium, and show why evidence is inconclusive.
+- Never use bare `Top Speed` for session peak, lap peak, trap speed, or a driver delta.
 
 Tyre wear:
 

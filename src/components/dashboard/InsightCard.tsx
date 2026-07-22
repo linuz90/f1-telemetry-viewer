@@ -90,7 +90,7 @@ const INSIGHT_STYLES: Record<InsightKind, InsightStyle> = {
     accent: "violet",
   },
   "lap-one-starter": { title: "Lap-1 Starter", icon: Rocket, accent: "sky" },
-  "top-speed-king": { title: "Top Speed King", icon: Gauge, accent: "cyan" },
+  "speed-trap-rank": { title: "Speed Trap Rank", icon: Gauge, accent: "cyan" },
   "tyre-whisperer": { title: "Tyre Whisperer", icon: Disc, accent: "lime" },
   "sector-specialist": {
     title: "Sector Specialist",

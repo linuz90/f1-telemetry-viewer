@@ -16,7 +16,7 @@ Supports recent F1 (and F2) telemetry, including the newly released **2026 Seaso
 - 🏁 **Results dashboard** - See your real race form at a glance: average finish, podiums, wins, front-row starts, top-five rate, DNFs, grid gain, recent results, best and toughest tracks, comeback drives, lap-one gains, fastest-lap highlights, and tyre-management patterns.
 - 🧭 **Formula scopes** - Keep F1 26, F1 25, F2 25, and older data separate with one app-wide selector and clean scoped URLs such as `/f1-26`, `/f1-26/tracks/sakhir`, and `/f1-26/sessions/session-slug`.
 - 🤝 **Rivals & teammates** - Aggregate online race rosters into teammate pace, frequent rivals, head-to-heads, fastest-lap threats, pole sitters, overtakers, and other repeat patterns.
-- 📊 **Session detail** - Open any race or qualifying session for lap-by-lap charts, sector tables, stint timelines, tyre wear, damage, ERS, fuel, position history, and driver-vs-driver deltas.
+- 📊 **Session detail** - Open any race or qualifying session for lap-by-lap charts, sector tables, stint timelines, tyre wear, damage, ERS, fuel, position history, canonical peak/trap speeds, and a cautious rival aero tendency backed by comparable-lap evidence.
 - 🗺️ **Track progress** - Drill into a circuit within the active game scope to review best laps, qualifying progression, race pace, setup history, tyre life, fuel usage, and every saved session for that track.
 - 🔒 **Private data loading** - Use the local API during development, self-host against your telemetry folder, or drag in `.json` files / a `.zip` in the browser. Hosted uploads stay in memory and never leave your device.
 
@@ -87,6 +87,7 @@ pnpm test:lap-stats              # Run complete-lap timing regressions
 pnpm test:race-pace              # Run Race Pace estimator/matching regressions
 pnpm test:energy-stats           # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                   # Run the focused fuel-aggregation suite
+pnpm test:speed                  # Run canonical speed/aero inference regressions
 pnpm typecheck:node              # Type-check the servers, plugins, and scripts
 pnpm benchmark:session-index     # Benchmark a disposable 1,260-file corpus
 ```
@@ -100,10 +101,10 @@ your live telemetry folder. Add `--source-dir /path/to/safe/telemetry` to copy
 from a local representative corpus instead of the committed demo fixtures; the
 source remains read-only and only aggregate measurements are printed.
 
-The session-summary index, complete-lap timing, Race Pace estimation, and fuel
-aggregation have focused suites built on Node's test runner. No general UI test
-runner or linter is configured; `pnpm build` remains the main whole-app
-validation command.
+The session-summary index, complete-lap timing, Race Pace estimation, fuel
+aggregation, and speed/aero inference have focused suites built on Node's test
+runner. No general UI test runner or linter is configured; `pnpm build` remains
+the main whole-app validation command.
 
 For debugging shared repro files without pointing at your full telemetry history, put the files in a small folder and launch against that folder:
 

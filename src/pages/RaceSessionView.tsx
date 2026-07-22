@@ -7,6 +7,10 @@ import {
 } from "../analysis/sessionInsightSummary";
 import { buildEventLocationBreakdown } from "../analysis/eventLocationBreakdown";
 import { buildStartReactionModel } from "../analysis/startReactionAnalysis";
+import {
+  buildDriverSpeedComparison,
+  buildSessionSpeedAnalysis,
+} from "../analysis/speedAnalysis";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { Card } from "../components/Card";
 import { CompoundLapComparison } from "../components/CompoundLapComparison";
@@ -25,6 +29,7 @@ import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
 import { StintComparisonTable } from "../components/StintComparisonTable";
 import { StintDetailCards, StintTimeline } from "../components/StintTimeline";
 import { StartReactionCard } from "../components/StartReactionCard";
+import { SpeedAeroComparison } from "../components/SpeedAeroComparison";
 import { TyreWearChart } from "../components/TyreWearChart";
 import { TrackSessionHistory } from "../components/track/TrackSessionHistory";
 import { Badge } from "../components/ui/Badge";
@@ -231,6 +236,22 @@ export function RaceSessionView({
   const rivalStints = getCompletedStints(rival ? getDriverStints(rival) : []);
   const rivalLaps = rival?.["session-history"]["lap-history-data"] ?? [];
   const rivalPitLaps = rivalStints.slice(1).map((s) => s["start-lap"]);
+  const speedAnalysis = useMemo(
+    () => buildSessionSpeedAnalysis(session),
+    [session],
+  );
+  const speedComparison = useMemo(
+    () =>
+      focusedDriver && rival
+        ? buildDriverSpeedComparison(
+            session,
+            focusedDriver.index,
+            rival.index,
+            speedAnalysis,
+          )
+        : null,
+    [focusedDriver, rival, session, speedAnalysis],
+  );
 
   // Cumulative deltas (only when rival selected)
   const deltas = useMemo(() => {
@@ -262,8 +283,17 @@ export function RaceSessionView({
         focusedDriver,
         overtakes: filteredOvertakes,
         raceControlEvents,
+        includeSpeedProfile: !rival,
+        speedAnalysis,
       }),
-    [filteredOvertakes, focusedDriver, raceControlEvents, session],
+    [
+      filteredOvertakes,
+      focusedDriver,
+      raceControlEvents,
+      rival,
+      session,
+      speedAnalysis,
+    ],
   );
   const sessionInsights = useMemo(
     () => curateSessionInsights(session, [...summaryInsights, ...insights]),
@@ -332,6 +362,14 @@ export function RaceSessionView({
       <VStack className="mt-6 gap-6 sm:gap-8">
         <SessionInsightsGrid insights={sessionInsights} hint={insightsHint} />
 
+        {focusedDriver && rival && (
+          <SpeedAeroComparison
+            comparison={speedComparison}
+            focusedName={focusedDriver["driver-name"]}
+            rivalName={rival["driver-name"]}
+          />
+        )}
+
         {startReaction && <StartReactionCard model={startReaction} />}
 
         {/* Stint strategy + tyre wear */}
@@ -371,6 +409,11 @@ export function RaceSessionView({
             rivalLaps={rival ? rivalLaps : undefined}
             rivalName={rival?.["driver-name"]}
             perLapInfo={perLapInfo}
+            lapPeaks={
+              focusedDriver
+                ? speedAnalysis.profiles.get(focusedDriver.index)?.lapPeaks
+                : undefined
+            }
             damageLaps={damageLaps}
             stints={stints}
           />
@@ -380,6 +423,7 @@ export function RaceSessionView({
         <Card as="section">
           <RaceResultsTable
             session={session}
+            speedAnalysis={speedAnalysis}
             focusedDriverIndex={focusedDriverIndex}
             raceControlEvents={raceControlEvents}
           />

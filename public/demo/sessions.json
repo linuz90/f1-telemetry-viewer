@@ -4883,6 +4883,7 @@
     "date": "2026-02-07T11:33:48",
     "gameYear": 25,
     "packetFormat": 2025,
+    "sessionUid": "1242174885864499500",
     "validLapCount": 3,
     "lapIndicators": [
       "valid",
@@ -4899,6 +4900,10 @@
     "activeHumanDriverCount": 0,
     "weather": "Clear",
     "playerSetFastestLap": true,
+    "qualifyingPosition": 1,
+    "qualifyingFieldSize": 20,
+    "poleLapTime": "01:08.793",
+    "poleLapTimeMs": 68793,
     "fileSize": 609766,
     "isAutoSave": false
   },
@@ -4911,6 +4916,7 @@
     "date": "2026-01-26T22:14:52",
     "gameYear": 25,
     "packetFormat": 2025,
+    "sessionUid": "2821619641529246000",
     "validLapCount": 22,
     "aiDifficulty": 0,
     "isOnline": true,

@@ -34,6 +34,7 @@ import {
   buildTrackQualifyingInsights,
   type TrackQualifyingInsights,
 } from "./trackQualifyingInsights";
+import { buildSessionSpeedAnalysis } from "./speedAnalysis";
 
 /**
  * Track-page analysis pipeline.
@@ -68,7 +69,7 @@ export interface TrackSessionData {
   trackTemp: number;
   airTemp: number;
   aiDifficulty: number;
-  topSpeed: number;
+  sessionPeakKmh: number;
   attemptCount: number;
 }
 
@@ -184,6 +185,9 @@ export function buildTrackSessionData(
   const valid = getValidLaps(laps);
   const info = session["session-info"];
   const kind = getTrackSessionKind(session);
+  const speedProfile = buildSessionSpeedAnalysis(session).profiles.get(
+    player.index,
+  );
 
   return {
     summary,
@@ -211,7 +215,7 @@ export function buildTrackSessionData(
     trackTemp: info["track-temperature"],
     airTemp: info["air-temperature"],
     aiDifficulty: info["ai-difficulty"],
-    topSpeed: player["top-speed-kmph"],
+    sessionPeakKmh: speedProfile?.sessionPeak?.kmh ?? 0,
     attemptCount: 1,
   };
 }

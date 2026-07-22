@@ -14,7 +14,6 @@ import {
 } from "../utils/stats/energy";
 import {
   driverBestLapTimeMs,
-  driverTopSpeed,
   sessionDriverBestLapTimeMs,
 } from "../utils/stats/drivers";
 import {
@@ -40,6 +39,11 @@ import {
   getDriverStints,
   stintWearRate,
 } from "../utils/stats/tyres";
+import {
+  buildSessionSpeedAnalysis,
+  type SessionSpeedAnalysis,
+  type SpeedQuality,
+} from "./speedAnalysis";
 
 /**
  * Session-result and comparison table models.
@@ -55,7 +59,8 @@ export type RaceResultSortKey =
   | "bestLap"
   | "racePace"
   | "gap"
-  | "topSpeed"
+  | "sessionPeak"
+  | "speedTrap"
   | "ers"
   | "ersHarv"
   | "ersHarvestPct";
@@ -68,7 +73,12 @@ export interface RaceDriverStats {
   racePaceConfidence: RacePaceConfidence | null;
   racePaceRankEligible: boolean;
   racePaceRankingSampleThreshold: number;
-  topSpeed: number;
+  sessionPeakKmh: number | null;
+  sessionPeakQuality: SpeedQuality | null;
+  sessionPeakRank: number | null;
+  speedTrapKmh: number | null;
+  speedTrapQuality: "good" | "unattributed" | "suspect" | null;
+  speedTrapRank: number | null;
   ers: number;
   ersHarv: number;
   ersHarvestPct: number | null;
@@ -77,7 +87,9 @@ export interface RaceDriverStats {
 export interface RaceResultHighlights {
   bestLapMs: number;
   bestPaceMs: number;
-  bestSpeedKmh: number;
+  bestSessionPeakKmh: number;
+  bestSpeedTrapKmh: number;
+  hasSpeedTrap: boolean;
   bestErs: number;
   bestErsHarv: number;
   hasErsHarv: boolean;
@@ -139,27 +151,27 @@ function maxPositive(values: Iterable<number>): number {
 }
 
 export function buildRaceDriverStats(
-  drivers: readonly DriverData[],
-): Map<string, RaceDriverStats> {
+  session: TelemetrySession,
+  speedAnalysis: SessionSpeedAnalysis = buildSessionSpeedAnalysis(session),
+): Map<number, RaceDriverStats> {
+  const drivers = session["classification-data"];
   const paceEstimates = new Map(
-    drivers.map((driver) => [
-      driver["driver-name"],
-      getRacePaceEstimate(driver),
-    ]),
+    drivers.map((driver) => [driver.index, getRacePaceEstimate(driver)]),
   );
   const referenceSampleCount = getRacePaceReferenceSampleCount(
     paceEstimates.values(),
   );
   const rankingSampleThreshold =
     getRacePaceRankingSampleThreshold(referenceSampleCount);
-  const map = new Map<string, RaceDriverStats>();
+  const map = new Map<number, RaceDriverStats>();
   for (const driver of drivers) {
     const bestLap = driverBestLapTimeMs(driver);
-    const racePaceEstimate = paceEstimates.get(driver["driver-name"])!;
+    const racePaceEstimate = paceEstimates.get(driver.index)!;
+    const speedProfile = speedAnalysis.profiles.get(driver.index);
 
     // Race pace uses eligible racing laps, not all valid laps, because pit
     // transitions and neutralized laps are valid telemetry but poor pace samples.
-    map.set(driver["driver-name"], {
+    map.set(driver.index, {
       bestLap,
       racePace: racePaceEstimate.timeMs ?? 0,
       racePaceLapCount: racePaceEstimate.sampleCount,
@@ -169,7 +181,12 @@ export function buildRaceDriverStats(
         referenceSampleCount,
       ),
       racePaceRankingSampleThreshold: rankingSampleThreshold,
-      topSpeed: driverTopSpeed(driver),
+      sessionPeakKmh: speedProfile?.sessionPeak?.kmh ?? null,
+      sessionPeakQuality: speedProfile?.sessionPeak?.quality ?? null,
+      sessionPeakRank: speedProfile?.sessionPeak?.rank ?? null,
+      speedTrapKmh: speedProfile?.speedTrap?.kmh ?? null,
+      speedTrapQuality: speedProfile?.speedTrap?.quality ?? null,
+      speedTrapRank: speedProfile?.speedTrap?.rank ?? null,
       ers: avgErsDeployMj(driver),
       ersHarv: avgErsHarvestMj(driver),
       ersHarvestPct: avgErsHarvestUtilization(driver),
@@ -179,7 +196,7 @@ export function buildRaceDriverStats(
 }
 
 export function buildRaceResultHighlights(
-  driverStats: Map<string, RaceDriverStats>,
+  driverStats: Map<number, RaceDriverStats>,
 ): RaceResultHighlights {
   const values = [...driverStats.values()];
   return {
@@ -189,12 +206,93 @@ export function buildRaceResultHighlights(
         .filter((stats) => stats.racePaceRankEligible)
         .map((stats) => stats.racePace),
     ),
-    bestSpeedKmh: maxPositive(values.map((stats) => stats.topSpeed)),
+    bestSessionPeakKmh: maxPositive(
+      values
+        .filter((stats) => stats.sessionPeakRank === 1)
+        .map((stats) => stats.sessionPeakKmh ?? 0),
+    ),
+    bestSpeedTrapKmh: maxPositive(
+      values
+        .filter((stats) => stats.speedTrapRank === 1)
+        .map((stats) => stats.speedTrapKmh ?? 0),
+    ),
+    hasSpeedTrap: values.some((stats) => stats.speedTrapKmh != null),
     bestErs: maxPositive(values.map((stats) => stats.ers)),
     bestErsHarv: maxPositive(values.map((stats) => stats.ersHarv)),
     hasErsHarv: values.some((stats) => stats.ersHarv > 0),
     hasErsHarvestPct: values.some((stats) => stats.ersHarvestPct != null),
   };
+}
+
+function normalizeDriverName(name: string): string {
+  return name.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
+/**
+ * Modern stint rows carry the car index. Legacy exports only have names, so
+ * fall back to a normalized name only when it identifies exactly one driver.
+ */
+export function resolveRaceResultDriverIndex(
+  entry: Pick<TyreStintHistoryV2Entry, "index" | "name">,
+  drivers: readonly DriverData[],
+): number | undefined {
+  if (
+    typeof entry.index === "number" &&
+    drivers.some((driver) => driver.index === entry.index)
+  ) {
+    return entry.index;
+  }
+
+  const key = normalizeDriverName(entry.name);
+  const matches = drivers.filter(
+    (driver) => normalizeDriverName(driver["driver-name"]) === key,
+  );
+  return matches.length === 1 ? matches[0]!.index : undefined;
+}
+
+export function raceDriverStatsForEntry(
+  entry: Pick<TyreStintHistoryV2Entry, "index" | "name">,
+  drivers: readonly DriverData[],
+  driverStats: Map<number, RaceDriverStats>,
+): RaceDriverStats | undefined {
+  const driverIndex = resolveRaceResultDriverIndex(entry, drivers);
+  return driverIndex == null ? undefined : driverStats.get(driverIndex);
+}
+
+function speedSortBucket(
+  value: number | null | undefined,
+  quality: SpeedQuality | "unattributed" | null | undefined,
+  metric: "sessionPeak" | "speedTrap",
+): number {
+  if (value == null || !Number.isFinite(value) || value <= 0) return 2;
+  if (metric === "sessionPeak") return quality === "good" ? 0 : 1;
+  return quality === "suspect" ? 1 : 0;
+}
+
+function compareSpeedStats(
+  statsA: RaceDriverStats | undefined,
+  statsB: RaceDriverStats | undefined,
+  metric: "sessionPeak" | "speedTrap",
+  sortDir: SortDirection,
+): number {
+  const valueA =
+    metric === "sessionPeak" ? statsA?.sessionPeakKmh : statsA?.speedTrapKmh;
+  const qualityA =
+    metric === "sessionPeak"
+      ? statsA?.sessionPeakQuality
+      : statsA?.speedTrapQuality;
+  const valueB =
+    metric === "sessionPeak" ? statsB?.sessionPeakKmh : statsB?.speedTrapKmh;
+  const qualityB =
+    metric === "sessionPeak"
+      ? statsB?.sessionPeakQuality
+      : statsB?.speedTrapQuality;
+  const bucketDelta =
+    speedSortBucket(valueA, qualityA, metric) -
+    speedSortBucket(valueB, qualityB, metric);
+  if (bucketDelta !== 0) return bucketDelta;
+  const comparison = (valueB ?? 0) - (valueA ?? 0);
+  return sortDir === "desc" ? -comparison : comparison;
 }
 
 export function buildPenaltiesByDriver(
@@ -231,24 +329,33 @@ export function sortRaceStintHistoryRows({
   entries,
   focusedOnly,
   focusedName,
+  focusedDriverIndex,
   sortKey,
   sortDir,
+  drivers,
   driverStats,
 }: {
   entries: readonly TyreStintHistoryV2Entry[];
   focusedOnly: boolean;
   focusedName?: string;
+  focusedDriverIndex?: number;
   sortKey: RaceResultSortKey;
   sortDir: SortDirection;
-  driverStats: Map<string, RaceDriverStats>;
+  drivers: readonly DriverData[];
+  driverStats: Map<number, RaceDriverStats>;
 }): TyreStintHistoryV2Entry[] {
   const filtered = focusedOnly
-    ? entries.filter((entry) => entry.name === focusedName)
+    ? entries.filter((entry) => {
+        const driverIndex = resolveRaceResultDriverIndex(entry, drivers);
+        return driverIndex != null
+          ? driverIndex === focusedDriverIndex
+          : entry.name === focusedName;
+      })
     : [...entries];
 
   return [...filtered].sort((a, b) => {
-    const statsA = driverStats.get(a.name);
-    const statsB = driverStats.get(b.name);
+    const statsA = raceDriverStatsForEntry(a, drivers, driverStats);
+    const statsB = raceDriverStatsForEntry(b, drivers, driverStats);
 
     // Limited-evidence values stay inspectable but never lead a user-sorted
     // pace table in either direction; they are not part of the ranked field.
@@ -282,9 +389,9 @@ export function sortRaceStintHistoryRows({
         comparison =
           (statsA?.racePace || Infinity) - (statsB?.racePace || Infinity);
         break;
-      case "topSpeed":
-        comparison = (statsB?.topSpeed || 0) - (statsA?.topSpeed || 0);
-        break;
+      case "sessionPeak":
+      case "speedTrap":
+        return compareSpeedStats(statsA, statsB, sortKey, sortDir);
       case "ers":
         comparison = (statsB?.ers || 0) - (statsA?.ers || 0);
         break;
@@ -310,19 +417,42 @@ export function buildFallbackRaceRows({
   drivers,
   focusedOnly,
   focusedDriverIndex,
+  sortKey = "pos",
+  sortDir = "asc",
+  driverStats,
 }: {
   drivers: readonly DriverData[];
   focusedOnly: boolean;
   focusedDriverIndex: number;
+  sortKey?: RaceResultSortKey;
+  sortDir?: SortDirection;
+  driverStats?: Map<number, RaceDriverStats>;
 }): DriverData[] {
-  return [...drivers]
+  const filtered = [...drivers]
     .filter((driver) => driver["final-classification"])
-    .filter((driver) => !focusedOnly || driver.index === focusedDriverIndex)
-    .sort(
-      (a, b) =>
-        (a["final-classification"]?.position ?? 99) -
-        (b["final-classification"]?.position ?? 99),
-    );
+    .filter((driver) => !focusedOnly || driver.index === focusedDriverIndex);
+
+  return filtered.sort((a, b) => {
+    const statsA = driverStats?.get(a.index);
+    const statsB = driverStats?.get(b.index);
+    let comparison = 0;
+    switch (sortKey) {
+      case "bestLap":
+        comparison =
+          (statsA?.bestLap || Infinity) - (statsB?.bestLap || Infinity);
+        break;
+      case "sessionPeak":
+      case "speedTrap":
+        return compareSpeedStats(statsA, statsB, sortKey, sortDir);
+      case "pos":
+      default:
+        comparison =
+          (a["final-classification"]?.position ?? 99) -
+          (b["final-classification"]?.position ?? 99);
+        break;
+    }
+    return sortDir === "desc" ? -comparison : comparison;
+  });
 }
 
 export function formatRaceGap(entry: TyreStintHistoryV2Entry): string {

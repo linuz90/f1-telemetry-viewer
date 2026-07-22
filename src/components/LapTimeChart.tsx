@@ -67,6 +67,12 @@ interface LapTimeChartProps {
   rivalName?: string;
   /** Per-lap info for SC/VSC status and ERS data */
   perLapInfo?: PerLapInfo[];
+  /** Canonical lap peaks; rejected samples are intentionally absent in UI. */
+  lapPeaks?: readonly {
+    lap: number;
+    kmh: number;
+    accepted: boolean;
+  }[];
   /** Laps where damage increased (shown with red shading) */
   damageLaps?: number[];
   /** Tyre stints to group laps by */
@@ -86,6 +92,7 @@ export function LapTimeChart({
   rivalLaps,
   rivalName,
   perLapInfo,
+  lapPeaks,
   damageLaps = [],
   stints,
 }: LapTimeChartProps) {
@@ -122,6 +129,7 @@ export function LapTimeChart({
     rivalPitLaps,
     rivalLaps,
     perLapInfo,
+    lapPeaks,
     stints,
     showCleanLaps,
   });
@@ -142,8 +150,8 @@ export function LapTimeChart({
   const showBatteryDetails = hasBattery && showBattery;
   const maxErsMj = analysis.maxErsMj;
   const hasFuel = analysis.hasFuel;
-  const hasTopSpeed = analysis.hasTopSpeed;
-  const bestTopSpeed = analysis.bestTopSpeed;
+  const hasLapPeak = analysis.hasLapPeak;
+  const bestLapPeakKmh = analysis.bestLapPeakKmh;
   const hasCleanLapOutliers = analysis.hasCleanLapOutliers;
   const chartBestTime = analysis.chartBestTime;
   const tableBestTime = analysis.tableBestTime;
@@ -491,7 +499,7 @@ export function LapTimeChart({
 
           const colCount =
             5 +
-            (hasTopSpeed ? 1 : 0) +
+            (hasLapPeak ? 1 : 0) +
             (showBatteryDetails && hasErs ? 1 : 0) +
             (showBatteryDetails && hasErsHarv ? 1 : 0) +
             (hasWear ? 1 : 0) +
@@ -519,11 +527,12 @@ export function LapTimeChart({
               >
                 S3
               </th>
-              {hasTopSpeed && (
+              {hasLapPeak && (
                 <th
                   className={tableHeadCellClass({ align: "right", size: "sm" })}
+                  title="Highest credible speed recorded anywhere on this completed lap. Rejected telemetry glitches are omitted."
                 >
-                  Speed
+                  Lap peak (km/h)
                 </th>
               )}
               {hasWear && (
@@ -651,7 +660,7 @@ export function LapTimeChart({
                 >
                   {msToSectorTime(d.s3 * 1000)}
                 </td>
-                {hasTopSpeed && (
+                {hasLapPeak && (
                   <td
                     className={cn(
                       tableCellClass({
@@ -660,13 +669,13 @@ export function LapTimeChart({
                         mono: true,
                       }),
                       d.valid &&
-                        d.topSpeed != null &&
-                        d.topSpeed === bestTopSpeed
+                        d.lapPeakKmh != null &&
+                        d.lapPeakKmh === bestLapPeakKmh
                         ? "text-best font-semibold"
                         : "",
                     )}
                   >
-                    {d.topSpeed != null ? `${d.topSpeed}` : "–"}
+                    {d.lapPeakKmh != null ? `${d.lapPeakKmh}` : "–"}
                   </td>
                 )}
                 {hasWear && (

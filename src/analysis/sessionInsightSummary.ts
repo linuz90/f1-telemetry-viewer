@@ -18,6 +18,10 @@ import type { StrategyInsight } from "../utils/stats/insightTypes";
 import { getValidLaps, isCompleteValidLap } from "../utils/stats/laps";
 import { getLapCompoundMap } from "../utils/stats/tyres";
 import { isSafetyCarStatus } from "./safetyCar";
+import {
+  buildSessionSpeedAnalysis,
+  type SessionSpeedAnalysis,
+} from "./speedAnalysis";
 
 /**
  * Raw per-session insight facts: result, best lap, incidents, weather, damage,
@@ -70,6 +74,8 @@ export interface BuildSessionSummaryInsightsOptions {
   focusedDriver: DriverData | undefined;
   overtakes?: OvertakeRecord[];
   raceControlEvents?: RaceControlEvent[];
+  includeSpeedProfile?: boolean;
+  speedAnalysis?: SessionSpeedAnalysis;
 }
 
 interface DriverResult {
@@ -729,11 +735,52 @@ function buildRaceControlIncidentInsight(
   };
 }
 
+function buildSpeedProfileInsight(
+  session: TelemetrySession,
+  driver: DriverData,
+  analysis?: SessionSpeedAnalysis,
+): SessionInsight | null {
+  const profile = (analysis ?? buildSessionSpeedAnalysis(session)).profiles.get(
+    driver.index,
+  );
+  const peak = profile?.sessionPeak;
+  if (!peak) return null;
+
+  const peakRank =
+    peak.rank != null && peak.fieldSize != null
+      ? ` · P${peak.rank}/${peak.fieldSize}`
+      : peak.quality === "limited"
+        ? " · unranked"
+        : "";
+  const trap = profile?.speedTrap;
+  const trapRank =
+    trap?.rank != null && trap.fieldSize != null
+      ? ` · P${trap.rank}/${trap.fieldSize}`
+      : "";
+
+  return {
+    type: "speed",
+    label: "Speed Profile",
+    value: `${Math.round(peak.kmh)} km/h`,
+    detail: `session peak${peakRank}`,
+    tooltip:
+      "Session peak is the highest credible speed observed in the session. It is normally completed-lap-backed; a Limited session-only fallback stays unranked. Speed trap is the best fixed measurement-point crossing.",
+    rank: peak.rank != null ? peak.rank - 1 : undefined,
+    rankTotal: peak.fieldSize,
+    accent: "sky",
+    extraDetails: trap
+      ? [`Speed trap: ${trap.kmh.toFixed(1)} km/h${trapRank}`]
+      : undefined,
+  };
+}
+
 export function buildSessionSummaryInsights({
   session,
   focusedDriver,
   overtakes = [],
   raceControlEvents = [],
+  includeSpeedProfile = true,
+  speedAnalysis,
 }: BuildSessionSummaryInsightsOptions): SessionInsight[] {
   if (!focusedDriver) return [];
   const eventGroupLabel = focusedDriver["is-player"]
@@ -747,6 +794,9 @@ export function buildSessionSummaryInsights({
       ? buildRaceResultInsight(session, focusedDriver)
       : buildQualifyingResultInsight(session, focusedDriver),
     buildBestLapInsight(session, focusedDriver),
+    includeSpeedProfile
+      ? buildSpeedProfileInsight(session, focusedDriver, speedAnalysis)
+      : null,
     isRaceSession(session)
       ? buildRaceFlowInsight(session, focusedDriver, overtakes)
       : null,

@@ -6,15 +6,17 @@ import {
   buildRaceResultHighlights,
   formatRaceGap,
   formatRaceStrategy,
+  raceDriverStatsForEntry,
+  resolveRaceResultDriverIndex,
   sortRaceStintHistoryRows,
   type RaceResultSortKey,
   type SortDirection,
   type RaceDriverStats,
 } from "../analysis/resultsAnalysis";
+import type { SessionSpeedAnalysis } from "../analysis/speedAnalysis";
 import type { RaceControlEvent, TelemetrySession } from "../types/telemetry";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { msToLapTime } from "../utils/format";
-import { driverTopSpeed } from "../utils/stats/drivers";
 import {
   ERS_HARVEST_UTILIZATION_TOOLTIP,
   RACE_PACE_TOOLTIP,
@@ -38,6 +40,7 @@ import { formatPenaltySummary } from "../utils/raceControl";
 
 interface RaceResultsTableProps {
   session: TelemetrySession;
+  speedAnalysis?: SessionSpeedAnalysis;
   focusedDriverIndex: number;
   raceControlEvents?: RaceControlEvent[];
 }
@@ -90,6 +93,7 @@ function racePaceEvidenceLabel(stats: RaceDriverStats | undefined): string {
  */
 export function RaceResultsTable({
   session,
+  speedAnalysis,
   focusedDriverIndex,
   raceControlEvents = [],
 }: RaceResultsTableProps) {
@@ -102,7 +106,10 @@ export function RaceResultsTable({
   const focusedDriver = drivers.find((d) => d.index === focusedDriverIndex);
   const focusedName = focusedDriver?.["driver-name"];
 
-  const driverStats = useMemo(() => buildRaceDriverStats(drivers), [drivers]);
+  const driverStats = useMemo(
+    () => buildRaceDriverStats(session, speedAnalysis),
+    [session, speedAnalysis],
+  );
   const penaltiesByDriver = useMemo(
     () => buildPenaltiesByDriver(raceControlEvents),
     [raceControlEvents],
@@ -114,11 +121,22 @@ export function RaceResultsTable({
       entries: stintHistory,
       focusedOnly,
       focusedName,
+      focusedDriverIndex,
       sortKey,
       sortDir,
+      drivers,
       driverStats,
     });
-  }, [driverStats, focusedName, focusedOnly, sortDir, sortKey, stintHistory]);
+  }, [
+    driverStats,
+    drivers,
+    focusedDriverIndex,
+    focusedName,
+    focusedOnly,
+    sortDir,
+    sortKey,
+    stintHistory,
+  ]);
 
   function toggleSort(key: RaceResultSortKey) {
     if (sortKey === key) {
@@ -137,11 +155,10 @@ export function RaceResultsTable({
 
   const thClass = (align: "left" | "right" = "left") =>
     tableHeadCellClass({ align, sortable: true });
+  const highlights = buildRaceResultHighlights(driverStats);
 
   // Use tyre-stint-history-v2 if available (has clean per-driver race results)
   if (stintHistory?.length) {
-    const highlights = buildRaceResultHighlights(driverStats);
-
     return (
       <div>
         <SectionHeader
@@ -203,16 +220,38 @@ export function RaceResultsTable({
                 </th>
                 <th
                   className={thClass("right")}
-                  onClick={() => toggleSort("topSpeed")}
+                  onClick={() => toggleSort("sessionPeak")}
                 >
-                  <SortIcon
-                    column="topSpeed"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    side="left"
-                  />
-                  Top Speed
+                  <Tooltip text="Highest credible speed recorded anywhere in the session. Session-only fallback values remain visible but are not ranked.">
+                    <span>
+                      <SortIcon
+                        column="sessionPeak"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        side="left"
+                      />
+                      Peak (km/h)
+                    </span>
+                  </Tooltip>
                 </th>
+                {highlights.hasSpeedTrap && (
+                  <th
+                    className={thClass("right")}
+                    onClick={() => toggleSort("speedTrap")}
+                  >
+                    <Tooltip text="Best speed recorded at the circuit's fixed speed-trap point.">
+                      <span>
+                        <SortIcon
+                          column="speedTrap"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          side="left"
+                        />
+                        Trap (km/h)
+                      </span>
+                    </Tooltip>
+                  </th>
+                )}
                 <th
                   className={thClass("right")}
                   onClick={() => toggleSort("ers")}
@@ -272,17 +311,29 @@ export function RaceResultsTable({
             </thead>
             <tbody>
               {sortedStintHistory.map((entry) => {
-                const isFocused = entry.name === focusedName;
+                const entryDriverIndex = resolveRaceResultDriverIndex(
+                  entry,
+                  drivers,
+                );
+                const isFocused =
+                  entryDriverIndex != null
+                    ? entryDriverIndex === focusedDriverIndex
+                    : entry.name === focusedName;
                 const status = entry["result-status"];
                 const gapStr = formatRaceGap(entry);
                 const stintStr = formatRaceStrategy(
                   entry["tyre-stint-history"] ?? [],
                 );
 
-                const stats = driverStats.get(entry.name);
+                const stats = raceDriverStatsForEntry(
+                  entry,
+                  drivers,
+                  driverStats,
+                );
                 const bestLap = stats?.bestLap ?? 0;
                 const racePace = stats?.racePace ?? 0;
-                const topSpeed = stats?.topSpeed ?? 0;
+                const sessionPeakKmh = stats?.sessionPeakKmh ?? null;
+                const speedTrapKmh = stats?.speedTrapKmh ?? null;
                 const ers = stats?.ers ?? 0;
                 const ersHarv = stats?.ersHarv ?? 0;
                 const ersHarvestPct = stats?.ersHarvestPct ?? null;
@@ -292,9 +343,8 @@ export function RaceResultsTable({
                   stats?.racePaceRankEligible === true &&
                   racePace > 0 &&
                   Math.abs(racePace - highlights.bestPaceMs) < 1;
-                const isBestSpeed =
-                  topSpeed > 0 &&
-                  Math.abs(topSpeed - highlights.bestSpeedKmh) < 1;
+                const isBestSessionPeak = stats?.sessionPeakRank === 1;
+                const isBestSpeedTrap = stats?.speedTrapRank === 1;
                 const isBestErs =
                   ers > 0 && Math.abs(ers - highlights.bestErs) < 0.1;
                 const isBestErsHarv =
@@ -359,11 +409,30 @@ export function RaceResultsTable({
                     <td
                       className={cn(
                         tableCellClass({ align: "right", mono: true }),
-                        isBestSpeed && "text-best",
+                        isBestSessionPeak && "text-best",
+                        stats?.sessionPeakQuality === "limited" &&
+                          "text-zinc-500",
                       )}
+                      title={
+                        stats?.sessionPeakQuality === "limited"
+                          ? "Limited: only the session-level speed was available, so this value is not ranked."
+                          : undefined
+                      }
                     >
-                      {topSpeed > 0 ? `${Math.round(topSpeed)}` : "–"}
+                      {sessionPeakKmh != null
+                        ? `${Math.round(sessionPeakKmh)}`
+                        : "–"}
                     </td>
+                    {highlights.hasSpeedTrap && (
+                      <td
+                        className={cn(
+                          tableCellClass({ align: "right", mono: true }),
+                          isBestSpeedTrap && "text-best",
+                        )}
+                      >
+                        {speedTrapKmh != null ? speedTrapKmh.toFixed(1) : "–"}
+                      </td>
+                    )}
                     <td
                       className={cn(
                         tableCellClass({ align: "right", mono: true }),
@@ -417,6 +486,9 @@ export function RaceResultsTable({
     drivers,
     focusedOnly,
     focusedDriverIndex,
+    sortKey,
+    sortDir,
+    driverStats,
   });
 
   return (
@@ -432,21 +504,67 @@ export function RaceResultsTable({
         <table className={tableClass}>
           <thead className={tableHeadClass}>
             <tr>
-              <th className={tableHeadCellClass()}>Pos</th>
+              <th className={thClass()} onClick={() => toggleSort("pos")}>
+                Pos
+                <SortIcon column="pos" sortKey={sortKey} sortDir={sortDir} />
+              </th>
               <th className={tableHeadCellClass()}>Driver</th>
               <th className={tableHeadCellClass()}>Team</th>
-              <th className={tableHeadCellClass({ align: "right" })}>
+              <th
+                className={thClass("right")}
+                onClick={() => toggleSort("bestLap")}
+              >
+                <SortIcon
+                  column="bestLap"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  side="left"
+                />
                 Best Lap
               </th>
-              <th className={tableHeadCellClass({ align: "right" })}>
-                Top Speed
+              <th
+                className={thClass("right")}
+                onClick={() => toggleSort("sessionPeak")}
+              >
+                <Tooltip text="Highest credible speed recorded anywhere in the session. Session-only fallback values remain visible but are not ranked.">
+                  <span>
+                    <SortIcon
+                      column="sessionPeak"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      side="left"
+                    />
+                    Peak (km/h)
+                  </span>
+                </Tooltip>
               </th>
+              {highlights.hasSpeedTrap && (
+                <th
+                  className={thClass("right")}
+                  onClick={() => toggleSort("speedTrap")}
+                >
+                  <Tooltip text="Best speed recorded at the circuit's fixed speed-trap point.">
+                    <span>
+                      <SortIcon
+                        column="speedTrap"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        side="left"
+                      />
+                      Trap (km/h)
+                    </span>
+                  </Tooltip>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
             {fallbackSorted.map((d) => {
               const fc = d["final-classification"]!;
               const penalties = penaltiesByDriver.get(d["driver-name"]) ?? [];
+              const stats = driverStats.get(d.index);
+              const sessionPeakKmh = stats?.sessionPeakKmh ?? null;
+              const speedTrapKmh = stats?.speedTrapKmh ?? null;
               return (
                 <tr
                   key={d.index}
@@ -478,12 +596,32 @@ export function RaceResultsTable({
                     {fc["best-lap-time-str"] || "–"}
                   </td>
                   <td
-                    className={tableCellClass({ align: "right", mono: true })}
+                    className={cn(
+                      tableCellClass({ align: "right", mono: true }),
+                      stats?.sessionPeakRank === 1 && "text-best",
+                      stats?.sessionPeakQuality === "limited" &&
+                        "text-zinc-500",
+                    )}
+                    title={
+                      stats?.sessionPeakQuality === "limited"
+                        ? "Limited: only the session-level speed was available, so this value is not ranked."
+                        : undefined
+                    }
                   >
-                    {driverTopSpeed(d) > 0
-                      ? `${Math.round(driverTopSpeed(d))}`
+                    {sessionPeakKmh != null
+                      ? `${Math.round(sessionPeakKmh)}`
                       : "–"}
                   </td>
+                  {highlights.hasSpeedTrap && (
+                    <td
+                      className={cn(
+                        tableCellClass({ align: "right", mono: true }),
+                        stats?.speedTrapRank === 1 && "text-best",
+                      )}
+                    >
+                      {speedTrapKmh != null ? speedTrapKmh.toFixed(1) : "–"}
+                    </td>
+                  )}
                 </tr>
               );
             })}

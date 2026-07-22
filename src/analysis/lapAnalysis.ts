@@ -32,7 +32,7 @@ export interface LapAnalysisRow {
   s1: number;
   s2: number;
   s3: number;
-  topSpeed?: number;
+  lapPeakKmh?: number;
   rivalTimeSec?: number;
   scStatus: string;
   isSC: boolean;
@@ -66,8 +66,8 @@ export interface LapAnalysisModel {
   hasBattery: boolean;
   maxErsMj: number;
   hasFuel: boolean;
-  hasTopSpeed: boolean;
-  bestTopSpeed: number;
+  hasLapPeak: boolean;
+  bestLapPeakKmh: number;
   chartBestTime: number;
   tableBestTime: number;
   bestS1: number;
@@ -83,6 +83,12 @@ export interface BuildLapAnalysisOptions {
   rivalPitLaps?: readonly number[];
   rivalLaps?: readonly LapHistoryEntry[];
   perLapInfo?: readonly PerLapInfo[];
+  /** Canonical samples from speedAnalysis; rejected glitches stay hidden. */
+  lapPeaks?: readonly {
+    lap: number;
+    kmh: number;
+    accepted: boolean;
+  }[];
   stints?: readonly TyreStint[];
   showCleanLaps?: boolean;
 }
@@ -226,10 +232,19 @@ export function buildLapAnalysis({
   rivalPitLaps = [],
   rivalLaps,
   perLapInfo,
+  lapPeaks,
   stints,
   showCleanLaps = false,
 }: BuildLapAnalysisOptions): LapAnalysisModel {
   const lapInfoByNumber = buildPerLapInfoMap(perLapInfo);
+  const canonicalLapPeaks = new Map(
+    (lapPeaks ?? [])
+      .filter(
+        (sample) =>
+          sample.accepted && Number.isFinite(sample.kmh) && sample.kmh > 0,
+      )
+      .map((sample) => [sample.lap, sample.kmh]),
+  );
   const { burnByLap, medianGreenBurn } = buildFuelBurnModel(perLapInfo);
   const rivalByLap = buildRivalLapMap(rivalLaps);
   const wearByLap = buildWorstWearByLap(stints);
@@ -250,7 +265,9 @@ export function buildLapAnalysis({
         s1: sectorTimeMs(lap, 1) / 1000,
         s2: sectorTimeMs(lap, 2) / 1000,
         s3: sectorTimeMs(lap, 3) / 1000,
-        topSpeed: info?.["top-speed-kmph"] ?? undefined,
+        // Absence is meaningful: either no canonical sample exists or the
+        // shared speed policy rejected the raw lap value as a glitch.
+        lapPeakKmh: canonicalLapPeaks.get(lapNumber),
         rivalTimeSec: rivalByLap.get(lapNumber) ?? undefined,
         scStatus,
         isSC: isFullSafetyCarStatus(scStatus),
@@ -295,7 +312,7 @@ export function buildLapAnalysis({
     (row) => row.ersHarvMj != null && row.ersHarvMj > 0,
   );
   const hasBattery = hasErs || hasErsHarv;
-  const hasTopSpeed = rows.some((row) => row.topSpeed != null);
+  const hasLapPeak = rows.some((row) => row.lapPeakKmh != null);
   const maxLap = maxOrZero(rows.map((row) => row.lap)) || 1;
 
   return {
@@ -329,12 +346,12 @@ export function buildLapAnalysis({
         )
       : 0,
     hasFuel: rows.some((row) => row.fuelKg != null),
-    hasTopSpeed,
-    bestTopSpeed: hasTopSpeed
+    hasLapPeak,
+    bestLapPeakKmh: hasLapPeak
       ? maxOrZero(
           rows
-            .filter((row) => row.valid && row.topSpeed != null)
-            .map((row) => row.topSpeed!),
+            .filter((row) => row.valid && row.lapPeakKmh != null)
+            .map((row) => row.lapPeakKmh!),
         )
       : 0,
     // `chartBestTime` respects Clean Laps, while `tableBestTime` always marks
