@@ -34,7 +34,7 @@ import {
   buildTrackQualifyingInsights,
   type TrackQualifyingInsights,
 } from "./trackQualifyingInsights";
-import { buildSessionSpeedAnalysis } from "./speedAnalysis";
+import { buildSessionSpeedAnalysis, type SpeedQuality } from "./speedAnalysis";
 
 /**
  * Track-page analysis pipeline.
@@ -70,6 +70,7 @@ export interface TrackSessionData {
   airTemp: number;
   aiDifficulty: number;
   sessionPeakKmh: number;
+  sessionPeakQuality: SpeedQuality | null;
   attemptCount: number;
 }
 
@@ -216,6 +217,7 @@ export function buildTrackSessionData(
     airTemp: info["air-temperature"],
     aiDifficulty: info["ai-difficulty"],
     sessionPeakKmh: speedProfile?.sessionPeak?.kmh ?? 0,
+    sessionPeakQuality: speedProfile?.sessionPeak?.quality ?? null,
     attemptCount: 1,
   };
 }

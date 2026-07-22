@@ -562,8 +562,8 @@ function isPenaltyAssignedToDriver(
 }
 
 function buildSafetyCarInsight(driver: DriverData): SessionInsight | null {
-  const safetyLaps = (driver["per-lap-info"] ?? []).filter(
-    (lap) => isSafetyCarStatus(lap["max-safety-car-status"]),
+  const safetyLaps = (driver["per-lap-info"] ?? []).filter((lap) =>
+    isSafetyCarStatus(lap["max-safety-car-status"]),
   );
   if (safetyLaps.length === 0) return null;
 

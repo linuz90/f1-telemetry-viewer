@@ -157,6 +157,7 @@ ERS:
 Speed:
 
 - Use `src/analysis/speedAnalysis.ts` for every product-facing speed value; do not read raw `top-speed-kmph` fields directly in pages or components.
+- `src/analysis/speedProfileAnalysis.ts` is an internal implementation detail of that model; product callers still import `speedAnalysis.ts` only.
 - Keep the meanings explicit: Session peak is the highest credible session observation, Lap peak is one completed lap's maximum, Representative high speed is the upper end of repeated eligible laps, and Speed trap is the best fixed-gate crossing.
 - `speed-trap-records` is authoritative for trap value/rank. Attach its lap only when `lap-data` reports a matching trap speed; race numbers are not unique enough for identity.
 - Aero tendency is a conservative race-only inference from repeated same-lap comparisons, not recorded setup truth. Keep absolute speeds and deltas typed separately, cap current-export confidence at Medium, and show why evidence is inconclusive.

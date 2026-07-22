@@ -690,7 +690,19 @@ test("Track Progress consumes the canonical peak instead of a stale raw scalar",
     validLapCount: 2,
   } satisfies SessionSummary;
 
-  assert.equal(buildTrackSessionData(summary, race)?.sessionPeakKmh, 336);
+  const trackSession = buildTrackSessionData(summary, race);
+  assert.equal(trackSession?.sessionPeakKmh, 336);
+  assert.equal(trackSession?.sessionPeakQuality, "good");
+
+  const limitedSubject = driver(0, "Limited player", [], {
+    sessionPeak: 330,
+  });
+  const limitedTrackSession = buildTrackSessionData(
+    summary,
+    session([limitedSubject]),
+  );
+  assert.equal(limitedTrackSession?.sessionPeakKmh, 330);
+  assert.equal(limitedTrackSession?.sessionPeakQuality, "limited");
 });
 
 test("dashboard speed-trap rank normalizes placement across field sizes", () => {

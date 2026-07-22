@@ -3,6 +3,7 @@ import type {
   TrackSessionData,
   TrackSessionKind,
 } from "../../analysis/trackAnalysis";
+import type { SpeedQuality } from "../../analysis/speedAnalysis";
 import type { SessionSummary } from "../../types/telemetry";
 import {
   formatRelativeDate,
@@ -52,7 +53,8 @@ interface HistoryRow {
   weather?: string;
   trackTemp?: number;
   airTemp?: number;
-  topSpeed?: number;
+  sessionPeakKmh?: number;
+  sessionPeakQuality?: SpeedQuality | null;
   wearRate?: number;
 }
 
@@ -76,8 +78,8 @@ function historyComparisonLabels(session: HistoryRow): string[] {
     session.trackTemp != null && session.trackTemp > 0
       ? `T:${session.trackTemp}° A:${session.airTemp ?? "—"}°`
       : null,
-    session.topSpeed != null && session.topSpeed > 0
-      ? `${session.topSpeed} km/h`
+    session.sessionPeakKmh != null && session.sessionPeakKmh > 0
+      ? `${Math.round(session.sessionPeakKmh)} km/h session peak${session.sessionPeakQuality === "limited" ? " (Limited)" : ""}`
       : null,
     session.wearRate != null && session.wearRate > 0
       ? `${session.wearRate.toFixed(1)}% wear/lap`
@@ -119,7 +121,8 @@ function detailedHistoryRow(session: TrackSessionData): HistoryRow {
     weather: session.weather,
     trackTemp: session.trackTemp,
     airTemp: session.airTemp,
-    topSpeed: session.topSpeed,
+    sessionPeakKmh: session.sessionPeakKmh,
+    sessionPeakQuality: session.sessionPeakQuality,
     wearRate: session.wearRate,
   };
 }

@@ -110,7 +110,8 @@ function buildTrackRace(
     trackTemp: 0,
     airTemp: 0,
     aiDifficulty: 0,
-    topSpeed: 0,
+    sessionPeakKmh: 0,
+    sessionPeakQuality: null,
     attemptCount: 1,
   };
 }
