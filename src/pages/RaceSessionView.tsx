@@ -17,6 +17,7 @@ import { CompoundLapComparison } from "../components/CompoundLapComparison";
 import { DamageTimeline } from "../components/DamageTimeline";
 import { DriverComparisonPicker } from "../components/DriverComparisonPicker";
 import { DuplicateNotice } from "../components/DuplicateNotice";
+import { EmptyState } from "../components/EmptyState";
 import { EventLocationPieChart } from "../components/EventLocationPieChart";
 import { LapTimeChart } from "../components/LapTimeChart";
 import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
@@ -54,6 +55,9 @@ import { calculateCumulativeDeltas } from "../utils/stats/laps";
 import { generateInsights } from "../utils/stats/raceInsights";
 import { getCompletedStints, getDriverStints } from "../utils/stats/tyres";
 import { trackTabForSessionType } from "../utils/routes";
+
+const RACE_CONTROL_DISABLED_MESSAGE =
+  'This save has no race-control data. Enable "Save race control messages" under Save Data in settings before your next session to see this.';
 
 function timedRaceDrivers(drivers: DriverData[]): DriverData[] {
   return [...drivers]
@@ -474,59 +478,64 @@ export function RaceSessionView({
           />
         </Card>
 
-        {/* Race control */}
-        {raceControlEvents.length > 0 && (
+        {/* Race control, plus where overtakes and collisions happened on
+            track. All three depend on the same race-control data, so when
+            none was captured, show a single explanation instead of three
+            near-identical empty cards. */}
+        {raceControlEvents.length === 0 ? (
           <Card as="section">
-            <RaceControlTimeline
-              events={raceControlEvents}
-              focusedDriver={focusedDriver}
+            <EmptyState
+              title="Race Control"
+              message={RACE_CONTROL_DISABLED_MESSAGE}
             />
           </Card>
-        )}
-
-        {/* Where overtakes and collisions happened on track. Gated on total
-            (not located) events so sessions missing location fields still
-            render the cards with an explanation instead of silently
-            disappearing. */}
-        {(overtakeLocations.total > 0 || collisionLocations.total > 0) && (
-          <div className="grid gap-6 md:grid-cols-2">
+        ) : (
+          <>
             <Card as="section">
-              <EventLocationPieChart
-                title="Overtake Locations"
-                unit="overtake"
-                breakdown={overtakeLocations}
-                emptyMessage="No overtakes were recorded for this session."
-                focus={
-                  focusedDriver
-                    ? {
-                        driver: focusedDriver,
-                        mode: "overtaker",
-                        events: raceControlEvents,
-                        messageType: "OVERTAKE",
-                      }
-                    : undefined
-                }
+              <RaceControlTimeline
+                events={raceControlEvents}
+                focusedDriver={focusedDriver}
               />
             </Card>
-            <Card as="section">
-              <EventLocationPieChart
-                title="Collision Locations"
-                unit="collision"
-                breakdown={collisionLocations}
-                emptyMessage="No collisions were recorded for this session."
-                focus={
-                  focusedDriver
-                    ? {
-                        driver: focusedDriver,
-                        mode: "involved",
-                        events: raceControlEvents,
-                        messageType: "COLLISION",
-                      }
-                    : undefined
-                }
-              />
-            </Card>
-          </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card as="section">
+                <EventLocationPieChart
+                  title="Overtake Locations"
+                  unit="overtake"
+                  breakdown={overtakeLocations}
+                  emptyMessage="No overtakes were recorded for this session."
+                  focus={
+                    focusedDriver
+                      ? {
+                          driver: focusedDriver,
+                          mode: "overtaker",
+                          events: raceControlEvents,
+                          messageType: "OVERTAKE",
+                        }
+                      : undefined
+                  }
+                />
+              </Card>
+              <Card as="section">
+                <EventLocationPieChart
+                  title="Collision Locations"
+                  unit="collision"
+                  breakdown={collisionLocations}
+                  emptyMessage="No collisions were recorded for this session."
+                  focus={
+                    focusedDriver
+                      ? {
+                          driver: focusedDriver,
+                          mode: "involved",
+                          events: raceControlEvents,
+                          messageType: "COLLISION",
+                        }
+                      : undefined
+                  }
+                />
+              </Card>
+            </div>
+          </>
         )}
 
         <TrackSessionHistory
