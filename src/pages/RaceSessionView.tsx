@@ -480,8 +480,7 @@ export function RaceSessionView({
 
         {/* Race control, plus where overtakes and collisions happened on
             track. All three depend on the same race-control data, so when
-            none was captured, show a single explanation instead of three
-            near-identical empty cards. */}
+            none was captured, explain why instead of silently omitting them. */}
         {raceControlEvents.length === 0 ? (
           <Card as="section">
             <EmptyState
@@ -497,44 +496,48 @@ export function RaceSessionView({
                 focusedDriver={focusedDriver}
               />
             </Card>
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card as="section">
-                <EventLocationPieChart
-                  title="Overtake Locations"
-                  unit="overtake"
-                  breakdown={overtakeLocations}
-                  emptyMessage="No overtakes were recorded for this session."
-                  focus={
-                    focusedDriver
-                      ? {
-                          driver: focusedDriver,
-                          mode: "overtaker",
-                          events: raceControlEvents,
-                          messageType: "OVERTAKE",
-                        }
-                      : undefined
-                  }
-                />
-              </Card>
-              <Card as="section">
-                <EventLocationPieChart
-                  title="Collision Locations"
-                  unit="collision"
-                  breakdown={collisionLocations}
-                  emptyMessage="No collisions were recorded for this session."
-                  focus={
-                    focusedDriver
-                      ? {
-                          driver: focusedDriver,
-                          mode: "involved",
-                          events: raceControlEvents,
-                          messageType: "COLLISION",
-                        }
-                      : undefined
-                  }
-                />
-              </Card>
-            </div>
+            {/* Flags, fastest laps, and other timeline events do not give
+                either location chart anything to plot. */}
+            {(overtakeLocations.total > 0 || collisionLocations.total > 0) && (
+              <div className="grid gap-6 md:grid-cols-2">
+                <Card as="section">
+                  <EventLocationPieChart
+                    title="Overtake Locations"
+                    unit="overtake"
+                    breakdown={overtakeLocations}
+                    emptyMessage="No overtakes were recorded for this session."
+                    focus={
+                      focusedDriver
+                        ? {
+                            driver: focusedDriver,
+                            mode: "overtaker",
+                            events: raceControlEvents,
+                            messageType: "OVERTAKE",
+                          }
+                        : undefined
+                    }
+                  />
+                </Card>
+                <Card as="section">
+                  <EventLocationPieChart
+                    title="Collision Locations"
+                    unit="collision"
+                    breakdown={collisionLocations}
+                    emptyMessage="No collisions were recorded for this session."
+                    focus={
+                      focusedDriver
+                        ? {
+                            driver: focusedDriver,
+                            mode: "involved",
+                            events: raceControlEvents,
+                            messageType: "COLLISION",
+                          }
+                        : undefined
+                    }
+                  />
+                </Card>
+              </div>
+            )}
           </>
         )}
 
