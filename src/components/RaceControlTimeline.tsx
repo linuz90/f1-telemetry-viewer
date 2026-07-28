@@ -19,7 +19,6 @@ import {
   eventMatchesRaceControlFocus,
   formatRaceControlClock,
   formatRaceControlEvent,
-  formatRaceControlLap,
   formatRaceControlLocation,
   getRaceControlDriverInfos,
   getUnknownRaceControlDetails,
@@ -28,6 +27,7 @@ import {
   raceControlEventMatchesSearch,
 } from "../utils/raceControl";
 import { EmptyState } from "./EmptyState";
+import { RaceControlLapNavigator } from "./RaceControlLapNavigator";
 import { Badge } from "./ui/Badge";
 import { Button } from "./ui/Button";
 import { Eyebrow } from "./ui/Eyebrow";
@@ -53,6 +53,9 @@ const VIEW_MODE_OPTIONS = [
 ] as const;
 
 const ALL_MESSAGE_TYPES = "all";
+const ALL_LAPS = "all";
+const DEFAULT_LAP = "1";
+const SESSION_EVENTS = "session";
 const EVENT_PAGE_SIZE = 80;
 const EVENT_VIEWPORT_HEIGHT = "min-h-[22rem] md:min-h-[35rem]";
 
@@ -171,6 +174,7 @@ export function RaceControlTimeline({
   const [focusOnly, setFocusOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [messageTypeFilter, setMessageTypeFilter] = useState<string[]>([]);
+  const [lapFilter, setLapFilter] = useState(DEFAULT_LAP);
   const [visiblePageCount, setVisiblePageCount] = useState(1);
 
   const keyEventCount = useMemo(
@@ -179,6 +183,9 @@ export function RaceControlTimeline({
   );
 
   const firstTimestamp = events[0]?.timestamp;
+  const firstNumberedLapTimestamp = events.find(
+    (event) => typeof event["lap-number"] === "number",
+  )?.timestamp;
 
   const baseEvents = useMemo(
     () =>
@@ -223,9 +230,9 @@ export function RaceControlTimeline({
 
   useEffect(() => {
     setVisiblePageCount(1);
-  }, [focusOnly, messageTypeFilter, searchQuery, viewMode]);
+  }, [focusOnly, lapFilter, messageTypeFilter, searchQuery, viewMode]);
 
-  const visibleEvents = useMemo(
+  const matchingEvents = useMemo(
     () =>
       baseEvents.filter((event) => {
         if (
@@ -239,9 +246,74 @@ export function RaceControlTimeline({
           event,
           searchQuery,
           firstTimestamp,
+          formatRaceControlLapLabel(event, firstNumberedLapTimestamp),
         );
       }),
-    [baseEvents, firstTimestamp, messageTypeFilter, searchQuery],
+    [
+      baseEvents,
+      firstNumberedLapTimestamp,
+      firstTimestamp,
+      messageTypeFilter,
+      searchQuery,
+    ],
+  );
+
+  const lapOptions = useMemo<PillSelectOption[]>(() => {
+    const availableLapKeys = new Set(
+      events.map((event) =>
+        getRaceControlLapKey(event, firstNumberedLapTimestamp),
+      ),
+    );
+    const matchingCounts = new Map<string, number>();
+    for (const event of matchingEvents) {
+      const lapKey = getRaceControlLapKey(event, firstNumberedLapTimestamp);
+      matchingCounts.set(lapKey, (matchingCounts.get(lapKey) ?? 0) + 1);
+    }
+
+    const numberedLaps = [...availableLapKeys]
+      .filter((lapKey) => lapKey !== SESSION_EVENTS)
+      .sort((a, b) => Number(a) - Number(b));
+
+    return [
+      {
+        value: ALL_LAPS,
+        label: `All laps (${matchingEvents.length})`,
+      },
+      ...numberedLaps.map((lapKey) => ({
+        value: lapKey,
+        label: `Lap ${lapKey} (${matchingCounts.get(lapKey) ?? 0})`,
+      })),
+      ...(availableLapKeys.has(SESSION_EVENTS)
+        ? [
+            {
+              value: SESSION_EVENTS,
+              label: `Session (${matchingCounts.get(SESSION_EVENTS) ?? 0})`,
+            },
+          ]
+        : []),
+    ];
+  }, [events, firstNumberedLapTimestamp, matchingEvents]);
+
+  const activeLapFilter =
+    lapFilter === ALL_LAPS ||
+    lapOptions.some((option) => String(option.value) === lapFilter)
+      ? lapFilter
+      : ALL_LAPS;
+
+  useEffect(() => {
+    if (lapFilter !== activeLapFilter) setLapFilter(activeLapFilter);
+  }, [activeLapFilter, lapFilter]);
+
+  const visibleEvents = useMemo(
+    () =>
+      activeLapFilter === ALL_LAPS
+        ? matchingEvents
+        : matchingEvents.filter(
+            (event) =>
+              getRaceControlLapKey(event, firstNumberedLapTimestamp) ===
+              activeLapFilter,
+          ),
+    [activeLapFilter, firstNumberedLapTimestamp, matchingEvents],
   );
 
   const pagedEvents = useMemo(
@@ -258,19 +330,23 @@ export function RaceControlTimeline({
     const indexByKey = new Map<string, number>();
 
     for (const event of pagedEvents) {
-      const key =
-        event["lap-number"] == null ? "session" : `lap-${event["lap-number"]}`;
+      const lapKey = getRaceControlLapKey(event, firstNumberedLapTimestamp);
+      const key = lapKey === SESSION_EVENTS ? SESSION_EVENTS : `lap-${lapKey}`;
       let index = indexByKey.get(key);
       if (index == null) {
         index = grouped.length;
         indexByKey.set(key, index);
-        grouped.push({ key, label: formatRaceControlLap(event), events: [] });
+        grouped.push({
+          key,
+          label: formatRaceControlLapLabel(event, firstNumberedLapTimestamp),
+          events: [],
+        });
       }
       grouped[index].events.push(event);
     }
 
     return grouped;
-  }, [pagedEvents]);
+  }, [firstNumberedLapTimestamp, pagedEvents]);
 
   if (!events.length) return null;
 
@@ -281,10 +357,10 @@ export function RaceControlTimeline({
       <SectionHeader
         size="sm"
         title="Race Control"
-        hint={`${keyEventCount} key event${keyEventCount === 1 ? "" : "s"} / ${events.length} total`}
-        className="mb-5"
+        hint={`${keyEventCount} key event${keyEventCount === 1 ? "" : "s"} · ${events.length} total`}
+        className="mb-4"
         action={
-          <HStack wrap className="gap-4">
+          <HStack wrap className="gap-3 sm:gap-4">
             <SegmentedControl
               ariaLabel="Race control events"
               size="sm"
@@ -293,34 +369,60 @@ export function RaceControlTimeline({
               options={VIEW_MODE_OPTIONS}
             />
             {focusedDriver && (
-              <FocusToggle
-                label="Focus driver"
-                value={focusOnly}
-                onChange={() => setFocusOnly((value) => !value)}
-              />
+              <>
+                <span
+                  aria-hidden="true"
+                  className="hidden h-4 w-px bg-zinc-800 sm:block"
+                />
+                <FocusToggle
+                  label="Focus driver"
+                  value={focusOnly}
+                  onChange={() => setFocusOnly((value) => !value)}
+                />
+              </>
             )}
           </HStack>
         }
       />
 
-      <div className="mb-4 grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
-        <Input
-          type="search"
-          size="md"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Search events, drivers, locations..."
-          aria-label="Search race-control events"
-          leftAdornment={<Search aria-hidden="true" />}
-        />
-        <MultiPillSelect
-          value={messageTypeFilter}
-          onChange={setMessageTypeFilter}
-          options={messageTypeOptions}
-          ariaLabel="Filter race-control event type"
-          width="compact"
-          size="md"
-        />
+      <div className="mb-5 grid gap-3 rounded-xl bg-zinc-950/30 p-2.5 ring-1 ring-inset ring-white/[0.035] lg:grid-cols-2 2xl:grid-cols-[minmax(16rem,1fr)_minmax(11rem,15rem)_minmax(16rem,19rem)]">
+        <div className="min-w-0 lg:col-span-2 2xl:col-span-1">
+          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-zinc-600">
+            Search
+          </span>
+          <Input
+            type="search"
+            size="md"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Events, drivers, or locations..."
+            aria-label="Search race-control events"
+            leftAdornment={<Search aria-hidden="true" />}
+          />
+        </div>
+        <div className="min-w-0">
+          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-zinc-600">
+            Event type
+          </span>
+          <MultiPillSelect
+            value={messageTypeFilter}
+            onChange={setMessageTypeFilter}
+            options={messageTypeOptions}
+            ariaLabel="Filter race-control event type"
+            width="full"
+            size="md"
+          />
+        </div>
+        <div className="min-w-0">
+          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-zinc-600">
+            Lap navigation
+          </span>
+          <RaceControlLapNavigator
+            value={activeLapFilter}
+            options={lapOptions}
+            onChange={setLapFilter}
+          />
+        </div>
       </div>
 
       {visibleEvents.length === 0 ? (
@@ -332,6 +434,7 @@ export function RaceControlTimeline({
         </div>
       ) : (
         <ScrollArea
+          key={activeLapFilter}
           axis="y"
           className={
             pagedEvents.length > 8
@@ -389,6 +492,35 @@ export function RaceControlTimeline({
       </HStack>
     </div>
   );
+}
+
+function getRaceControlLapKey(
+  event: RaceControlEvent,
+  firstNumberedLapTimestamp: number | undefined,
+): string {
+  if (typeof event["lap-number"] === "number") {
+    return String(event["lap-number"]);
+  }
+
+  // PnG emits opening session messages before it starts attaching lap numbers.
+  // Keep those lights/session-start events with lap 1 without relabeling any
+  // truly session-wide message that arrives later.
+  if (
+    firstNumberedLapTimestamp != null &&
+    event.timestamp <= firstNumberedLapTimestamp
+  ) {
+    return "1";
+  }
+
+  return SESSION_EVENTS;
+}
+
+function formatRaceControlLapLabel(
+  event: RaceControlEvent,
+  firstNumberedLapTimestamp: number | undefined,
+): string {
+  const lapKey = getRaceControlLapKey(event, firstNumberedLapTimestamp);
+  return lapKey === SESSION_EVENTS ? "Session" : `Lap ${lapKey}`;
 }
 
 function RaceControlEventRow({
