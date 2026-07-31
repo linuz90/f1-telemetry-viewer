@@ -102,6 +102,28 @@ export function eventMatchesRaceControlFocus(
   );
 }
 
+/**
+ * A pit-lane overtake is a position swap that only happened because exactly one
+ * of the two drivers was in the pits — not a real on-track pass. When both are
+ * pitting (or neither is), the change is treated as a genuine overtake.
+ *
+ * Both flags must be present: older exports omit them, and PnG writes null when
+ * it cannot resolve a driver. Either way there is not enough information to call
+ * it a pit-lane pass, so it stays visible as a normal overtake.
+ */
+export function isPitLaneOvertake(event: RaceControlEvent): boolean {
+  if (event["message-type"] !== "OVERTAKE") return false;
+  const overtakerPitting = event["overtaker-pitting"];
+  const overtakenPitting = event["overtaken-pitting"];
+  if (
+    typeof overtakerPitting !== "boolean" ||
+    typeof overtakenPitting !== "boolean"
+  ) {
+    return false;
+  }
+  return overtakerPitting !== overtakenPitting;
+}
+
 export function raceControlEventsToOvertakes(
   events: RaceControlEvent[],
 ): OvertakeRecord[] {

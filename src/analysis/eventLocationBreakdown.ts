@@ -2,6 +2,7 @@ import type { DriverData, RaceControlEvent } from "../types/telemetry";
 import {
   formatRaceControlLocation,
   isDriverInvolvedInRaceControlEvent,
+  isPitLaneOvertake,
 } from "../utils/raceControl";
 
 /** A single slice of a location-breakdown pie chart. */
@@ -40,6 +41,18 @@ export function eventMatchesDriverFocus(
     );
   }
   return isDriverInvolvedInRaceControlEvent(event, driver);
+}
+
+/**
+ * Drop pit-lane position swaps. They happen at the pit entry/exit rather than
+ * where the cars were racing, so counting them as overtakes at that location
+ * would misreport where a track's passes actually happen. Charts offer a toggle
+ * to put them back.
+ */
+export function excludePitLaneOvertakes(
+  events: RaceControlEvent[],
+): RaceControlEvent[] {
+  return events.filter((event) => !isPitLaneOvertake(event));
 }
 
 /** Keep the pie readable — beyond this, the long tail folds into "Other". */
@@ -166,6 +179,8 @@ function hasLocatedIncident(events: RaceControlEvent[]): boolean {
 export interface TrackLocationBreakdown {
   overtakes: EventLocationBreakdown;
   collisions: EventLocationBreakdown;
+  /** Pooled events behind the breakdowns, so charts can re-bucket them. */
+  events: RaceControlEvent[];
   /** Races contributing to the pies (have located incidents). */
   locatedRaceCount: number;
   /** Races with incidents but no location data, excluded from the pies. */
@@ -203,8 +218,12 @@ export function buildTrackLocationBreakdowns(
   const events = source.flat();
 
   return {
-    overtakes: buildEventLocationBreakdown(events, "OVERTAKE"),
+    overtakes: buildEventLocationBreakdown(
+      excludePitLaneOvertakes(events),
+      "OVERTAKE",
+    ),
     collisions: buildEventLocationBreakdown(events, "COLLISION"),
+    events,
     locatedRaceCount: locatedRaces.length,
     excludedRaceCount,
   };

@@ -5,7 +5,10 @@ import {
   buildSessionInsightsHint,
   buildSessionSummaryInsights,
 } from "../analysis/sessionInsightSummary";
-import { buildEventLocationBreakdown } from "../analysis/eventLocationBreakdown";
+import {
+  buildEventLocationBreakdown,
+  excludePitLaneOvertakes,
+} from "../analysis/eventLocationBreakdown";
 import { buildStartReactionModel } from "../analysis/startReactionAnalysis";
 import {
   buildDriverSpeedComparison,
@@ -211,7 +214,11 @@ export function RaceSessionView({
     [raceControlEvents],
   );
   const overtakeLocations = useMemo(
-    () => buildEventLocationBreakdown(raceControlEvents, "OVERTAKE"),
+    () =>
+      buildEventLocationBreakdown(
+        excludePitLaneOvertakes(raceControlEvents),
+        "OVERTAKE",
+      ),
     [raceControlEvents],
   );
   const collisionLocations = useMemo(
@@ -506,14 +513,14 @@ export function RaceSessionView({
                     unit="overtake"
                     breakdown={overtakeLocations}
                     emptyMessage="No overtakes were recorded for this session."
+                    source={{
+                      events: raceControlEvents,
+                      messageType: "OVERTAKE",
+                    }}
+                    pitLaneToggle
                     focus={
                       focusedDriver
-                        ? {
-                            driver: focusedDriver,
-                            mode: "overtaker",
-                            events: raceControlEvents,
-                            messageType: "OVERTAKE",
-                          }
+                        ? { driver: focusedDriver, mode: "overtaker" }
                         : undefined
                     }
                   />
@@ -524,14 +531,13 @@ export function RaceSessionView({
                     unit="collision"
                     breakdown={collisionLocations}
                     emptyMessage="No collisions were recorded for this session."
+                    source={{
+                      events: raceControlEvents,
+                      messageType: "COLLISION",
+                    }}
                     focus={
                       focusedDriver
-                        ? {
-                            driver: focusedDriver,
-                            mode: "involved",
-                            events: raceControlEvents,
-                            messageType: "COLLISION",
-                          }
+                        ? { driver: focusedDriver, mode: "involved" }
                         : undefined
                     }
                   />

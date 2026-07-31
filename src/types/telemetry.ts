@@ -306,6 +306,8 @@ export interface RaceControlEvent {
   "driver-index"?: number;
   "overtaker-index"?: number;
   "overtaken-index"?: number;
+  "overtaker-pitting"?: boolean | null;
+  "overtaken-pitting"?: boolean | null;
   "penalty-type"?: string;
   "infringement-type"?: string;
   time?: number;

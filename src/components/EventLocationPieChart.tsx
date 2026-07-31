@@ -7,6 +7,7 @@ import type {
 import {
   buildEventLocationBreakdown,
   eventMatchesDriverFocus,
+  excludePitLaneOvertakes,
   isAggregateLocationLabel,
 } from "../analysis/eventLocationBreakdown";
 import {
@@ -15,36 +16,57 @@ import {
   LOCATION_OTHER_COLOR,
 } from "../constants/colors";
 import type { DriverData, RaceControlEvent } from "../types/telemetry";
+import { isPitLaneOvertake } from "../utils/raceControl";
 import { EmptyState } from "./EmptyState";
+// Aliased: `Tooltip` here would collide with the recharts chart tooltip below.
+import { Tooltip as HoverTooltip } from "./Tooltip";
 import { FocusToggle } from "./ui/FocusToggle";
 import { SectionHeader } from "./ui/SectionHeader";
+import { HStack } from "./ui/Stack";
+
+/** Raw events behind `breakdown`; required by either toggle to re-bucket. */
+interface EventLocationSource {
+  events: RaceControlEvent[];
+  /** Race-control message type this chart covers (e.g. "OVERTAKE"). */
+  messageType: string;
+}
 
 /**
  * Enables the "Focus driver only" toggle. Omit entirely (e.g. in aggregate
- * track view) to render the chart without a toggle.
+ * track view) to render the chart without one.
  */
 interface EventLocationFocus {
   /** Driver the toggle narrows to. */
   driver: DriverData;
   /** How the toggle filters events for this chart (directional vs commutative). */
   mode: EventFocusMode;
-  /** Raw events, re-bucketed when the toggle is on. */
-  events: RaceControlEvent[];
-  /** Race-control message type this chart covers (e.g. "OVERTAKE"). */
-  messageType: string;
 }
 
 interface EventLocationPieChartProps {
   title: string;
   /** Singular noun for the events, e.g. "overtake" / "collision". */
   unit: string;
-  /** Breakdown shown by default (and when the focus toggle is off). */
+  /** Breakdown shown when every toggle is off; must already exclude pit-lane. */
   breakdown: EventLocationBreakdown;
   /** Shown when no events of this type were recorded at all. */
   emptyMessage: string;
+  /** Raw events; needed for any toggle to rebuild the breakdown. */
+  source?: EventLocationSource;
   /** Opt-in focus-driver toggle; omit to render without one. */
   focus?: EventLocationFocus;
+  /** Opt-in "Pit lane overtakes" toggle. Overtake charts only. */
+  pitLaneToggle?: boolean;
 }
+
+/**
+ * Pit-lane detection needs per-driver pitting flags that Pits n' Giggles only
+ * started exporting in v4.4.0. Older sessions still count those passes as
+ * regular overtakes, and there is no way to reclassify them after the fact —
+ * say so rather than letting the toggle look broken.
+ */
+const PIT_LANE_TOOLTIP =
+  "Pit-lane passes are only detected in sessions recorded with Pits n' " +
+  "Giggles v4.4.0 or later. Earlier sessions still count them as overtakes.";
 
 interface ColoredSlice {
   label: string;
@@ -63,19 +85,37 @@ export function EventLocationPieChart({
   unit,
   breakdown,
   emptyMessage,
+  source,
   focus,
+  pitLaneToggle,
 }: EventLocationPieChartProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [focusOnly, setFocusOnly] = useState(false);
+  const [showPitLane, setShowPitLane] = useState(false);
 
-  // Re-bucket only when focused; otherwise reuse the given breakdown.
+  // Re-bucket only when a toggle moves off its default; otherwise reuse the
+  // breakdown the caller already built.
   const activeBreakdown = useMemo(() => {
-    if (!focusOnly || !focus) return breakdown;
-    const focusedEvents = focus.events.filter((event) =>
-      eventMatchesDriverFocus(event, focus.driver, focus.mode),
-    );
-    return buildEventLocationBreakdown(focusedEvents, focus.messageType);
-  }, [focusOnly, focus, breakdown]);
+    if (!source || (!focusOnly && !showPitLane)) return breakdown;
+    let events = showPitLane
+      ? source.events
+      : excludePitLaneOvertakes(source.events);
+    if (focusOnly && focus) {
+      events = events.filter((event) =>
+        eventMatchesDriverFocus(event, focus.driver, focus.mode),
+      );
+    }
+    return buildEventLocationBreakdown(events, source.messageType);
+  }, [breakdown, focus, focusOnly, showPitLane, source]);
+
+  // Whether this chart's data can actually distinguish pit-lane passes. The
+  // toggle is shown either way — a switch that comes and goes per track reads
+  // as a bug — but it explains itself when there is nothing to reveal.
+  const hasPitLaneOvertakes = useMemo(
+    () =>
+      Boolean(pitLaneToggle) && Boolean(source?.events.some(isPitLaneOvertake)),
+    [pitLaneToggle, source],
+  );
 
   const { slices, total, locatedCount } = activeBreakdown;
 
@@ -85,13 +125,19 @@ export function EventLocationPieChart({
   const noDataMessage =
     focusOnly && focus
       ? `No ${unit}s ${focus.mode === "overtaker" ? "by" : "involving"} ${focus.driver["driver-name"]} in this session.`
-      : emptyMessage;
+      : // Everything of this type was a pit-lane pass, so the toggle is the
+        // only way back to a non-empty pie.
+        hasPitLaneOvertakes && !showPitLane
+        ? `Every ${unit} here happened in the pit lane. Turn on "Pit lane" to include them.`
+        : emptyMessage;
 
   let hueIndex = 0;
   const colored: ColoredSlice[] = slices.map((slice) => {
     const color = isAggregateLocationLabel(slice.label)
       ? LOCATION_OTHER_COLOR
-      : LOCATION_BREAKDOWN_COLORS[hueIndex++ % LOCATION_BREAKDOWN_COLORS.length];
+      : LOCATION_BREAKDOWN_COLORS[
+          hueIndex++ % LOCATION_BREAKDOWN_COLORS.length
+        ];
     return { ...slice, color };
   });
 
@@ -102,14 +148,35 @@ export function EventLocationPieChart({
         title={title}
         hint={hint}
         action={
-          // Only offer the toggle when there's a pie to filter. Key off the
-          // base (all-driver) located count, not the filtered result, so it
-          // doesn't disappear when a focused driver has no events.
-          focus && breakdown.locatedCount > 0 ? (
-            <FocusToggle
-              value={focusOnly}
-              onChange={() => setFocusOnly((value) => !value)}
-            />
+          // Only offer toggles when there's a pie to filter. Key off the base
+          // (all-driver) located count, not the filtered result, so they don't
+          // disappear when a focused driver has no events.
+          source && (pitLaneToggle || (focus && breakdown.locatedCount > 0)) ? (
+            <HStack wrap justify="end" className="gap-x-3 gap-y-1.5">
+              {focus && breakdown.locatedCount > 0 && (
+                <FocusToggle
+                  value={focusOnly}
+                  onChange={() => setFocusOnly((value) => !value)}
+                />
+              )}
+              {pitLaneToggle && (
+                <HoverTooltip
+                  text={
+                    hasPitLaneOvertakes
+                      ? PIT_LANE_TOOLTIP
+                      : `No pit-lane ${unit}s detected here. ${PIT_LANE_TOOLTIP}`
+                  }
+                >
+                  <span className="inline-flex">
+                    <FocusToggle
+                      label="Pit lane"
+                      value={showPitLane}
+                      onChange={() => setShowPitLane((value) => !value)}
+                    />
+                  </span>
+                </HoverTooltip>
+              )}
+            </HStack>
           ) : undefined
         }
       />
@@ -202,7 +269,9 @@ export function EventLocationPieChart({
                       className="size-2.5 shrink-0 rounded-sm"
                       style={{ backgroundColor: slice.color }}
                     />
-                    <span className="truncate text-zinc-300">{slice.label}</span>
+                    <span className="truncate text-zinc-300">
+                      {slice.label}
+                    </span>
                   </span>
                   <span className="shrink-0 font-mono tabular-nums text-zinc-500">
                     {slice.count} · {pct}%

@@ -248,6 +248,7 @@ export function TrackProgressPage() {
   const {
     overtakes: overtakeLocations,
     collisions: collisionLocations,
+    events: locationEvents,
     locatedRaceCount,
     excludedRaceCount,
   } = useMemo(
@@ -1381,6 +1382,11 @@ export function TrackProgressPage() {
                         unit="overtake"
                         breakdown={overtakeLocations}
                         emptyMessage="No overtakes were recorded at this track."
+                        source={{
+                          events: locationEvents,
+                          messageType: "OVERTAKE",
+                        }}
+                        pitLaneToggle
                       />
                     </section>
                     <section className={cardClass}>
