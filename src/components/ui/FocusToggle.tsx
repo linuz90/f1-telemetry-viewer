@@ -14,7 +14,7 @@ export function FocusToggle({
   label?: string;
 }) {
   return (
-    <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer select-none">
+    <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs text-zinc-400 cursor-pointer select-none">
       {label}
       <button
         type="button"
