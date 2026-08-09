@@ -1,5 +1,6 @@
 import { queryOptions, type QueryClient } from "@tanstack/react-query";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
+import { normalizeSession } from "../utils/normalizeSession";
 
 export type Mode = "detecting" | "api" | "demo" | "upload";
 export type DataSourceMode = Exclude<Mode, "detecting">;
@@ -94,7 +95,7 @@ export function sessionDetailQueryOptions(
       if (mode === "upload") {
         const data = uploadStore.get(slug);
         if (!data) throw new Error(`Session not found: ${slug}`);
-        return data;
+        return normalizeSession(data);
       }
       const url =
         mode === "demo"
@@ -107,7 +108,7 @@ export function sessionDetailQueryOptions(
             ? `Failed to load demo session: ${slug}`
             : `Failed to load session: ${slug}`,
         );
-      return res.json() as Promise<TelemetrySession>;
+      return normalizeSession((await res.json()) as TelemetrySession);
     },
     // Session JSON is immutable once exported, so cache entries live for the
     // whole visit (parity with the old permanent in-memory Promise cache).
