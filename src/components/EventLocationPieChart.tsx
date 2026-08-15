@@ -46,7 +46,7 @@ interface EventLocationPieChartProps {
   title: string;
   /** Singular noun for the events, e.g. "overtake" / "collision". */
   unit: string;
-  /** Breakdown shown when every toggle is off; must already exclude pit-lane. */
+  /** Breakdown shown when every toggle is off; must reflect default filtering. */
   breakdown: EventLocationBreakdown;
   /** Shown when no events of this type were recorded at all. */
   emptyMessage: string;
@@ -92,30 +92,49 @@ export function EventLocationPieChart({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [focusOnly, setFocusOnly] = useState(false);
   const [showPitLane, setShowPitLane] = useState(false);
+  const sourceEvents = source?.events;
+  const sourceMessageType = source?.messageType;
 
   // Re-bucket only when a toggle moves off its default; otherwise reuse the
   // breakdown the caller already built.
   const activeBreakdown = useMemo(() => {
-    if (!source || (!focusOnly && !showPitLane)) return breakdown;
+    if (!sourceEvents || !sourceMessageType || (!focusOnly && !showPitLane)) {
+      return breakdown;
+    }
     let events = showPitLane
-      ? source.events
-      : excludePitLaneOvertakes(source.events);
+      ? sourceEvents
+      : excludePitLaneOvertakes(sourceEvents);
     if (focusOnly && focus) {
       events = events.filter((event) =>
         eventMatchesDriverFocus(event, focus.driver, focus.mode),
       );
     }
-    return buildEventLocationBreakdown(events, source.messageType);
-  }, [breakdown, focus, focusOnly, showPitLane, source]);
+    return buildEventLocationBreakdown(events, sourceMessageType);
+  }, [
+    breakdown,
+    focus,
+    focusOnly,
+    showPitLane,
+    sourceEvents,
+    sourceMessageType,
+  ]);
 
   // Whether this chart's data can actually distinguish pit-lane passes. The
   // toggle is shown either way — a switch that comes and goes per track reads
   // as a bug — but it explains itself when there is nothing to reveal.
   const hasPitLaneOvertakes = useMemo(
     () =>
-      Boolean(pitLaneToggle) && Boolean(source?.events.some(isPitLaneOvertake)),
-    [pitLaneToggle, source],
+      Boolean(pitLaneToggle) && Boolean(sourceEvents?.some(isPitLaneOvertake)),
+    [pitLaneToggle, sourceEvents],
   );
+  const sourceBreakdown = useMemo(
+    () =>
+      sourceEvents && sourceMessageType
+        ? buildEventLocationBreakdown(sourceEvents, sourceMessageType)
+        : null,
+    [sourceEvents, sourceMessageType],
+  );
+  const canFocus = Boolean(focus && sourceBreakdown?.locatedCount);
 
   const { slices, total, locatedCount } = activeBreakdown;
 
@@ -148,12 +167,11 @@ export function EventLocationPieChart({
         title={title}
         hint={hint}
         action={
-          // Only offer toggles when there's a pie to filter. Key off the base
-          // (all-driver) located count, not the filtered result, so they don't
-          // disappear when a focused driver has no events.
-          source && (pitLaneToggle || (focus && breakdown.locatedCount > 0)) ? (
+          // Keep focus available for raw located data, including a pit-only pie
+          // hidden by the default filter, so the two toggles always compose.
+          source && (pitLaneToggle || canFocus) ? (
             <HStack wrap justify="end" className="gap-x-3 gap-y-1.5">
-              {focus && breakdown.locatedCount > 0 && (
+              {focus && canFocus && (
                 <FocusToggle
                   value={focusOnly}
                   onChange={() => setFocusOnly((value) => !value)}

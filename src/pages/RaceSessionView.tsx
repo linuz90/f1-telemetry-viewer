@@ -8,6 +8,7 @@ import {
 import {
   buildEventLocationBreakdown,
   excludePitLaneOvertakes,
+  hasLocationBreakdownEvents,
 } from "../analysis/eventLocationBreakdown";
 import { buildStartReactionModel } from "../analysis/startReactionAnalysis";
 import {
@@ -223,6 +224,10 @@ export function RaceSessionView({
   );
   const collisionLocations = useMemo(
     () => buildEventLocationBreakdown(raceControlEvents, "COLLISION"),
+    [raceControlEvents],
+  );
+  const hasLocationEvents = useMemo(
+    () => hasLocationBreakdownEvents(raceControlEvents),
     [raceControlEvents],
   );
   const filteredOvertakes = useMemo(
@@ -505,7 +510,7 @@ export function RaceSessionView({
             </Card>
             {/* Flags, fastest laps, and other timeline events do not give
                 either location chart anything to plot. */}
-            {(overtakeLocations.total > 0 || collisionLocations.total > 0) && (
+            {hasLocationEvents && (
               <div className="grid gap-6 md:grid-cols-2">
                 <Card as="section">
                   <EventLocationPieChart

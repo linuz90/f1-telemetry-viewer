@@ -162,16 +162,25 @@ export function buildEventLocationBreakdown(
   return { slices, total, locatedCount: total - unknown };
 }
 
-const INCIDENT_TYPES = new Set(["OVERTAKE", "COLLISION"]);
+const LOCATION_BREAKDOWN_TYPES = new Set(["OVERTAKE", "COLLISION"]);
+
+/** Whether raw race-control data contains anything either location chart owns. */
+export function hasLocationBreakdownEvents(
+  events: RaceControlEvent[],
+): boolean {
+  return events.some((event) =>
+    LOCATION_BREAKDOWN_TYPES.has(event["message-type"]),
+  );
+}
 
 function hasIncidents(events: RaceControlEvent[]): boolean {
-  return events.some((event) => INCIDENT_TYPES.has(event["message-type"]));
+  return hasLocationBreakdownEvents(events);
 }
 
 function hasLocatedIncident(events: RaceControlEvent[]): boolean {
   return events.some(
     (event) =>
-      INCIDENT_TYPES.has(event["message-type"]) &&
+      LOCATION_BREAKDOWN_TYPES.has(event["message-type"]) &&
       formatRaceControlLocation(event) != null,
   );
 }
