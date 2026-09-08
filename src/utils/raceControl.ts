@@ -348,6 +348,8 @@ export function humanizeRaceControlType(type: string): string {
 
 function withReason(base: string, reason: unknown): string {
   if (typeof reason !== "string" || !reason.trim()) return base;
+  // Older PnG exports stringify an absent reason as "None".
+  if (reason.trim().toLowerCase() === "none") return base;
 
   // PnG renders an unhandled enum value as "Unknown (99)". The raw wire number
   // is debug detail, so drop it and keep the plain "Unknown".
