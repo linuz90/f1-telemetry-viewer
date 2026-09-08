@@ -1,12 +1,18 @@
 import {
   AlertTriangle,
+  Bot,
   Car,
   Circle,
   Flag,
   Gauge,
+  Play,
+  Rocket,
   Search,
+  ShieldAlert,
+  Square,
   Timer,
   Trophy,
+  Wind,
   Wrench,
   Zap,
   type LucideIcon,
@@ -21,7 +27,6 @@ import {
   formatRaceControlEvent,
   formatRaceControlLocation,
   getRaceControlDriverInfos,
-  getUnknownRaceControlDetails,
   humanizeRaceControlType,
   isKeyRaceControlEvent,
   raceControlEventMatchesSearch,
@@ -164,12 +169,96 @@ const EVENT_STYLES: Record<string, EventStyle> = {
     iconClass: "bg-yellow-500/15 text-yellow-400",
     badgeClass: "bg-yellow-500/15 text-yellow-300",
   },
+  SESSION_START: {
+    label: "Session",
+    icon: Play,
+    iconClass: "bg-zinc-800 text-zinc-400",
+    badgeClass: "bg-zinc-800/80 text-zinc-400",
+  },
+  SESSION_END: {
+    label: "Session",
+    icon: Square,
+    iconClass: "bg-zinc-800 text-zinc-400",
+    badgeClass: "bg-zinc-800/80 text-zinc-400",
+  },
+  RED_FLAG: {
+    label: "Red flag",
+    icon: Flag,
+    iconClass: "bg-red-500/15 text-red-400",
+    badgeClass: "bg-red-500/15 text-red-300",
+  },
+  SAFETY_CAR: {
+    label: "Safety car",
+    icon: Car,
+    iconClass: "bg-amber-500/15 text-amber-400",
+    badgeClass: "bg-amber-500/15 text-amber-300",
+  },
+  DRIVE_THROUGH_SERVED: {
+    label: "Penalty served",
+    icon: AlertTriangle,
+    iconClass: "bg-amber-500/15 text-amber-400",
+    badgeClass: "bg-amber-500/15 text-amber-300",
+  },
+  STOP_GO_SERVED: {
+    label: "Penalty served",
+    icon: AlertTriangle,
+    iconClass: "bg-amber-500/15 text-amber-400",
+    badgeClass: "bg-amber-500/15 text-amber-300",
+  },
+  DRS_ENABLED: {
+    label: "DRS",
+    icon: Wind,
+    iconClass: "bg-emerald-500/15 text-emerald-400",
+    badgeClass: "bg-emerald-500/15 text-emerald-300",
+  },
+  DRS_DISABLED: {
+    label: "DRS",
+    icon: Wind,
+    iconClass: "bg-zinc-800 text-zinc-400",
+    badgeClass: "bg-zinc-800/80 text-zinc-400",
+  },
+  PARTIAL_AERO_MODE_ENABLED: {
+    label: "Aero",
+    icon: ShieldAlert,
+    iconClass: "bg-amber-500/15 text-amber-400",
+    badgeClass: "bg-amber-500/15 text-amber-300",
+  },
+  PARTIAL_AERO_MODE_DISABLED: {
+    label: "Aero",
+    icon: ShieldAlert,
+    iconClass: "bg-zinc-800 text-zinc-400",
+    badgeClass: "bg-zinc-800/80 text-zinc-400",
+  },
+  OVERTAKE_MODE_ENABLED: {
+    label: "Overtake mode",
+    icon: Rocket,
+    iconClass: "bg-violet-500/15 text-violet-400",
+    badgeClass: "bg-violet-500/15 text-violet-300",
+  },
+  OVERTAKE_MODE_DISABLED: {
+    label: "Overtake mode",
+    icon: Rocket,
+    iconClass: "bg-zinc-800 text-zinc-400",
+    badgeClass: "bg-zinc-800/80 text-zinc-400",
+  },
+  DRIVER_AI_STATUS_CHANGE: {
+    label: "AI",
+    icon: Bot,
+    iconClass: "bg-zinc-800 text-zinc-400",
+    badgeClass: "bg-zinc-800/80 text-zinc-400",
+  },
 };
 
 export function RaceControlTimeline({
-  events,
+  events: allEvents,
   focusedDriver,
 }: RaceControlTimelineProps) {
+  // A message type with no EVENT_STYLES entry has no renderer here, so it is
+  // dropped rather than shown as an anonymous row with raw payload fields.
+  const events = useMemo(
+    () => allEvents.filter((event) => event["message-type"] in EVENT_STYLES),
+    [allEvents],
+  );
   const [viewMode, setViewMode] = useState<ViewMode>("key");
   const [focusOnly, setFocusOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -539,9 +628,6 @@ function RaceControlEventRow({
   const location = formatRaceControlLocation(event);
   const driverInfos = getRaceControlDriverInfos(event);
   const primaryDriver = driverInfos[0];
-  const details = EVENT_STYLES[event["message-type"]]
-    ? []
-    : getUnknownRaceControlDetails(event);
 
   return (
     <div className="rounded-md border border-zinc-800/80 bg-zinc-950/60 px-3 py-2.5 shadow-sm shadow-black/10">
@@ -603,20 +689,6 @@ function RaceControlEventRow({
                 </span>
               )}
             </div>
-          )}
-          {details.length > 0 && (
-            <HStack align="stretch" wrap className="mt-1 gap-1">
-              {details.map((detail) => (
-                <Badge
-                  key={detail}
-                  size="xs"
-                  shape="square"
-                  className="bg-zinc-950/80 text-zinc-500"
-                >
-                  {detail}
-                </Badge>
-              ))}
-            </HStack>
           )}
         </div>
       </HStack>

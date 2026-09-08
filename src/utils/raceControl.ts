@@ -222,6 +222,28 @@ export function formatRaceControlEvent(event: RaceControlEvent): string {
       return "Session started";
     case "SESSION_END":
       return "Session ended";
+    case "RED_FLAG":
+      return "Red flag";
+    case "SAFETY_CAR":
+      return formatSafetyCarEvent(event);
+    case "DRIVE_THROUGH_SERVED":
+      return `${driverName(event["driver-info"])} served a drive-through penalty`;
+    case "STOP_GO_SERVED":
+      return `${driverName(event["driver-info"])} served a stop-go penalty${formatStopTime(event["stop-time"])}`;
+    case "DRS_ENABLED":
+      return "DRS enabled";
+    case "DRS_DISABLED":
+      return withReason("DRS disabled", event.reason);
+    case "PARTIAL_AERO_MODE_ENABLED":
+      return withReason("Partial aero mode enabled", event.reason);
+    case "PARTIAL_AERO_MODE_DISABLED":
+      return "Partial aero mode disabled";
+    case "OVERTAKE_MODE_ENABLED":
+      return "Overtake mode enabled";
+    case "OVERTAKE_MODE_DISABLED":
+      return "Overtake mode disabled";
+    case "DRIVER_AI_STATUS_CHANGE":
+      return formatAiStatusChangeEvent(event);
     default:
       return humanizeRaceControlType(event["message-type"]);
   }
@@ -250,18 +272,6 @@ export function getRaceControlDriverInfos(
     seen.add(key);
     return true;
   });
-}
-
-export function getUnknownRaceControlDetails(
-  event: RaceControlEvent,
-): string[] {
-  return Object.entries(event)
-    .filter(([key, value]) => {
-      if (BASE_DETAIL_KEYS.has(key) || NESTED_INFO_KEYS.has(key)) return false;
-      return ["string", "number", "boolean"].includes(typeof value);
-    })
-    .slice(0, 3)
-    .map(([key, value]) => `${humanizeRaceControlType(key)}: ${String(value)}`);
 }
 
 export function getRaceControlSearchText(
@@ -334,6 +344,47 @@ export function humanizeRaceControlType(type: string): string {
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function withReason(base: string, reason: unknown): string {
+  if (typeof reason !== "string" || !reason.trim()) return base;
+  // Older PnG exports stringify an absent reason as "None".
+  if (reason.trim().toLowerCase() === "none") return base;
+
+  // PnG renders an unhandled enum value as "Unknown (99)". The raw wire number
+  // is debug detail, so drop it and keep the plain "Unknown".
+  const text = reason.trim().replace(/^Unknown\s*\(\d+\)$/i, "Unknown");
+  return `${base}: ${text}`;
+}
+
+function formatStopTime(stopTime: unknown): string {
+  return typeof stopTime === "number" && stopTime > 0 ? ` (${stopTime}s)` : "";
+}
+
+/**
+ * The AI-controlled flag flips when a player hands their car over and takes it
+ * back, so the two transitions read as the driver pausing and resuming:
+ * false -> true is a pause, true -> false is a resume.
+ */
+function formatAiStatusChangeEvent(event: RaceControlEvent): string {
+  const name = driverName(event["driver-info"]);
+  if (typeof event["new-state"] !== "boolean")
+    return `${name} changed AI status`;
+  return event["new-state"]
+    ? `${name} paused (AI took over)`
+    : `${name} resumed (back in control)`;
+}
+
+function formatSafetyCarEvent(event: RaceControlEvent): string {
+  const scType = event["sc-type"];
+  const eventType = event["event-type"];
+  const label =
+    typeof scType === "string" && scType
+      ? humanizeRaceControlType(scType)
+      : "Safety car";
+  return typeof eventType === "string" && eventType
+    ? `${label}: ${humanizeRaceControlType(eventType).toLowerCase()}`
+    : label;
 }
 
 function formatPenaltyEvent(event: RaceControlEvent): string {

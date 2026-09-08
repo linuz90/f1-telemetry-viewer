@@ -326,6 +326,15 @@ export interface RaceControlEvent {
   "old-tyre-index"?: number;
   "new-tyre-index"?: number;
   "num-lights"?: number;
+  "sc-type"?: string;
+  "event-type"?: string;
+  "stop-time"?: number;
+  // DRIVER_AI_STATUS_CHANGE: the driver's AI-controlled flag either side of the
+  // transition. true means the car is run by the AI, false means by the player,
+  // so false -> true is the driver pausing and true -> false is them resuming.
+  // The message is only emitted on a change, so old-state is always !new-state.
+  "old-state"?: boolean;
+  "new-state"?: boolean;
   "lap-distance"?: number | null;
   sector?: RaceControlSector | null;
   "segment-info"?: RaceControlSegmentInfo | null;
