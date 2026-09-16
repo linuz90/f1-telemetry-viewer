@@ -151,15 +151,9 @@ visible telemetry file once. Later requests, including the first request after
 a restart, normally stat the files and reuse unchanged summaries; adding or
 changing one save only reads that save.
 
-The cache can contain summary metadata such as driver and rival names, so its
-directory and files are created with private permissions where the operating
-system supports them. It never contains full telemetry JSON, and session-detail
-requests continue to stream the original Pits n' Giggles file byte for byte.
-The viewer does not modify the telemetry folder or use Pits n' Giggles'
-`.png_session_cache.json`. You can safely delete `.cache/f1-telemetry-viewer/`
-while the viewer is stopped; the next session-list request will rebuild it.
-Embedded Pits n' Giggles builds continue to use their Python session API and do
-not initialize or create this viewer-owned Node cache.
+The production server also applies normal HTTP caching and compression. Hashed assets and immutable session files receive long-lived browser cache headers, while the live session list uses an ETag so an unchanged refresh returns `304` without downloading the payload again. Text and JSON responses use Brotli or gzip when the client supports them.
+
+The cache can contain summary metadata such as driver and rival names, so its directory and files are created with private permissions where the operating system supports them. It never contains full telemetry JSON, and session-detail requests stream the original Pits n' Giggles file with transport-only HTTP compression. The viewer does not modify the telemetry folder or use Pits n' Giggles' `.png_session_cache.json`. You can safely delete `.cache/f1-telemetry-viewer/` while the viewer is stopped; the next session-list request will rebuild it. Embedded Pits n' Giggles builds continue to use their Python session API and do not initialize or create this viewer-owned Node cache.
 
 | Variable        | Default               | Description                                        |
 | --------------- | --------------------- | -------------------------------------------------- |

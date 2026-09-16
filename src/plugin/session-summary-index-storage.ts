@@ -163,6 +163,23 @@ export function signaturesEqual(
   );
 }
 
+/**
+ * Compare the fields that identify immutable telemetry content for cache reuse.
+ * Metadata-only syncs can advance ctime without changing the file; inode still
+ * catches atomic replacements while size + mtime catch normal content writes.
+ */
+export function cacheSignaturesEqual(
+  left: FileSignature,
+  right: FileSignature,
+): boolean {
+  return (
+    left.size === right.size &&
+    left.mtimeNs === right.mtimeNs &&
+    left.dev === right.dev &&
+    left.ino === right.ino
+  );
+}
+
 interface WritePersistedIndexOptions {
   indexFile: string;
   formatVersion: number;
