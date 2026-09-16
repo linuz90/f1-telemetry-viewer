@@ -18,6 +18,7 @@ import {
   pathResolvesInsideAny,
 } from "./session-summary-index-files.ts";
 import {
+  cacheSignaturesEqual,
   signatureFromStats,
   signaturesEqual,
   validatePersistedIndex,
@@ -405,7 +406,7 @@ export function createSessionSummaryIndex(
       seenPaths.add(relativePath);
       const signature = candidate.signature;
       const previous = entries.get(relativePath);
-      if (previous && signaturesEqual(previous.signature, signature)) {
+      if (previous && cacheSignaturesEqual(previous.signature, signature)) {
         counters.reused += 1;
         pendingParseFailures.delete(relativePath);
         continue;
@@ -414,7 +415,7 @@ export function createSessionSummaryIndex(
       const pendingFailure = pendingParseFailures.get(relativePath);
       if (
         pendingFailure &&
-        signaturesEqual(pendingFailure.signature, signature)
+        cacheSignaturesEqual(pendingFailure.signature, signature)
       ) {
         if (Date.now() - pendingFailure.firstSeenAt < CORRUPT_FILE_SETTLE_MS) {
           counters.reused += 1;

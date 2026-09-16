@@ -387,6 +387,48 @@ test("cold, warm, and restart refreshes preserve exact summary output", async (t
   assert.deepEqual(await readdir(harness.telemetryDir), ["2026_01_26"]);
 });
 
+test("metadata-only ctime changes keep immutable files cached after restart", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("POSIX chmod is required to reproduce metadata-only ctime churn");
+    return;
+  }
+
+  const harness = await createHarness(t);
+  const relativePath = path.posix.join("race", RACE_FILE);
+  const filePath = await copyFixture(harness.telemetryDir, relativePath);
+  const index = createSessionSummaryIndex({
+    telemetryDir: harness.telemetryDir,
+    indexFile: harness.indexFile,
+    logger: harness.logger,
+  });
+  await index.refresh();
+
+  const before = await stat(filePath, { bigint: true });
+  const originalMode = Number(before.mode & 0o777n);
+  await delay(20);
+  await chmod(filePath, originalMode ^ 0o100);
+  await chmod(filePath, originalMode);
+  const after = await stat(filePath, { bigint: true });
+
+  assert.equal(after.size, before.size);
+  assert.equal(after.mtimeNs, before.mtimeNs);
+  assert.equal(after.dev, before.dev);
+  assert.equal(after.ino, before.ino);
+  assert.notEqual(after.ctimeNs, before.ctimeNs);
+
+  const restarted = createSessionSummaryIndex({
+    telemetryDir: harness.telemetryDir,
+    indexFile: harness.indexFile,
+    logger: harness.logger,
+  });
+  const refreshed = await restarted.refresh();
+  assert.equal(refreshed.stats.cacheState, "loaded");
+  assert.equal(refreshed.stats.reused, 1);
+  assert.equal(refreshed.stats.filesRead, 0);
+  assert.equal(refreshed.stats.parsed, 0);
+  assert.equal(refreshed.stats.rawBytesRead, 0);
+});
+
 test("add, modify, and delete refresh only the affected file", async (t) => {
   const harness = await createHarness(t);
   const raceRelativePath = path.posix.join("race", RACE_FILE);
@@ -571,11 +613,7 @@ test("F1 26 sentinel AI slots do not inflate online driver or human rival counts
     "show-online-names": false,
     platform: "Unknown",
   };
-  session["classification-data"] = [
-    player,
-    sentinelAi,
-    disconnectedHuman,
-  ];
+  session["classification-data"] = [player, sentinelAi, disconnectedHuman];
 
   const { summary } = buildSessionSummary(RACE_FILE, session);
   assert.equal(summary.isOnline, true);
@@ -1121,6 +1159,9 @@ test("production HTTP server preserves list/detail contracts and reports refresh
     path.join(distDir, "index.html"),
     "<!doctype html><title>test</title>",
   );
+  const assetBody = "console.log('cached telemetry asset');\n".repeat(100);
+  await mkdir(path.join(distDir, "assets"), { recursive: true });
+  await writeFile(path.join(distDir, "assets", "app-test.js"), assetBody);
 
   const sessionIndex = createSessionSummaryIndex({
     telemetryDir: harness.telemetryDir,
@@ -1134,23 +1175,86 @@ test("production HTTP server preserves list/detail contracts and reports refresh
   });
   const origin = await listenOnEphemeralPort(t, server);
 
-  const listResponse = await fetch(`${origin}/api/sessions`);
+  const shellResponse = await fetch(`${origin}/f1-26`, {
+    headers: { "accept-encoding": "gzip" },
+  });
+  assert.equal(shellResponse.status, 200);
+  assert.equal(shellResponse.headers.get("cache-control"), "no-cache");
+  assert.equal(shellResponse.headers.get("content-encoding"), "gzip");
+  assert.equal(
+    await shellResponse.text(),
+    "<!doctype html><title>test</title>",
+  );
+
+  const assetResponse = await fetch(`${origin}/assets/app-test.js`, {
+    headers: { "accept-encoding": "br" },
+  });
+  assert.equal(assetResponse.status, 200);
+  assert.equal(
+    assetResponse.headers.get("cache-control"),
+    "public, max-age=31536000, immutable",
+  );
+  assert.equal(assetResponse.headers.get("content-encoding"), "br");
+  assert.equal(assetResponse.headers.get("vary"), "Accept-Encoding");
+  assert.equal(await assetResponse.text(), assetBody);
+
+  const listResponse = await fetch(`${origin}/api/sessions`, {
+    headers: { "accept-encoding": "gzip" },
+  });
   assert.equal(listResponse.status, 200);
   assert.match(
     listResponse.headers.get("content-type") ?? "",
     /application\/json/,
   );
+  assert.equal(listResponse.headers.get("cache-control"), "private, no-cache");
+  assert.equal(listResponse.headers.get("content-encoding"), "gzip");
+  assert.equal(listResponse.headers.get("vary"), "Accept-Encoding");
+  const listEtag = listResponse.headers.get("etag");
+  assert.ok(listEtag);
   const sessions = (await listResponse.json()) as SessionSummary[];
   assert.equal(sessions.length, 1);
   assert.equal(sessions[0]?.relativePath, relativePath);
 
+  const revalidatedListResponse = await fetch(`${origin}/api/sessions`, {
+    headers: { "if-none-match": listEtag },
+  });
+  assert.equal(revalidatedListResponse.status, 304);
+  assert.equal(await revalidatedListResponse.text(), "");
+
+  const qualifyingRelativePath = path.posix.join("qualifying", QUALIFYING_FILE);
+  await copyFixture(
+    harness.telemetryDir,
+    qualifyingRelativePath,
+    QUALIFYING_DEMO,
+  );
+  const changedListResponse = await fetch(`${origin}/api/sessions`, {
+    headers: {
+      "accept-encoding": "gzip",
+      "if-none-match": listEtag,
+    },
+  });
+  assert.equal(changedListResponse.status, 200);
+  assert.notEqual(changedListResponse.headers.get("etag"), listEtag);
+  assert.equal(changedListResponse.headers.get("content-encoding"), "gzip");
+  assert.equal(
+    ((await changedListResponse.json()) as SessionSummary[]).length,
+    2,
+  );
+
   const slug = sessions[0]!.slug;
-  const detailResponse = await fetch(`${origin}/api/sessions/${slug}`);
+  const detailResponse = await fetch(`${origin}/api/sessions/${slug}`, {
+    headers: { "accept-encoding": "gzip" },
+  });
   assert.equal(detailResponse.status, 200);
   assert.match(
     detailResponse.headers.get("content-type") ?? "",
     /application\/json/,
   );
+  assert.equal(
+    detailResponse.headers.get("cache-control"),
+    "private, max-age=31536000, immutable",
+  );
+  assert.equal(detailResponse.headers.get("content-encoding"), "gzip");
   assert.equal(
     checksumBytes(new Uint8Array(await detailResponse.arrayBuffer())),
     await checksum(fixturePath),
@@ -1179,7 +1283,7 @@ test("production HTTP server preserves list/detail contracts and reports refresh
   assert.equal(defaultIndexResponse.status, 200);
   assert.equal(
     ((await defaultIndexResponse.json()) as SessionSummary[]).length,
-    1,
+    2,
   );
   await assert.rejects(stat(path.join(distDir, ".cache")), { code: "ENOENT" });
 
