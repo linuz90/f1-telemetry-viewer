@@ -38,6 +38,10 @@ export interface TrackStrategySuggestion {
   risk?: TrackStrategyRisk;
   /** Relative/absolute timing estimate used to rank strategy rows. */
   timeEstimate?: TrackStrategyTimeEstimate;
+  /** Wet plans only: a risk-free different stop count on the same compound
+   *  that stays time-competitive, so a plan near the wear cap shows what the
+   *  safer shape costs. */
+  closeStopCount?: { stopCount: number; deltaMs: number };
 }
 
 export interface TrackStrategyRisk {
@@ -101,15 +105,21 @@ export interface TrackRaceRecommendation {
   raceCount: number;
   /** Number of races in the bucket that finished near full distance (>= totalLaps - 1) */
   fullDistanceRaceCount: number;
-  /** Whether usable bucket tyre data produced a strategy shape */
+  /** Whether usable bucket tyre data produced a dry or wet strategy shape */
   hasEvidence: boolean;
   bestRaceLap: TrackBestRaceLap | null;
   /** Best race lap vs best quali lap (ms). Negative = race lap was faster. 0 if either side missing */
   raceVsQualiDeltaMs: number;
   /** Average ERS deployed per lap across the bucket's races (MJ). 0 if no data */
   avgErsDeployMj: number;
+  /** Race distance the strategy shapes span. */
+  totalLaps: number;
   recommended: TrackStrategySuggestion | null;
   alternative: TrackStrategySuggestion | null;
+  /** One same-compound plan per wet compound with bucket evidence, Inters
+   *  first. Separate from the dry ranking because rain intensity, not lap
+   *  time, decides between them. */
+  wetStrategies: TrackStrategySuggestion[];
   fuelTarget: TrackFuelTarget | null;
   sinceLastRace: TrackSinceLastRaceDelta | null;
 }

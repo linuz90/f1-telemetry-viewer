@@ -5,9 +5,12 @@ import type {
 import { PUNCTURE_THRESHOLD, projectWearFromCurve } from "../utils/stats/tyres";
 import {
   DRY_COMPOUND_PRIORITY,
+  isDryCompound,
   rankDryCompoundsByPace,
+  rankWetCompounds,
 } from "./trackStrategyCompounds";
 import {
+  buildSingleCompoundTimingContext,
   buildTimingContext,
   findRaceTimeAnchor,
   scoreShape,
@@ -70,10 +73,14 @@ function buildPitWindow(stintEndLap: number, totalLaps: number) {
  *  out-lap from fresh rubber, which is roughly one lap of pace differential. */
 const UNDERCUT_NUDGE_LAPS = 1;
 
-/** Borderline one-stops are useful to see, but only when they're within about
- *  one high-deg lap of the normal puncture-risk cap. Anything beyond this is
- *  too far into "hope for a safety car" territory to present as a strategy. */
-const MANAGED_ONE_STOP_WEAR_BUFFER = 7;
+/** Borderline stretched stints (dry one-stops, wet plans with fewer stops) are
+ *  useful to see, but only when they're within about one high-deg lap of the
+ *  normal puncture-risk cap. Anything beyond this is too far into "hope for a
+ *  safety car" territory to present as a strategy. */
+const MANAGED_WEAR_BUFFER = 7;
+/** Stop counts tried for a same-compound wet plan. Three stops already cover
+ *  ~100 laps at typical Inters wear, so higher counts only add pit loss. */
+const WET_STOP_COUNTS = [0, 1, 2, 3] as const;
 const ONE_STOP_PIT_LAP_ADJUSTMENTS = [0, -1, 1] as const;
 // Show stop-count variety only when it is plausibly actionable. A 15-20s slower
 // two-stop is technically different, but a near-even one-stop mirror is the more
@@ -221,7 +228,7 @@ function buildOneStopShape(
   const projectedMaxWear = Math.max(...projectedWears);
   const overThreshold = projectedMaxWear - PUNCTURE_THRESHOLD;
   if (overThreshold > 0) {
-    if (!options.allowManaged || overThreshold > MANAGED_ONE_STOP_WEAR_BUFFER) {
+    if (!options.allowManaged || overThreshold > MANAGED_WEAR_BUFFER) {
       return null;
     }
 
@@ -273,6 +280,49 @@ function buildTwoStopShape(
     compounds: [fastest.compound, durable.compound, fastest.compound],
     stintLaps,
     stintWearPercentages,
+  };
+}
+
+/** Evenly split race on one compound. Even stints minimise the worst stint's
+ *  wear when every stint runs the same tyre; leftover laps go to the later
+ *  stints so stops land slightly early, the same undercut bias as the dry
+ *  one-stop. Returns null past the managed-tyre buffer. */
+function buildSameCompoundShape(
+  compound: CompoundLifeStats,
+  totalLaps: number,
+  stopCount: number,
+): TrackStrategyShape | null {
+  const stintCount = stopCount + 1;
+  const base = Math.floor(totalLaps / stintCount);
+  if (base < 1) return null;
+  const remainder = totalLaps - base * stintCount;
+  const stintLaps = Array.from(
+    { length: stintCount },
+    (_, i) => base + (i >= stintCount - remainder ? 1 : 0),
+  );
+  const stintWearPercentages = stintLaps.map((laps, i) =>
+    projectedStintWear(compound, laps, i, stintCount, stopCount),
+  );
+  const compounds = stintLaps.map(() => compound.compound);
+  const projectedMaxWear = Math.max(...stintWearPercentages);
+  const overThreshold = projectedMaxWear - PUNCTURE_THRESHOLD;
+  if (overThreshold <= 0) {
+    return { compounds, stintLaps, stintWearPercentages };
+  }
+  if (overThreshold > MANAGED_WEAR_BUFFER) return null;
+
+  return {
+    compounds,
+    stintLaps,
+    stintWearPercentages,
+    risk: {
+      kind: "managed-tyres",
+      projectedMaxWear,
+      overThreshold,
+      limitingCompound: compound.compound,
+      limitingStintLaps:
+        stintLaps[stintWearPercentages.indexOf(projectedMaxWear)],
+    },
   };
 }
 
@@ -449,7 +499,7 @@ export function synthesizeStrategies(
 
   const fastestScoreMs = candidateList[0].score?.totalScoreMs ?? 0;
   const anchor = timingContext
-    ? findRaceTimeAnchor(entries, timingContext)
+    ? findRaceTimeAnchor(entries, timingContext, isDryCompound)
     : null;
   const suggestions = candidateList.map((candidate) =>
     suggestionFromShape(
@@ -494,4 +544,87 @@ export function synthesizeStrategies(
     null;
 
   return { recommended, alternative };
+}
+
+/** Wet races drop the two-compound rule, so a wet plan is a stop-count choice
+ *  on one compound. Inters vs Full Wets is decided by rain intensity rather
+ *  than lap time, so each wet compound with bucket evidence gets its own plan
+ *  instead of competing in one ranking. Crossovers to slicks are not modelled:
+ *  their timing depends on when the track dries, which past races can't
+ *  forecast. */
+export function synthesizeWetStrategies(
+  compoundLifeStats: CompoundLifeStats[],
+  totalLaps: number,
+  raceCount: number,
+  fullDistanceRaceCount: number,
+  entries: BucketRaceEntry[],
+  pitLossEntries: BucketRaceEntry[],
+): TrackStrategySuggestion[] {
+  return rankWetCompounds(compoundLifeStats).flatMap((compound) => {
+    const shapes = WET_STOP_COUNTS.map((stopCount) =>
+      buildSameCompoundShape(compound, totalLaps, stopCount),
+    ).filter((shape): shape is TrackStrategyShape => shape != null);
+    if (shapes.length === 0) return [];
+
+    const timingContext = buildSingleCompoundTimingContext(
+      entries,
+      pitLossEntries,
+      compound.compound,
+    );
+    const candidates = shapes.map((shape) => ({
+      shape,
+      score: timingContext ? scoreShape(shape, timingContext) : undefined,
+    }));
+    // Shapes are generated in stop-count order, so the stable fallback sort
+    // keeps the fewest-stop strict plan first when pit loss is unknown.
+    candidates.sort((a, b) =>
+      a.score && b.score
+        ? a.score.totalScoreMs - b.score.totalScoreMs
+        : Number(a.shape.risk != null) - Number(b.shape.risk != null),
+    );
+    const best = candidates[0];
+    const closeCandidate = candidates
+      .slice(1)
+      .find((candidate) => !candidate.shape.risk);
+    const closeDeltaMs =
+      best.score && closeCandidate?.score
+        ? closeCandidate.score.totalScoreMs - best.score.totalScoreMs
+        : null;
+    const anchor = timingContext
+      ? findRaceTimeAnchor(
+          entries,
+          timingContext,
+          (candidate) => candidate === compound.compound,
+        )
+      : null;
+
+    return [
+      {
+        ...suggestionFromShape(
+          best.shape,
+          totalLaps,
+          raceCount,
+          fullDistanceRaceCount,
+          undefined,
+          timingContext && best.score
+            ? timeEstimateForCandidate(
+                best,
+                best.score.totalScoreMs,
+                timingContext,
+                anchor,
+              )
+            : undefined,
+        ),
+        closeStopCount:
+          closeCandidate &&
+          closeDeltaMs != null &&
+          closeDeltaMs <= STOP_COUNT_ALTERNATIVE_MAX_DELTA_MS
+            ? {
+                stopCount: closeCandidate.shape.compounds.length - 1,
+                deltaMs: Math.round(closeDeltaMs),
+              }
+            : undefined,
+      },
+    ];
+  });
 }

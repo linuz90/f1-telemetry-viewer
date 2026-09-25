@@ -15,7 +15,10 @@ import {
   getRacePaceLaps,
 } from "../utils/stats/laps";
 import { avgWearRate } from "../utils/stats/tyres";
-import { synthesizeStrategies } from "./trackStrategySynthesis";
+import {
+  synthesizeStrategies,
+  synthesizeWetStrategies,
+} from "./trackStrategySynthesis";
 import type {
   BucketRaceEntry,
   TrackBestRaceLap,
@@ -195,7 +198,15 @@ export function buildTrackRaceRecommendation(
     entries,
     pitLossEntries,
   );
-  const hasEvidence = recommended != null;
+  const wetStrategies = synthesizeWetStrategies(
+    strategyCompoundLifeStats,
+    totalLaps,
+    entries.length,
+    fullDistanceEntries.length,
+    entries,
+    pitLossEntries,
+  );
+  const hasEvidence = recommended != null || wetStrategies.length > 0;
 
   // ── Fuel target (single line) ────────────────────────────────────────────
   const fuelTarget: TrackFuelTarget | null = bucketFuelStats
@@ -235,8 +246,10 @@ export function buildTrackRaceRecommendation(
     bestRaceLap,
     raceVsQualiDeltaMs,
     avgErsDeployMj: avgErsMj,
+    totalLaps,
     recommended,
     alternative,
+    wetStrategies,
     fuelTarget,
     sinceLastRace,
   };

@@ -1269,11 +1269,6 @@ export function TrackProgressPage() {
               pitLossRaceSessions: raceSessions,
             },
           );
-          const strategyTotalLaps =
-            recommendation?.recommended?.stintLaps.reduce(
-              (sum, n) => sum + n,
-              0,
-            ) ?? 0;
           return (
             <>
               {showRaceLengthSelector && selectedRaceAnalysisBucket && (
@@ -1359,12 +1354,14 @@ export function TrackProgressPage() {
               )}
 
               {/* Strategy — ranks feasible wear-gated shapes by bucket-scoped
-                tyre pace/wear plus same-track or default pit-loss time. */}
-              {recommendation?.recommended && strategyTotalLaps > 0 && (
+                tyre pace/wear plus same-track or default pit-loss time, with
+                separate wet plans when Inters/Full Wet stints exist. */}
+              {recommendation?.hasEvidence && (
                 <TrackStrategySection
                   recommended={recommendation.recommended}
                   alternative={recommendation.alternative}
-                  totalLaps={strategyTotalLaps}
+                  wetStrategies={recommendation.wetStrategies}
+                  totalLaps={recommendation.totalLaps}
                   raceLengthLabel={selectedRaceLengthLabel}
                 />
               )}

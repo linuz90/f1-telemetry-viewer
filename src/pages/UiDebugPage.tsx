@@ -290,6 +290,27 @@ const trackAlternative: TrackStrategySuggestion = {
   },
 };
 
+const trackWetStrategy: TrackStrategySuggestion = {
+  compounds: ["Inters", "Inters"],
+  stintLaps: [13, 14],
+  stintWearPercentages: [52, 57],
+  pitWindows: [{ earliest: 12, latest: 14, target: 13 }],
+  raceCount: 2,
+  fullDistanceRaceCount: 1,
+  isEvidenceBacked: true,
+  timeEstimate: {
+    deltaToFastestMs: 0,
+    pitLossMs: 19_000,
+    confidence: "medium",
+    source: "relative tyre/wear/pit model",
+    details: {
+      pitLossSource: "Pits n' Giggles Austria default",
+      paceSource: "Inters-only stop-count comparison",
+    },
+  },
+  closeStopCount: { stopCount: 2, deltaMs: 2_200 },
+};
+
 const trackRecommendation: TrackRaceRecommendation = {
   raceCount: 2,
   fullDistanceRaceCount: 1,
@@ -302,8 +323,10 @@ const trackRecommendation: TrackRaceRecommendation = {
   },
   raceVsQualiDeltaMs: 1575,
   avgErsDeployMj: 7.4,
+  totalLaps: 27,
   recommended: trackStrategy,
   alternative: trackAlternative,
+  wetStrategies: [trackWetStrategy],
   fuelTarget: {
     recommendedDeltaLaps: -2.7,
     recommendedFuelKg: 32.9,
@@ -790,6 +813,7 @@ export function UiDebugPage() {
         <TrackStrategySection
           recommended={trackStrategy}
           alternative={trackAlternative}
+          wetStrategies={[trackWetStrategy]}
           totalLaps={27}
           raceLengthLabel="27-lap"
         />
