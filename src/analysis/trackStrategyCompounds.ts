@@ -17,6 +17,41 @@ export function isDryCompound(compound: string): boolean {
   return compound in DRY_COMPOUND_PRIORITY;
 }
 
+/** Pits n' Giggles exports `Inters` and `Wet`; the long-form aliases keep
+ *  older or hand-built data working. Lower = lighter rain. */
+const WET_COMPOUND_PRIORITY: Record<string, number> = {
+  Inters: 0,
+  Intermediate: 0,
+  Wet: 1,
+  Wets: 1,
+};
+
+export function isWetCompound(compound: string): boolean {
+  return compound in WET_COMPOUND_PRIORITY;
+}
+
+export function isFullWetCompound(compound: string): boolean {
+  return WET_COMPOUND_PRIORITY[compound] === 1;
+}
+
+/** Wet compounds with usable wear evidence, Inters before Full Wets. */
+export function rankWetCompounds(
+  compoundLifeStats: CompoundLifeStats[],
+): CompoundLifeStats[] {
+  return compoundLifeStats
+    .filter(
+      (c) =>
+        isWetCompound(c.compound) &&
+        c.stintCount > 0 &&
+        c.avgWearRatePerLap > 0,
+    )
+    .sort(
+      (a, b) =>
+        WET_COMPOUND_PRIORITY[a.compound] - WET_COMPOUND_PRIORITY[b.compound] ||
+        b.stintCount - a.stintCount,
+    );
+}
+
 /** Sort dry compound stats by relative softness (Soft → Medium → Hard).
  *  Observed best-lap order isn't trustworthy here because fuel load and
  *  driver effort confound it — a player's best Hard lap can easily beat

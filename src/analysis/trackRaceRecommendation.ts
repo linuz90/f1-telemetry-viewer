@@ -15,7 +15,10 @@ import {
   getRacePaceLaps,
 } from "../utils/stats/laps";
 import { avgWearRate } from "../utils/stats/tyres";
-import { synthesizeStrategies } from "./trackStrategySynthesis";
+import {
+  synthesizeStrategies,
+  synthesizeWetStrategies,
+} from "./trackStrategySynthesis";
 import type {
   BucketRaceEntry,
   TrackBestRaceLap,
@@ -99,9 +102,9 @@ function bestRacePaceLapWithCompound(
  *  SegmentedControl above the tyre-life cards. Practice/qualifying sessions are
  *  excluded by the race filter inside this function (defense in depth).
  *
- *  Returns null only when the bucket has zero race entries. The evidence gate
- *  for strategy/alternative is exposed on the result (`hasEvidence`,
- *  `recommended`, `alternative`) so the UI can render the always-on chips
+ *  Returns null only when the bucket has zero race entries. The strategy
+ *  evidence gate is exposed on the result (`hasEvidence`, `recommended`,
+ *  `alternative`, `wetStrategies`) so the UI can render the always-on chips
  *  (best lap, fuel, ERS) even when strategy data is too thin. */
 export function buildTrackRaceRecommendation(
   bucketRaceSessions: TelemetrySession[],
@@ -195,7 +198,15 @@ export function buildTrackRaceRecommendation(
     entries,
     pitLossEntries,
   );
-  const hasEvidence = recommended != null;
+  const wetStrategies = synthesizeWetStrategies(
+    strategyCompoundLifeStats,
+    totalLaps,
+    entries.length,
+    fullDistanceEntries.length,
+    entries,
+    pitLossEntries,
+  );
+  const hasEvidence = recommended != null || wetStrategies.length > 0;
 
   // ── Fuel target (single line) ────────────────────────────────────────────
   const fuelTarget: TrackFuelTarget | null = bucketFuelStats
@@ -235,8 +246,10 @@ export function buildTrackRaceRecommendation(
     bestRaceLap,
     raceVsQualiDeltaMs,
     avgErsDeployMj: avgErsMj,
+    totalLaps,
     recommended,
     alternative,
+    wetStrategies,
     fuelTarget,
     sinceLastRace,
   };

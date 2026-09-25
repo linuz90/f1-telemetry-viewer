@@ -578,6 +578,7 @@ export function scoreShape(
 
 function observedShapeFromEntry(
   entry: BucketRaceEntry,
+  isPlanCompound: (compound: string) => boolean,
 ): TrackStrategyShape | null {
   const stints = getDriverStints(entry.player).filter(
     (stint) => stint["stint-length"] > 0,
@@ -585,7 +586,8 @@ function observedShapeFromEntry(
   if (stints.length === 0) return null;
   if (
     stints.some(
-      (stint) => !isDryCompound(stint["tyre-set-data"]["visual-tyre-compound"]),
+      (stint) =>
+        !isPlanCompound(stint["tyre-set-data"]["visual-tyre-compound"]),
     )
   ) {
     return null;
@@ -609,9 +611,12 @@ function observedShapeFromEntry(
   };
 }
 
+/** Anchors absolute durations on the latest completed race run entirely on
+ *  the plan's compounds, so a wet race never anchors a dry plan or vice versa. */
 export function findRaceTimeAnchor(
   entries: BucketRaceEntry[],
   context: StrategyTimingContext,
+  isPlanCompound: (compound: string) => boolean,
 ): StrategyTimeAnchor | null {
   for (const entry of [...entries].reverse()) {
     if (!entry.isFullDistance) continue;
@@ -620,7 +625,7 @@ export function findRaceTimeAnchor(
     const totalRaceTimeSeconds = classification?.["total-race-time"] ?? 0;
     if (totalRaceTimeSeconds <= 0) continue;
 
-    const observedShape = observedShapeFromEntry(entry);
+    const observedShape = observedShapeFromEntry(entry, isPlanCompound);
     if (!observedShape) continue;
 
     return {
@@ -650,6 +655,33 @@ export function buildTimingContext(
     pitLoss,
     paceModel,
     strategyPaceModels: buildStrategyPaceModels(entries, paceModel),
+  };
+}
+
+/** Wet plans compare stop counts on a single compound, so compound pace
+ *  offsets cancel out and only pit loss plus wear degradation separate the
+ *  candidates. */
+export function buildSingleCompoundTimingContext(
+  entries: BucketRaceEntry[],
+  pitLossEntries: BucketRaceEntry[],
+  compound: string,
+): StrategyTimingContext | null {
+  const representative = entries[0];
+  if (!representative) return null;
+
+  const pitLoss = resolvePitLoss(pitLossEntries, representative);
+  if (!pitLoss) return null;
+
+  return {
+    pitLoss,
+    paceModel: {
+      offsetsMs: new Map([[compound, 0]]),
+      // Rain intensity and drying rate change wet tyre wear from race to race,
+      // so wet evidence never earns high confidence.
+      confidence: "medium",
+      source: `${compound}-only stop-count comparison`,
+    },
+    strategyPaceModels: new Map(),
   };
 }
 

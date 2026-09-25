@@ -88,6 +88,7 @@ pnpm test:race-pace              # Run Race Pace estimator/matching regressions
 pnpm test:energy-stats           # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                   # Run the focused fuel-aggregation suite
 pnpm test:speed                  # Run canonical speed/aero inference regressions
+pnpm test:strategy               # Run Track Strategy synthesis regressions (dry + wet)
 pnpm typecheck:node              # Type-check the servers, plugins, and scripts
 pnpm benchmark:session-index     # Benchmark a disposable 1,260-file corpus
 ```
@@ -102,9 +103,9 @@ from a local representative corpus instead of the committed demo fixtures; the
 source remains read-only and only aggregate measurements are printed.
 
 The session-summary index, complete-lap timing, Race Pace estimation, fuel
-aggregation, and speed/aero inference have focused suites built on Node's test
-runner. No general UI test runner or linter is configured; `pnpm build` remains
-the main whole-app validation command.
+aggregation, speed/aero inference, and Track Strategy synthesis have focused
+suites built on Node's test runner. No general UI test runner or linter is
+configured; `pnpm build` remains the main whole-app validation command.
 
 For debugging shared repro files without pointing at your full telemetry history, put the files in a small folder and launch against that folder:
 

@@ -1,4 +1,11 @@
-import { AlertTriangle, Award, CircleHelp, Disc } from "lucide-react";
+import {
+  AlertTriangle,
+  Award,
+  CircleHelp,
+  CloudRain,
+  Disc,
+} from "lucide-react";
+import { isFullWetCompound } from "../../analysis/trackStrategyCompounds";
 import type { TrackStrategySuggestion } from "../../analysis/trackStrategyTypes";
 import { cn } from "../../utils/cn";
 import { PUNCTURE_THRESHOLD } from "../../utils/stats/tyres";
@@ -12,12 +19,17 @@ import { HStack } from "../ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
 
 const STRATEGY_EVIDENCE_TOOLTIP = `Pace and wear come from this race-length bucket. Ranking blends distance-matched compound pace, projected worst-wheel wear, pit-loss cost, and managed-tyre risk; pit loss uses same-track player stops when available, then F1 defaults. Stints still target the ${PUNCTURE_THRESHOLD}% cap.`;
+const WET_STRATEGY_TOOLTIP =
+  "Wet plans pick a stop count on one wet compound from your Inters/Full Wet stints; switching to slicks depends on when the track dries, so it isn't modelled.";
+
+type StrategyRowKind = "recommended" | "alternative" | "wet";
 
 /**
  * F1 broadcast-style strategy visualization for the Race tab. Shows the
  * recommended and alternative strategy shapes as stacked equal-weight ribbons,
  * with stints scaled to their lap counts and pit windows shaded ±1 lap around
- * the target pit lap.
+ * the target pit lap. Wet plans (one per wet compound) follow in their own
+ * group, and render alone when the bucket has no dry evidence.
  *
  * Shapes come from the same selected race-length tyre-wear synthesis in
  * `analysis/trackStrategySynthesis.ts`, then get ranked by the timing model. The
@@ -27,21 +39,26 @@ const STRATEGY_EVIDENCE_TOOLTIP = `Pace and wear come from this race-length buck
 export function TrackStrategySection({
   recommended,
   alternative,
+  wetStrategies,
   totalLaps,
   raceLengthLabel,
 }: {
-  recommended: TrackStrategySuggestion;
+  recommended: TrackStrategySuggestion | null;
   alternative: TrackStrategySuggestion | null;
+  wetStrategies: TrackStrategySuggestion[];
   totalLaps: number;
   /** Optional race-length bucket label (e.g. "33-lap") shown in the subtitle */
   raceLengthLabel?: string;
 }) {
+  // Race counts are bucket-wide, so any plan carries the same numbers.
+  const evidence = recommended ?? wetStrategies[0];
+  if (!evidence) return null;
   const sampleCount =
-    recommended.fullDistanceRaceCount > 0
-      ? recommended.fullDistanceRaceCount
-      : recommended.raceCount;
+    evidence.fullDistanceRaceCount > 0
+      ? evidence.fullDistanceRaceCount
+      : evidence.raceCount;
   const sampleKind =
-    recommended.fullDistanceRaceCount > 0 ? "full-distance race" : "race";
+    evidence.fullDistanceRaceCount > 0 ? "full-distance race" : "race";
   const subtitleParts: string[] = [];
   if (raceLengthLabel) subtitleParts.push(raceLengthLabel);
   subtitleParts.push(
@@ -57,18 +74,39 @@ export function TrackStrategySection({
           <HStack className="gap-0.5">
             <CopyButton
               label="Copy strategy"
-              getText={() => formatStrategyText(recommended, totalLaps)}
+              getText={() =>
+                [
+                  recommended && formatStrategyText(recommended, totalLaps),
+                  ...wetStrategies.map((strategy) =>
+                    formatStrategyText(
+                      strategy,
+                      totalLaps,
+                      `Wet race strategy (${wetCondition(strategy).toLowerCase()})`,
+                    ),
+                  ),
+                ]
+                  .filter(Boolean)
+                  .join("\n\n")
+              }
             />
-            <StrategyEvidenceHelp />
+            <StrategyEvidenceHelp
+              text={
+                wetStrategies.length > 0
+                  ? `${STRATEGY_EVIDENCE_TOOLTIP} ${WET_STRATEGY_TOOLTIP}`
+                  : STRATEGY_EVIDENCE_TOOLTIP
+              }
+            />
           </HStack>
         }
       />
 
-      <StrategyRow
-        kind="recommended"
-        strategy={recommended}
-        totalLaps={totalLaps}
-      />
+      {recommended && (
+        <StrategyRow
+          kind="recommended"
+          strategy={recommended}
+          totalLaps={totalLaps}
+        />
+      )}
       {alternative && (
         <StrategyRow
           kind="alternative"
@@ -76,13 +114,30 @@ export function TrackStrategySection({
           totalLaps={totalLaps}
         />
       )}
+      {wetStrategies.length > 0 && (
+        <div
+          className={cn(
+            "space-y-7",
+            recommended && "border-t border-white/5 pt-7",
+          )}
+        >
+          {wetStrategies.map((strategy) => (
+            <StrategyRow
+              key={strategy.compounds[0]}
+              kind="wet"
+              strategy={strategy}
+              totalLaps={totalLaps}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
-function StrategyEvidenceHelp() {
+function StrategyEvidenceHelp({ text }: { text: string }) {
   return (
-    <Tooltip text={STRATEGY_EVIDENCE_TOOLTIP}>
+    <Tooltip text={text}>
       <button
         type="button"
         className="inline-flex size-7 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-white/[0.03] hover:text-zinc-300 focus-visible:outline focus-visible:outline-1 focus-visible:outline-zinc-500"
@@ -99,25 +154,43 @@ function StrategyRow({
   strategy,
   totalLaps,
 }: {
-  kind: "recommended" | "alternative";
+  kind: StrategyRowKind;
   strategy: TrackStrategySuggestion;
   totalLaps: number;
 }) {
   const isRecommended = kind === "recommended";
+  const isWet = kind === "wet";
   const isManaged = strategy.risk?.kind === "managed-tyres";
-  const Icon = isManaged ? AlertTriangle : isRecommended ? Award : Disc;
+  const Icon = isManaged
+    ? AlertTriangle
+    : isWet
+      ? CloudRain
+      : isRecommended
+        ? Award
+        : Disc;
   // Recommended = amber/gold — broadcast convention for the "winning" or
   // "podium" strategy callout. Alternative stays neutral zinc so the eye
-  // tracks Recommended first without dimming the alternative's data.
-  const labelTone = isRecommended ? "text-amber-300" : "text-zinc-300";
-  const label = isRecommended ? "Recommended" : "Alternative";
-  const tagline = isManaged
-    ? "One-stop, tyre management required"
-    : strategy.fastStart === true
-      ? "Fast start, durable finish"
-      : strategy.fastStart === false
-        ? "Durable start, fast finisher"
-        : "Two-stop sandwich";
+  // tracks Recommended first without dimming the alternative's data. Wet
+  // uses the same sky accent as the dashboard's Wet Weather insight.
+  const labelTone = isRecommended
+    ? "text-amber-300"
+    : isWet
+      ? "text-sky-300"
+      : "text-zinc-300";
+  const label = isRecommended
+    ? "Recommended"
+    : isWet
+      ? "Wet race"
+      : "Alternative";
+  const tagline = isWet
+    ? wetTagline(strategy, isManaged)
+    : isManaged
+      ? "One-stop, tyre management required"
+      : strategy.fastStart === true
+        ? "Fast start, durable finish"
+        : strategy.fastStart === false
+          ? "Durable start, fast finisher"
+          : "Two-stop sandwich";
   const timingLabel = formatStrategyTiming(kind, strategy.timeEstimate);
 
   return (
@@ -142,7 +215,9 @@ function StrategyRow({
                   ? "text-zinc-400 ring-white/10"
                   : isRecommended
                     ? "text-amber-200 ring-amber-300/30"
-                    : "text-zinc-200 ring-white/15",
+                    : isWet
+                      ? "text-sky-200 ring-sky-300/30"
+                      : "text-zinc-200 ring-white/15",
               )}
             >
               {timingLabel}
@@ -159,16 +234,53 @@ function StrategyRow({
         totalLaps={totalLaps}
       />
 
-      <PitDetail pitWindows={strategy.pitWindows} totalLaps={totalLaps} />
+      <PitDetail
+        pitWindows={strategy.pitWindows}
+        totalLaps={totalLaps}
+        closeStopCount={strategy.closeStopCount}
+      />
     </div>
   );
 }
 
+function formatStopCount(stopCount: number): string {
+  if (stopCount === 0) return "No-stop";
+  if (stopCount === 1) return "One-stop";
+  if (stopCount === 2) return "Two-stop";
+  if (stopCount === 3) return "Three-stop";
+  return `${stopCount}-stop`;
+}
+
+/** Inters are the light-rain tyre and Full Wets the heavy-rain one, so wet
+ *  plans are labelled by the condition they are for. */
+function wetCondition(strategy: TrackStrategySuggestion): string {
+  return isFullWetCompound(strategy.compounds[0] ?? "")
+    ? "Heavy rain"
+    : "Light rain";
+}
+
+function wetTagline(
+  strategy: TrackStrategySuggestion,
+  isManaged: boolean,
+): string {
+  const stops = formatStopCount(strategy.pitWindows.length).toLowerCase();
+  return `${wetCondition(strategy)}, ${stops}${isManaged ? ", tyre management required" : ""}`;
+}
+
 function formatStrategyTiming(
-  kind: "recommended" | "alternative",
+  kind: StrategyRowKind,
   estimate: TrackStrategySuggestion["timeEstimate"],
 ): string | null {
   if (!estimate) return null;
+
+  const duration =
+    estimate.predictedTotalRaceMs && estimate.confidence !== "low"
+      ? `~${formatRaceDuration(estimate.predictedTotalRaceMs)}`
+      : null;
+
+  // Wet rows only rank stop counts on their own compound, so "fastest" would
+  // read as a comparison against the dry plans or the other wet compound.
+  if (kind === "wet") return duration ?? "best stop count";
 
   const deltaLabel =
     estimate.deltaToFastestMs <= 250
@@ -177,9 +289,7 @@ function formatStrategyTiming(
         : "even"
       : formatSignedSeconds(estimate.deltaToFastestMs, 1);
 
-  if (estimate.predictedTotalRaceMs && estimate.confidence !== "low") {
-    return `~${formatRaceDuration(estimate.predictedTotalRaceMs)} · ${deltaLabel}`;
-  }
+  if (duration) return `${duration} · ${deltaLabel}`;
 
   return kind === "recommended" && estimate.deltaToFastestMs <= 250
     ? "fastest by model"
@@ -372,21 +482,23 @@ function wearBadgeTone(wear: number): string {
 function PitDetail({
   pitWindows,
   totalLaps,
+  closeStopCount,
 }: {
   pitWindows: { earliest: number; latest: number; target: number }[];
   totalLaps: number;
+  closeStopCount?: TrackStrategySuggestion["closeStopCount"];
 }) {
-  if (pitWindows.length === 0) {
-    return <p className="text-xs text-zinc-500">No-stop — run to the flag.</p>;
-  }
-  return (
-    <p className="text-xs text-zinc-500">
-      {pitWindows
-        .map((w, i) => {
+  const parts =
+    pitWindows.length === 0
+      ? ["No-stop — run to the flag"]
+      : pitWindows.map((w, i) => {
           const label = pitWindows.length > 1 ? `Pit ${i + 1}` : "Pit window";
           return `${label} target lap ${w.target} (${w.earliest}–${w.latest} of ${totalLaps})`;
-        })
-        .join(" · ")}
-    </p>
-  );
+        });
+  if (closeStopCount) {
+    parts.push(
+      `${formatStopCount(closeStopCount.stopCount)} ${formatSignedSeconds(closeStopCount.deltaMs, 1)}`,
+    );
+  }
+  return <p className="text-xs text-zinc-500">{parts.join(" · ")}</p>;
 }

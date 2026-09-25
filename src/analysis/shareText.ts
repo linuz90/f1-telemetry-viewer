@@ -63,6 +63,7 @@ function formatSliderValue(
 export function formatStrategyText(
   strategy: TrackStrategySuggestion,
   totalLaps: number,
+  title = "Race strategy",
 ): string {
   const lines = [
     `${strategy.compounds.join(" → ")} (${formatPitSummary(strategy.pitWindows)})`,
@@ -81,7 +82,7 @@ export function formatStrategyText(
     startLap = endLap + 1;
   });
 
-  return `Race strategy · ${totalLaps} laps\n\n${lines.join("\n")}`;
+  return `${title} · ${totalLaps} laps\n\n${lines.join("\n")}`;
 }
 
 function formatPitSummary(

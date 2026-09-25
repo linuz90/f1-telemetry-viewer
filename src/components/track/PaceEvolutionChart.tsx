@@ -79,7 +79,15 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
   const showFilter = distinctKinds.size > 1;
 
   // Collect every compound that appears in the (filtered) data, in display order.
-  const compoundOrder = ["Soft", "Medium", "Hard", "Intermediate", "Wet"];
+  // Pits n' Giggles exports `Inters`; `Intermediate` covers older data.
+  const compoundOrder = [
+    "Soft",
+    "Medium",
+    "Hard",
+    "Inters",
+    "Intermediate",
+    "Wet",
+  ];
   const present = new Set<string>();
   for (const d of filtered) {
     for (const c of Object.keys(d.paces)) present.add(c);

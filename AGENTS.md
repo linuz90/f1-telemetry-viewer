@@ -10,8 +10,8 @@ F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON ex
 - Local dev indexes telemetry summaries and streams raw telemetry JSON from disk.
 - Production/demo mode reads committed demo data or user-uploaded JSON/zip files.
 - Focused Node test suites cover the session-summary index, complete-lap timing,
-  Race Pace estimation, and fuel aggregation. No general UI test runner or
-  linter is configured.
+  Race Pace estimation, fuel aggregation, and Track Strategy synthesis. No
+  general UI test runner or linter is configured.
 
 ## Commands
 
@@ -34,6 +34,7 @@ pnpm test:energy-stats        # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                # Run fuel aggregation and recommendation tests
 pnpm test:speed               # Run canonical speed/aero inference regressions
 pnpm test:share-text          # Run plain-text setup/strategy copy formats
+pnpm test:strategy            # Run Track Strategy synthesis regressions (dry + wet)
 pnpm typecheck:node           # Type-check Node servers/plugins/scripts
 pnpm benchmark:session-index  # Benchmark a disposable generated corpus
 ```
@@ -217,6 +218,7 @@ Strategy timing:
 - Pit-loss fallbacks may cross distance because pit-lane time loss is distance-independent: infer same-track user pit loss first, reject obvious outlier stops, then use attributed Pits n' Giggles F1 defaults, then a low-confidence F1 median. Do not invent F2 pit-loss defaults.
 - Strategy alternatives should stay useful: prefer a different stop count only when it is time-competitive; otherwise show the next best distinct one-stop or pit-window shape.
 - Absolute strategy durations are display estimates anchored to completed same-distance races; otherwise prefer relative deltas and confidence/source copy.
+- Wet plans are separate same-compound stop-count plans, one per wet compound (PnG exports `Inters` and `Wet`, not `Intermediate`). Keep wet stints out of dry pair ranking, anchor each plan only on races run entirely on its compounds, and leave slick crossovers unmodelled because they depend on when the track dries.
 
 Rivals roster:
 
