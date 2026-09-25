@@ -18,7 +18,9 @@ import { CopyButton } from "../ui/CopyButton";
 import { HStack } from "../ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
 
-const STRATEGY_EVIDENCE_TOOLTIP = `Pace and wear come from this race-length bucket. Ranking blends distance-matched compound pace, projected worst-wheel wear, pit-loss cost, and managed-tyre risk; pit loss uses same-track player stops when available, then F1 defaults. Stints still target the ${PUNCTURE_THRESHOLD}% cap. Wet plans pick a stop count on one wet compound from your Inters/Full Wet stints; switching to slicks depends on when the track dries, so it isn't modelled.`;
+const STRATEGY_EVIDENCE_TOOLTIP = `Pace and wear come from this race-length bucket. Ranking blends distance-matched compound pace, projected worst-wheel wear, pit-loss cost, and managed-tyre risk; pit loss uses same-track player stops when available, then F1 defaults. Stints still target the ${PUNCTURE_THRESHOLD}% cap.`;
+const WET_STRATEGY_TOOLTIP =
+  "Wet plans pick a stop count on one wet compound from your Inters/Full Wet stints; switching to slicks depends on when the track dries, so it isn't modelled.";
 
 type StrategyRowKind = "recommended" | "alternative" | "wet";
 
@@ -79,7 +81,7 @@ export function TrackStrategySection({
                     formatStrategyText(
                       strategy,
                       totalLaps,
-                      "Wet race strategy",
+                      `Wet race strategy (${wetCondition(strategy).toLowerCase()})`,
                     ),
                   ),
                 ]
@@ -87,7 +89,13 @@ export function TrackStrategySection({
                   .join("\n\n")
               }
             />
-            <StrategyEvidenceHelp />
+            <StrategyEvidenceHelp
+              text={
+                wetStrategies.length > 0
+                  ? `${STRATEGY_EVIDENCE_TOOLTIP} ${WET_STRATEGY_TOOLTIP}`
+                  : STRATEGY_EVIDENCE_TOOLTIP
+              }
+            />
           </HStack>
         }
       />
@@ -127,9 +135,9 @@ export function TrackStrategySection({
   );
 }
 
-function StrategyEvidenceHelp() {
+function StrategyEvidenceHelp({ text }: { text: string }) {
   return (
-    <Tooltip text={STRATEGY_EVIDENCE_TOOLTIP}>
+    <Tooltip text={text}>
       <button
         type="button"
         className="inline-flex size-7 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-white/[0.03] hover:text-zinc-300 focus-visible:outline focus-visible:outline-1 focus-visible:outline-zinc-500"
@@ -243,17 +251,20 @@ function formatStopCount(stopCount: number): string {
   return `${stopCount}-stop`;
 }
 
-/** Inters are the light-rain tyre and Full Wets the heavy-rain one, so the
- *  tagline names the condition each wet plan is for. */
+/** Inters are the light-rain tyre and Full Wets the heavy-rain one, so wet
+ *  plans are labelled by the condition they are for. */
+function wetCondition(strategy: TrackStrategySuggestion): string {
+  return isFullWetCompound(strategy.compounds[0] ?? "")
+    ? "Heavy rain"
+    : "Light rain";
+}
+
 function wetTagline(
   strategy: TrackStrategySuggestion,
   isManaged: boolean,
 ): string {
-  const condition = isFullWetCompound(strategy.compounds[0] ?? "")
-    ? "Heavy rain"
-    : "Light rain";
   const stops = formatStopCount(strategy.pitWindows.length).toLowerCase();
-  return `${condition}, ${stops}${isManaged ? ", tyre management required" : ""}`;
+  return `${wetCondition(strategy)}, ${stops}${isManaged ? ", tyre management required" : ""}`;
 }
 
 function formatStrategyTiming(
@@ -262,20 +273,25 @@ function formatStrategyTiming(
 ): string | null {
   if (!estimate) return null;
 
-  // A wet plan is the fastest of its own same-compound candidates.
-  const isRowFastest = kind !== "alternative";
+  const duration =
+    estimate.predictedTotalRaceMs && estimate.confidence !== "low"
+      ? `~${formatRaceDuration(estimate.predictedTotalRaceMs)}`
+      : null;
+
+  // Wet rows only rank stop counts on their own compound, so "fastest" would
+  // read as a comparison against the dry plans or the other wet compound.
+  if (kind === "wet") return duration ?? "best stop count";
+
   const deltaLabel =
     estimate.deltaToFastestMs <= 250
-      ? isRowFastest
+      ? kind === "recommended"
         ? "fastest"
         : "even"
       : formatSignedSeconds(estimate.deltaToFastestMs, 1);
 
-  if (estimate.predictedTotalRaceMs && estimate.confidence !== "low") {
-    return `~${formatRaceDuration(estimate.predictedTotalRaceMs)} · ${deltaLabel}`;
-  }
+  if (duration) return `${duration} · ${deltaLabel}`;
 
-  return isRowFastest && estimate.deltaToFastestMs <= 250
+  return kind === "recommended" && estimate.deltaToFastestMs <= 250
     ? "fastest by model"
     : deltaLabel;
 }

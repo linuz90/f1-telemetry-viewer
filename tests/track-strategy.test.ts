@@ -187,6 +187,24 @@ test("mixed buckets keep dry and wet plans on their own compounds", () => {
   assert.ok(wet.timeEstimate?.predictedTotalRaceMs);
 });
 
+test("wet plans stretched past any real stint drop to low confidence", () => {
+  // One short opening Inters stint (e.g. before a crossover to slicks) is too
+  // thin to vouch for a full-distance wet plan.
+  const recommendation = recommend([
+    {
+      totalLaps: 30,
+      stints: [
+        { compound: "Inters", laps: 4, wearPerLap: 3 },
+        { compound: "Hard", laps: 26, wearPerLap: 2 },
+      ],
+    },
+  ]);
+
+  const [wet] = recommendation.wetStrategies;
+  assert.ok(Math.max(...wet.stintLaps) > 4);
+  assert.equal(wet.timeEstimate?.confidence, "low");
+});
+
 test("full wets get their own plan after Inters", () => {
   const recommendation = recommend([
     {

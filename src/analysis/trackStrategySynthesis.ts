@@ -597,6 +597,19 @@ export function synthesizeWetStrategies(
           (candidate) => candidate === compound.compound,
         )
       : null;
+    const estimate =
+      timingContext && best.score
+        ? timeEstimateForCandidate(
+            best,
+            best.score.totalScoreMs,
+            timingContext,
+            anchor,
+          )
+        : undefined;
+    // Stints longer than any real one on this compound are linear wear
+    // extrapolations, often from a short opening stint on a drying track.
+    const isExtrapolated =
+      Math.max(...best.shape.stintLaps) > compound.longestStint;
 
     return [
       {
@@ -606,14 +619,16 @@ export function synthesizeWetStrategies(
           raceCount,
           fullDistanceRaceCount,
           undefined,
-          timingContext && best.score
-            ? timeEstimateForCandidate(
-                best,
-                best.score.totalScoreMs,
-                timingContext,
-                anchor,
-              )
-            : undefined,
+          estimate && isExtrapolated
+            ? {
+                ...estimate,
+                confidence: "low",
+                details: {
+                  ...estimate.details,
+                  paceSource: `${estimate.details?.paceSource}; wear extrapolated past your ${compound.longestStint}-lap longest ${compound.compound} stint`,
+                },
+              }
+            : estimate,
         ),
         closeStopCount:
           closeCandidate &&

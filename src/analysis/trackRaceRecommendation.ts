@@ -102,9 +102,9 @@ function bestRacePaceLapWithCompound(
  *  SegmentedControl above the tyre-life cards. Practice/qualifying sessions are
  *  excluded by the race filter inside this function (defense in depth).
  *
- *  Returns null only when the bucket has zero race entries. The evidence gate
- *  for strategy/alternative is exposed on the result (`hasEvidence`,
- *  `recommended`, `alternative`) so the UI can render the always-on chips
+ *  Returns null only when the bucket has zero race entries. The strategy
+ *  evidence gate is exposed on the result (`hasEvidence`, `recommended`,
+ *  `alternative`, `wetStrategies`) so the UI can render the always-on chips
  *  (best lap, fuel, ERS) even when strategy data is too thin. */
 export function buildTrackRaceRecommendation(
   bucketRaceSessions: TelemetrySession[],

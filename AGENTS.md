@@ -10,8 +10,8 @@ F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON ex
 - Local dev indexes telemetry summaries and streams raw telemetry JSON from disk.
 - Production/demo mode reads committed demo data or user-uploaded JSON/zip files.
 - Focused Node test suites cover the session-summary index, complete-lap timing,
-  Race Pace estimation, and fuel aggregation. No general UI test runner or
-  linter is configured.
+  Race Pace estimation, fuel aggregation, and Track Strategy synthesis. No
+  general UI test runner or linter is configured.
 
 ## Commands
 
