@@ -33,6 +33,7 @@ pnpm test:race-pace           # Run Race Pace estimator/matching regressions
 pnpm test:energy-stats        # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                # Run fuel aggregation and recommendation tests
 pnpm test:speed               # Run canonical speed/aero inference regressions
+pnpm test:share-text          # Run plain-text setup/strategy copy formats
 pnpm typecheck:node           # Type-check Node servers/plugins/scripts
 pnpm benchmark:session-index  # Benchmark a disposable generated corpus
 ```

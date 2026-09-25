@@ -3,9 +3,11 @@ import type { TrackStrategySuggestion } from "../../analysis/trackStrategyTypes"
 import { cn } from "../../utils/cn";
 import { PUNCTURE_THRESHOLD } from "../../utils/stats/tyres";
 import { formatSignedSeconds } from "../../utils/format";
+import { formatStrategyText } from "../../analysis/shareText";
 import { cardClass } from "../Card";
 import { Tooltip } from "../Tooltip";
 import { SectionHeader } from "../ui/SectionHeader";
+import { CopyButton } from "../ui/CopyButton";
 import { HStack } from "../ui/Stack";
 import { stintChipStyle, stintChipTextStyle } from "../ui/StintChip";
 
@@ -51,7 +53,15 @@ export function TrackStrategySection({
       <SectionHeader
         title="Strategy"
         hint={subtitleParts.join(" · ")}
-        action={<StrategyEvidenceHelp />}
+        action={
+          <HStack className="gap-0.5">
+            <CopyButton
+              label="Copy strategy"
+              getText={() => formatStrategyText(recommended, totalLaps)}
+            />
+            <StrategyEvidenceHelp />
+          </HStack>
+        }
       />
 
       <StrategyRow

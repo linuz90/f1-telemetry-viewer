@@ -1,5 +1,7 @@
 import type { CarSetup } from "../types/telemetry";
 import { CAR_SETUP_RANGES } from "../constants/setup";
+import { formatSetupText } from "../analysis/shareText";
+import { CopyButton } from "./ui/CopyButton";
 import { Eyebrow } from "./ui/Eyebrow";
 import { SectionHeader } from "./ui/SectionHeader";
 import { HStack, VStack } from "./ui/Stack";
@@ -119,7 +121,18 @@ export function CarSetupCard({ setup }: CarSetupCardProps) {
 
   return (
     <div>
-      <SectionHeader size="sm" title="Car Setup" className="mb-4" />
+      <SectionHeader
+        size="sm"
+        title="Car Setup"
+        className="mb-4"
+        action={
+          <CopyButton
+            label="Copy setup"
+            getText={() => formatSetupText(setup)}
+            className="-my-1.5"
+          />
+        }
+      />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
         {/* Column 1: Aero + Transmission + Brakes */}
         <div className="space-y-5">
