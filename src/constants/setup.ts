@@ -3,8 +3,8 @@
 export const CAR_SETUP_RANGES: Record<string, [number, number]> = {
   "front-wing": [0, 50],
   "rear-wing": [0, 50],
-  "on-throttle": [50, 100],
-  "off-throttle": [50, 100],
+  "on-throttle": [0, 100],
+  "off-throttle": [0, 100],
   "front-camber": [-3.5, -2.5],
   "rear-camber": [-2.0, -1.0],
   "front-toe": [0.0, 0.5],
