@@ -6,6 +6,7 @@ import {
   F1_26_TRACK_CALENDAR_IDS,
   TRACK_DEFINITIONS,
 } from "../constants/tracks";
+import { PNG_TURN_FIXES } from "../constants/pngTurnFixes";
 import { TRACK_GEOMETRY } from "../constants/trackGeometry";
 import {
   F1_PIT_LOSS_DEFAULT_SECONDS,
@@ -183,7 +184,11 @@ test("per-track tables are keyed by canonical track ids", () => {
     ...TRACK_DEFINITIONS.map(({ id }) => id),
     ...ADDITIONAL_TRACK_IDS,
   ]);
-  for (const table of [TRACK_GEOMETRY, F1_PIT_LOSS_DEFAULT_SECONDS]) {
+  for (const table of [
+    TRACK_GEOMETRY,
+    F1_PIT_LOSS_DEFAULT_SECONDS,
+    PNG_TURN_FIXES,
+  ]) {
     for (const trackId of Object.keys(table)) {
       assert.ok(ids.has(trackId), trackId);
     }

@@ -143,6 +143,7 @@ Track identity:
 - `SessionSummary.track` keeps the raw exporter label; do not rewrite persisted summaries for presentation.
 - Use `getTrackId()` / `isSameTrack()` for grouping and comparison, `getTrackDisplayName()` for UI copy, and `trackPath()` for canonical URLs.
 - Keep legacy exporter-derived track slugs resolving so existing bookmarks redirect to the canonical circuit route.
+- Turn numbers follow the official numbering in `getTrackCorners()`. Race-control locations come from Pits n' Giggles' `segment-info`, so `normalizeSession()` relabels the segments in `PNG_TURN_FIXES` where its numbers differ; add a range there rather than patching labels in components.
 
 Start reaction:
 
