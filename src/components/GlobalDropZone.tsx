@@ -115,8 +115,7 @@ export function GlobalDropZone() {
                     Drop telemetry files
                   </p>
                   <p className="mt-1 text-sm text-zinc-400">
-                    .json sessions with their .pngt lap recordings, or a .zip of
-                    your data folder
+                    .json session files or a .zip of your data folder
                   </p>
                 </div>
               </>

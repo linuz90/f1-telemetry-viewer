@@ -46,7 +46,7 @@ export function ZipUploadScreen({
           f.name.endsWith(".pngt"),
       );
       if (valid.length === 0) {
-        setError("Please upload .zip, .json or .pngt files");
+        setError("Please upload .zip or .json files");
         return;
       }
       try {
@@ -147,8 +147,7 @@ export function ZipUploadScreen({
                   Drop or select telemetry files
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
-                  .json sessions with their .pngt lap recordings, or a .zip of
-                  your data folder
+                  .json session files, or a .zip of your data folder
                 </p>
               </div>
               {error && <p className="text-xs text-behind">{error}</p>}

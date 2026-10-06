@@ -404,8 +404,13 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
 
   if (scope.kind === "session" && !sessionRecording) return null;
   // The track pool holds valid, pit-free bests only; a family whose complete
-  // laps are all invalid has nothing to default to.
-  if (scope.kind === "track" && familyPool.length === 0 && !lapsParam) {
+  // laps are all invalid has nothing to default to. URL refs count only when
+  // they name a recording here, so a shared link never shows an empty card.
+  if (
+    scope.kind === "track" &&
+    familyPool.length === 0 &&
+    urlRefs.length === 0
+  ) {
     return null;
   }
   if (
