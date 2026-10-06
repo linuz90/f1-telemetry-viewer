@@ -1,4 +1,13 @@
-import { CircleAlert, CircleCheck } from "lucide-react";
+import {
+  BatteryMedium,
+  ChevronsDown,
+  ChevronsUp,
+  CircleAlert,
+  CircleCheck,
+  MoveRight,
+  Spline,
+  type LucideIcon,
+} from "lucide-react";
 import {
   useEffect,
   useRef,
@@ -10,10 +19,24 @@ import {
   TIP_FLOOR_S,
   type LapComparison,
   type LapTip,
+  type TipCategory,
 } from "../../analysis/lapTelemetryAnalysis";
 import { cn } from "../../utils/cn";
 import { Eyebrow } from "../ui/Eyebrow";
 import { ScrollArea } from "../ui/ScrollArea";
+
+/**
+ * Glyph before each tip's title, so the categories scan as shapes down the
+ * list. There is no common throttle or brake icon, so the pedals read as a
+ * pair: chevrons down for slowing into a corner, up for powering out of it.
+ */
+const CATEGORY_ICONS: Record<TipCategory, LucideIcon> = {
+  Battery: BatteryMedium,
+  Braking: ChevronsDown,
+  "Mid-corner": Spline,
+  Exit: ChevronsUp,
+  Straight: MoveRight,
+};
 
 function signed(value: number, unit = ""): string {
   return `${value > 0 ? "+" : value < 0 ? "−" : "±"}${Math.abs(value).toFixed(3)}${unit}`;
@@ -254,8 +277,8 @@ function TipRow({
 }) {
   // Battery deployment moves the gap without any driving to copy, so those
   // rows say so and their bar steps back.
-  const battery = tip.category === "Battery";
-  const notDriving = battery && tip.kind === "note";
+  const notDriving = tip.category === "Battery" && tip.kind === "note";
+  const Icon = CATEGORY_ICONS[tip.category];
   return (
     <li ref={ref}>
       <button
@@ -280,12 +303,20 @@ function TipRow({
         </span>
         <span className="min-w-0">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-sm font-medium text-zinc-100">
-              {tip.title}
+            <span className="inline-flex items-center gap-1.5">
+              <Icon
+                className="size-3.5 shrink-0 text-zinc-500"
+                aria-label={tip.category}
+              >
+                <title>{tip.category}</title>
+              </Icon>
+              <span className="text-sm font-medium text-zinc-100">
+                {tip.title}
+              </span>
             </span>
-            {battery && (
+            {notDriving && (
               <span className="rounded-md px-1.5 text-2xs text-zinc-500 ring-1 ring-inset ring-zinc-800">
-                {notDriving ? "battery, not driving" : "battery"}
+                not driving
               </span>
             )}
           </span>
