@@ -39,14 +39,18 @@ export function normalizeSessionRelativePath(relativePath: string): string {
   return relativePath.replace(/\\/g, "/");
 }
 
-export function isSafeRelativePath(relativePath: string): boolean {
+/** `extension` defaults to session JSON; lap recordings pass `.pngt`. */
+export function isSafeRelativePath(
+  relativePath: string,
+  extension = ".json",
+): boolean {
   if (
     relativePath.length === 0 ||
     relativePath.includes("\0") ||
     relativePath.includes("\\") ||
     isAbsolute(relativePath) ||
     win32.isAbsolute(relativePath) ||
-    !relativePath.endsWith(".json")
+    !relativePath.endsWith(extension)
   ) {
     return false;
   }
@@ -118,8 +122,9 @@ export async function pathResolvesInsideAny(
 export function absolutePathFor(
   telemetryRoot: string,
   relativePath: string,
+  extension = ".json",
 ): string | undefined {
-  if (!isSafeRelativePath(relativePath)) return undefined;
+  if (!isSafeRelativePath(relativePath, extension)) return undefined;
   const absolutePath = resolve(telemetryRoot, ...relativePath.split("/"));
   return isWithin(telemetryRoot, absolutePath) ? absolutePath : undefined;
 }
@@ -148,8 +153,10 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export async function discoverJsonFiles(
+/** One walk for every extension, so callers needing two never walk twice. */
+export async function discoverTelemetryFiles(
   telemetryRoot: string,
+  extensions: readonly string[] = [".json"],
 ): Promise<string[]> {
   const files: string[] = [];
 
@@ -160,11 +167,15 @@ export async function discoverJsonFiles(
       const fullPath = resolve(directory, entry.name);
       if (entry.isDirectory()) {
         await walk(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith(".json")) {
+      } else if (entry.isFile()) {
+        const extension = extensions.find((ext) => entry.name.endsWith(ext));
+        if (!extension) continue;
         const relativePath = normalizeSessionRelativePath(
           relative(telemetryRoot, fullPath),
         );
-        if (isSafeRelativePath(relativePath)) files.push(relativePath);
+        if (isSafeRelativePath(relativePath, extension)) {
+          files.push(relativePath);
+        }
       }
     }
   }
@@ -178,12 +189,17 @@ export async function collectCandidateStats(
   telemetryRoot: string,
   relativePaths: readonly string[],
   onInspectError: (relativePath: string) => void,
+  extension = ".json",
 ): Promise<CandidateStat[]> {
   return mapWithConcurrency(
     relativePaths,
     METADATA_CONCURRENCY,
     async (relativePath): Promise<CandidateStat> => {
-      const absolutePath = absolutePathFor(telemetryRoot, relativePath);
+      const absolutePath = absolutePathFor(
+        telemetryRoot,
+        relativePath,
+        extension,
+      );
       if (!absolutePath) return { relativePath, state: "not-regular" };
       try {
         const stats = await lstat(absolutePath, { bigint: true });
@@ -214,8 +230,9 @@ export async function collectCandidateStats(
 export async function openIndexedFile(
   telemetryRoot: string,
   relativePath: string,
+  extension = ".json",
 ): Promise<OpenedSessionFile | undefined> {
-  const absolutePath = absolutePathFor(telemetryRoot, relativePath);
+  const absolutePath = absolutePathFor(telemetryRoot, relativePath, extension);
   if (!absolutePath) return undefined;
 
   let handle: FileHandle | undefined;

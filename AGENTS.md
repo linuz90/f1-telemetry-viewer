@@ -8,10 +8,10 @@ F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON ex
 
 - No database.
 - Local dev indexes telemetry summaries and streams raw telemetry JSON from disk.
-- Production/demo mode reads committed demo data or user-uploaded JSON/zip files.
+- Production/demo mode reads committed demo data or user-uploaded JSON/zip/`.pngt` files.
 - Focused Node test suites cover the session-summary index, complete-lap timing,
-  Race Pace estimation, fuel aggregation, and Track Strategy synthesis. No
-  general UI test runner or linter is configured.
+  Race Pace estimation, fuel aggregation, Track Strategy synthesis, and lap
+  recordings and their tips. No general UI test runner or linter is configured.
 
 ## Commands
 
@@ -35,6 +35,10 @@ pnpm test:fuel                # Run fuel aggregation and recommendation tests
 pnpm test:speed               # Run canonical speed/aero inference regressions
 pnpm test:share-text          # Run plain-text setup/strategy copy formats
 pnpm test:strategy            # Run Track Strategy synthesis regressions (dry + wet)
+pnpm test:lap-recording       # Run .pngt reader, completeness and API regressions
+pnpm test:lap-telemetry       # Run lap-comparison tips, defaults and track-map calibration
+pnpm check:lap-telemetry [folder] # Re-measure lap-tip clock accuracy and tip census on real recordings
+pnpm generate-track-geometry  # Regenerate src/constants/trackGeometry.ts (turn markers, circuit paths)
 pnpm typecheck:node           # Type-check Node servers/plugins/scripts
 pnpm benchmark:session-index  # Benchmark a disposable generated corpus
 ```
@@ -71,7 +75,8 @@ Data flow:
 - Dev: `src/plugin/telemetry-server.ts` adapts the shared index to Vite middleware.
 - Self-hosting: `server.ts` adapts the same index to the production HTTP server.
 - Production/demo: `public/demo/sessions.json`.
-- Upload mode: JSON/zip files parsed in-browser.
+- Upload mode: JSON/zip/`.pngt` files parsed in-browser.
+- Lap recordings (`.pngt`, Pits n' Giggles 5.0 beta): `src/plugin/lap-recording-index.ts` indexes them on their own and serves `/api/lap-recordings/...` for both servers; upload mode opens them through the same reader in `src/utils/lapRecording/`.
 
 Routes:
 
@@ -102,6 +107,7 @@ Product surfaces:
 - `src/pages/QualifyingSessionView.tsx`
 - `src/pages/TrackProgressPage.tsx`
 - `src/pages/UiDebugPage.tsx`
+- `src/components/lap-telemetry/` — Lap Telemetry section (session pages and each Track Progress tab).
 
 Shared UI:
 
@@ -118,7 +124,8 @@ Telemetry intelligence:
 - `src/analysis/` — product-facing models, rankings, buckets, insight curation, chart-ready data.
 - `src/utils/stats/` — low-level reusable telemetry/math primitives.
 - `src/constants/` — shared tokens, routes, storage keys, setup ranges, track calendars.
-- Thin compatibility wrappers remain in `src/utils/colors.ts`, `src/utils/routes.ts`, `src/utils/tracks.ts`, and `src/utils/links.ts`.
+- `src/utils/tracks.ts` is the one entry point for track identity and per-track lookups; per-track tables in `src/constants/` are keyed by its canonical ids.
+- Thin compatibility wrappers remain in `src/utils/colors.ts`, `src/utils/routes.ts`, and `src/utils/links.ts`.
 
 ## Telemetry Rules
 
@@ -219,6 +226,21 @@ Strategy timing:
 - Strategy alternatives should stay useful: prefer a different stop count only when it is time-competitive; otherwise show the next best distinct one-stop or pit-window shape.
 - Absolute strategy durations are display estimates anchored to completed same-distance races; otherwise prefer relative deltas and confidence/source copy.
 - Wet plans are separate same-compound stop-count plans, one per wet compound (PnG exports `Inters` and `Wet`, not `Intermediate`). Keep wet stints out of dry pair ranking, anchor each plan only on races run entirely on its compounds, and leave slick crossovers unmodelled because they depend on when the track dries.
+
+Lap telemetry:
+
+- A recorded lap is complete only by `judgeLapCoverage()`: timed, first and last samples within 30 m of the line, no gap over 30 m. Never trust the exporter's `is_good`; most flagged laps start mid-lap.
+- Keep recordings out of `SessionSummary` and the session index. They pair with session JSON by `recordingPairKey()` and stay reachable when `deduplicateSessions` hides their session, which is where restarted qualifying runs keep their only complete laps: the surviving row claims them through `duplicateSlugs` (`sessionSaveSlugs()`) for its glyph and session page.
+- Player index, track length and sector starts come from the paired session JSON; the recording has none of them.
+- Tips come from `compareLaps()` corner units, which telescope to the official lap-time gap; keep tips plus remainder equal to it. `TIP_FLOOR_S` (0.03 s) is about three times the error of one stretch measured against official sector times.
+- Every lap-tip threshold is a documented constant in the Tuning section of `src/analysis/lapTelemetryAnalysis.ts`; add new ones there, never inline. Run `pnpm check:lap-telemetry` before and after changing one: it prints aggregates only, and a change shows up as tips moving between rows of its census.
+- A corner unit starts at the lift even when the throttle is back before the slowest point, and is named for every turn up to where both laps are flat again. A corner that nets under the floor still gets a note when one phase moved 0.05 s or more; its time stays the true net.
+- A tip's evidence itemises every phase of its unit, so the cause it names is never credited with the whole stretch.
+- Battery is a lap-long budget: a battery tip names the earlier stretch its energy came from, and that stretch's tip says where it paid back and loses its imperative when the battery was worth more.
+- Turn numbers and map paths come from real reference laps in the generated `src/constants/trackGeometry.ts` (`pnpm generate-track-geometry`, MultiViewer), read through `getTrackCorners()` and `getTrackPath()`. Markers sit up to about 50 m from the game's slowest point, so `nameUnits()` matches them by stretch, not exact distance.
+- Layouts without published geometry (short, reverse, Madring) keep lap-distance names, and their map falls back to the outline drawing lined up by `calibrateOutline()`.
+- On full-throttle stretches, check battery before driving; a flat-out difference with equal battery is car, setup or tow and gets no driving advice. Imperative advice is only for the player's own lap A.
+- The reader rejects unknown `.pngt` format versions and decodes only the channels in `LapChannel`; it is the one place to adapt when the beta format changes.
 
 Rivals roster:
 

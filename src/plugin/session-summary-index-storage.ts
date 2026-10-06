@@ -77,6 +77,7 @@ function isBuiltSessionSummary(
     typeof summary.fileSize === "number" &&
     Number.isFinite(summary.fileSize) &&
     !Object.hasOwn(summary, "duplicateCount") &&
+    !Object.hasOwn(summary, "duplicateSlugs") &&
     isOptionalString(summary.sessionUid) &&
     isOptionalString(summary.formula) &&
     isOptionalFiniteNumber(summary.gameYear) &&

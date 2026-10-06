@@ -26,7 +26,10 @@ export function GlobalDropZone() {
 
       const files = Array.from(e.dataTransfer?.files ?? []);
       const valid = files.filter(
-        (f) => f.name.endsWith(".zip") || f.name.endsWith(".json"),
+        (f) =>
+          f.name.endsWith(".zip") ||
+          f.name.endsWith(".json") ||
+          f.name.endsWith(".pngt"),
       );
       if (valid.length === 0) return;
       try {
@@ -112,7 +115,8 @@ export function GlobalDropZone() {
                     Drop telemetry files
                   </p>
                   <p className="mt-1 text-sm text-zinc-400">
-                    .json session files or a .zip of your data folder
+                    .json sessions with their .pngt lap recordings, or a .zip of
+                    your data folder
                   </p>
                 </div>
               </>

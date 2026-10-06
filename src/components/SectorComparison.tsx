@@ -9,6 +9,7 @@ import type {
 } from "../types/telemetry";
 import { cn } from "../utils/cn";
 import { msToLapTime, msToSectorTime } from "../utils/format";
+import { LapTraceLink } from "./lap-telemetry/LapTraceLink";
 import { Badge } from "./ui/Badge";
 import { CompoundSwatchLabel } from "./ui/CompoundSwatchLabel";
 import { Eyebrow } from "./ui/Eyebrow";
@@ -19,6 +20,8 @@ interface SectorComparisonProps {
   laps: LapHistoryEntry[];
   stints?: TyreStintBasic[];
   perLapInfo?: PerLapInfo[];
+  /** Lap Telemetry link for a lap, by lap time in ms, when it was recorded whole. */
+  lapTraceHref?: (lapTimeMs: number) => string | undefined;
 }
 
 type SectorTone = PerformanceTone;
@@ -69,6 +72,7 @@ export function SectorComparison({
   laps,
   stints,
   perLapInfo,
+  lapTraceHref,
 }: SectorComparisonProps) {
   const [showInvalidLaps, setShowInvalidLaps] = useState(false);
   const model = buildSectorBreakdownModel({ laps, stints, perLapInfo });
@@ -111,6 +115,7 @@ export function SectorComparison({
             model.bestTime !== null && d.valid
               ? d.total - model.bestTime
               : null;
+          const traceHref = lapTraceHref?.(Math.round(d.total * 1000));
 
           return (
             <div key={d.lap}>
@@ -119,6 +124,7 @@ export function SectorComparison({
                   <span className="text-sm font-semibold text-zinc-300">
                     Lap {d.lap}
                   </span>
+                  {traceHref && <LapTraceLink href={traceHref} />}
                   {d.compound && (
                     <CompoundSwatchLabel
                       compound={d.compound}

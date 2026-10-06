@@ -40,10 +40,13 @@ export function ZipUploadScreen({
     async (files: File[]) => {
       setError(null);
       const valid = files.filter(
-        (f) => f.name.endsWith(".zip") || f.name.endsWith(".json"),
+        (f) =>
+          f.name.endsWith(".zip") ||
+          f.name.endsWith(".json") ||
+          f.name.endsWith(".pngt"),
       );
       if (valid.length === 0) {
-        setError("Please upload .zip or .json files");
+        setError("Please upload .zip, .json or .pngt files");
         return;
       }
       try {
@@ -144,7 +147,8 @@ export function ZipUploadScreen({
                   Drop or select telemetry files
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
-                  .json session files, or a .zip of your data folder
+                  .json sessions with their .pngt lap recordings, or a .zip of
+                  your data folder
                 </p>
               </div>
               {error && <p className="text-xs text-behind">{error}</p>}
@@ -153,7 +157,7 @@ export function ZipUploadScreen({
           <input
             ref={inputRef}
             type="file"
-            accept=".zip,.json"
+            accept=".zip,.json,.pngt"
             multiple
             className="hidden"
             onChange={onFileSelect}

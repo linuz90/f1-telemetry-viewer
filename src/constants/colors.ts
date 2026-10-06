@@ -139,6 +139,9 @@ export const LOCATION_BREAKDOWN_COLORS = [
   "#ef4444", // red-500
 ] as const;
 
+/** Lap Telemetry slots A and B reuse the app's player/rival tokens. */
+export const LAP_SLOT_COLORS = [CHART_THEME.player, CHART_THEME.rival] as const;
+
 /** Muted grey for the aggregate "Other" / "Unknown" slices. */
 export const LOCATION_OTHER_COLOR = CHART_THEME.muted;
 

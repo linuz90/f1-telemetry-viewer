@@ -6,14 +6,20 @@ import {
   F1_26_TRACK_CALENDAR_IDS,
   TRACK_DEFINITIONS,
 } from "../constants/tracks";
-import { getF1PitLossDefaultMs } from "../constants/pitLoss";
+import { TRACK_GEOMETRY } from "../constants/trackGeometry";
+import {
+  F1_PIT_LOSS_DEFAULT_SECONDS,
+  getF1PitLossDefaultMs,
+} from "../constants/pitLoss";
 import { buildTrackGroups } from "../components/dashboard/helpers";
 import type { SessionSummary } from "../types/telemetry";
 import {
+  getTrackCorners,
   getTrackCountryName,
   getTrackDisplayName,
   getTrackId,
   getTrackLayoutKey,
+  getTrackPath,
   isSameTrack,
   isTrackSlugMatch,
   sortTracksByCalendar,
@@ -170,4 +176,67 @@ test("unknown tracks retain a predictable fallback identity and label", () => {
   assert.equal(getTrackId("  Fantasy_Circuit  "), "fantasy-circuit");
   assert.equal(getTrackDisplayName("  Fantasy_Circuit  "), "Fantasy_Circuit");
   assert.equal(getTrackCountryName("Fantasy Circuit"), null);
+});
+
+test("per-track tables are keyed by canonical track ids", () => {
+  const ids = new Set<string>([
+    ...TRACK_DEFINITIONS.map(({ id }) => id),
+    ...ADDITIONAL_TRACK_IDS,
+  ]);
+  for (const table of [TRACK_GEOMETRY, F1_PIT_LOSS_DEFAULT_SECONDS]) {
+    for (const trackId of Object.keys(table)) {
+      assert.ok(ids.has(trackId), trackId);
+    }
+  }
+});
+
+test("turn markers run in lap order and lap paths are closed, boxed laps", () => {
+  for (const [trackId, { turns, path }] of Object.entries(TRACK_GEOMETRY)) {
+    turns.forEach((fraction, i) => {
+      assert.ok(fraction > (turns[i - 1] ?? 0) && fraction < 1, trackId);
+    });
+    assert.ok(path.length >= 100 && path.length % 2 === 0, trackId);
+    // Simplifying may drop the outermost point, so the box is only nearly full.
+    assert.ok(Math.min(...path) >= 0 && Math.max(...path) <= 500, trackId);
+    assert.ok(Math.max(...path) > 499, trackId);
+    // The lap ends back at the line, a position sample or two short of it.
+    const [endX, endY] = path.slice(-2);
+    assert.ok(Math.hypot(endX - path[0], endY - path[1]) < 15, trackId);
+  }
+});
+
+test("lap paths run the way each circuit is driven", () => {
+  // On screen (y down) a positive shoelace area is a clockwise lap, so a
+  // mirrored or reversed path flips this. Suzuka crosses itself.
+  const anticlockwise = new Set([
+    "austin",
+    "baku",
+    "imola",
+    "interlagos",
+    "jeddah",
+    "las-vegas",
+    "marina-bay",
+    "miami",
+    "yas-marina",
+  ]);
+  for (const [trackId, { path }] of Object.entries(TRACK_GEOMETRY)) {
+    if (trackId === "suzuka") continue;
+    let area = 0;
+    for (let i = 0; i < path.length; i += 2) {
+      const next = (i + 2) % path.length;
+      area += path[i] * path[next + 1] - path[next] * path[i + 1];
+    }
+    assert.equal(area > 0, !anticlockwise.has(trackId), trackId);
+  }
+});
+
+test("turn markers scale to the game's track length and skip other layouts", () => {
+  const melbourne = getTrackCorners("Australia", 5276);
+  assert.equal(melbourne.length, 14);
+  assert.equal(melbourne[12].number, 13);
+  assert.ok(Math.abs(melbourne[12].distanceM - 4637) < 1);
+  assert.deepEqual(getTrackCorners("Silverstone Reverse", 5891), []);
+  assert.deepEqual(getTrackCorners("Madring", 5416), []);
+  assert.equal(getTrackPath("Albert Park"), TRACK_GEOMETRY.melbourne.path);
+  assert.equal(getTrackPath("Silverstone Reverse"), null);
 });

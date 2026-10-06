@@ -1,6 +1,7 @@
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../../utils/cn";
+import { CheckboxMenuItem } from "./CheckboxMenuItem";
 import {
   FORM_CONTROL_CHROME_STYLES,
   FORM_CONTROL_CONTAINER_STYLES,
@@ -91,57 +92,25 @@ export function MultiPillSelect({
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[12rem] overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 py-1 shadow-lg shadow-black/20">
-          <button
-            type="button"
-            onClick={() => onChange([])}
-            className={cn(
-              "flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors hover:bg-zinc-800/60",
-              value.length === 0 ? "text-zinc-100" : "text-zinc-400",
-            )}
+          <CheckboxMenuItem
+            checked={value.length === 0}
+            onToggle={() => onChange([])}
           >
-            <span
-              className={cn(
-                "flex size-3.5 shrink-0 items-center justify-center rounded-sm border",
-                value.length === 0
-                  ? "border-zinc-500 bg-zinc-600"
-                  : "border-zinc-700",
-              )}
-            >
-              {value.length === 0 && <Check className="size-2 text-zinc-200" />}
-            </span>
             {allOption?.label}
-          </button>
+          </CheckboxMenuItem>
 
           <div className="my-1 h-px bg-zinc-800" />
 
-          {typeOptions.map((option) => {
-            const isSelected = value.includes(String(option.value));
-            return (
-              <button
-                key={String(option.value)}
-                type="button"
-                disabled={option.disabled}
-                onClick={() => toggle(String(option.value))}
-                className={cn(
-                  "flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors hover:bg-zinc-800/60",
-                  isSelected ? "text-zinc-100" : "text-zinc-400",
-                  option.disabled && "cursor-not-allowed opacity-40",
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex size-3.5 shrink-0 items-center justify-center rounded-sm border",
-                    isSelected
-                      ? "border-zinc-500 bg-zinc-600"
-                      : "border-zinc-700",
-                  )}
-                >
-                  {isSelected && <Check className="size-2 text-zinc-200" />}
-                </span>
-                <span className="truncate">{option.label}</span>
-              </button>
-            );
-          })}
+          {typeOptions.map((option) => (
+            <CheckboxMenuItem
+              key={String(option.value)}
+              checked={value.includes(String(option.value))}
+              disabled={option.disabled}
+              onToggle={() => toggle(String(option.value))}
+            >
+              {option.label}
+            </CheckboxMenuItem>
+          ))}
         </div>
       )}
     </div>

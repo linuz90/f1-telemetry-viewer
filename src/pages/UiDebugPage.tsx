@@ -10,7 +10,10 @@ import {
   Zap,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { Card } from "../components/Card";
 import { CompoundStatCard } from "../components/CompoundStatCard";
+import { LapComparisonView } from "../components/lap-telemetry/LapComparisonView";
+import type { SlotLap } from "../components/lap-telemetry/types";
 import { DamageTimeline } from "../components/DamageTimeline";
 import { LapTimeChart } from "../components/LapTimeChart";
 import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
@@ -62,6 +65,13 @@ import type {
   TrackStrategySuggestion,
 } from "../analysis/trackStrategyTypes";
 import type { CumulativeDelta } from "../utils/stats/laps";
+import { prepareLap } from "../analysis/lapTelemetryAnalysis";
+import type { LapCandidate } from "../analysis/lapTelemetrySelection";
+import { LAP_SLOT_COLORS } from "../constants/colors";
+import {
+  syntheticLap,
+  type SyntheticLapOptions,
+} from "../utils/lapRecording/syntheticLap";
 
 const COMPOUNDS = ["Soft", "Medium", "Hard", "Inters", "Wet", "C1", "C3", "C5"];
 
@@ -924,9 +934,114 @@ export function UiDebugPage() {
           perLapInfo={perLapInfo.slice(0, 5)}
         />
       </DebugSection>
+
+      <DebugSection file="src/components/lap-telemetry/LapComparisonView.tsx">
+        <Card as="section" className="space-y-4">
+          <LapComparisonView
+            slots={lapTelemetryFixture.slots}
+            laps={lapTelemetryFixture.laps}
+            sectorStarts={[1757, 3179]}
+            track="Melbourne"
+          />
+        </Card>
+      </DebugSection>
     </div>
   );
 }
+
+/**
+ * Synthetic Melbourne-length laps with known causes: lap A brakes 25 m early
+ * into Turn 3 (1.12 km) and arrives at the back straight with half the
+ * battery, so the tips list shows one braking and one battery item.
+ */
+const lapTelemetryFixture = (() => {
+  const trackLengthM = 5276;
+  const corners: SyntheticLapOptions["corners"] = [
+    { apex: 400, minKmh: 190 },
+    { apex: 1120, minKmh: 105 },
+    { apex: 2470, minKmh: 160 },
+    { apex: 4160, minKmh: 122 },
+    { apex: 4660, minKmh: 96 },
+  ];
+  const deploy = (stored: number) => (d: number) =>
+    d < 2800 ? stored : Math.max(0, stored - ((d - 2800) / 900) * 1_500_000);
+  const variants: [string, string, number, Partial<SyntheticLapOptions>][] = [
+    [
+      "A",
+      "RUSSELL",
+      21,
+      {
+        corners: corners.map((corner) =>
+          corner.apex === 1120 ? { ...corner, brakeFor: 175 } : corner,
+        ),
+        battery: deploy(750_000),
+        speedLoss: (d) =>
+          d > 3250 && d < 4000 ? Math.min(9, (d - 3250) * 0.03) : 0,
+      },
+    ],
+    ["B", "LECLERC", 16, { battery: deploy(1_500_000) }],
+  ];
+  const laps = variants.map(([key, driverName, index, options]) => {
+    const lap = syntheticLap({ trackLengthM, corners, ...options });
+    const trace = Object.fromEntries(
+      Object.entries(lap.channels).map(([name, values]) => [
+        name,
+        Float32Array.from(values),
+      ]),
+    );
+    return prepareLap(
+      trace,
+      {
+        key,
+        driverName,
+        team: index === 21 ? "Mercedes '26" : "Ferrari '26",
+        isPlayer: index === 21,
+        sessionType: "Short Qualifying",
+        lapNumber: 1,
+        lapTimeMs: lap.lapTimeMs,
+        compound: "Soft",
+        weather: "Clear",
+      },
+      trackLengthM,
+    );
+  });
+  const slots: SlotLap[] = laps.map((lap, index) => {
+    const candidate: LapCandidate = {
+      ref: {
+        recordingSlug: "fixture",
+        driverIndex: index === 0 ? 21 : 16,
+        lapNumber: 1,
+      },
+      lapTimeMs: lap.context.lapTimeMs,
+      driverName: lap.context.driverName,
+      team: lap.context.team,
+      isPlayer: lap.context.isPlayer,
+      compound: "Soft",
+      recording: {
+        slug: "fixture",
+        sessionType: "Short Qualifying",
+        track: "Melbourne",
+        date: "2026-10-05T20:49:14",
+        trackLengthM,
+        completeLapCount: 2,
+        drivers: [],
+      },
+      eligible: true,
+      valid: true,
+      pitLap: false,
+      standingStart: false,
+    };
+    return {
+      slot: index === 0 ? "A" : "B",
+      key: lap.context.key,
+      color: LAP_SLOT_COLORS[index],
+      label: index === 0 ? "You" : "Leclerc",
+      candidate,
+      detail: "Lap 1 · Soft",
+    };
+  });
+  return { laps, slots };
+})();
 
 function DebugSection({
   file,

@@ -38,6 +38,8 @@ import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
 import { TrackQualifyingInsights } from "../components/track/TrackQualifyingInsights";
 import { TrackSessionHistory } from "../components/track/TrackSessionHistory";
 import { TrackStrategySection } from "../components/track/TrackStrategySection";
+import { LapTelemetrySection } from "../components/lap-telemetry/LapTelemetrySection";
+import { LAPS_QUERY_PARAM } from "../analysis/lapTelemetrySelection";
 import { TrackFlag } from "../components/TrackFlag";
 import { Badge } from "../components/ui/Badge";
 import { Button, buttonVariants } from "../components/ui/Button";
@@ -524,6 +526,8 @@ export function TrackProgressPage() {
     setActiveTab(tab);
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set(TRACK_TAB_QUERY_PARAM, tab);
+    // A lap selection belongs to one tab's session kind.
+    nextParams.delete(LAPS_QUERY_PARAM);
     setSearchParams(nextParams);
   };
 
@@ -1424,6 +1428,18 @@ export function TrackProgressPage() {
             </>
           );
         })()}
+
+      {activeFormulaKey && (
+        <LapTelemetrySection
+          key={selectedTab}
+          scope={{
+            kind: "track",
+            track: trackSourceName,
+            formulaKey: activeFormulaKey,
+            sessionKind: selectedTab,
+          }}
+        />
+      )}
 
       <TrackSessionHistory
         activeKind={selectedTab}
