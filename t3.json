@@ -1,0 +1,38 @@
+{
+  "$schema": "https://t3.codes/schema/t3.json",
+  "defaultThreadEnvMode": "worktree",
+  "scripts": [
+    {
+      "name": "Setup Worktree",
+      "command": "./workspace-setup.sh init",
+      "icon": "configure",
+      "runOnWorktreeCreate": true,
+      "async": false
+    },
+    {
+      "name": "Run Telemetry",
+      "command": "pnpm dev",
+      "icon": "play"
+    },
+    {
+      "name": "Run Debug Telemetry",
+      "command": "pnpm dev:debug",
+      "icon": "debug"
+    },
+    {
+      "name": "Run Demo",
+      "command": "pnpm dev:prod",
+      "icon": "play"
+    },
+    {
+      "name": "Test",
+      "command": "pnpm test",
+      "icon": "test"
+    },
+    {
+      "name": "Build",
+      "command": "pnpm build",
+      "icon": "build"
+    }
+  ]
+}

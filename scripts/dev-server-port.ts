@@ -9,7 +9,12 @@ const WORKTREE_PORT_RANGE = 1000;
 
 export interface DevServerPortResolution {
   port: number | undefined;
-  source: "manual" | "conductor" | "codex-worktree" | "vite-default";
+  source:
+    | "manual"
+    | "conductor"
+    | "codex-worktree"
+    | "t3-worktree"
+    | "vite-default";
   strict: boolean;
 }
 
@@ -37,13 +42,11 @@ function isInsideDirectory(target: string, parent: string) {
   );
 }
 
-function isCodexManagedWorktree(cwd: string, env: NodeJS.ProcessEnv) {
-  const codexHome = path.resolve(
-    env.CODEX_HOME ?? path.join(homedir(), ".codex"),
+function isInsideToolWorktrees(cwd: string, toolHome: string) {
+  return isInsideDirectory(
+    path.resolve(cwd),
+    path.join(path.resolve(toolHome), "worktrees"),
   );
-  const worktreesRoot = path.join(codexHome, "worktrees");
-
-  return isInsideDirectory(path.resolve(cwd), worktreesRoot);
 }
 
 function stableWorktreePort(cwd: string) {
@@ -67,13 +70,26 @@ export function resolveDevServerPort(
     return { port: conductorPort, source: "conductor", strict: true };
   }
 
-  // Codex app worktrees do not currently provide a reserved port like
-  // Conductor does, so hash the checkout path to avoid Vite's run-order-based
+  // Codex and T3 Code worktrees do not provide a reserved port like Conductor
+  // does, so hash the checkout path to avoid Vite's run-order-based
   // auto-increment behavior while keeping normal local checkouts on 5173.
-  if (isCodexManagedWorktree(cwd, env)) {
+  // A custom T3 "Worktree location" setting is not detected.
+  if (
+    isInsideToolWorktrees(cwd, env.CODEX_HOME ?? path.join(homedir(), ".codex"))
+  ) {
     return {
       port: stableWorktreePort(cwd),
       source: "codex-worktree",
+      strict: true,
+    };
+  }
+
+  if (
+    isInsideToolWorktrees(cwd, env.T3CODE_HOME ?? path.join(homedir(), ".t3"))
+  ) {
+    return {
+      port: stableWorktreePort(cwd),
+      source: "t3-worktree",
       strict: true,
     };
   }

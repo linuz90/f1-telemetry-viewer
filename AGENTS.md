@@ -52,11 +52,11 @@ When a user gives a localhost URL or screenshot, prefer the telemetry source tha
 
 ## Worktrees
 
-- `./workspace-setup.sh init` is the shared setup entry point for Codex/Conductor worktrees.
-- `.worktreeinclude` copies ignored local env files into managed worktrees.
+- `./workspace-setup.sh init` is the shared setup entry point for Codex/Conductor/T3 Code and plain `git worktree add` checkouts; it reapplies `.worktreeinclude` (e.g. `.env`) from the main checkout.
+- T3 Code reads `t3.json` (new threads default to worktrees).
 - Conductor shared settings: `.conductor/settings.toml`.
 - Personal Conductor overrides: `.conductor/settings.local.toml` (gitignored).
-- Dev server ports are deterministic in managed worktrees: Conductor uses `$CONDUCTOR_PORT`; Codex worktrees under `$CODEX_HOME/worktrees` get a stable hash-based Vite port. Run `pnpm dev:port` or `pnpm dev:port -- --json` to inspect it. Export `VITE_DEV_PORT` to override manually.
+- Dev server ports are deterministic in managed worktrees: Conductor uses `$CONDUCTOR_PORT`; Codex (`$CODEX_HOME/worktrees`) and T3 Code (`$T3CODE_HOME/worktrees`) worktrees get a stable hash-based Vite port. Run `pnpm dev:port` or `pnpm dev:port -- --json` to inspect it. Export `VITE_DEV_PORT` to override manually.
 - If no `.env` exists in a worktree, use `pnpm dev:prod` or create one from `.env.example`.
 
 ## Architecture
