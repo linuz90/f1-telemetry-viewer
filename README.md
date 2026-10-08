@@ -65,7 +65,7 @@ pnpm dev
 ```
 
 Open the URL printed by Vite, usually [http://localhost:5173](http://localhost:5173).
-Managed Codex/Conductor worktrees use deterministic per-worktree ports so
+Managed Codex/Conductor/T3 Code worktrees use deterministic per-worktree ports so
 parallel branches do not silently drift to whichever port is next available.
 
 ## Commands

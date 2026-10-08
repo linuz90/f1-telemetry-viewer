@@ -31,6 +31,11 @@ resolve_target_root() {
     return
   fi
 
+  if [[ -n "${T3CODE_WORKTREE_PATH:-}" ]]; then
+    printf '%s\n' "$T3CODE_WORKTREE_PATH"
+    return
+  fi
+
   local git_root
   if git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
     printf '%s\n' "$git_root"
@@ -45,6 +50,46 @@ resolve_target_root() {
   fi
 
   printf '%s\n' "$dir"
+}
+
+# The checkout to copy .worktreeinclude files from. Falls back to the main
+# checkout behind the shared .git dir so plain `git worktree add` works too.
+resolve_source_root() {
+  local candidate
+  for candidate in "${WORKSPACE_SOURCE_PATH:-}" "${CONDUCTOR_ROOT_PATH:-}" "${T3CODE_PROJECT_ROOT:-}"; do
+    if [[ -n "$candidate" && -d "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return
+    fi
+  done
+
+  local common_dir
+  if common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
+    printf '%s\n' "$(dirname "$common_dir")"
+  fi
+}
+
+# T3 Code and plain Git worktrees do not copy ignored files, and Codex/Claude
+# copying is best-effort, so reapply .worktreeinclude here (missing files only,
+# never overwriting per-worktree edits). This is what carries the real
+# TELEMETRY_DIR in .env into new worktrees.
+copy_worktree_includes() {
+  local target_root="$1"
+  local source_root
+  source_root="$(resolve_source_root)"
+
+  [[ -f .worktreeinclude && -n "$source_root" ]] || return 0
+  [[ "$(cd "$source_root" && pwd -P)" != "$(pwd -P)" ]] || return 0
+
+  local file
+  while IFS= read -r -d '' file; do
+    [[ -e "$target_root/$file" ]] && continue
+    # Match Codex/Claude semantics: only copy files the target also ignores.
+    git -C "$target_root" check-ignore -q -- "$file" || continue
+    mkdir -p "$(dirname "$target_root/$file")"
+    cp -p "$source_root/$file" "$target_root/$file"
+    echo "Copied $file from $source_root"
+  done < <(git -C "$source_root" ls-files -z --others --ignored --exclude-from="$target_root/.worktreeinclude")
 }
 
 run_pnpm_install() {
@@ -78,10 +123,11 @@ init_workspace() {
     exit 1
   fi
 
+  copy_worktree_includes "$target_root"
   run_pnpm_install
 
   if [[ ! -e .env ]]; then
-    echo "No .env found. Managed worktrees copy it via .worktreeinclude when it exists in the source checkout."
+    echo "No .env found, so local telemetry is unavailable. Create one from .env.example or use pnpm dev:prod."
   fi
 }
 
