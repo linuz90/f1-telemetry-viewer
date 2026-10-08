@@ -17,8 +17,9 @@ Supports recent F1 (and F2) telemetry, including the newly released **2026 Seaso
 - 🧭 **Formula scopes** - Keep F1 26, F1 25, F2 25, and older data separate with one app-wide selector and clean scoped URLs such as `/f1-26`, `/f1-26/tracks/sakhir`, and `/f1-26/sessions/session-slug`.
 - 🤝 **Rivals & teammates** - Aggregate online race rosters into teammate pace, frequent rivals, head-to-heads, fastest-lap threats, pole sitters, overtakers, and other repeat patterns.
 - 📊 **Session detail** - Open any race or qualifying session for lap-by-lap charts, sector tables, stint timelines, tyre wear, damage, ERS, fuel, position history, canonical peak/trap speeds, and a cautious rival aero tendency backed by comparable-lap evidence.
+- 📈 **Lap telemetry** - With Pits n' Giggles 5.0 lap recordings, compare two complete laps (yours, a rival's, or the fastest recorded at the track) on speed, throttle, brake, gear and battery traces, with a track map, lap playback, and tips on where the time went.
 - 🗺️ **Track progress** - Drill into a circuit within the active game scope to review best laps, qualifying progression, race pace, setup history, tyre life, fuel usage, and every saved session for that track.
-- 🔒 **Private data loading** - Use the local API during development, self-host against your telemetry folder, or drag in `.json` files / a `.zip` in the browser. Hosted uploads stay in memory and never leave your device.
+- 🔒 **Private data loading** - Use the local API during development, self-host against your telemetry folder, or drag in `.json` files (with their `.pngt` lap recordings) / a `.zip` in the browser. Hosted uploads stay in memory and never leave your device.
 
 The dashboard prefers representative online races when there is enough human-grid data. If that is not available for a formula scope, it gracefully falls back to whatever race results or session history exists, so you only see an empty state when there is truly no data to show.
 
@@ -89,6 +90,10 @@ pnpm test:energy-stats           # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                   # Run the focused fuel-aggregation suite
 pnpm test:speed                  # Run canonical speed/aero inference regressions
 pnpm test:strategy               # Run Track Strategy synthesis regressions (dry + wet)
+pnpm test:lap-recording          # Run .pngt reader, completeness and API regressions
+pnpm test:lap-telemetry          # Run lap-comparison tips, defaults and track-map calibration
+pnpm check:lap-telemetry [folder] # Measure lap-tip accuracy on real recordings (aggregates only)
+pnpm generate-track-geometry     # Regenerate turn markers and circuit paths
 pnpm typecheck:node              # Type-check the servers, plugins, and scripts
 pnpm benchmark:session-index     # Benchmark a disposable 1,260-file corpus
 ```
@@ -103,9 +108,10 @@ from a local representative corpus instead of the committed demo fixtures; the
 source remains read-only and only aggregate measurements are printed.
 
 The session-summary index, complete-lap timing, Race Pace estimation, fuel
-aggregation, speed/aero inference, and Track Strategy synthesis have focused
-suites built on Node's test runner. No general UI test runner or linter is
-configured; `pnpm build` remains the main whole-app validation command.
+aggregation, speed/aero inference, Track Strategy synthesis, and lap recordings
+and their tips have focused suites built on Node's test runner. No general UI
+test runner or linter is configured; `pnpm build` remains the main whole-app
+validation command.
 
 For debugging shared repro files without pointing at your full telemetry history, put the files in a small folder and launch against that folder:
 
@@ -152,6 +158,8 @@ visible telemetry file once. Later requests, including the first request after
 a restart, normally stat the files and reuse unchanged summaries; adding or
 changing one save only reads that save.
 
+Pits n' Giggles 5.0 lap recordings (`.pngt`) under `TELEMETRY_DIR` are served from `/api/lap-recordings` by both `pnpm dev` and `pnpm start`. They are indexed in memory, not in the summary cache.
+
 The production server also applies normal HTTP caching and compression. Hashed assets and immutable session files receive long-lived browser cache headers, while the live session list uses an ETag so an unchanged refresh returns `304` without downloading the payload again. Text and JSON responses use Brotli or gzip when the client supports them.
 
 The cache can contain summary metadata such as driver and rival names, so its directory and files are created with private permissions where the operating system supports them. It never contains full telemetry JSON, and session-detail requests stream the original Pits n' Giggles file with transport-only HTTP compression. The viewer does not modify the telemetry folder or use Pits n' Giggles' `.png_session_cache.json`. You can safely delete `.cache/f1-telemetry-viewer/` while the viewer is stopped; the next session-list request will rebuild it. Embedded Pits n' Giggles builds continue to use their Python session API and do not initialize or create this viewer-owned Node cache.
@@ -172,6 +180,7 @@ React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts 3, React Router 7, JSZip,
 ## Supported Data
 
 - Race, short qualifying, one-shot qualifying, time trial, practice, and other Pits n' Giggles session JSON files
+- Pits n' Giggles 5.0 beta lap recordings (`.pngt`) beside their session JSON, for lap traces and comparisons
 - Formula-aware comparisons for F1 26 / 2026 DLC, F1 25, F2 25, and older F1 generations
 - Current F1 26 track ordering, including Madrid / Madring support
 - Online race rosters when available, including rival identity, team, lap stats, overtakes, grid position, finish position, penalties, DNFs, and fastest-lap flags
@@ -186,7 +195,7 @@ src/
   context/       TelemetryProvider and browser zip/json loader
   hooks/         Session list, session detail, and track history hooks
   pages/         Dashboard, session detail, and track progress routes
-  plugin/        Shared session index and Vite local telemetry API
+  plugin/        Shared session and lap-recording indexes, Vite local telemetry API
   utils/         Formatting, formula scopes, storage, summaries, routes, low-level stats
   types/         TypeScript telemetry model
 ```

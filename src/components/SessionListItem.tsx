@@ -1,9 +1,11 @@
 import { NavLink } from "react-router-dom";
 import type { SessionSummary } from "../types/telemetry";
 import { cn } from "../utils/cn";
+import { sessionSaveSlugs } from "../utils/deduplicateSessions";
 import { formatSessionType, formatTime } from "../utils/format";
 import { sessionSummaryPath } from "../utils/routes";
 import { SessionCard } from "./SessionCard";
+import { RecordedLapsIcon } from "./lap-telemetry/RecordedLapsIcon";
 
 interface SessionListItemProps {
   session: SessionSummary;
@@ -29,6 +31,7 @@ export function SessionListItem({
       isOnline={session.isOnline}
       isSpectator={session.isSpectator}
       hideMode={hideMode}
+      badge={<RecordedLapsIcon sessionSlugs={sessionSaveSlugs(session)} />}
     />
   );
 

@@ -32,6 +32,7 @@ import { msToLapTime, msToSectorTime } from "../utils/format";
 import { readStoredBoolean, writeStoredBoolean } from "../utils/storage";
 import { Tooltip as HoverTooltip } from "./Tooltip";
 import { Badge } from "./ui/Badge";
+import { LapTraceLink } from "./lap-telemetry/LapTraceLink";
 import { FocusToggle } from "./ui/FocusToggle";
 import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
@@ -77,6 +78,8 @@ interface LapTimeChartProps {
   damageLaps?: number[];
   /** Tyre stints to group laps by */
   stints?: TyreStint[];
+  /** Lap Telemetry link for a lap, by lap time in ms, when it was recorded whole. */
+  lapTraceHref?: (lapTimeMs: number) => string | undefined;
 }
 
 /**
@@ -95,6 +98,7 @@ export function LapTimeChart({
   lapPeaks,
   damageLaps = [],
   stints,
+  lapTraceHref,
 }: LapTimeChartProps) {
   const [showBattery, setShowBattery] = useState(() =>
     readStoredBoolean(LAP_CHART_BATTERY_VISIBILITY_STORAGE_KEY),
@@ -580,6 +584,7 @@ export function LapTimeChart({
             const isBestS3 =
               d.valid && bestS3 > 0 && Math.abs(d.s3 - bestS3) < 0.001;
             const wear = d.wear;
+            const traceHref = lapTraceHref?.(Math.round(d.timeSec * 1000));
             const scBg = d.isSC
               ? "bg-amber-500/10"
               : d.isVSC
@@ -592,6 +597,9 @@ export function LapTimeChart({
               >
                 <td className={tableCellClass({ size: "sm", mono: true })}>
                   {d.lap}
+                  {traceHref && (
+                    <LapTraceLink href={traceHref} className="ml-1" />
+                  )}
                   {!d.valid && (
                     // text-behind is the app-wide "you're behind" red, not a
                     // generic chip tone — keep the override here.

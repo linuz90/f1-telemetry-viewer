@@ -40,6 +40,12 @@ import {
   gzipSync,
 } from "node:zlib";
 import {
+  createLapRecordingIndex,
+  isLapRecordingPath,
+  resolveLapRecordingRequest,
+  type LapRecordingIndex,
+} from "./src/plugin/lap-recording-index.ts";
+import {
   createSessionSummaryIndex,
   type OpenedSessionFile,
   type SessionSummaryIndex,
@@ -337,10 +343,54 @@ async function handleSessionApi(
   }
 }
 
+async function handleLapRecordingApi(
+  req: IncomingMessage,
+  pathname: string,
+  lapRecordingIndex: LapRecordingIndex,
+  res: ServerResponse,
+): Promise<void> {
+  try {
+    const response = await resolveLapRecordingRequest(
+      pathname,
+      lapRecordingIndex,
+    );
+    if (res.destroyed || res.writableEnded) return;
+    // Manifests and lists are JSON worth compressing; lap bytes are already
+    // deflated inside the recording.
+    const encoding =
+      typeof response.body === "string"
+        ? selectContentEncoding(req.headers["accept-encoding"])
+        : undefined;
+    const body =
+      typeof response.body === "string" && encoding === "br"
+        ? brotliCompressSync(response.body, BROTLI_OPTIONS)
+        : typeof response.body === "string" && encoding === "gzip"
+          ? gzipSync(response.body, GZIP_OPTIONS)
+          : response.body;
+    res.writeHead(response.status, {
+      "Cache-Control": response.cacheControl,
+      "Content-Type": response.contentType,
+      ...(typeof response.body === "string" ? { Vary: "Accept-Encoding" } : {}),
+      ...(encoding ? { "Content-Encoding": encoding } : {}),
+    });
+    res.end(body);
+  } catch (error) {
+    console.error("Failed to serve lap recording:", error);
+    if (res.destroyed || res.writableEnded) return;
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Failed to load lap recordings" }));
+  }
+}
+
 export interface ProductionServerOptions {
   telemetryDir: string;
   distDir: string;
   sessionIndex?: SessionSummaryIndex;
+  lapRecordingIndex?: LapRecordingIndex;
 }
 
 /** Creates the standalone server without listening, so its API can be tested. */
@@ -348,6 +398,7 @@ export function createProductionServer({
   telemetryDir,
   distDir,
   sessionIndex,
+  lapRecordingIndex,
 }: ProductionServerOptions): Server {
   const effectiveSessionIndex =
     sessionIndex ??
@@ -355,11 +406,23 @@ export function createProductionServer({
       telemetryDir,
       cacheExclusionRoots: [distDir],
     });
+  const effectiveLapRecordingIndex =
+    lapRecordingIndex ?? createLapRecordingIndex({ telemetryDir });
   const writeSessionList = createSessionListResponder();
   const indexPath = join(distDir, "index.html");
 
   return createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+
+    if (isLapRecordingPath(url.pathname)) {
+      void handleLapRecordingApi(
+        req,
+        url.pathname,
+        effectiveLapRecordingIndex,
+        res,
+      );
+      return;
+    }
 
     if (
       url.pathname === "/api/sessions" ||

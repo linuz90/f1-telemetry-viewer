@@ -42,7 +42,9 @@ import type { SessionSummary } from "../types/telemetry";
  *     earlier auto-saves it dominates.
  *
  * Each hidden save bumps the surviving session's `duplicateCount`, which
- * powers the `DuplicateNotice` in the session detail page.
+ * powers the `DuplicateNotice` in the session detail page, and lands in its
+ * `duplicateSlugs`, which lets the row claim lap recordings paired with the
+ * hidden saves (restarted qualifying runs often hold the only complete laps).
  */
 
 /** Window for Rule A — see header comment. */
@@ -57,13 +59,21 @@ export function deduplicateSessions<T extends WithFileSize>(
   // each surviving session (so we can show "N duplicate saves hidden").
   const removed = new Set<T>();
   const dupeCount = new Map<T, number>();
+  const dupeSlugs = new Map<T, string[]>();
   const getDupes = (session: T) =>
     dupeCount.get(session) ?? session.duplicateCount ?? 0;
+  const getDupeSlugs = (session: T) =>
+    dupeSlugs.get(session) ?? session.duplicateSlugs ?? [];
   const recordDrop = (keep: T, drop: T) => {
     // The dropped session may itself have accumulated duplicates from a
     // prior pass (Rule A → Rule B) or from input data; carry the total.
     const merged = getDupes(keep) + getDupes(drop) + 1;
     dupeCount.set(keep, merged);
+    dupeSlugs.set(keep, [
+      ...getDupeSlugs(keep),
+      drop.slug,
+      ...getDupeSlugs(drop),
+    ]);
     removed.add(drop);
   };
 
@@ -71,13 +81,21 @@ export function deduplicateSessions<T extends WithFileSize>(
   applyAutoSaveDominanceRule(sessions, removed, recordDrop);
 
   // Preserve the caller's order and annotate survivors with the (possibly
-  // updated) duplicate count.
+  // updated) duplicate count and hidden slugs.
   return sessions
     .filter((s) => !removed.has(s))
     .map((s) => {
-      const count = dupeCount.get(s) ?? s.duplicateCount;
-      return count ? { ...s, duplicateCount: count } : s;
+      const slugs = dupeSlugs.get(s);
+      if (!slugs) return s;
+      return { ...s, duplicateCount: dupeCount.get(s), duplicateSlugs: slugs };
     });
+}
+
+/** The row's own save plus every save dedupe folded into it. */
+export function sessionSaveSlugs(
+  session: Pick<SessionSummary, "slug" | "duplicateSlugs">,
+): string[] {
+  return [session.slug, ...(session.duplicateSlugs ?? [])];
 }
 
 // ---------------------------------------------------------------------------

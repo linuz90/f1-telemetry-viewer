@@ -1,4 +1,5 @@
 import { Eye } from "lucide-react";
+import type { ReactNode } from "react";
 import { cn } from "../utils/cn";
 import { getTrackDisplayName } from "../utils/tracks";
 import { TrackFlag } from "./TrackFlag";
@@ -18,6 +19,8 @@ interface SessionCardProps {
   isSpectator?: boolean;
   /** When true, the date header already shows the AI/Online context — omit it from the row. */
   hideMode?: boolean;
+  /** Small marker after the time, e.g. recorded lap telemetry. */
+  badge?: ReactNode;
 }
 
 const INDICATOR_COLORS = {
@@ -37,6 +40,7 @@ export function SessionCard({
   isOnline,
   isSpectator,
   hideMode,
+  badge,
 }: SessionCardProps) {
   const typeMeta = getSessionTypeMeta(sessionType);
   const TypeIcon = typeMeta.icon;
@@ -71,6 +75,7 @@ export function SessionCard({
           {!hideMode && (
             <SessionModeLabel isOnline={isOnline} aiDifficulty={aiDifficulty} />
           )}
+          {badge}
         </HStack>
         <HStack className="min-w-0 flex-1 justify-end gap-1">
           {isSpectator && (

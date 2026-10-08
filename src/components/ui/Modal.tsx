@@ -29,11 +29,15 @@ export function Modal({ onClose, children, className }: ModalProps) {
 
   useEffect(() => {
     if (!onClose) return;
+    // Capture phase plus preventDefault claims the key before page-level Esc
+    // handlers (Lap Telemetry's zoom reset) see it.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      handleClose();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose, handleClose]);
 
   return (

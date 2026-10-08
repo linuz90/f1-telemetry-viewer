@@ -12,7 +12,9 @@ import { SectorComparison } from "../components/SectorComparison";
 import { SectorVsBest } from "../components/SectorVsBest";
 import { SessionHeader } from "../components/SessionHeader";
 import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
+import { LapTelemetrySection } from "../components/lap-telemetry/LapTelemetrySection";
 import { TrackSessionHistory } from "../components/track/TrackSessionHistory";
+import { useLapTraceLinks } from "../hooks/useLapRecordings";
 import { useSessionList } from "../hooks/useSessionList";
 import { useTrackHistory } from "../hooks/useTrackHistory";
 import type { TelemetrySession } from "../types/telemetry";
@@ -99,6 +101,8 @@ export function QualifyingSessionView({
     [session],
   );
 
+  const lapTraceHref = useLapTraceLinks(slug, focusedDriver?.index);
+
   // Show car setup only for the actual player with valid setup data
   const showSetup =
     focusedDriver?.["is-player"] && focusedDriver["car-setup"]?.["is-valid"];
@@ -131,6 +135,15 @@ export function QualifyingSessionView({
         />
       </Card>
 
+      <LapTelemetrySection
+        scope={{
+          kind: "session",
+          sessionSlug: slug,
+          duplicateSlugs: sessionMeta?.duplicateSlugs,
+          focusedDriverIndex,
+        }}
+      />
+
       {/* Player lap breakdown */}
       {laps.length > 0 && (
         <Card as="section">
@@ -138,6 +151,7 @@ export function QualifyingSessionView({
             laps={laps}
             stints={stints}
             perLapInfo={perLapInfo}
+            lapTraceHref={lapTraceHref}
           />
         </Card>
       )}

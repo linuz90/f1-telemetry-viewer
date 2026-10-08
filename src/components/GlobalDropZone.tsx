@@ -26,7 +26,10 @@ export function GlobalDropZone() {
 
       const files = Array.from(e.dataTransfer?.files ?? []);
       const valid = files.filter(
-        (f) => f.name.endsWith(".zip") || f.name.endsWith(".json"),
+        (f) =>
+          f.name.endsWith(".zip") ||
+          f.name.endsWith(".json") ||
+          f.name.endsWith(".pngt"),
       );
       if (valid.length === 0) return;
       try {

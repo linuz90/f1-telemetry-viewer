@@ -1,5 +1,6 @@
 import type { DashboardActivityGroup } from "../../analysis/dashboardActivity";
 import { formatTime } from "../../utils/format";
+import { sessionSaveSlugs } from "../../utils/deduplicateSessions";
 import { sessionSummaryPath } from "../../utils/routes";
 import { getTrackDisplayName } from "../../utils/tracks";
 import { SessionResultMetric } from "../SessionResultMetric";
@@ -9,6 +10,7 @@ import { TrackFlag } from "../TrackFlag";
 import { SessionRow } from "../SessionRow";
 import { resolveSessionMode } from "../sessionModeMeta";
 import { Badge } from "../ui/Badge";
+import { RecordedLapsIcon } from "../lap-telemetry/RecordedLapsIcon";
 
 function modeLabel(session: DashboardActivityGroup["representative"]): string {
   if (session.isSpectator) return "Spectator";
@@ -63,6 +65,7 @@ export function ActivityRow({
             formula={session.formula}
           />
           <SessionResultStatusBadge status={result?.status} />
+          <RecordedLapsIcon sessionSlugs={sessionSaveSlugs(session)} />
           {attempt && (
             <Badge tone="zinc" className="max-sm:hidden">
               {attempt}
