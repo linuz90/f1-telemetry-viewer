@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
   lowerBound,
+  valueAt,
   type LapSeries,
   type LapSeriesSet,
 } from "../../analysis/lapTelemetryAnalysis";
@@ -128,13 +129,10 @@ export function LapReadout({
     setGhosting(!ghosting);
     writeStoredBoolean(LAP_INPUT_GHOST_STORAGE_KEY, !ghosting);
   };
-  // The grid is uniform, so one index serves every lap's channels.
-  const index =
-    hover === null
-      ? null
-      : Math.min(series.grid.length - 1, lowerBound(series.grid, hover));
   // Lap A's clock, the one playback runs on.
-  const elapsed = index === null ? null : (series.laps[0]?.time[index] ?? null);
+  const lapA = series.laps[0];
+  const elapsed =
+    hover === null || !lapA ? null : valueAt(series.grid, lapA.time, hover);
   const head =
     hover === null
       ? "Play the lap or hover the traces"
@@ -181,10 +179,12 @@ export function LapReadout({
               lap={lap}
               ghost={ghost}
               grid={series.grid}
-              index={index}
+              distance={hover}
               // Gap is A's, so it reads "A +0.045" on the comparison's card.
               gapS={
-                slotIndex > 0 && gap && index !== null ? gap.gapS[index] : null
+                slotIndex > 0 && gap && hover !== null
+                  ? valueAt(series.grid, gap.gapS, hover)
+                  : null
               }
               showBattery={showBattery}
             />
@@ -200,7 +200,7 @@ function InputCard({
   lap,
   ghost,
   grid,
-  index,
+  distance,
   gapS,
   showBattery,
 }: {
@@ -209,21 +209,29 @@ function InputCard({
   /** The compared lap, drawn faintly behind this one's inputs. */
   ghost: LapSeries | undefined;
   grid: Float64Array;
-  index: number | null;
+  /** Cursor distance in metres. */
+  distance: number | null;
   gapS: number | null;
   showBattery: boolean;
 }) {
-  const at = lap && index !== null ? index : null;
+  const at = lap && distance !== null ? distance : null;
   const channels = lap?.channels;
+  // Read between grid points: snapping to the 2 m grid stepped the cards
+  // only ~12 times a second through slow corners during playback.
   const read = (values: Float32Array | undefined) =>
-    at !== null && values ? values[at] : null;
+    at !== null && values ? valueAt(grid, values, at) : null;
+  // Gear and deploy mode are steps; blending two would invent a value.
+  const stepIndex =
+    at === null ? null : Math.min(grid.length - 1, lowerBound(grid, at));
+  const readStep = (values: Float32Array | undefined) =>
+    stepIndex !== null && values ? values[stepIndex] : null;
   const throttle = read(channels?.throttle);
   const brake = read(channels?.brake);
   const steering = read(channels?.steering);
-  const gear = read(channels?.gear);
+  const gear = readStep(channels?.gear);
   const speed = read(channels?.speed);
   const battery = read(channels?.ersMj);
-  const ersModeValue = read(channels?.ersMode);
+  const ersModeValue = readStep(channels?.ersMode);
   const recording = slot.candidate.recording;
   const ersMode =
     ersModeValue === null
@@ -235,12 +243,9 @@ function InputCard({
         );
   const ghostChannels = ghost?.channels;
 
-  const step = grid.length > 1 ? grid[1] - grid[0] : 1;
   let ersTrend: "deploy" | "harvest" | null = null;
   if (showBattery && at !== null && channels && battery !== null) {
-    const before =
-      channels.ersMj[Math.max(0, at - Math.round(ERS_TREND_M / step))];
-    const delta = battery - before;
+    const delta = battery - valueAt(grid, channels.ersMj, at - ERS_TREND_M);
     if (delta > ERS_TREND_MIN_MJ) ersTrend = "harvest";
     else if (delta < -ERS_TREND_MIN_MJ) ersTrend = "deploy";
   }
@@ -293,8 +298,8 @@ function InputCard({
           brake={channels?.brake}
           ghostThrottle={ghostChannels?.throttle}
           ghostBrake={ghostChannels?.brake}
+          grid={grid}
           end={at}
-          length={Math.round(TRAIL_M / step)}
         />
         <div className="flex shrink-0 gap-1">
           <InputBar
@@ -360,7 +365,7 @@ function InputCard({
         <div className="relative flex w-10 shrink-0 items-center justify-center">
           {ghostChannels && at !== null && (
             <SteeringWheel
-              steering={ghostChannels.steering[at]}
+              steering={read(ghostChannels.steering)}
               className="absolute text-zinc-300 opacity-25"
             />
           )}
@@ -416,27 +421,37 @@ function InputTrail({
   brake,
   ghostThrottle,
   ghostBrake,
+  grid,
   end,
-  length,
 }: {
   throttle?: Float32Array;
   brake?: Float32Array;
   ghostThrottle?: Float32Array;
   ghostBrake?: Float32Array;
+  grid: Float64Array;
+  /** Cursor distance in metres, the trail's right edge. */
   end: number | null;
-  length: number;
 }) {
   const path = (values?: Float32Array) => {
     if (!values || end === null) return "";
-    const start = end - length;
+    const start = end - TRAIL_M;
     const parts: string[] = [];
-    for (let i = Math.max(0, start); i <= end; i += 1) {
-      const x = ((i - start) / length) * 100;
-      const y = 100 - Math.min(100, Math.max(0, values[i]));
+    const lineTo = (distance: number, value: number) => {
+      const x = ((distance - start) / TRAIL_M) * 100;
+      const y = 100 - Math.min(100, Math.max(0, value));
       parts.push(
         `${parts.length === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`,
       );
-    }
+    };
+    // From the grid point before the window (clipped by the viewBox) to the
+    // cursor itself, so the trail scrolls smoothly instead of in 2 m steps.
+    for (
+      let i = Math.max(0, lowerBound(grid, start) - 1);
+      i < grid.length && grid[i] < end;
+      i += 1
+    )
+      lineTo(grid[i], values[i]);
+    lineTo(end, valueAt(grid, values, end));
     return parts.join("");
   };
   return (
