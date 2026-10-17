@@ -9,7 +9,7 @@
  * laps are the lap that has to beat a real human grid. Splitting the best-lap
  * tiles keeps those signals from masking each other.
  *
- * What we DON'T have: the per-driver roster on online quali sessions (CLAUDE.md
+ * What we DON'T have: the per-driver roster on online quali sessions (AGENTS.md
  * notes the roster is race-only). So `fastestOnlinePole` carries a *time* and a
  * pole-share, never a rival name — the UI is honest about that.
  */
