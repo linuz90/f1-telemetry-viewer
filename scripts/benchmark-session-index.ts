@@ -19,7 +19,7 @@ import {
   type SessionIndexRefreshStats,
 } from "../src/plugin/session-summary-index.ts";
 import {
-  discoverJsonFiles,
+  discoverTelemetryFiles,
   pathResolvesInsideAny,
 } from "../src/plugin/session-summary-index-files.ts";
 
@@ -401,7 +401,7 @@ async function runBenchmark(options: BenchmarkOptions) {
   await mkdir(options.scratchRoot, { recursive: true });
   await assertScratchOutsideSourceData(options.scratchRoot, options.sourceDir);
   const sourceFixtures = options.sourceDir
-    ? (await discoverJsonFiles(options.sourceDir)).map((relativePath) =>
+    ? (await discoverTelemetryFiles(options.sourceDir)).map((relativePath) =>
         path.join(options.sourceDir!, relativePath),
       )
     : undefined;

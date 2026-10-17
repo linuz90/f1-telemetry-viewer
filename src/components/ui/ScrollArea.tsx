@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef } from "react";
+import type { ComponentProps } from "react";
 import { cn } from "../../utils/cn";
 
 type ScrollAxis = "x" | "y" | "both";
@@ -24,7 +24,7 @@ export const scrollbarGutterClass: Record<ScrollGutter, string> = {
   both: "scrollbar-gutter-both",
 };
 
-type ScrollAreaProps = ComponentPropsWithoutRef<"div"> & {
+type ScrollAreaProps = ComponentProps<"div"> & {
   axis?: ScrollAxis;
   tone?: ScrollTone;
   gutter?: ScrollGutter;

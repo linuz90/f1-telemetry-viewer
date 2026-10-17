@@ -1,6 +1,12 @@
 import type { ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import {
+  createLapRecordingIndex,
+  isLapRecordingPath,
+  resolveLapRecordingRequest,
+  type LapRecordingIndex,
+} from "./lap-recording-index.ts";
+import {
   createSessionSummaryIndex,
   type OpenedSessionFile,
   type SessionSummaryIndex,
@@ -80,10 +86,32 @@ async function handleTelemetryRequest(
   }
 }
 
+async function handleLapRecordingRequest(
+  pathname: string,
+  lapRecordingIndex: LapRecordingIndex,
+  res: ServerResponse,
+): Promise<void> {
+  try {
+    const response = await resolveLapRecordingRequest(
+      pathname,
+      lapRecordingIndex,
+    );
+    if (res.destroyed || res.writableEnded) return;
+    res.statusCode = response.status;
+    res.setHeader("Content-Type", response.contentType);
+    res.setHeader("Cache-Control", response.cacheControl);
+    res.end(response.body);
+  } catch (error) {
+    console.error("Failed to serve lap recording:", error);
+    writeJsonError(res, 500, "Failed to load lap recordings");
+  }
+}
+
 /**
  * Vite plugin that serves telemetry JSON files from a local directory.
  * - GET /api/sessions — list all sessions with metadata
  * - GET /api/sessions/[slug] — return raw JSON for a session
+ * - GET /api/lap-recordings/... — lap recordings, see lap-recording-index.ts
  *
  * `base` is the configured Vite base path (e.g. "/save-viewer/"). The dev
  * server does not strip it before handing requests to middleware, so
@@ -95,6 +123,9 @@ export function telemetryServer(telemetryDir?: string, base = "/"): Plugin {
   // without a telemetry directory. Do not initialize filesystem state then.
   const sessionIndex = telemetryDir
     ? createSessionSummaryIndex({ telemetryDir })
+    : undefined;
+  const lapRecordingIndex = telemetryDir
+    ? createLapRecordingIndex({ telemetryDir })
     : undefined;
   const basePrefix = base.endsWith("/") ? base.slice(0, -1) : base;
 
@@ -108,6 +139,15 @@ export function telemetryServer(telemetryDir?: string, base = "/"): Plugin {
             ? rawUrl.slice(basePrefix.length)
             : rawUrl;
         const pathname = strippedUrl.split("?", 1)[0] ?? strippedUrl;
+
+        if (isLapRecordingPath(pathname)) {
+          if (!lapRecordingIndex) {
+            writeJsonError(res, 500, "TELEMETRY_DIR not set in .env");
+            return;
+          }
+          void handleLapRecordingRequest(pathname, lapRecordingIndex, res);
+          return;
+        }
 
         if (
           pathname !== "/api/sessions" &&

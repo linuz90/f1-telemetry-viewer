@@ -11,11 +11,13 @@ import {
   joinMetaParts,
   msToLapTime,
 } from "../../utils/format";
+import { sessionSaveSlugs } from "../../utils/deduplicateSessions";
 import { sessionSummaryPath, trackTabForSessionType } from "../../utils/routes";
 import { SessionModeLabel } from "../SessionModeLabel";
 import { SessionResultMetric } from "../SessionResultMetric";
 import { SessionResultStatusBadge } from "../SessionResultStatusBadge";
 import { SessionRow } from "../SessionRow";
+import { RecordedLapsIcon } from "../lap-telemetry/RecordedLapsIcon";
 import { SessionTypeBadge } from "../SessionTypeBadge";
 import { SESSION_TYPE_FILTER_META } from "../sessionTypeMeta";
 import { Badge } from "../ui/Badge";
@@ -269,6 +271,9 @@ export function TrackSessionHistory({
                   />
                   <SessionResultStatusBadge
                     status={session.summary.playerRaceResult?.status}
+                  />
+                  <RecordedLapsIcon
+                    sessionSlugs={sessionSaveSlugs(session.summary)}
                   />
                   {session.attemptCount > 1 && (
                     <Badge tone="amber" className="max-sm:hidden">

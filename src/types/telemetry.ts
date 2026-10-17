@@ -61,6 +61,8 @@ export interface SessionSummary {
   poleLapTimeMs?: number;
   fileSize?: number;
   duplicateCount?: number;
+  /** Slugs of the saves dedupe hid behind this one; never persisted. */
+  duplicateSlugs?: string[];
   /**
    * True when the save was produced by Pits n' Giggles' periodic
    * "just-in-case" auto-save (detected from the filename). Used for the

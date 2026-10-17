@@ -505,6 +505,10 @@ test("deletion removes stale slugs and resurrects a dominated PnG auto-save", as
   const initial = await index.refresh();
   assert.equal(initial.sessions.length, 1);
   assert.equal(initial.sessions[0]?.relativePath, manualRelativePath);
+  // The survivor claims the hidden save, so its lap recordings stay attached.
+  assert.deepEqual(initial.sessions[0]?.duplicateSlugs, [
+    toSlug(autoRelativePath),
+  ]);
 
   await unlink(manualPath);
   const afterDelete = await index.refresh();
@@ -513,6 +517,7 @@ test("deletion removes stale slugs and resurrects a dominated PnG auto-save", as
   assert.equal(afterDelete.stats.parsed, 0);
   assert.equal(afterDelete.sessions.length, 1);
   assert.equal(afterDelete.sessions[0]?.relativePath, autoRelativePath);
+  assert.equal(afterDelete.sessions[0]?.duplicateSlugs, undefined);
   assert.equal(
     await openSessionPath(index, toSlug(manualRelativePath)),
     undefined,

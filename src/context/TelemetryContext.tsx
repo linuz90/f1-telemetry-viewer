@@ -21,8 +21,15 @@ import {
 import {
   loadZipFile,
   loadJsonFiles,
+  openLoadedRecordings,
+  type LoadedRecordingFile,
   type LoadedSessionSummary,
 } from "./zipLoader";
+import {
+  lapRecordingKeys,
+  type LapRecordingStore,
+} from "../queries/lapRecordings";
+import type { RecordingPairing } from "../utils/lapRecording/types";
 import { deduplicateSessions } from "../utils/deduplicateSessions";
 import {
   getFormulaScopeOptions,
@@ -43,6 +50,8 @@ interface TelemetryContextValue {
   getSession: (slug: string) => Promise<TelemetrySession>;
   getSessionQueryOptions: (slug: string) => SessionDetailQueryOptions;
   loadFiles: (files: File[]) => Promise<void>;
+  /** Upload-mode lap recordings; empty in api/demo mode. */
+  lapRecordingStore: LapRecordingStore;
   showUploadModal: boolean;
   setShowUploadModal: (show: boolean) => void;
   filesLoading: boolean;
@@ -72,6 +81,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   >(null);
   // In-memory store for upload mode
   const [sessionStore] = useState(() => new Map<string, TelemetrySession>());
+  const [lapRecordingStore] = useState<LapRecordingStore>(() => new Map());
 
   const detectionQuery = useQuery({
     queryKey: telemetryKeys.dataSource,
@@ -163,10 +173,21 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       try {
         const zips = files.filter((f) => f.name.endsWith(".zip"));
         const jsons = files.filter((f) => f.name.endsWith(".json"));
+        const recordings: LoadedRecordingFile[] = files
+          .filter((f) => f.name.endsWith(".pngt"))
+          .map((f) => ({ fileName: f.name, data: f }));
+        // A recording needs its session JSON for the player, track length and
+        // sectors; dropping one alone must not replace the loaded sessions.
+        if (zips.length === 0 && jsons.length === 0) {
+          throw new Error(
+            "Add the session .json with the .pngt lap recording, or drop a .zip of the whole day folder.",
+          );
+        }
 
         // Load zip(s) first, then JSON files on top
         const allSessions: LoadedSessionSummary[] = [];
         const allData = new Map<string, TelemetrySession>();
+        const pairings = new Map<string, RecordingPairing>();
 
         for (const zip of zips) {
           const result = await loadZipFile(zip);
@@ -174,6 +195,10 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
           for (const [slug, data] of result.sessionData) {
             allData.set(slug, data);
           }
+          for (const [key, pairing] of result.pairings) {
+            pairings.set(key, pairing);
+          }
+          recordings.push(...result.recordingFiles);
         }
 
         if (jsons.length > 0) {
@@ -182,7 +207,14 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
           for (const [slug, data] of result.sessionData) {
             allData.set(slug, data);
           }
+          for (const [key, pairing] of result.pairings) {
+            pairings.set(key, pairing);
+          }
         }
+        const openedRecordings = await openLoadedRecordings(
+          recordings,
+          pairings,
+        );
 
         const deduplicatedSessions = deduplicateSessions(allSessions);
         deduplicatedSessions.sort(
@@ -201,12 +233,19 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         queryClient.removeQueries({
           queryKey: telemetryKeys.sessionDetailsByMode("upload"),
         });
+        lapRecordingStore.clear();
+        for (const [slug, recording] of openedRecordings) {
+          lapRecordingStore.set(slug, recording);
+        }
+        queryClient.removeQueries({
+          queryKey: lapRecordingKeys.byMode("upload"),
+        });
         setUploadedSessions(deduplicatedSessions);
       } finally {
         setFilesLoading(false);
       }
     },
-    [sessionStore, queryClient],
+    [sessionStore, lapRecordingStore, queryClient],
   );
 
   return (
@@ -222,6 +261,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         getSession,
         getSessionQueryOptions,
         loadFiles,
+        lapRecordingStore,
         showUploadModal,
         setShowUploadModal,
         filesLoading,

@@ -40,7 +40,10 @@ export function ZipUploadScreen({
     async (files: File[]) => {
       setError(null);
       const valid = files.filter(
-        (f) => f.name.endsWith(".zip") || f.name.endsWith(".json"),
+        (f) =>
+          f.name.endsWith(".zip") ||
+          f.name.endsWith(".json") ||
+          f.name.endsWith(".pngt"),
       );
       if (valid.length === 0) {
         setError("Please upload .zip or .json files");
@@ -153,7 +156,7 @@ export function ZipUploadScreen({
           <input
             ref={inputRef}
             type="file"
-            accept=".zip,.json"
+            accept=".zip,.json,.pngt"
             multiple
             className="hidden"
             onChange={onFileSelect}

@@ -14,8 +14,10 @@
     "server.ts",
     "vite.config.ts",
     "scripts/benchmark-session-index.ts",
+    "scripts/check-lap-telemetry.ts",
     "scripts/dev-port.ts",
     "scripts/dev-server-port.ts",
+    "scripts/generate-track-geometry.ts",
     "tests/**/*",
     "src/plugin/**/*",
     "src/utils/parseFilename.ts"

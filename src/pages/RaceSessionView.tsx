@@ -44,6 +44,8 @@ import {
   type PillSelectWidth,
 } from "../components/ui/PillSelect";
 import { HStack, VStack } from "../components/ui/Stack";
+import { LapTelemetrySection } from "../components/lap-telemetry/LapTelemetrySection";
+import { useLapTraceLinks } from "../hooks/useLapRecordings";
 import { useSessionList } from "../hooks/useSessionList";
 import { useTrackHistory } from "../hooks/useTrackHistory";
 import type { DriverData, TelemetrySession } from "../types/telemetry";
@@ -360,6 +362,7 @@ export function RaceSessionView({
     () => buildDamageIncreaseLaps(perLapInfo),
     [perLapInfo],
   );
+  const lapTraceHref = useLapTraceLinks(slug, focusedDriver?.index);
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
@@ -432,8 +435,19 @@ export function RaceSessionView({
             }
             damageLaps={damageLaps}
             stints={stints}
+            lapTraceHref={lapTraceHref}
           />
         </Card>
+
+        <LapTelemetrySection
+          scope={{
+            kind: "session",
+            sessionSlug: slug,
+            duplicateSlugs: sessionMeta?.duplicateSlugs,
+            focusedDriverIndex,
+            rivalDriverIndex: rival?.index ?? null,
+          }}
+        />
 
         {/* Results table */}
         <Card as="section">

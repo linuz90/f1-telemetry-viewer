@@ -11,3 +11,6 @@ export const CHANGELOG_SEEN_STORAGE_KEY = "changelog-last-seen";
 export const LAP_CHART_BATTERY_VISIBILITY_STORAGE_KEY =
   "f1.lapTimeChart.showBattery";
 export const LAP_CHART_CLEAN_LAPS_STORAGE_KEY = "f1.lapTimeChart.cleanLaps";
+export const LAP_TRACE_PANES_STORAGE_KEY = "f1.lapTelemetry.panes";
+export const LAP_TRACE_HEIGHTS_STORAGE_KEY = "f1.lapTelemetry.paneHeights";
+export const LAP_INPUT_GHOST_STORAGE_KEY = "f1.lapTelemetry.inputGhost";
