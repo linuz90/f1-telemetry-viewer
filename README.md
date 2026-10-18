@@ -17,9 +17,9 @@ Supports recent F1 (and F2) telemetry, including the newly released **2026 Seaso
 - 🧭 **Formula scopes** - Keep F1 26, F1 25, F2 25, and older data separate with one app-wide selector and clean scoped URLs such as `/f1-26`, `/f1-26/tracks/sakhir`, and `/f1-26/sessions/session-slug`.
 - 🤝 **Rivals & teammates** - Aggregate online race rosters into teammate pace, frequent rivals, head-to-heads, fastest-lap threats, pole sitters, overtakers, and other repeat patterns.
 - 📊 **Session detail** - Open any race or qualifying session for lap-by-lap charts, sector tables, stint timelines, tyre wear, damage, ERS, fuel, position history, canonical peak/trap speeds, and a cautious rival aero tendency backed by comparable-lap evidence.
-- 📈 **Lap telemetry** - With Pits n' Giggles 5.0 lap recordings, compare two complete laps (yours, a rival's, or the fastest recorded at the track) on speed, throttle, brake, gear and battery traces, with a track map, lap playback, and tips on where the time went.
+- 📈 **Lap telemetry** - With Pits n' Giggles 5.0 lap recordings, compare two complete laps (yours, a rival's, a friend's `.pngt` dropped onto the page, or the fastest recorded at the track) on speed, throttle, brake, gear and battery traces, with a track map, lap playback, and tips on where the time went.
 - 🗺️ **Track progress** - Drill into a circuit within the active game scope to review best laps, qualifying progression, race pace, setup history, tyre life, fuel usage, and every saved session for that track.
-- 🔒 **Private data loading** - Use the local API during development, self-host against your telemetry folder, or drag in `.json` files (with their `.pngt` lap recordings) / a `.zip` in the browser. Hosted uploads stay in memory and never leave your device.
+- 🔒 **Private data loading** - Use the local API during development, self-host against your telemetry folder, or drag in `.json` files (with their `.pngt` lap recordings) / a `.zip` in the browser. Hosted uploads stay in memory and imported lap files in browser storage; neither leaves your device.
 
 The dashboard prefers representative online races when there is enough human-grid data. If that is not available for a formula scope, it gracefully falls back to whatever race results or session history exists, so you only see an empty state when there is truly no data to show.
 

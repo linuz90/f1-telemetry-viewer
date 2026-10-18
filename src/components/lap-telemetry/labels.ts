@@ -11,11 +11,15 @@ export function driverLabel(name: string, isPlayer: boolean): string {
   return isPlayer ? "You" : titleCaseName(name);
 }
 
-/** "Short Quali · 5 Oct 20:49" */
+/** "Short Quali · 5 Oct 20:49", prefixed "Imported" for a browser import. */
 export function recordingLabel(
-  recording: Pick<LapRecordingSummary, "sessionType" | "formula" | "date">,
+  recording: Pick<
+    LapRecordingSummary,
+    "sessionType" | "formula" | "date" | "imported"
+  >,
 ): string {
-  return `${formatSessionType(recording.sessionType, recording.formula)} · ${formatShortDate(recording.date)} ${formatTime(recording.date)}`;
+  const label = `${formatSessionType(recording.sessionType, recording.formula)} · ${formatShortDate(recording.date)} ${formatTime(recording.date)}`;
+  return recording.imported ? `Imported · ${label}` : label;
 }
 
 /**

@@ -265,6 +265,45 @@ export function resolvePresets(
   ];
 }
 
+/**
+ * Laps to open after importing a file: the user's best at the circuit (same
+ * session kind first) as A against the owner's best in the file. The user's
+ * own file opens alone, so the default comparison fills B.
+ */
+export function importedLapRefs(
+  imported: LapRecordingSummary,
+  ownerIndex: number,
+  recordings: readonly LapRecordingSummary[],
+): LapRef[] {
+  const best = imported.drivers.find((d) => d.index === ownerIndex)?.best;
+  const theirs = best && {
+    recordingSlug: imported.slug,
+    driverIndex: ownerIndex,
+    lapNumber: best.lapNumber,
+  };
+  if (imported.playerIndex === ownerIndex) return theirs ? [theirs] : [];
+  const family = familyOf(imported);
+  const mine = bestLapCandidates(
+    recordings.filter(
+      (recording) =>
+        recording.slug !== imported.slug &&
+        isInFamily(recording, {
+          track: family.track,
+          formulaKey: family.formulaKey,
+        }),
+    ),
+  ).filter((candidate) => candidate.isPlayer);
+  const a =
+    fastest(
+      mine.filter(
+        (candidate) =>
+          trackTabForSessionType(candidate.recording.sessionType) ===
+          family.kind,
+      ),
+    ) ?? fastest(mine);
+  return [a?.ref, theirs].filter((ref): ref is LapRef => !!ref);
+}
+
 /** Lap A with zero clicks. */
 export function defaultLapA(
   pool: readonly LapCandidate[],

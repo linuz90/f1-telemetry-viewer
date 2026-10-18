@@ -25,6 +25,7 @@ import {
   type LoadedRecordingFile,
   type LoadedSessionSummary,
 } from "./zipLoader";
+import { isImportedSlug } from "./lapImports";
 import {
   lapRecordingKeys,
   type LapRecordingStore,
@@ -50,7 +51,7 @@ interface TelemetryContextValue {
   getSession: (slug: string) => Promise<TelemetrySession>;
   getSessionQueryOptions: (slug: string) => SessionDetailQueryOptions;
   loadFiles: (files: File[]) => Promise<void>;
-  /** Upload-mode lap recordings; empty in api/demo mode. */
+  /** Upload-mode lap recordings plus browser imports (`LapImportsProvider`). */
   lapRecordingStore: LapRecordingStore;
   showUploadModal: boolean;
   setShowUploadModal: (show: boolean) => void;
@@ -176,8 +177,8 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         const recordings: LoadedRecordingFile[] = files
           .filter((f) => f.name.endsWith(".pngt"))
           .map((f) => ({ fileName: f.name, data: f }));
-        // A recording needs its session JSON for the player, track length and
-        // sectors; dropping one alone must not replace the loaded sessions.
+        // Reached with nothing loaded (`useLoadFiles` imports lone recordings
+        // otherwise): there is no session for its player, length and sectors.
         if (zips.length === 0 && jsons.length === 0) {
           throw new Error(
             "Add the session .json with the .pngt lap recording, or drop a .zip of the whole day folder.",
@@ -233,7 +234,10 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         queryClient.removeQueries({
           queryKey: telemetryKeys.sessionDetailsByMode("upload"),
         });
-        lapRecordingStore.clear();
+        // Imports belong to the browser, not to the uploaded folder.
+        for (const slug of lapRecordingStore.keys()) {
+          if (!isImportedSlug(slug)) lapRecordingStore.delete(slug);
+        }
         for (const [slug, recording] of openedRecordings) {
           lapRecordingStore.set(slug, recording);
         }

@@ -18,6 +18,8 @@ import type {
   LapRecordingSummary,
 } from "../src/utils/lapRecording/types";
 import { range, syntheticLap } from "../src/utils/lapRecording/syntheticLap";
+import { lapRefKey, parseLapRefs } from "../src/analysis/lapTelemetrySelection";
+import { openDroppedFile } from "../src/context/lapImports";
 import { buildPngt } from "./lapRecordingFixtures";
 
 const TRACK_LENGTH = 4000;
@@ -100,6 +102,37 @@ test("recordings keep the 64-bit session UID and reject unknown format versions"
     }),
     /Unsupported lap recording format pngt v2/,
   );
+});
+
+test("a renamed friend's file imports with a working lap link and its real date", async () => {
+  const bytes = await buildPngt({
+    timestamp: "2026-10-17T18:14:02.956423+02:00",
+    drivers: [
+      {
+        index: 21,
+        name: "HAMILTON",
+        laps: [
+          {
+            lapNumber: 1,
+            lapTimeMs: fullLap.lapTimeMs,
+            channels: fullLap.channels,
+          },
+        ],
+      },
+    ],
+  });
+  // A browser's duplicate download, then a chat app's rename.
+  for (const name of [
+    "Short_Qualifying_Suzuka_2026_10_17_18_14_02 (1).pngt",
+    "marco suzuka lap.pngt",
+  ]) {
+    const entry = await openDroppedFile(
+      new File([new Uint8Array(bytes)], name),
+    );
+    const ref = { recordingSlug: entry.slug, driverIndex: 21, lapNumber: 1 };
+    assert.deepEqual(parseLapRefs(lapRefKey(ref)), [ref], name);
+    assert.equal(entry.recording.manifest.date, "2026-10-17T18:14:02", name);
+  }
 });
 
 test("a recording pairs with its Just_in_case session JSON", () => {

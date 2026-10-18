@@ -277,6 +277,7 @@ export async function openLapRecording(
     app_version?: unknown;
     game_year?: unknown;
     formula?: unknown;
+    timestamp?: unknown;
     track?: { name?: unknown };
   };
   // JSON.parse would round the 64-bit UID, so lift it from the raw text.
@@ -371,6 +372,15 @@ export async function openLapRecording(
     .sort((a, b) => a.index - b.index);
 
   const parsedName = parseFilename(stripExtension(options.fileName));
+  // A shared file is often renamed ("... (1).pngt"); its session start,
+  // local time with an offset, then stands in for the filename's.
+  const localStart = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
+  const stamped =
+    typeof session.timestamp === "string" ? session.timestamp.slice(0, 19) : "";
+  const date =
+    localStart.test(parsedName.date) || !localStart.test(stamped)
+      ? parsedName.date
+      : stamped;
   const sessionType =
     typeof session.session_type === "string"
       ? session.session_type
@@ -389,7 +399,7 @@ export async function openLapRecording(
       typeof session.game_year === "number" ? session.game_year : undefined,
     appVersion:
       typeof session.app_version === "string" ? session.app_version : undefined,
-    date: parsedName.date,
+    date,
     trackLengthM,
     sessionSlug: pairing?.sessionSlug,
     playerIndex: pairing?.playerIndex,
@@ -484,6 +494,7 @@ export function summarizeLapRecording(
     date: manifest.date,
     trackLengthM: manifest.trackLengthM,
     playerIndex: manifest.playerIndex,
+    imported: manifest.imported,
     completeLapCount,
     drivers,
   };

@@ -11,7 +11,10 @@ import type {
 } from "../utils/lapRecording/types";
 import type { Mode } from "./telemetry";
 
-/** Upload mode keeps opened recordings in memory, keyed by recording slug. */
+/**
+ * Opened recordings held in memory, keyed by recording slug: upload mode's
+ * files plus browser imports, which every mode serves from here first.
+ */
 export type LapRecordingStore = Map<string, OpenedLapRecording>;
 
 // Hierarchical like telemetryKeys so replacing uploads evicts one prefix.
@@ -29,28 +32,28 @@ const apiBase = () => `${import.meta.env.BASE_URL}api/lap-recordings`;
 export function lapRecordingListQueryOptions(
   mode: Mode,
   store: LapRecordingStore,
+  /** Stored imports are open, so a selection naming one does not flash defaults. */
+  importsReady: boolean,
 ) {
   return queryOptions({
     queryKey: lapRecordingKeys.list(mode),
     queryFn: async (): Promise<LapRecordingSummary[]> => {
-      if (mode === "upload") {
-        return [...store.values()].map((recording) =>
-          summarizeLapRecording(recording.manifest),
-        );
-      }
-      if (mode !== "api") return [];
+      const held = [...store.values()].map((recording) =>
+        summarizeLapRecording(recording.manifest),
+      );
+      if (mode !== "api") return held;
       const res = await fetch(apiBase());
       // Hosts that embed the viewer (Pits n' Giggles) may not serve this
       // route, or answer it with their SPA page; no recordings is the honest
       // answer there, not an error.
-      if (res.status === 404) return [];
+      if (res.status === 404) return held;
       if (!res.ok) throw new Error("Failed to load lap recordings");
       if (!res.headers.get("content-type")?.includes("application/json")) {
-        return [];
+        return held;
       }
-      return res.json() as Promise<LapRecordingSummary[]>;
+      return [...((await res.json()) as LapRecordingSummary[]), ...held];
     },
-    enabled: mode === "api" || mode === "upload",
+    enabled: importsReady && mode !== "detecting",
     staleTime: 10_000,
   });
 }
@@ -63,11 +66,9 @@ export function lapRecordingManifestQueryOptions(
   return queryOptions({
     queryKey: lapRecordingKeys.manifest(mode, slug),
     queryFn: async (): Promise<LapRecordingManifest> => {
-      if (mode === "upload") {
-        const recording = store.get(slug);
-        if (!recording) throw new Error(`Lap recording not found: ${slug}`);
-        return recording.manifest;
-      }
+      const held = store.get(slug);
+      if (held) return held.manifest;
+      if (mode !== "api") throw new Error(`Lap recording not found: ${slug}`);
       const res = await fetch(`${apiBase()}/${slug}`);
       if (!res.ok) throw new Error(`Failed to load lap recording: ${slug}`);
       return res.json() as Promise<LapRecordingManifest>;
@@ -87,9 +88,10 @@ export function lapTraceQueryOptions(
     queryKey: lapRecordingKeys.lap(mode, slug, driverIndex, lapNumber),
     queryFn: async (): Promise<LapTrace> => {
       let bytes: Uint8Array | undefined;
-      if (mode === "upload") {
-        bytes = await store.get(slug)?.readLapBytes(driverIndex, lapNumber);
-      } else {
+      const held = store.get(slug);
+      if (held) {
+        bytes = await held.readLapBytes(driverIndex, lapNumber);
+      } else if (mode === "api") {
         const res = await fetch(
           `${apiBase()}/${slug}/${driverIndex}/${lapNumber}`,
         );

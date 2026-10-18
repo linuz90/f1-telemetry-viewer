@@ -10,20 +10,29 @@ import {
   type PreparedLap,
 } from "../src/analysis/lapTelemetryAnalysis";
 import {
+  bestLapCandidates,
   defaultComparison,
   defaultLapA,
+  importedLapRefs,
   isSoloSelection,
   parseLapRefs,
+  resolvePresets,
   serializeLapRefs,
   type LapCandidate,
 } from "../src/analysis/lapTelemetrySelection";
+import { applyImportOwner } from "../src/context/lapImports";
+import { summarizeLapRecording } from "../src/utils/lapRecording/reader";
 import {
   calibrateOutline,
   orderByLap,
   outlineFromPath,
   outlinePointAt,
 } from "../src/analysis/trackOutline";
-import type { LapRecordingSummary } from "../src/utils/lapRecording/types";
+import type {
+  LapRecordingManifest,
+  LapRecordingSummary,
+  RecordedLap,
+} from "../src/utils/lapRecording/types";
 import {
   syntheticLap,
   type SyntheticChannels,
@@ -481,6 +490,102 @@ test("a lone lap round-trips as solo; an entry-point ref does not", () => {
   assert.ok(isSoloSelection(solo));
   assert.ok(!isSoloSelection("race-a~21~2"));
   assert.ok(!isSoloSelection(serializeLapRefs([a, { ...a, lapNumber: 3 }])));
+});
+
+const completeLap = (lapNumber: number, lapTimeMs: number): RecordedLap => ({
+  lapNumber,
+  lapTimeMs,
+  valid: true,
+  pitInLap: false,
+  pitOutLap: false,
+  sampleCount: 2_900,
+  startDistanceM: 1,
+  endDistanceM: 5_806,
+  maxGapM: 3,
+  complete: true,
+});
+
+// A friend's Suzuka file. The player index stands in for a paired session
+// JSON: it is the friend's car, so it must never read as the viewer's.
+const friendFile: LapRecordingManifest = {
+  slug: "short-qualifying-suzuka-2026-10-17-18-14-02",
+  fileName: "Short_Qualifying_Suzuka_2026_10_17_18_14_02.pngt",
+  sessionType: "Short Qualifying",
+  track: "Suzuka",
+  formula: "F1 26",
+  gameYear: 25,
+  date: "2026-10-17T18:14:02",
+  trackLengthM: 5_807,
+  playerIndex: 21,
+  drivers: [
+    { index: 21, name: "HAMILTON", laps: [completeLap(1, 88_767)] },
+    { index: 10, name: "PÉREZ", laps: [completeLap(1, 89_864)] },
+  ],
+};
+
+const ownSuzuka = (
+  slug: string,
+  sessionType: string,
+  lapTimeMs: number,
+): LapRecordingSummary => ({
+  slug,
+  sessionType,
+  track: "Suzuka",
+  formula: "F1 26",
+  gameYear: 25,
+  date: "2026-10-17T10:34:13",
+  trackLengthM: 5_807,
+  playerIndex: 3,
+  completeLapCount: 1,
+  drivers: [{ index: 3, name: "RUSSELL", best: { lapNumber: 4, lapTimeMs } }],
+});
+
+test("a friend's imported laps carry their name and never count as yours", () => {
+  const slug = "imported-friend";
+  const friend = summarizeLapRecording(
+    applyImportOwner(friendFile, slug, { driverIndex: 21, name: "Marco" }),
+  );
+  const theirs = bestLapCandidates([friend]).find(
+    (c) => c.ref.driverIndex === 21,
+  )!;
+  assert.equal(friend.playerIndex, undefined);
+  assert.equal(theirs.driverName, "Marco");
+  assert.equal(theirs.isPlayer, false);
+
+  // Faster than your lap, yet "My best here" stays yours.
+  const race = ownSuzuka("race-suzuka", "Race", 91_577);
+  const pool = bestLapCandidates([race, friend]);
+  const myBest = resolvePresets(pool[0].ref, pool).find(
+    (preset) => preset.id === "my-best",
+  );
+  assert.equal(myBest?.candidate, undefined);
+  assert.equal(myBest?.reason, "Lap A is your best here");
+
+  // Your same-kind best opens as A, even when a race lap is quicker.
+  const quali = ownSuzuka(
+    "short-qualifying-suzuka",
+    "Short Qualifying",
+    88_950,
+  );
+  const fastRace = ownSuzuka("race-suzuka", "Race", 88_500);
+  assert.deepEqual(importedLapRefs(friend, 21, [fastRace, quali, friend]), [
+    { recordingSlug: quali.slug, driverIndex: 3, lapNumber: 4 },
+    { recordingSlug: slug, driverIndex: 21, lapNumber: 1 },
+  ]);
+  // Without a qualifying lap of yours, your race lap stands in.
+  assert.equal(
+    importedLapRefs(friend, 21, [fastRace, friend])[0]?.recordingSlug,
+    fastRace.slug,
+  );
+
+  // Marked as your own, the file's car is you and opens alone.
+  const mine = summarizeLapRecording(
+    applyImportOwner(friendFile, slug, { driverIndex: 21, name: null }),
+  );
+  assert.equal(mine.playerIndex, 21);
+  assert.deepEqual(importedLapRefs(mine, 21, [quali, mine]), [
+    { recordingSlug: slug, driverIndex: 21, lapNumber: 1 },
+  ]);
 });
 
 // --- Track outline -----------------------------------------------------------

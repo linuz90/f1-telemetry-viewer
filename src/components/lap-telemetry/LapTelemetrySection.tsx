@@ -47,6 +47,7 @@ import { SectionHeader } from "../ui/SectionHeader";
 import { driverLabel, recordingLabel } from "./labels";
 import { LapChips } from "./LapChips";
 import { LapComparisonView } from "./LapComparisonView";
+import { LapImportsRow } from "./LapImportsRow";
 import { LapPicker } from "./LapPicker";
 import { SLOT_NAMES, type SlotLap } from "./types";
 
@@ -325,9 +326,14 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   }, [selected, traces, selectedManifests, failedSelectedManifests]);
   const preparedLaps = prepared === "failed" ? null : prepared;
 
-  const aManifest = selected[0]
-    ? selectedManifests.get(selected[0].ref.recordingSlug)
-    : undefined;
+  // Sectors come from a paired session JSON; an imported lap has none, but
+  // the other lap, at the same circuit, usually does.
+  const sectorStarts = selected
+    .map(
+      (candidate) =>
+        selectedManifests.get(candidate.ref.recordingSlug)?.sectorStartsM,
+    )
+    .find(Boolean);
   // Scroll once per navigation, after the section has laps to show: on a
   // reload or shared link the list loads after the first render.
   const scrolledFor = useRef<string | null>(null);
@@ -548,10 +554,12 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
           key={selectionKey}
           slots={slots}
           laps={preparedLaps}
-          sectorStarts={aManifest?.sectorStartsM}
+          sectorStarts={sectorStarts}
           track={family?.track}
         />
       )}
+
+      <LapImportsRow slugs={trackSlugs} />
 
       {pickerSlot !== null && family && (
         <LapPicker

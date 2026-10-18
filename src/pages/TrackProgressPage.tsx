@@ -39,7 +39,10 @@ import { TrackQualifyingInsights } from "../components/track/TrackQualifyingInsi
 import { TrackSessionHistory } from "../components/track/TrackSessionHistory";
 import { TrackStrategySection } from "../components/track/TrackStrategySection";
 import { LapTelemetrySection } from "../components/lap-telemetry/LapTelemetrySection";
-import { LAPS_QUERY_PARAM } from "../analysis/lapTelemetrySelection";
+import {
+  LAPS_QUERY_PARAM,
+  recordingFormulaKey,
+} from "../analysis/lapTelemetrySelection";
 import { TrackFlag } from "../components/TrackFlag";
 import { Badge } from "../components/ui/Badge";
 import { Button, buttonVariants } from "../components/ui/Button";
@@ -49,6 +52,7 @@ import { SectionHeader } from "../components/ui/SectionHeader";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { HStack, VStack } from "../components/ui/Stack";
 import { useTelemetry } from "../context/TelemetryContext";
+import { useLapRecordingList } from "../hooks/useLapRecordings";
 import { useSessionList } from "../hooks/useSessionList";
 import {
   buildRaceAnalysisBuckets,
@@ -85,6 +89,7 @@ import {
   isTrackSessionTab,
   sessionSummaryPath,
   trackPath,
+  trackTabForSessionType,
 } from "../utils/routes";
 import { TRACK_TAB_QUERY_PARAM } from "../constants/routes";
 import { aggregateCompoundLife } from "../utils/stats/trackAggregates";
@@ -119,6 +124,7 @@ export function TrackProgressPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { sessions } = useSessionList();
+  const { recordings: lapRecordings } = useLapRecordingList();
   const {
     getSession,
     mode,
@@ -185,6 +191,24 @@ export function TrackProgressPage() {
   const playerTrackSessionKey = playerTrackSessions
     .map((s) => s.slug)
     .join("|");
+
+  // A friend's imported laps can be all that is recorded at a circuit.
+  const recordedLapTabs = useMemo(
+    () => [
+      ...new Set(
+        lapRecordings
+          .filter(
+            // The section opens on eligible bests only.
+            (recording) =>
+              recording.drivers.some((driver) => driver.best) &&
+              isTrackSlugMatch(recording.track, trackId) &&
+              recordingFormulaKey(recording) === activeFormulaKey,
+          )
+          .map((recording) => trackTabForSessionType(recording.sessionType)),
+      ),
+    ],
+    [activeFormulaKey, lapRecordings, trackId],
+  );
 
   // Keep the exporter value for metadata lookup; presentation uses the curated name.
   const trackSourceName =
@@ -401,6 +425,35 @@ export function TrackProgressPage() {
           <TrackSessionHistory
             activeKind={activeTab}
             spectatorSessions={spectatorHistory}
+          />
+        </div>
+      );
+    }
+
+    if (activeFormulaKey && recordedLapTabs.length > 0) {
+      const lapTab = recordedLapTabs.includes(activeTab)
+        ? activeTab
+        : recordedLapTabs[0];
+      return (
+        <div className="p-6 max-w-5xl mx-auto space-y-6">
+          <div>
+            <h2 className="text-xl font-bold mb-1">
+              <TrackFlag track={trackSourceName} className="mr-2" />
+              {displayTrackName}
+            </h2>
+            <p className="text-sm text-zinc-500">
+              {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
+              No sessions of yours here yet, only recorded laps
+            </p>
+          </div>
+          <LapTelemetrySection
+            key={lapTab}
+            scope={{
+              kind: "track",
+              track: trackSourceName,
+              formulaKey: activeFormulaKey,
+              sessionKind: lapTab,
+            }}
           />
         </div>
       );

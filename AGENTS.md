@@ -76,7 +76,7 @@ Data flow:
 - Self-hosting: `server.ts` adapts the same index to the production HTTP server.
 - Production/demo: `public/demo/sessions.json`.
 - Upload mode: JSON/zip/`.pngt` files parsed in-browser.
-- Lap recordings (`.pngt`, Pits n' Giggles 5.0 beta): `src/plugin/lap-recording-index.ts` indexes them on their own and serves `/api/lap-recordings/...` for both servers; upload mode opens them through the same reader in `src/utils/lapRecording/`.
+- Lap recordings (`.pngt`, Pits n' Giggles 5.0 beta): `src/plugin/lap-recording-index.ts` indexes them on their own and serves `/api/lap-recordings/...` for both servers; upload mode and browser imports (`LapImportsProvider`) open them through the same reader in `src/utils/lapRecording/`.
 
 Routes:
 
@@ -233,6 +233,7 @@ Lap telemetry:
 - A recorded lap is complete only by `judgeLapCoverage()`: timed, first and last samples within 30 m of the line, no gap over 30 m. Never trust the exporter's `is_good`; most flagged laps start mid-lap.
 - Keep recordings out of `SessionSummary` and the session index. They pair with session JSON by `recordingPairKey()` and stay reachable when `deduplicateSessions` hides their session, which is where restarted qualifying runs keep their only complete laps: the surviving row claims them through `duplicateSlugs` (`sessionSaveSlugs()`) for its glyph and session page.
 - Player index, track length and sector starts come from the paired session JSON; the recording has none of them.
+- A `.pngt` dropped on its own is a browser import (`src/context/lapImports.ts`, IndexedDB), never written to `TELEMETRY_DIR`. "Whose laps are these?" names its owner: a friend's car takes the friend's name and is never `isPlayer`, even when a paired JSON marks it as the player. Imports sit in the shared lap-recording store, which every mode reads first, so they work in the embedded Pits n' Giggles viewer too; an unpaired lap borrows sector starts from the other selected lap.
 - Tips come from `compareLaps()` corner units, which telescope to the official lap-time gap; keep tips plus remainder equal to it. `TIP_FLOOR_S` (0.03 s) is about three times the error of one stretch measured against official sector times.
 - Every lap-tip threshold is a documented constant in the Tuning section of `src/analysis/lapTelemetryAnalysis.ts`; add new ones there, never inline. Run `pnpm check:lap-telemetry` before and after changing one: it prints aggregates only, and a change shows up as tips moving between rows of its census.
 - A corner unit starts at the lift even when the throttle is back before the slowest point, and is named for every turn up to where both laps are flat again. A corner that nets under the floor still gets a note when one phase moved 0.05 s or more; its time stays the true net.

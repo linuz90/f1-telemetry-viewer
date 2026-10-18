@@ -12,6 +12,8 @@ import {
   Upload,
 } from "lucide-react";
 import { useTelemetry } from "../context/TelemetryContext";
+import { useLapRecordingList } from "../hooks/useLapRecordings";
+import { useLoadFiles } from "../hooks/useLoadFiles";
 import {
   AUTHOR_GITHUB_URL,
   AUTHOR_NAME,
@@ -27,7 +29,10 @@ export function ZipUploadScreen({
 }: {
   dismissable?: boolean;
 }) {
-  const { loadFiles, filesLoading, setShowUploadModal } = useTelemetry();
+  const { filesLoading, setShowUploadModal } = useTelemetry();
+  const loadFiles = useLoadFiles();
+  // Only Pits n' Giggles 5 records laps, so only its users hear about them.
+  const recordsLaps = useLapRecordingList().recordings.length > 0;
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -39,20 +44,18 @@ export function ZipUploadScreen({
   const handleFiles = useCallback(
     async (files: File[]) => {
       setError(null);
-      const valid = files.filter(
-        (f) =>
-          f.name.endsWith(".zip") ||
-          f.name.endsWith(".json") ||
-          f.name.endsWith(".pngt"),
-      );
-      if (valid.length === 0) {
-        setError("Please upload .zip or .json files");
-        return;
-      }
       try {
-        await loadFiles(valid);
+        const result = await loadFiles(files);
+        if (result.kind === "none") {
+          setError("Please upload .zip or .json files");
+          return;
+        }
+        if (result.kind === "laps" && result.failed.length > 0) {
+          setError(`Could not read ${result.failed.join("; ")}`);
+          return;
+        }
         setShowUploadModal(false);
-        navigate("/");
+        if (result.kind === "sessions") navigate("/");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load files");
       }
@@ -148,6 +151,7 @@ export function ZipUploadScreen({
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
                   .json session files, or a .zip of your data folder
+                  {recordsLaps && ", or a friend's .pngt laps to compare"}
                 </p>
               </div>
               {error && <p className="text-xs text-behind">{error}</p>}

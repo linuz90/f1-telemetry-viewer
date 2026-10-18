@@ -87,6 +87,8 @@ export interface LapRecordingManifest {
   playerIndex?: number;
   sectorStartsM?: [number, number];
   weather?: string;
+  /** Imported into this browser (a friend's file), not read from the telemetry folder. */
+  imported?: boolean;
   drivers: RecordedDriver[];
 }
 
@@ -107,6 +109,7 @@ export interface LapRecordingSummary {
   date: string;
   trackLengthM: number;
   playerIndex?: number;
+  imported?: boolean;
   completeLapCount: number;
   drivers: {
     index: number;

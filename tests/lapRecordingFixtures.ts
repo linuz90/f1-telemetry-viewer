@@ -50,6 +50,8 @@ export async function buildPngt(options: {
   track?: string;
   version?: number;
   sessionUid?: string;
+  /** Session start as exported, local time with its offset. */
+  timestamp?: string;
   drivers: FixtureDriver[];
 }): Promise<Uint8Array> {
   const zip = new JSZip();
@@ -60,7 +62,7 @@ export async function buildPngt(options: {
   // Written by hand so the 64-bit UID stays an unquoted integer, as exported.
   zip.file(
     "session.json",
-    `{"session_uid": ${options.sessionUid ?? "6148745969696205249"}, "session_type": ${JSON.stringify(options.sessionType ?? "Short Qualifying")}, "app_version": "5.0.0-beta.1", "game_year": 25, "formula": "F1 26", "track": {"id": 0, "name": ${JSON.stringify(options.track ?? "Melbourne")}}}`,
+    `{"session_uid": ${options.sessionUid ?? "6148745969696205249"}, "session_type": ${JSON.stringify(options.sessionType ?? "Short Qualifying")}, "app_version": "5.0.0-beta.1", "game_year": 25, "formula": "F1 26",${options.timestamp ? ` "timestamp": ${JSON.stringify(options.timestamp)},` : ""} "track": {"id": 0, "name": ${JSON.stringify(options.track ?? "Melbourne")}}}`,
   );
   zip.file("manifest.json", JSON.stringify({ sensors: {} }));
   zip.file(

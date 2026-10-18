@@ -1,5 +1,6 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
+import { useLapImports } from "../context/LapImportsContext";
 import { useTelemetry } from "../context/TelemetryContext";
 import {
   LAP_TELEMETRY_ANCHOR,
@@ -20,10 +21,13 @@ import type {
 
 const EMPTY: LapRecordingSummary[] = [];
 
-/** Every lap recording the current data source knows about. */
+/** Every lap recording the current data source knows about, plus browser imports. */
 export function useLapRecordingList() {
   const { mode, lapRecordingStore } = useTelemetry();
-  const query = useQuery(lapRecordingListQueryOptions(mode, lapRecordingStore));
+  const { ready } = useLapImports();
+  const query = useQuery(
+    lapRecordingListQueryOptions(mode, lapRecordingStore, ready),
+  );
   return { recordings: query.data ?? EMPTY, loading: query.isLoading };
 }
 

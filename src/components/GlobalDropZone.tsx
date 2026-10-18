@@ -2,10 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Upload } from "lucide-react";
 import { useTelemetry } from "../context/TelemetryContext";
+import { useLapRecordingList } from "../hooks/useLapRecordings";
+import { useLoadFiles } from "../hooks/useLoadFiles";
 import { HStack, VStack } from "./ui/Stack";
 
 export function GlobalDropZone() {
-  const { loadFiles, filesLoading, setShowUploadModal } = useTelemetry();
+  const { filesLoading, setShowUploadModal } = useTelemetry();
+  const loadFiles = useLoadFiles();
+  // Only Pits n' Giggles 5 records laps, so only its users hear about them.
+  const recordsLaps = useLapRecordingList().recordings.length > 0;
   const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,17 +30,14 @@ export function GlobalDropZone() {
       setVisible(false);
 
       const files = Array.from(e.dataTransfer?.files ?? []);
-      const valid = files.filter(
-        (f) =>
-          f.name.endsWith(".zip") ||
-          f.name.endsWith(".json") ||
-          f.name.endsWith(".pngt"),
-      );
-      if (valid.length === 0) return;
       try {
+        const result = await loadFiles(files);
+        if (result.kind === "none") return;
         setShowUploadModal(false);
-        await loadFiles(valid);
-        navigate("/");
+        // Lap imports open their own "whose laps" dialog instead.
+        if (result.kind === "sessions") navigate("/");
+        else if (result.failed.length > 0)
+          setError(`Could not read ${result.failed.join("; ")}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load files");
       }
@@ -116,6 +118,7 @@ export function GlobalDropZone() {
                   </p>
                   <p className="mt-1 text-sm text-zinc-400">
                     .json session files or a .zip of your data folder
+                    {recordsLaps && ", or a friend's .pngt laps to compare"}
                   </p>
                 </div>
               </>
