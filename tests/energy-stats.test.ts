@@ -188,7 +188,6 @@ test("harvest utilization sort keeps missing telemetry last in both directions",
   for (const sortDir of ["asc", "desc"] as const) {
     const sorted = sortRaceStintHistoryRows({
       entries,
-      focusedOnly: false,
       sortKey: "ersHarvestPct",
       sortDir,
       drivers,

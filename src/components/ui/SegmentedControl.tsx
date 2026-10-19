@@ -12,6 +12,8 @@ export interface SegmentedOption<T extends string = string> {
   meta?: ReactNode;
   /** Leading icon — dimmed when inactive, matches label tone when active. */
   icon?: LucideIcon;
+  /** Leading colour dot, e.g. a tyre compound's colour. */
+  swatch?: string;
 }
 
 interface Props<T extends string> {
@@ -84,6 +86,16 @@ export function SegmentedControl<T extends string>({
             )}
           >
             <span className="inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap">
+              {opt.swatch && (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "inline-block size-2 shrink-0 rounded-full",
+                    !active && "opacity-70",
+                  )}
+                  style={{ backgroundColor: opt.swatch }}
+                />
+              )}
               {Icon && (
                 // Icon size matches the `text-xs` (12px) x-height + caps so
                 // it doesn't grow the flex row and shift the label up by ~1px

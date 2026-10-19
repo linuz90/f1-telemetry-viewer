@@ -21,7 +21,7 @@
     "test:session-index": "tsx --test src/plugin/session-summary-index.test.ts",
     "test:tracks": "tsx --test src/utils/tracks.test.ts",
     "test:lap-stats": "tsx --test tests/lap-stats.test.ts",
-    "test:race-pace": "tsx --test tests/race-pace.test.ts tests/matched-pace.test.ts",
+    "test:race-pace": "tsx --test tests/race-pace.test.ts tests/matched-pace.test.ts tests/race-results.test.ts",
     "test:energy-stats": "tsx --test tests/energy-stats.test.ts",
     "test:fuel": "tsx --test src/utils/stats/energy.test.ts src/utils/stats/trackAggregates.test.ts",
     "test:speed": "tsx --test tests/speed-analysis.test.ts",

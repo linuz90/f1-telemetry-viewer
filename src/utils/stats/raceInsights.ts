@@ -54,7 +54,7 @@ export function generateInsights(
             ? `faster on the same tyres vs ${rivalName} · ${matchedPace.firstSampleCount} vs ${matchedPace.secondSampleCount} laps`
             : `slower on the same tyres vs ${rivalName} · ${matchedPace.firstSampleCount} vs ${matchedPace.secondSampleCount} laps`,
         tooltip:
-          "Weighted same-compound median pace. Each compound requires at least 3 clean laps per driver, and the smaller sample must cover at least half the larger one.",
+          "Weighted same-compound Race Pace: the mean of each driver's clean laps on the tyres you both ran. Each compound requires at least 3 clean laps per driver, and the smaller sample must cover at least half the larger one.",
       });
     }
 
@@ -119,7 +119,7 @@ export function generateInsights(
                 : `even by sector vs ${rivalName}`,
         extraDetails: sectorRows,
         tooltip:
-          "Same-compound median sectors using the same coverage-balanced clean laps as Matched Pace.",
+          "Same-compound mean sectors using the same coverage-balanced clean laps as Matched Pace.",
       });
     }
 

@@ -54,7 +54,7 @@ function driver(
   } as unknown as DriverData;
 }
 
-test("matched pace compares same-compound medians with shared evidence", () => {
+test("matched pace compares same-compound means with shared evidence", () => {
   const comparison = compareCompoundMatchedRacePace(
     driver("Player", [100_000, 101_000, 102_000, 103_000, 104_000]),
     driver("Rival", [101_000, 102_000, 103_000, 104_000]),
@@ -225,4 +225,16 @@ test("partial races cannot claim a historical Race Pace best", () => {
     ).some(({ label }) => label === "Race Pace vs Best"),
     true,
   );
+});
+
+test("matched pace uses the Race Pace mean, not the median", () => {
+  // Medians would call this a full second; the means the Classification table
+  // shows with Medium selected differ by 0.7 s, and the insight must agree.
+  const comparison = compareCompoundMatchedRacePace(
+    driver("Player", [100_000, 100_000, 100_000, 101_200]),
+    driver("Rival", [101_000, 101_000, 101_000, 101_000]),
+  );
+  assert.ok(comparison);
+  assert.equal(comparison.deltaMs, -700);
+  assert.deepEqual(comparison.sectorDeltasMs, [0, 0, -700]);
 });

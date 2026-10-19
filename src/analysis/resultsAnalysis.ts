@@ -19,14 +19,19 @@ import {
 import {
   filterOutlierLaps,
   getBestLapTime,
+  getPitLapNumbers,
+  getRacePaceLapSamples,
   getValidLaps,
+  isCompleteValidLap,
   medianLapTimeMs,
 } from "../utils/stats/laps";
 import {
+  calculateRacePaceEstimate,
   getRacePaceEstimate,
   getRacePaceRankingSampleThreshold,
   getRacePaceReferenceSampleCount,
   isRacePaceRankEligible,
+  MIN_RACE_PACE_SAMPLE_COUNT,
   type RacePaceConfidence,
 } from "../utils/stats/racePace";
 import {
@@ -37,8 +42,10 @@ import {
 import {
   getCompletedStints,
   getDriverStints,
+  getLapCompoundMap,
   stintWearRate,
 } from "../utils/stats/tyres";
+import { compoundDisplayRank } from "../constants/compounds";
 import {
   buildSessionSpeedAnalysis,
   type SessionSpeedAnalysis,
@@ -150,13 +157,72 @@ function maxPositive(values: Iterable<number>): number {
   return positive.length > 0 ? Math.max(...positive) : 0;
 }
 
+/**
+ * Compounds the Classification table can filter by: those on which at least
+ * one driver has enough eligible laps for a Race Pace. A compound that only
+ * appears in a two-lap stint would filter to a column of dashes. Softest first.
+ */
+export function listRacePaceCompounds(session: TelemetrySession): string[] {
+  const lapCounts = new Map<string, number>();
+  for (const driver of session["classification-data"]) {
+    const perDriver = new Map<string, number>();
+    for (const sample of getRacePaceLapSamples(driver)) {
+      if (!sample.compound) continue;
+      perDriver.set(sample.compound, (perDriver.get(sample.compound) ?? 0) + 1);
+    }
+    for (const [compound, count] of perDriver) {
+      lapCounts.set(compound, Math.max(lapCounts.get(compound) ?? 0, count));
+    }
+  }
+  return [...lapCounts]
+    .filter(([, count]) => count >= MIN_RACE_PACE_SAMPLE_COUNT)
+    .map(([compound]) => compound)
+    .sort((a, b) => compoundDisplayRank(a) - compoundDisplayRank(b));
+}
+
+/** Fastest complete valid lap the driver set on one compound (0 if none).
+ *  Pit in/out laps are skipped: a late stop leaves a slow out-lap as the only
+ *  lap on the new compound, which is not a best lap on it. */
+function bestLapOnCompoundMs(driver: DriverData, compound: string): number {
+  const compoundByLap = getLapCompoundMap(driver);
+  const pitLaps = getPitLapNumbers(driver);
+  let best = 0;
+  for (const [index, lap] of driver["session-history"][
+    "lap-history-data"
+  ].entries()) {
+    if (compoundByLap.get(index + 1) !== compound) continue;
+    if (pitLaps.has(index + 1)) continue;
+    if (!isCompleteValidLap(lap)) continue;
+    const timeMs = lap["lap-time-in-ms"];
+    if (best === 0 || timeMs < best) best = timeMs;
+  }
+  return best;
+}
+
+/**
+ * Per-driver table stats. With `compound` set, Best Lap and Race Pace use only
+ * laps on that compound, so a driver who ran it is compared like-for-like and
+ * one who did not shows no value. Race Pace keeps its definition (mean of
+ * eligible laps) and its half-the-reference ranking floor, applied within the
+ * compound, so a short stint never outranks a full one.
+ */
 export function buildRaceDriverStats(
   session: TelemetrySession,
   speedAnalysis: SessionSpeedAnalysis = buildSessionSpeedAnalysis(session),
+  compound: string | null = null,
 ): Map<number, RaceDriverStats> {
   const drivers = session["classification-data"];
   const paceEstimates = new Map(
-    drivers.map((driver) => [driver.index, getRacePaceEstimate(driver)]),
+    drivers.map((driver) => [
+      driver.index,
+      compound
+        ? calculateRacePaceEstimate(
+            getRacePaceLapSamples(driver).filter(
+              (sample) => sample.compound === compound,
+            ),
+          )
+        : getRacePaceEstimate(driver),
+    ]),
   );
   const referenceSampleCount = getRacePaceReferenceSampleCount(
     paceEstimates.values(),
@@ -165,7 +231,9 @@ export function buildRaceDriverStats(
     getRacePaceRankingSampleThreshold(referenceSampleCount);
   const map = new Map<number, RaceDriverStats>();
   for (const driver of drivers) {
-    const bestLap = driverBestLapTimeMs(driver);
+    const bestLap = compound
+      ? bestLapOnCompoundMs(driver, compound)
+      : driverBestLapTimeMs(driver);
     const racePaceEstimate = paceEstimates.get(driver.index)!;
     const speedProfile = speedAnalysis.profiles.get(driver.index);
 
@@ -327,33 +395,18 @@ function compareRaceGap(
 
 export function sortRaceStintHistoryRows({
   entries,
-  focusedOnly,
-  focusedName,
-  focusedDriverIndex,
   sortKey,
   sortDir,
   drivers,
   driverStats,
 }: {
   entries: readonly TyreStintHistoryV2Entry[];
-  focusedOnly: boolean;
-  focusedName?: string;
-  focusedDriverIndex?: number;
   sortKey: RaceResultSortKey;
   sortDir: SortDirection;
   drivers: readonly DriverData[];
   driverStats: Map<number, RaceDriverStats>;
 }): TyreStintHistoryV2Entry[] {
-  const filtered = focusedOnly
-    ? entries.filter((entry) => {
-        const driverIndex = resolveRaceResultDriverIndex(entry, drivers);
-        return driverIndex != null
-          ? driverIndex === focusedDriverIndex
-          : entry.name === focusedName;
-      })
-    : [...entries];
-
-  return [...filtered].sort((a, b) => {
+  return [...entries].sort((a, b) => {
     const statsA = raceDriverStatsForEntry(a, drivers, driverStats);
     const statsB = raceDriverStatsForEntry(b, drivers, driverStats);
 
@@ -382,6 +435,11 @@ export function sortRaceStintHistoryRows({
         comparison = (a.position ?? 99) - (b.position ?? 99);
         break;
       case "bestLap":
+        // A driver with no lap (common with a compound selected) stays at the
+        // bottom in both directions instead of leading a descending sort.
+        if (!statsA?.bestLap !== !statsB?.bestLap) {
+          return statsA?.bestLap ? -1 : 1;
+        }
         comparison =
           (statsA?.bestLap || Infinity) - (statsB?.bestLap || Infinity);
         break;
@@ -415,22 +473,18 @@ export function sortRaceStintHistoryRows({
 
 export function buildFallbackRaceRows({
   drivers,
-  focusedOnly,
-  focusedDriverIndex,
   sortKey = "pos",
   sortDir = "asc",
   driverStats,
 }: {
   drivers: readonly DriverData[];
-  focusedOnly: boolean;
-  focusedDriverIndex: number;
   sortKey?: RaceResultSortKey;
   sortDir?: SortDirection;
   driverStats?: Map<number, RaceDriverStats>;
 }): DriverData[] {
-  const filtered = [...drivers]
-    .filter((driver) => driver["final-classification"])
-    .filter((driver) => !focusedOnly || driver.index === focusedDriverIndex);
+  const filtered = [...drivers].filter(
+    (driver) => driver["final-classification"],
+  );
 
   return filtered.sort((a, b) => {
     const statsA = driverStats?.get(a.index);
@@ -438,6 +492,11 @@ export function buildFallbackRaceRows({
     let comparison = 0;
     switch (sortKey) {
       case "bestLap":
+        // A driver with no lap (common with a compound selected) stays at the
+        // bottom in both directions instead of leading a descending sort.
+        if (!statsA?.bestLap !== !statsB?.bestLap) {
+          return statsA?.bestLap ? -1 : 1;
+        }
         comparison =
           (statsA?.bestLap || Infinity) - (statsB?.bestLap || Infinity);
         break;
