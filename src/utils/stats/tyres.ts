@@ -201,6 +201,26 @@ export function projectWearFromCurve(
   return before.worstWear + (plannedLaps - before.stintLap) * projectedRate;
 }
 
+/** Stint laps until worst-wheel wear reaches `threshold`: read off the curve
+ *  when the stint got there, otherwise projected past its end at the rate
+ *  `projectWearFromCurve` uses (late-stint rate, never gentler than the
+ *  average). Null without a curve or without any recorded wear. */
+export function projectLapsToWear(
+  curve: readonly StintWearCurvePoint[],
+  threshold: number,
+): number | null {
+  const last = curve.at(-1);
+  if (!last || last.worstWear <= 0 || last.stintLap <= 0) return null;
+
+  const crossed = curve.find((point) => point.worstWear >= threshold);
+  if (crossed) return crossed.stintLap;
+
+  const nextLapWear = projectWearFromCurve(curve, last.stintLap + 1);
+  const rate = nextLapWear == null ? 0 : nextLapWear - last.worstWear;
+  if (rate <= 0) return null;
+  return Math.round(last.stintLap + (threshold - last.worstWear) / rate);
+}
+
 /** Get the compound sequence for a driver's stints */
 function getCompoundSequence(stints: TyreStint[]): string[] {
   return stints.map((s) => s["tyre-set-data"]["visual-tyre-compound"]);

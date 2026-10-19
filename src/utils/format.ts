@@ -8,6 +8,13 @@ export function msToLapTime(ms: number): string {
   return minutes > 0 ? `${minutes}:${seconds.padStart(6, "0")}` : seconds;
 }
 
+/** "LECLERC" -> "Leclerc"; recordings write driver names in capitals. */
+export function titleCaseName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/(^|[\s'-])\p{L}/gu, (match) => match.toUpperCase());
+}
+
 /** Convert milliseconds to sector time string (e.g. 33341 -> "33.341") */
 export function msToSectorTime(ms: number): string {
   if (ms <= 0) return "-";

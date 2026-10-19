@@ -14,39 +14,34 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { ActionEmptyState } from "../components/ActionEmptyState";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-  ZAxis,
-} from "recharts";
 import { cardClass } from "../components/Card";
 import { CarSetupCard } from "../components/CarSetupCard";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { EventLocationPieChart } from "../components/EventLocationPieChart";
 import { RaceSetupComparison } from "../components/RaceSetupComparison";
-import { getSessionTypeMeta } from "../components/sessionTypeMeta";
+import { TRACK_KIND_META } from "../components/sessionTypeMeta";
 import { PaceEvolutionChart } from "../components/track/PaceEvolutionChart";
+import { TyreLifeEvidenceBar } from "../components/track/TyreLifeEvidenceBar";
 import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
+import { TrackPaceTrends } from "../components/track/TrackPaceTrends";
 import { TrackQualifyingInsights } from "../components/track/TrackQualifyingInsights";
 import { TrackSessionHistory } from "../components/track/TrackSessionHistory";
 import { TrackStrategySection } from "../components/track/TrackStrategySection";
+import { LapTelemetrySection } from "../components/lap-telemetry/LapTelemetrySection";
+import {
+  LAPS_QUERY_PARAM,
+  recordingFormulaKey,
+} from "../analysis/lapTelemetrySelection";
 import { TrackFlag } from "../components/TrackFlag";
 import { Badge } from "../components/ui/Badge";
 import { Button, buttonVariants } from "../components/ui/Button";
-import { InsightDetail, InsightValue } from "../components/ui/InsightText";
+import { InsightValue } from "../components/ui/InsightText";
 import { InsightTile } from "../components/ui/InsightTile";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { HStack, VStack } from "../components/ui/Stack";
 import { useTelemetry } from "../context/TelemetryContext";
+import { useLapRecordingList } from "../hooks/useLapRecordings";
 import { useSessionList } from "../hooks/useSessionList";
 import {
   buildRaceAnalysisBuckets,
@@ -64,14 +59,8 @@ import {
   hasLocationBreakdownEvents,
 } from "../analysis/eventLocationBreakdown";
 import { buildTrackRivalBenchmark } from "../analysis/rivalStats";
-import { CHART_THEME, SECTOR_COLORS, TOOLTIP_STYLE } from "../constants/colors";
 import { getSessionFormulaScopeKey } from "../utils/formulaScope";
-import {
-  formatDate,
-  formatSessionType,
-  msToLapTime,
-  msToSectorTime,
-} from "../utils/format";
+import { formatDate, formatSessionType, msToLapTime } from "../utils/format";
 import { getRaceControlEvents } from "../utils/raceControl";
 import {
   getTrackDisplayName,
@@ -83,9 +72,15 @@ import {
   isTrackSessionTab,
   sessionSummaryPath,
   trackPath,
+  trackTabForSessionType,
 } from "../utils/routes";
 import { TRACK_TAB_QUERY_PARAM } from "../constants/routes";
 import { aggregateCompoundLife } from "../utils/stats/trackAggregates";
+import {
+  PEAK_PACE_LABEL,
+  PEAK_PACE_TOOLTIP,
+  PEAK_PACE_WINDOW,
+} from "../utils/stats/peakPace";
 import { buildPaceEvolution } from "../utils/stats/trackPaceEvolution";
 import { buildTrackRaceRecommendation } from "../analysis/trackRaceRecommendation";
 import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
@@ -102,21 +97,12 @@ const TRACK_TAB_MOBILE_LABELS: Record<TrackSessionKind, string> = {
   "time-trial": "TT",
 };
 
-// Map each tab to the canonical session-type label the shared `getSessionTypeMeta`
-// helper understands. "Qualifying" pools Short Quali + One-Shot Quali, so we
-// resolve via "Short Quali" (the Timer icon) — the timer reads as the more
-// generic "this is a timed session" cue than the One-Shot's Target.
-const TRACK_TAB_META_LABEL: Record<TrackSessionKind, string> = {
-  qualifying: "Short Quali",
-  race: "Race",
-  "time-trial": "Time Trial",
-};
-
 export function TrackProgressPage() {
   const { trackId } = useParams<{ trackId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { sessions } = useSessionList();
+  const { recordings: lapRecordings } = useLapRecordingList();
   const {
     getSession,
     mode,
@@ -183,6 +169,24 @@ export function TrackProgressPage() {
   const playerTrackSessionKey = playerTrackSessions
     .map((s) => s.slug)
     .join("|");
+
+  // A friend's imported laps can be all that is recorded at a circuit.
+  const recordedLapTabs = useMemo(
+    () => [
+      ...new Set(
+        lapRecordings
+          .filter(
+            // The section opens on eligible bests only.
+            (recording) =>
+              recording.drivers.some((driver) => driver.best) &&
+              isTrackSlugMatch(recording.track, trackId) &&
+              recordingFormulaKey(recording) === activeFormulaKey,
+          )
+          .map((recording) => trackTabForSessionType(recording.sessionType)),
+      ),
+    ],
+    [activeFormulaKey, lapRecordings, trackId],
+  );
 
   // Keep the exporter value for metadata lookup; presentation uses the curated name.
   const trackSourceName =
@@ -404,6 +408,35 @@ export function TrackProgressPage() {
       );
     }
 
+    if (activeFormulaKey && recordedLapTabs.length > 0) {
+      const lapTab = recordedLapTabs.includes(activeTab)
+        ? activeTab
+        : recordedLapTabs[0];
+      return (
+        <div className="p-6 max-w-5xl mx-auto space-y-6">
+          <div>
+            <h2 className="text-xl font-bold mb-1">
+              <TrackFlag track={trackSourceName} className="mr-2" />
+              {displayTrackName}
+            </h2>
+            <p className="text-sm text-zinc-500">
+              {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
+              No sessions of yours here yet, only recorded laps
+            </p>
+          </div>
+          <LapTelemetrySection
+            key={lapTab}
+            scope={{
+              kind: "track",
+              track: trackSourceName,
+              formulaKey: activeFormulaKey,
+              sessionKind: lapTab,
+            }}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center justify-center h-full">
         <ActionEmptyState
@@ -467,32 +500,17 @@ export function TrackProgressPage() {
   const qualiData = trackAnalysis.qualifying.sessions;
   const raceData = trackAnalysis.raceData;
   const timeTrialData = trackAnalysis.timeTrial.sessions;
-  const theoreticalBestS1 = trackAnalysis.qualifying.theoreticalS1;
-  const theoreticalBestMs = trackAnalysis.qualifying.theoreticalBestMs;
   const actualBestQualiMs = trackAnalysis.qualifying.bestLapMs;
-  const latestQuali = trackAnalysis.qualifying.latest;
   const qualifyingInsights = trackAnalysis.qualifyingInsights;
   const bestQualiSession = trackAnalysis.qualifying.bestSession;
   const bestQualiSetup = trackAnalysis.qualifying.bestSetup;
-  const theoreticalTimeTrialS1 = trackAnalysis.timeTrial.theoreticalS1;
   const theoreticalTimeTrialMs = trackAnalysis.timeTrial.theoreticalBestMs;
   const bestTimeTrialMs = trackAnalysis.timeTrial.bestLapMs;
   const timeTrialGapMs = trackAnalysis.timeTrial.gapToTheoreticalMs;
-  const latestTimeTrial = trackAnalysis.timeTrial.latest;
   const bestTimeTrialSession = trackAnalysis.timeTrial.bestSession;
   const bestTimeTrialSetup = trackAnalysis.timeTrial.bestSetup;
-  const lapTrend = trackAnalysis.qualifying.lapTrend;
-  const sectorTrend = trackAnalysis.qualifying.sectorTrend;
-  const consistencyTrend = trackAnalysis.qualifying.consistencyTrend;
-  const timeTrialLapTrend = trackAnalysis.timeTrial.lapTrend;
-  const timeTrialSectorTrend = trackAnalysis.timeTrial.sectorTrend;
-  const timeTrialConsistencyTrend = trackAnalysis.timeTrial.consistencyTrend;
-  const sectorCards = trackAnalysis.qualifying.sectorCards;
-  const timeTrialSectorCards = trackAnalysis.timeTrial.sectorCards;
-  const qualifyingScatter = trackAnalysis.qualifying.scatter;
-  const timeTrialScatter = trackAnalysis.timeTrial.scatter;
 
-  // Race-on-race peak three-lap pace per compound — feeds 3-Lap Pace Evolution
+  // Race-on-race peak pace per compound — feeds Peak Pace Evolution
   // chart. Uses bucket-scoped sessions so a 5-lap repro doesn't get plotted
   // against a 30-lap race in the same line. The set identity match is by
   // TelemetrySession reference, which is stable across renders here.
@@ -503,8 +521,6 @@ export function TrackProgressPage() {
       .map((d) => ({ session: d.session, date: d.summary.date })),
   );
 
-  const tooltipStyle = TOOLTIP_STYLE;
-
   const availableTabs = trackAnalysis.availableTabs;
   const selectedTab = availableTabs.includes(activeTab)
     ? activeTab
@@ -513,7 +529,7 @@ export function TrackProgressPage() {
     value,
     label: TRACK_TAB_LABELS[value],
     mobileLabel: TRACK_TAB_MOBILE_LABELS[value],
-    icon: getSessionTypeMeta(TRACK_TAB_META_LABEL[value]).icon,
+    icon: TRACK_KIND_META[value].icon,
   }));
   const handleRaceLengthChange = (raceLaps: string) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -524,8 +540,25 @@ export function TrackProgressPage() {
     setActiveTab(tab);
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set(TRACK_TAB_QUERY_PARAM, tab);
+    // A lap selection belongs to one tab's session kind.
+    nextParams.delete(LAPS_QUERY_PARAM);
     setSearchParams(nextParams);
   };
+
+  // Qualifying and Time Trial put it right under Key Insights: the tiles say
+  // how far off a lap is, the recorded laps say where. Race places it after
+  // Strategy. Renders nothing without recordings.
+  const lapTelemetry = activeFormulaKey ? (
+    <LapTelemetrySection
+      key={selectedTab}
+      scope={{
+        kind: "track",
+        track: trackSourceName,
+        formulaKey: activeFormulaKey,
+        sessionKind: selectedTab,
+      }}
+    />
+  ) : null;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -589,292 +622,12 @@ export function TrackProgressPage() {
             <TrackQualifyingInsights insights={qualifyingInsights} />
           )}
 
-          {/* Best lap over time */}
-          {lapTrend.length > 1 && (
-            <section className={cardClass}>
-              <SectionHeader title="Best Lap Over Time" />
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart
-                  data={lapTrend}
-                  margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={CHART_THEME.grid}
-                  />
-                  <XAxis
-                    dataKey="day"
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                  />
-                  <YAxis
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                    tickFormatter={(v) => msToLapTime(v * 1000)}
-                    domain={["auto", "auto"]}
-                  />
-                  <Tooltip
-                    {...tooltipStyle}
-                    formatter={(value: number | undefined) => [
-                      value ? msToLapTime(value * 1000) : "–",
-                      "Best Lap",
-                    ]}
-                    labelFormatter={(v) => {
-                      const entry = lapTrend.find((d) => d.day === v);
-                      return entry?.fullDate ?? String(v);
-                    }}
-                  />
-                  {theoreticalBestMs > 0 && (
-                    <ReferenceLine
-                      y={theoreticalBestMs / 1000}
-                      stroke={CHART_THEME.ahead}
-                      strokeDasharray="6 4"
-                      strokeWidth={1.5}
-                      label={{
-                        value: "Theoretical",
-                        fill: CHART_THEME.ahead,
-                        fontSize: 10,
-                        position: "right",
-                      }}
-                    />
-                  )}
-                  <Line
-                    type="monotone"
-                    dataKey="bestLap"
-                    stroke={CHART_THEME.best}
-                    strokeWidth={2}
-                    dot={{ fill: CHART_THEME.best, r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </section>
-          )}
+          {lapTelemetry}
 
-          {/* Sector Gap Cards */}
-          {latestQuali && theoreticalBestS1 > 0 && (
-            <div className="grid grid-cols-3 gap-3">
-              {sectorCards.map((s) => (
-                <SectorBestTile
-                  key={s.label}
-                  label={`${s.label} — All-Time Best`}
-                  bestMs={s.bestMs}
-                  latestMs={s.latestMs}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Sector improvement */}
-          {sectorTrend.length > 1 && (
-            <section className={cardClass}>
-              <SectionHeader title="Sector Improvement" />
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart
-                  data={sectorTrend}
-                  margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={CHART_THEME.grid}
-                  />
-                  <XAxis
-                    dataKey="idx"
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                  />
-                  <YAxis
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                    tickFormatter={(v) => `${v.toFixed(1)}s`}
-                    domain={["auto", "auto"]}
-                  />
-                  <Tooltip
-                    {...tooltipStyle}
-                    formatter={(
-                      value: number | undefined,
-                      name: string | undefined,
-                    ) => [`${value?.toFixed(3) ?? "–"}s`, name ?? ""]}
-                    labelFormatter={(v) => `Session ${v}`}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="S1"
-                    stroke={SECTOR_COLORS.S1}
-                    strokeWidth={2}
-                    dot={{ fill: SECTOR_COLORS.S1, r: 3 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="S2"
-                    stroke={SECTOR_COLORS.S2}
-                    strokeWidth={2}
-                    dot={{ fill: SECTOR_COLORS.S2, r: 3 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="S3"
-                    stroke={SECTOR_COLORS.S3}
-                    strokeWidth={2}
-                    dot={{ fill: SECTOR_COLORS.S3, r: 3 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </section>
-          )}
-
-          {/* All qualifying lap times scatter */}
-          {qualifyingScatter.allPoints.length >= 2 && (
-            <section className={cardClass}>
-              <SectionHeader title="All Qualifying Lap Times" />
-              <ResponsiveContainer width="100%" height={260}>
-                <ScatterChart
-                  margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={CHART_THEME.grid}
-                  />
-                  <XAxis
-                    dataKey="idx"
-                    type="number"
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                    domain={[0.5, qualiData.length + 0.5]}
-                    ticks={Array.from(
-                      { length: qualiData.length },
-                      (_, i) => i + 1,
-                    )}
-                    label={{
-                      value: "Session",
-                      position: "insideBottom",
-                      offset: -2,
-                      fill: CHART_THEME.axis,
-                      fontSize: 11,
-                    }}
-                  />
-                  <YAxis
-                    dataKey="timeSec"
-                    type="number"
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                    tickFormatter={(v) => msToLapTime(v * 1000)}
-                    domain={["auto", "auto"]}
-                  />
-                  <ZAxis range={[60, 60]} />
-                  <Tooltip
-                    {...tooltipStyle}
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const point = payload[0]?.payload as
-                        | { timeSec: number; label: string }
-                        | undefined;
-                      if (!point) return null;
-                      return (
-                        <div
-                          style={{
-                            ...tooltipStyle.contentStyle,
-                            padding: "8px 12px",
-                            color: "#e4e4e7",
-                          }}
-                        >
-                          <div
-                            style={{
-                              color: "#a1a1aa",
-                              marginBottom: 4,
-                              fontSize: 11,
-                            }}
-                          >
-                            {point.label}
-                          </div>
-                          <div style={{ fontFamily: "monospace" }}>
-                            {msToLapTime(point.timeSec * 1000)}
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Scatter
-                    data={qualifyingScatter.invalidPoints}
-                    fill={CHART_THEME.behind}
-                    fillOpacity={0.4}
-                    shape="circle"
-                  />
-                  <Scatter
-                    data={qualifyingScatter.validPoints}
-                    fill={CHART_THEME.player}
-                    fillOpacity={0.6}
-                    shape="circle"
-                  />
-                  <Scatter
-                    data={qualifyingScatter.bestPoints}
-                    fill={CHART_THEME.best}
-                    fillOpacity={1}
-                    shape="circle"
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
-              <div className="flex gap-4 mt-2 text-xs text-zinc-500">
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400" />
-                  Valid lap
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500/50" />
-                  Invalid lap
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded-full bg-purple-400" />
-                  Best per session
-                </span>
-              </div>
-            </section>
-          )}
-
-          {/* Consistency trend */}
-          {consistencyTrend.length > 1 && (
-            <section className={cardClass}>
-              <SectionHeader title="Consistency Trend" />
-              <ResponsiveContainer width="100%" height={180}>
-                <LineChart
-                  data={consistencyTrend}
-                  margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={CHART_THEME.grid}
-                  />
-                  <XAxis
-                    dataKey="idx"
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                  />
-                  <YAxis
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                    tickFormatter={(v) => `${v.toFixed(1)}s`}
-                  />
-                  <Tooltip
-                    {...tooltipStyle}
-                    formatter={(value: number | undefined) => [
-                      `${value?.toFixed(3) ?? "–"}s`,
-                      "Std Dev",
-                    ]}
-                    labelFormatter={(v) => {
-                      const entry = consistencyTrend.find((d) => d.idx === v);
-                      return entry?.label ?? `Session ${v}`;
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="stdDev"
-                    stroke="#a78bfa"
-                    strokeWidth={2}
-                    dot={{ fill: "#a78bfa", r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </section>
-          )}
+          <TrackPaceTrends
+            pace={trackAnalysis.qualifying}
+            sectorTitle="All-Time Best"
+          />
 
           {/* Best qualifying setup */}
           {bestQualiSetup && bestQualiSession && (
@@ -942,289 +695,12 @@ export function TrackProgressPage() {
             </InsightTile>
           </div>
 
-          {timeTrialLapTrend.length > 1 && (
-            <section className={cardClass}>
-              <SectionHeader title="Best TT Lap Over Time" />
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart
-                  data={timeTrialLapTrend}
-                  margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={CHART_THEME.grid}
-                  />
-                  <XAxis
-                    dataKey="day"
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                  />
-                  <YAxis
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                    tickFormatter={(v) => msToLapTime(v * 1000)}
-                    domain={["auto", "auto"]}
-                  />
-                  <Tooltip
-                    {...tooltipStyle}
-                    formatter={(value: number | undefined) => [
-                      value ? msToLapTime(value * 1000) : "–",
-                      "Best Lap",
-                    ]}
-                    labelFormatter={(v) => {
-                      const entry = timeTrialLapTrend.find((d) => d.day === v);
-                      return entry?.fullDate ?? String(v);
-                    }}
-                  />
-                  {theoreticalTimeTrialMs > 0 && (
-                    <ReferenceLine
-                      y={theoreticalTimeTrialMs / 1000}
-                      stroke={CHART_THEME.ahead}
-                      strokeDasharray="6 4"
-                      strokeWidth={1.5}
-                      label={{
-                        value: "Theoretical",
-                        fill: CHART_THEME.ahead,
-                        fontSize: 10,
-                        position: "right",
-                      }}
-                    />
-                  )}
-                  <Line
-                    type="monotone"
-                    dataKey="bestLap"
-                    stroke={CHART_THEME.best}
-                    strokeWidth={2}
-                    dot={{ fill: CHART_THEME.best, r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </section>
-          )}
+          {lapTelemetry}
 
-          {latestTimeTrial && theoreticalTimeTrialS1 > 0 && (
-            <div className="grid grid-cols-3 gap-3">
-              {timeTrialSectorCards.map((s) => (
-                <SectorBestTile
-                  key={s.label}
-                  label={`${s.label} — TT Best`}
-                  bestMs={s.bestMs}
-                  latestMs={s.latestMs}
-                />
-              ))}
-            </div>
-          )}
-
-          {timeTrialSectorTrend.length > 1 && (
-            <section className={cardClass}>
-              <SectionHeader title="TT Sector Improvement" />
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart
-                  data={timeTrialSectorTrend}
-                  margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={CHART_THEME.grid}
-                  />
-                  <XAxis
-                    dataKey="idx"
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                  />
-                  <YAxis
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                    tickFormatter={(v) => `${v.toFixed(1)}s`}
-                    domain={["auto", "auto"]}
-                  />
-                  <Tooltip
-                    {...tooltipStyle}
-                    formatter={(
-                      value: number | undefined,
-                      name: string | undefined,
-                    ) => [`${value?.toFixed(3) ?? "–"}s`, name ?? ""]}
-                    labelFormatter={(v) => `Attempt ${v}`}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="S1"
-                    stroke={SECTOR_COLORS.S1}
-                    strokeWidth={2}
-                    dot={{ fill: SECTOR_COLORS.S1, r: 3 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="S2"
-                    stroke={SECTOR_COLORS.S2}
-                    strokeWidth={2}
-                    dot={{ fill: SECTOR_COLORS.S2, r: 3 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="S3"
-                    stroke={SECTOR_COLORS.S3}
-                    strokeWidth={2}
-                    dot={{ fill: SECTOR_COLORS.S3, r: 3 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </section>
-          )}
-
-          {timeTrialScatter.allPoints.length >= 2 && (
-            <section className={cardClass}>
-              <SectionHeader title="All Time Trial Lap Times" />
-              <ResponsiveContainer width="100%" height={260}>
-                <ScatterChart
-                  margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={CHART_THEME.grid}
-                  />
-                  <XAxis
-                    dataKey="idx"
-                    type="number"
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                    domain={[0.5, timeTrialData.length + 0.5]}
-                    ticks={Array.from(
-                      { length: timeTrialData.length },
-                      (_, i) => i + 1,
-                    )}
-                    label={{
-                      value: "Attempt",
-                      position: "insideBottom",
-                      offset: -2,
-                      fill: CHART_THEME.axis,
-                      fontSize: 11,
-                    }}
-                  />
-                  <YAxis
-                    dataKey="timeSec"
-                    type="number"
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                    tickFormatter={(v) => msToLapTime(v * 1000)}
-                    domain={["auto", "auto"]}
-                  />
-                  <ZAxis range={[60, 60]} />
-                  <Tooltip
-                    {...tooltipStyle}
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const point = payload[0]?.payload as
-                        | { timeSec: number; label: string }
-                        | undefined;
-                      if (!point) return null;
-                      return (
-                        <div
-                          style={{
-                            ...tooltipStyle.contentStyle,
-                            padding: "8px 12px",
-                            color: "#e4e4e7",
-                          }}
-                        >
-                          <div
-                            style={{
-                              color: "#a1a1aa",
-                              marginBottom: 4,
-                              fontSize: 11,
-                            }}
-                          >
-                            {point.label}
-                          </div>
-                          <div style={{ fontFamily: "monospace" }}>
-                            {msToLapTime(point.timeSec * 1000)}
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Scatter
-                    data={timeTrialScatter.invalidPoints}
-                    fill={CHART_THEME.behind}
-                    fillOpacity={0.4}
-                    shape="circle"
-                  />
-                  <Scatter
-                    data={timeTrialScatter.validPoints}
-                    fill={CHART_THEME.player}
-                    fillOpacity={0.6}
-                    shape="circle"
-                  />
-                  <Scatter
-                    data={timeTrialScatter.bestPoints}
-                    fill={CHART_THEME.best}
-                    fillOpacity={1}
-                    shape="circle"
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
-              <div className="flex gap-4 mt-2 text-xs text-zinc-500">
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400" />
-                  Valid lap
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500/50" />
-                  Invalid lap
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded-full bg-purple-400" />
-                  Best per attempt
-                </span>
-              </div>
-            </section>
-          )}
-
-          {timeTrialConsistencyTrend.length > 1 && (
-            <section className={cardClass}>
-              <SectionHeader title="TT Consistency Trend" />
-              <ResponsiveContainer width="100%" height={180}>
-                <LineChart
-                  data={timeTrialConsistencyTrend}
-                  margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={CHART_THEME.grid}
-                  />
-                  <XAxis
-                    dataKey="idx"
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                  />
-                  <YAxis
-                    stroke={CHART_THEME.axis}
-                    fontSize={11}
-                    tickFormatter={(v) => `${v.toFixed(1)}s`}
-                  />
-                  <Tooltip
-                    {...tooltipStyle}
-                    formatter={(value: number | undefined) => [
-                      `${value?.toFixed(3) ?? "–"}s`,
-                      "Std Dev",
-                    ]}
-                    labelFormatter={(v) => {
-                      const entry = timeTrialConsistencyTrend.find(
-                        (d) => d.idx === v,
-                      );
-                      return entry?.label ?? `Attempt ${v}`;
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="stdDev"
-                    stroke="#a78bfa"
-                    strokeWidth={2}
-                    dot={{ fill: "#a78bfa", r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </section>
-          )}
+          <TrackPaceTrends
+            pace={trackAnalysis.timeTrial}
+            sectorTitle="TT Best"
+          />
 
           {bestTimeTrialSetup && bestTimeTrialSession && (
             <section className={cardClass}>
@@ -1258,7 +734,7 @@ export function TrackProgressPage() {
         selectedTab === "race" &&
         (() => {
           // Shared recommendation drives Key Insights AND the Strategy section
-          // below Compound Tyre Life. Both reuse the same wear/pace synthesis so
+          // below Tyre Life. Both reuse the same wear/pace synthesis so
           // there's a single source of truth per race-length bucket.
           const recommendation = buildTrackRaceRecommendation(
             selectedRaceSessions,
@@ -1289,7 +765,7 @@ export function TrackProgressPage() {
 
               {/* Key Insights — synthesizes the rest of the tab into "what should
                 I actually do here?". Reacts to the same race-length selector that
-                drives the Compound Tyre Life cards below. */}
+                drives the Tyre Life cards below. */}
               {recommendation && (
                 <TrackKeyInsights
                   recommendation={recommendation}
@@ -1298,10 +774,24 @@ export function TrackProgressPage() {
                 />
               )}
 
-              {/* Compound tyre life cards */}
+              {/* Tyre life cards. The hero is a stint length (laps to the
+                puncture threshold), not a race lap: the Strategy section owns
+                pit laps. Practice races are mostly partial, so the bar shows
+                how far real driving went before the projection takes over. */}
               {selectedCompoundLifeStats.length > 0 && (
                 <div>
-                  <SectionHeader title="Compound Tyre Life" />
+                  <SectionHeader
+                    title="Tyre Life"
+                    hint={`${
+                      selectedRaceAnalysisBucket
+                        ? `${selectedRaceAnalysisBucket.totalLaps}-lap races · `
+                        : ""
+                    }${selectedTyreLifeStintCount} stint${
+                      selectedTyreLifeStintCount !== 1 ? "s" : ""
+                    } across ${selectedTyreLifeRaceCount} race${
+                      selectedTyreLifeRaceCount !== 1 ? "s" : ""
+                    }`}
+                  />
                   <div
                     className="grid gap-2"
                     style={{
@@ -1312,10 +802,19 @@ export function TrackProgressPage() {
                       <CompoundStatCard
                         key={cs.compound}
                         compound={cs.compound}
+                        subtitle={`${cs.stintCount} stint${cs.stintCount !== 1 ? "s" : ""}`}
                         hero={{
-                          value: `~${cs.estMaxLife}`,
-                          label: "pit by lap",
+                          value: `~${cs.estMaxLife} laps`,
+                          label: `to ${PUNCTURE_THRESHOLD}% wear`,
                         }}
+                        belowHero={
+                          <TyreLifeEvidenceBar
+                            compound={cs.compound}
+                            seenLaps={cs.longestStint}
+                            seenWear={cs.longestStintEndWear}
+                            estLife={cs.estMaxLife}
+                          />
+                        }
                         rows={[
                           ...(cs.bestLapMs > 0
                             ? [
@@ -1323,32 +822,40 @@ export function TrackProgressPage() {
                                   label: "Best lap",
                                   value: msToLapTime(cs.bestLapMs),
                                   className: "font-mono text-best",
+                                  divider: true,
+                                },
+                              ]
+                            : []),
+                          ...(cs.peakPaceMs > 0
+                            ? [
+                                {
+                                  label: PEAK_PACE_LABEL,
+                                  note: `${cs.peakPaceLapCount} laps`,
+                                  tooltip: PEAK_PACE_TOOLTIP,
+                                  value: msToLapTime(cs.peakPaceMs),
+                                  divider: cs.bestLapMs <= 0,
                                 },
                               ]
                             : []),
                           {
-                            label: "Avg worst/lap",
+                            label: "Wear",
                             value: `${cs.avgWearRatePerLap.toFixed(1)}%/lap`,
-                            divider: cs.bestLapMs > 0,
+                            divider: true,
                           },
                           {
-                            label: "Stints",
-                            value: `${cs.avgStintLength}–${cs.longestStint} laps`,
+                            label: "Avg stint",
+                            value: `${cs.avgStintLength} laps`,
                           },
                         ]}
                       />
                     ))}
                   </div>
                   <p className="text-xs text-zinc-600 mt-1.5">
-                    Pit lap estimated at {PUNCTURE_THRESHOLD}% worst-wheel wear
-                    (puncture risk threshold), based on{" "}
-                    {selectedTyreLifeStintCount} stint
-                    {selectedTyreLifeStintCount !== 1 ? "s" : ""} across{" "}
-                    {selectedTyreLifeRaceCount}{" "}
-                    {selectedRaceLengthLabel
-                      ? `${selectedRaceLengthLabel} `
-                      : ""}
-                    race{selectedTyreLifeRaceCount !== 1 ? "s" : ""}.
+                    Solid = longest stint on that compound and the worst-wheel
+                    wear it reached; stripes = projection to the{" "}
+                    {PUNCTURE_THRESHOLD}% puncture risk threshold along your
+                    stints&apos; wear curves. {PEAK_PACE_LABEL} is the mean of
+                    your fastest {PEAK_PACE_WINDOW} clean laps.
                   </p>
                 </div>
               )}
@@ -1365,6 +872,10 @@ export function TrackProgressPage() {
                   raceLengthLabel={selectedRaceLengthLabel}
                 />
               )}
+
+              {/* The race plan above is what this tab is opened for, so the
+                recorded laps follow it instead of splitting it up. */}
+              {lapTelemetry}
 
               {/* Peak three-lap pace evolution, race-on-race by compound. */}
               {paceEvolutionData.length > 1 && (
@@ -1431,47 +942,5 @@ export function TrackProgressPage() {
         spectatorSessions={spectatorHistory}
       />
     </div>
-  );
-}
-
-/**
- * "All-Time Best Sector" / "TT Best Sector" tile. Uses the shared `InsightTile`
- * shell so these cards live in the same visual family as the dashboard and
- * Race-tab key-insight grids — accent-tinted surface, mono uppercase eyebrow,
- * and an accent-colored hero number. Per the design rule, only the number
- * itself is tinted; the "Latest" line and delta stay neutral/semantic.
- */
-function SectorBestTile({
-  label,
-  bestMs,
-  latestMs,
-}: {
-  label: string;
-  bestMs: number;
-  latestMs: number;
-}) {
-  const deltaMs = latestMs > 0 && bestMs > 0 ? latestMs - bestMs : 0;
-  return (
-    <InsightTile title={label} icon={Timer} accent="purple">
-      <InsightValue size="md" tone="text-best">
-        {bestMs > 0 ? msToSectorTime(bestMs) : "–"}
-      </InsightValue>
-      {latestMs > 0 && (
-        <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
-          <span className="text-zinc-500">Latest: </span>
-          <span className="font-mono text-zinc-300">
-            {msToSectorTime(latestMs)}
-          </span>
-          {deltaMs > 0 && (
-            <span className="font-mono text-warning ml-1">
-              +{(deltaMs / 1000).toFixed(3)}
-            </span>
-          )}
-          {deltaMs === 0 && bestMs > 0 && (
-            <span className="font-mono text-ahead ml-1">PB</span>
-          )}
-        </InsightDetail>
-      )}
-    </InsightTile>
   );
 }

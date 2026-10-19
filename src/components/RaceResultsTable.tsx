@@ -6,6 +6,7 @@ import {
   buildRaceResultHighlights,
   formatRaceGap,
   formatRaceStrategy,
+  listRacePaceCompounds,
   raceDriverStatsForEntry,
   resolveRaceResultDriverIndex,
   sortRaceStintHistoryRows,
@@ -15,20 +16,19 @@ import {
 } from "../analysis/resultsAnalysis";
 import type { SessionSpeedAnalysis } from "../analysis/speedAnalysis";
 import type { RaceControlEvent, TelemetrySession } from "../types/telemetry";
-import { getTeamColor, getTeamName } from "../utils/colors";
+import { getCompoundColor, getTeamColor, getTeamName } from "../utils/colors";
 import { msToLapTime } from "../utils/format";
 import {
   ERS_HARVEST_UTILIZATION_TOOLTIP,
   RACE_PACE_TOOLTIP,
 } from "../utils/stats/insightTypes";
-import { usePlayerOnly } from "../hooks/usePlayerOnly";
 import { cn } from "../utils/cn";
 import { AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import { Badge } from "./ui/Badge";
-import { FocusToggle } from "./ui/FocusToggle";
 import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
+import { SegmentedControl } from "./ui/SegmentedControl";
 import {
   tableCellClass,
   tableClass,
@@ -82,17 +82,40 @@ function SortIcon({
   );
 }
 
-function racePaceEvidenceLabel(stats: RaceDriverStats | undefined): string {
+const ALL_COMPOUNDS = "all";
+
+function racePaceEvidenceLabel(
+  stats: RaceDriverStats | undefined,
+  compound: string | null,
+): string {
   const sampleCount = stats?.racePaceLapCount ?? 0;
   const laps = `${sampleCount} ${sampleCount === 1 ? "lap" : "laps"}`;
 
   if (!stats || stats.racePace <= 0) {
-    return sampleCount > 0 ? `${laps} · need 3` : "0 clean laps";
+    if (sampleCount > 0) return `${laps} · need 3`;
+    return compound ? `no ${compound} laps` : "0 clean laps";
   }
   if (!stats.racePaceRankEligible) {
     return `${laps} · need ${stats.racePaceRankingSampleThreshold}`;
   }
   return `${laps} · ${stats.racePaceConfidence}`;
+}
+
+/** Compound dot after a header, matching the selector's swatch, so a
+ *  compound-scoped column says so without widening the header. */
+function CompoundScope({ compound }: { compound: string | null }) {
+  if (!compound) return null;
+  return (
+    <>
+      <span
+        aria-hidden
+        title={`On ${compound} laps only`}
+        className="ml-1 inline-block size-2 rounded-full align-middle"
+        style={{ backgroundColor: getCompoundColor(compound) }}
+      />
+      <span className="sr-only"> on {compound}</span>
+    </>
+  );
 }
 
 function SessionPeakValue({
@@ -124,18 +147,38 @@ export function RaceResultsTable({
   focusedDriverIndex,
   raceControlEvents = [],
 }: RaceResultsTableProps) {
-  const [focusedOnly, toggleFocusedOnly] = usePlayerOnly();
   const [sortKey, setSortKey] = useState<RaceResultSortKey>("pos");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
+  const [compoundChoice, setCompoundChoice] = useState<string>(ALL_COMPOUNDS);
   const stintHistory = session["tyre-stint-history-v2"];
   const drivers = session["classification-data"];
 
   const focusedDriver = drivers.find((d) => d.index === focusedDriverIndex);
   const focusedName = focusedDriver?.["driver-name"];
 
+  // Mixed strategies make whole-race pace compare different tyres; picking a
+  // compound recomputes Best Lap and Race Pace on that compound's laps only.
+  // One compound in the whole race means there is nothing to filter.
+  const raceCompounds = useMemo(
+    () => listRacePaceCompounds(session),
+    [session],
+  );
+  const compound = raceCompounds.includes(compoundChoice)
+    ? compoundChoice
+    : null;
+  const compoundOptions = [
+    { value: ALL_COMPOUNDS, label: "All" },
+    ...raceCompounds.map((value) => ({
+      value,
+      label: value,
+      mobileLabel: value.slice(0, 1),
+      swatch: getCompoundColor(value),
+    })),
+  ];
+
   const driverStats = useMemo(
-    () => buildRaceDriverStats(session, speedAnalysis),
-    [session, speedAnalysis],
+    () => buildRaceDriverStats(session, speedAnalysis, compound),
+    [session, speedAnalysis, compound],
   );
   const penaltiesByDriver = useMemo(
     () => buildPenaltiesByDriver(raceControlEvents),
@@ -146,24 +189,12 @@ export function RaceResultsTable({
     if (!stintHistory?.length) return [];
     return sortRaceStintHistoryRows({
       entries: stintHistory,
-      focusedOnly,
-      focusedName,
-      focusedDriverIndex,
       sortKey,
       sortDir,
       drivers,
       driverStats,
     });
-  }, [
-    driverStats,
-    drivers,
-    focusedDriverIndex,
-    focusedName,
-    focusedOnly,
-    sortDir,
-    sortKey,
-    stintHistory,
-  ]);
+  }, [driverStats, drivers, sortDir, sortKey, stintHistory]);
 
   function toggleSort(key: RaceResultSortKey) {
     if (sortKey === key) {
@@ -215,7 +246,15 @@ export function RaceResultsTable({
           size="sm"
           title="Classification"
           action={
-            <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
+            raceCompounds.length > 1 ? (
+              <SegmentedControl
+                ariaLabel="Pace compound"
+                options={compoundOptions}
+                value={compound ?? ALL_COMPOUNDS}
+                onChange={setCompoundChoice}
+                size="sm"
+              />
+            ) : undefined
           }
         />
         <ScrollArea axis="x">
@@ -250,7 +289,10 @@ export function RaceResultsTable({
                     sortDir={sortDir}
                     side="left"
                   />
-                  Best Lap
+                  <span className="whitespace-nowrap">
+                    Best Lap
+                    <CompoundScope compound={compound} />
+                  </span>
                 </th>
                 <th
                   className={thClass("right")}
@@ -264,7 +306,10 @@ export function RaceResultsTable({
                         sortDir={sortDir}
                         side="left"
                       />
-                      Race Pace
+                      <span className="whitespace-nowrap">
+                        Race Pace
+                        <CompoundScope compound={compound} />
+                      </span>
                     </span>
                   </Tooltip>
                 </th>
@@ -453,7 +498,7 @@ export function RaceResultsTable({
                     >
                       <div>{racePace > 0 ? msToLapTime(racePace) : "–"}</div>
                       <div className="mt-0.5 whitespace-nowrap font-sans text-2xs font-normal text-zinc-500">
-                        {racePaceEvidenceLabel(stats)}
+                        {racePaceEvidenceLabel(stats, compound)}
                       </div>
                     </td>
                     <td
@@ -535,8 +580,6 @@ export function RaceResultsTable({
   // Fallback: use classification-data with final-classification
   const fallbackSorted = buildFallbackRaceRows({
     drivers,
-    focusedOnly,
-    focusedDriverIndex,
     sortKey,
     sortDir,
     driverStats,
@@ -544,13 +587,7 @@ export function RaceResultsTable({
 
   return (
     <div>
-      <SectionHeader
-        size="sm"
-        title="Classification"
-        action={
-          <FocusToggle value={focusedOnly} onChange={toggleFocusedOnly} />
-        }
-      />
+      <SectionHeader size="sm" title="Classification" />
       <ScrollArea axis="x">
         <table className={tableClass}>
           <thead className={tableHeadClass}>

@@ -1,6 +1,5 @@
 import type { DriverData } from "../../types/telemetry";
 import { sectorTimeMs } from "../format";
-import { median } from "./core";
 import { getRacePaceLapSamples, type RacePaceLapSample } from "./laps";
 import { getRacePaceRankingSampleThreshold } from "./racePace";
 
@@ -14,8 +13,17 @@ export interface CompoundMatchedPaceComparison {
   firstSampleCount: number;
   secondSampleCount: number;
   compounds: string[];
-  /** Same-pool first-minus-second medians for S1, S2, and S3. */
+  /** Same-pool first-minus-second means for S1, S2, and S3. */
   sectorDeltasMs: [number, number, number];
+}
+
+function meanMs(
+  samples: readonly RacePaceLapSample[],
+  value: (sample: RacePaceLapSample) => number,
+): number {
+  return (
+    samples.reduce((sum, sample) => sum + value(sample), 0) / samples.length
+  );
 }
 
 function racePaceSamplesByCompound(
@@ -52,7 +60,7 @@ export function compareCompoundMatchedRacePace(
 
     // Matching one hot lap would only disguise a best-lap comparison. Three
     // clean laps per driver is the smallest useful stint-level pace sample;
-    // the relative floor also prevents a 10-lap median masquerading as a
+    // the relative floor also prevents a 10-lap mean masquerading as a
     // balanced comparison against only three laps.
     const sharedEvidence = Math.min(firstSamples.length, secondSamples.length);
     const requiredEvidence = getRacePaceRankingSampleThreshold(
@@ -65,23 +73,19 @@ export function compareCompoundMatchedRacePace(
       continue;
     }
 
-    const firstMedian = median(firstSamples.map((sample) => sample.timeMs));
-    const secondMedian = median(secondSamples.map((sample) => sample.timeMs));
-    if (firstMedian == null || secondMedian == null) continue;
-
-    weightedDeltaMs += (firstMedian - secondMedian) * sharedEvidence;
+    // Means, like Race Pace: the per-compound delta then equals the gap the
+    // Classification table shows with that compound selected, and the three
+    // sector deltas sum to the lap delta. Outliers are already removed by
+    // `getRacePaceLapSamples`, which is what a median would otherwise buy.
+    weightedDeltaMs +=
+      (meanMs(firstSamples, (sample) => sample.timeMs) -
+        meanMs(secondSamples, (sample) => sample.timeMs)) *
+      sharedEvidence;
     for (const sector of [1, 2, 3] as const) {
-      const firstSectorMedian = median(
-        firstSamples.map((sample) => sectorTimeMs(sample.lap, sector)),
-      );
-      const secondSectorMedian = median(
-        secondSamples.map((sample) => sectorTimeMs(sample.lap, sector)),
-      );
-      // Race-pace samples are structurally complete, so all three medians are
-      // present; keeping the guard makes this helper robust to future sources.
-      if (firstSectorMedian == null || secondSectorMedian == null) continue;
       weightedSectorDeltasMs[sector - 1] +=
-        (firstSectorMedian - secondSectorMedian) * sharedEvidence;
+        (meanMs(firstSamples, (sample) => sectorTimeMs(sample.lap, sector)) -
+          meanMs(secondSamples, (sample) => sectorTimeMs(sample.lap, sector))) *
+        sharedEvidence;
     }
     totalWeight += sharedEvidence;
     firstSampleCount += firstSamples.length;

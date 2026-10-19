@@ -1,29 +1,20 @@
 import type { TelemetrySession } from "../../types/telemetry";
 import { findPlayer } from "./drivers";
-import { getRacePaceLapSamples } from "./laps";
+import { getRacePaceLapSamples, type RacePaceLapSample } from "./laps";
+import { calculatePeakPace } from "./peakPace";
 
 // ────────────────────────────────────────────────────────────────────────────
-// 3-Lap Pace Evolution — race-on-race peak pace per compound at one track.
+// Peak Pace Evolution — race-on-race peak pace per compound at one track.
 //
-// Why three-fastest-lap pace (not median, not best lap):
-//   • A median across a whole stint is biased against long stints — tyre
-//     degradation in the tail drags the number down, so a 5-lap stint looks
-//     faster than a 25-lap stint even when the long stint's peak laps are
-//     actually quicker. Unfair race-to-race comparison.
-//   • A single best lap is too sensitive to slipstream and one-off flyers.
-//   • Averaging the FASTEST N race-pace laps filters single-lap noise while
-//     retaining peak multi-lap pace on that compound.
-//
-// This intentionally measures pace potential, not overall Race Pace. Longer
-// runs have more opportunities to supply a fast window, which is why the UI
-// names the three-lap method explicitly rather than presenting it as the
-// canonical all-clean-lap average.
+// Each point is `calculatePeakPace` over that race's race-pace laps on the
+// compound; `peakPace.ts` owns the definition and the reasons behind it.
+// Longer runs have more chances to supply a fast window, which is why the UI
+// names the method and carries lap counts instead of presenting it as the
+// canonical all-clean-lap Race Pace.
 //
 // Pit/SC/incident outliers are already filtered by `getRacePaceLapSamples`.
 // `minLapsPerCompound` gates noisy single-lap samples (default 3).
 // ────────────────────────────────────────────────────────────────────────────
-
-const REPRESENTATIVE_PACE_WINDOW = 3;
 
 /**
  * Race context. Distinguishes "clean air" runs from "full grid" runs because
@@ -85,9 +76,9 @@ export interface PaceEvolutionPoint {
   /** Session context (clean air / traffic / online vs offline). */
   context: RaceContext;
   /**
-   * Compound → average of the fastest N race-pace laps on that compound (ms),
-   * where N = REPRESENTATIVE_PACE_WINDOW (3). Only compounds with at least
-   * `minLapsPerCompound` race-pace laps are present.
+   * Compound → peak pace on that compound (ms): `calculatePeakPace` over the
+   * race's eligible laps. Only compounds with at least `minLapsPerCompound`
+   * race-pace laps are present.
    */
   paces: Record<string, number>;
   /** Compound → total race-pace lap count for that compound this session. */
@@ -103,23 +94,21 @@ export function buildPaceEvolution(
       const player = findPlayer(session);
       if (!player) return null;
       const samples = getRacePaceLapSamples(player);
-      const groups = new Map<string, number[]>();
+      const groups = new Map<string, RacePaceLapSample[]>();
       for (const s of samples) {
         if (!s.compound) continue;
         const arr = groups.get(s.compound) ?? [];
-        arr.push(s.timeMs);
+        arr.push(s);
         groups.set(s.compound, arr);
       }
       const paces: Record<string, number> = {};
       const counts: Record<string, number> = {};
-      for (const [compound, times] of groups) {
-        if (times.length < minLapsPerCompound) continue;
-        // Mean of the fastest N — see header comment for rationale.
-        const sorted = [...times].sort((a, b) => a - b);
-        const window = sorted.slice(0, REPRESENTATIVE_PACE_WINDOW);
-        const sum = window.reduce((a, b) => a + b, 0);
-        paces[compound] = sum / window.length;
-        counts[compound] = times.length;
+      for (const [compound, compoundSamples] of groups) {
+        if (compoundSamples.length < minLapsPerCompound) continue;
+        const peak = calculatePeakPace(compoundSamples);
+        if (!peak) continue;
+        paces[compound] = peak.timeMs;
+        counts[compound] = peak.sampleCount;
       }
       // Skip sessions that yielded no qualifying compound — keeps the X axis
       // honest about how many sessions actually contribute a data point.

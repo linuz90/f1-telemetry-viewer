@@ -10,9 +10,16 @@ interface ModalProps {
   children: ReactNode;
   // Sizing/extra classes applied to the inner panel.
   className?: string;
+  /** Id of the element that names the dialog, usually its heading. */
+  labelledBy?: string;
 }
 
-export function Modal({ onClose, children, className }: ModalProps) {
+export function Modal({
+  onClose,
+  children,
+  className,
+  labelledBy,
+}: ModalProps) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -29,11 +36,15 @@ export function Modal({ onClose, children, className }: ModalProps) {
 
   useEffect(() => {
     if (!onClose) return;
+    // Capture phase plus preventDefault claims the key before page-level Esc
+    // handlers (Lap Telemetry's zoom reset) see it.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      handleClose();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose, handleClose]);
 
   return (
@@ -45,6 +56,9 @@ export function Modal({ onClose, children, className }: ModalProps) {
       onClick={handleClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={labelledBy}
         onClick={(e) => e.stopPropagation()}
         className={cn(
           "relative flex w-full flex-col rounded-3xl bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950 shadow-2xl ring-1 ring-white/[0.06] transition-all duration-[180ms] ease-out",

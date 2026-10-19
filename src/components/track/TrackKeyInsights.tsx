@@ -13,6 +13,8 @@ import type {
   TrackFuelTarget,
   TrackRaceRecommendation,
 } from "../../analysis/trackStrategyTypes";
+import { Tooltip } from "../Tooltip";
+import { Badge } from "../ui/Badge";
 import { CompoundBadge } from "../ui/CompoundBadge";
 import { highlightDetailValues } from "../ui/HighlightedDetailText";
 import { InsightDetail, InsightValue } from "../ui/InsightText";
@@ -157,51 +159,58 @@ function RaceVsQualiTile({ deltaMs }: { deltaMs: number }) {
 }
 
 function FuelTargetTile({ target }: { target: TrackFuelTarget }) {
-  // Recommended delta is "carry +X laps worth of fuel beyond the bare minimum".
-  // Negative = you should carry less; ~0 = on target. The amber tile accent
-  // already conveys the "fuel" category — keep the number itself neutral so it
-  // reads as data, not a verdict.
+  // Hero is the game's fuel-slider value: laps carried beyond the bare minimum
+  // at lights out. The amber accent already says "fuel", so the number stays
+  // neutral data rather than a verdict. Sample sizes and the P75 burn sit
+  // behind the confidence badge to keep this tile as compact as its siblings.
   const delta = target.recommendedDeltaLaps;
 
-  // Clean-race excess: how many laps of fuel you'd typically finish with if
-  // every lap burned at the pooled green-flag rate (i.e. no SC tailwind).
-  // Negative means the slider value you used would only get you home thanks
-  // to safety-car saves — bad advice for next race.
+  // Clean-race excess: laps of fuel past starts would have finished with had
+  // every lap burned at the pooled green-flag rate. Negative means those loads
+  // only got home thanks to safety-car saves. Near zero says nothing the hero
+  // doesn't, so it only earns a line when it's off.
   const excess = target.excessAtFinishLaps;
-  let note: string | null = null;
-  if (Math.abs(excess) >= 0.4) {
-    note =
-      excess > 0
-        ? `~${excess.toFixed(1)} laps spare in a clean race`
-        : `~${Math.abs(excess).toFixed(1)} laps short in a clean race`;
-  } else {
-    note = "on target for a clean race";
-  }
+  const pastNote =
+    Math.abs(excess) >= 0.4
+      ? `past starts ~${Math.abs(excess).toFixed(1)} laps ${excess > 0 ? "heavy" : "short"}`
+      : null;
+
+  const { confidence, completedRaceCount } = target;
+  const finished = completedRaceCount === 0 ? "none" : completedRaceCount;
+  const evidence = [
+    `Based on ${pluralize(target.eligibleAttemptCount, "race")} here (${finished} finished) and ${pluralize(target.consecutiveGreenPairCount, "green-flag lap")}.`,
+    `Burn is the 75th percentile, ${formatKgPerLap(target.burnRateKgPerLap)}, so push laps are covered.`,
+    confidence !== "high" && "Finish more races here to raise confidence.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <InsightTile title="Fuel Plan" icon={Fuel} accent="amber">
+    <InsightTile
+      title="Fuel Plan"
+      icon={Fuel}
+      accent="amber"
+      badge={
+        <Tooltip text={evidence}>
+          <Badge tone="zinc">
+            {confidence[0]!.toUpperCase()}
+            {confidence.slice(1)} confidence
+          </Badge>
+        </Tooltip>
+      }
+    >
       <InsightValue>
         {delta >= 0 ? "+" : ""}
         {delta.toFixed(1)} laps
       </InsightValue>
-      <InsightDetail className="mt-1.5">recommended initial fuel</InsightDetail>
-      <InsightDetail size="sm" tone="text-zinc-500" className="mt-2">
+      <InsightDetail className="mt-1.5">
         {highlightDetailValues(
-          `≈ ${formatFuelKg(target.recommendedFuelKg)} total · ${formatKgPerLap(target.burnRateKgPerLap)} P75 burn`,
+          `start fuel · ${formatFuelKg(target.recommendedFuelKg)}`,
         )}
       </InsightDetail>
-      <InsightDetail size="sm" tone="text-zinc-400" className="mt-1">
-        {highlightDetailValues(
-          joinMetaParts([
-            `${target.confidence[0]!.toUpperCase()}${target.confidence.slice(1)} confidence`,
-            `${target.completedRaceCount} of ${target.eligibleAttemptCount} attempts completed`,
-            pluralize(target.consecutiveGreenPairCount, "green pair"),
-          ]),
-        )}
-      </InsightDetail>
-      {note && (
+      {pastNote && (
         <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
-          {highlightDetailValues(note)}
+          {highlightDetailValues(pastNote)}
         </InsightDetail>
       )}
     </InsightTile>

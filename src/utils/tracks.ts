@@ -1,3 +1,4 @@
+import { TRACK_GEOMETRY } from "../constants/trackGeometry";
 import {
   ADDITIONAL_TRACK_IDS,
   F1_25_TRACK_CALENDAR_IDS,
@@ -125,6 +126,36 @@ export function getTrackCountryCode(track: string): string | null {
 /** Get the SVG layout key for a track, reusing the base layout for variants. */
 export function getTrackLayoutKey(track: string): string | null {
   return resolveTrack(track).definition?.layoutKey ?? null;
+}
+
+export interface TrackCorner {
+  /** Official turn number. */
+  number: number;
+  /** Lap distance of the turn's marker, metres. */
+  distanceM: number;
+}
+
+/**
+ * Official turns of a layout in lap order, placed on the game's own track
+ * length. Empty for layouts without markers (short, reverse, Madring).
+ */
+export function getTrackCorners(
+  track: string,
+  trackLengthM: number,
+): TrackCorner[] {
+  const fractions = TRACK_GEOMETRY[getTrackId(track)]?.turns ?? [];
+  return fractions.map((fraction, i) => ({
+    number: i + 1,
+    distanceM: fraction * trackLengthM,
+  }));
+}
+
+/**
+ * A real reference lap of a layout as x0, y0, x1, y1…, from the timing line
+ * in driving order, or null where none is published. See `TrackGeometry`.
+ */
+export function getTrackPath(track: string): readonly number[] | null {
+  return TRACK_GEOMETRY[getTrackId(track)]?.path ?? null;
 }
 
 export function isSameTrack(a: string, b: string): boolean {

@@ -13,8 +13,10 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { SessionPage } from "./pages/SessionPage";
 import { TrackProgressPage } from "./pages/TrackProgressPage";
 import { TelemetryProvider, useTelemetry } from "./context/TelemetryContext";
+import { LapImportsProvider } from "./context/LapImportsContext";
 import { ZipUploadScreen } from "./components/ZipUploadScreen";
 import { GlobalDropZone } from "./components/GlobalDropZone";
+import { LapImportDialog } from "./components/lap-telemetry/LapImportDialog";
 import { PNG_VERSION_TITLE_PREFIX } from "./config/branding";
 import { dashboardPath, replaceFormulaScopeInPath } from "./utils/routes";
 
@@ -89,6 +91,7 @@ function AppRoutes() {
         <ZipUploadScreen dismissable={!needsData} />
       )}
       <GlobalDropZone />
+      <LapImportDialog />
     </>
   );
 }
@@ -201,8 +204,10 @@ if (appVersion) {
 export function App() {
   return (
     <TelemetryProvider>
-      <AppRoutes />
-      {analyticsEnabled && <Analytics />}
+      <LapImportsProvider>
+        <AppRoutes />
+        {analyticsEnabled && <Analytics />}
+      </LapImportsProvider>
     </TelemetryProvider>
   );
 }

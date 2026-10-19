@@ -64,7 +64,7 @@ export function filterOutlierLaps(laps: LapHistoryEntry[]): LapHistoryEntry[] {
  * The last lap of each stint (except the final one) is the pit-in lap,
  * and the first lap of the next stint is the pit-out lap.
  */
-function getPitLapNumbers(d: DriverData): Set<number> {
+export function getPitLapNumbers(d: DriverData): Set<number> {
   const stints = getDriverStints(d);
   const pitLaps = new Set<number>();
   for (let i = 0; i < stints.length - 1; i++) {

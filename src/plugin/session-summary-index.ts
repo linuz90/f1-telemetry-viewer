@@ -11,7 +11,7 @@ import {
 import {
   absolutePathFor,
   collectCandidateStats,
-  discoverJsonFiles,
+  discoverTelemetryFiles,
   isPathInsideOrEqual,
   isSafeRelativePath,
   openIndexedFile,
@@ -143,10 +143,11 @@ function finalizeEntries(
         entry.built?.valid === true,
     )
     .map((entry) => {
-      // duplicateCount belongs to the current corpus-wide dedupe pass, never to
-      // a persisted per-file summary.
+      // duplicateCount/duplicateSlugs belong to the current corpus-wide dedupe
+      // pass, never to a persisted per-file summary.
       const summary = { ...entry.built.summary };
       delete summary.duplicateCount;
+      delete summary.duplicateSlugs;
       return summary;
     })
     .sort((a, b) => {
@@ -362,7 +363,7 @@ export function createSessionSummaryIndex(
 
     let discovered: string[];
     try {
-      discovered = await discoverJsonFiles(telemetryRoot);
+      discovered = await discoverTelemetryFiles(telemetryRoot);
     } catch {
       if (!finalized) throw new Error("Unable to scan the telemetry directory");
       const stats: SessionIndexRefreshStats = {

@@ -295,7 +295,6 @@ test("race pace stays visible but cannot rank without relative evidence", () => 
     assert.equal(
       sortRaceStintHistoryRows({
         entries,
-        focusedOnly: false,
         sortKey: "racePace",
         sortDir,
         drivers: [fullRace, shortRace],
@@ -371,7 +370,6 @@ test("race result speed stats use indexed profiles and rank peak and trap indepe
       { name: "wrong legacy name", index: rival.index, position: 2 },
       { name: " pílot one ", position: 1 },
     ] as TyreStintHistoryV2Entry[],
-    focusedOnly: false,
     sortKey: "speedTrap",
     sortDir: "asc",
     drivers: [player, rival, tiedTrapDriver],
@@ -385,7 +383,6 @@ test("race result speed stats use indexed profiles and rank peak and trap indepe
       { name: "Rival", position: 2 },
       { name: "Pílot One", position: 1 },
     ] as TyreStintHistoryV2Entry[],
-    focusedOnly: false,
     sortKey: "sessionPeak",
     sortDir: "asc",
     drivers: [player, rival, tiedTrapDriver, limitedPeakDriver],
@@ -395,8 +392,6 @@ test("race result speed stats use indexed profiles and rank peak and trap indepe
 
   const fallbackPeaks = buildFallbackRaceRows({
     drivers: [limitedPeakDriver, rival, player],
-    focusedOnly: false,
-    focusedDriverIndex: player.index,
     sortKey: "sessionPeak",
     sortDir: "asc",
     driverStats: stats,

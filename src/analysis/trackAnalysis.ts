@@ -28,7 +28,9 @@ import {
   bestSectorTimeMs,
   formatDate,
   formatSessionType,
+  formatShortDate,
   formatTime,
+  joinMetaParts,
 } from "../utils/format";
 import {
   buildTrackQualifyingInsights,
@@ -88,42 +90,44 @@ export interface RaceAnalysisBucket {
   raceCount: number;
 }
 
-export interface LapTrendPoint {
-  day: string;
-  bestLap: number;
-  fullDate: string;
+/** One timed lap on the lap-times chart, at its session's column. */
+export interface LapTimePoint {
+  idx: number;
+  timeSec: number;
 }
 
-export interface SectorTrendPoint {
+/** One session column of the lap-times chart, oldest first. */
+export interface SessionLapTimes {
+  /** 1-based column, shared with the session's laps. */
   idx: number;
-  S1: number;
-  S2: number;
-  S3: number;
-}
-
-export interface ConsistencyTrendPoint {
-  idx: number;
-  stdDev: number;
+  /** Axis tick: the day on that day's first session, its clock time after. */
+  tick: string;
+  /** Tooltip heading, e.g. "Short Quali · Sat, 17 Oct 2026 · 11:28". */
   label: string;
+  /** Null without a complete valid lap, so the best-lap line skips it. */
+  bestLapSec: number | null;
+  validLapCount: number;
+  invalidLapCount: number;
+  /** Standard deviation of the valid laps; null below two of them. */
+  stdDevSec: number | null;
+}
+
+/**
+ * Every timed lap plus each session's best and spread, so one chart answers
+ * what separate best-lap, all-laps and consistency charts used to.
+ */
+export interface LapTimesBySession {
+  sessions: SessionLapTimes[];
+  validLaps: LapTimePoint[];
+  invalidLaps: LapTimePoint[];
 }
 
 export interface SectorCardModel {
   label: string;
   bestMs: number;
   latestMs: number;
-}
-
-export interface LapScatterPoint {
-  idx: number;
-  timeSec: number;
-  label: string;
-}
-
-export interface LapScatterSeries {
-  validPoints: LapScatterPoint[];
-  invalidPoints: LapScatterPoint[];
-  bestPoints: LapScatterPoint[];
-  allPoints: LapScatterPoint[];
+  /** Each session's best time in this sector, oldest first. */
+  trendMs: number[];
 }
 
 export interface TrackPaceAnalysis {
@@ -137,11 +141,8 @@ export interface TrackPaceAnalysis {
   latest: TrackSessionData | null;
   bestSession: TrackSessionData | null;
   bestSetup: CarSetup | null;
-  lapTrend: LapTrendPoint[];
-  sectorTrend: SectorTrendPoint[];
-  consistencyTrend: ConsistencyTrendPoint[];
+  lapTimes: LapTimesBySession;
   sectorCards: SectorCardModel[];
-  scatter: LapScatterSeries;
 }
 
 export interface TrackAnalysisData {
@@ -389,60 +390,6 @@ function minPositive(values: readonly number[]): number {
   return positive.length > 0 ? Math.min(...positive) : 0;
 }
 
-function buildLapTrend(sessions: readonly TrackSessionData[]): LapTrendPoint[] {
-  const byDay: Record<string, { bestLapMs: number; date: string }> = {};
-  for (const session of sessions) {
-    if (session.bestLapMs <= 0) continue;
-    const dayKey = session.summary.date.split("T")[0]!;
-    const previous = byDay[dayKey];
-    if (!previous || session.bestLapMs < previous.bestLapMs) {
-      byDay[dayKey] = {
-        bestLapMs: session.bestLapMs,
-        date: session.summary.date,
-      };
-    }
-  }
-
-  return Object.entries(byDay)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([dayKey, { bestLapMs, date }]) => ({
-      day: new Date(dayKey).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-      }),
-      bestLap: bestLapMs / 1000,
-      fullDate: formatDate(date),
-    }));
-}
-
-function buildSectorTrend(
-  sessions: readonly TrackSessionData[],
-): SectorTrendPoint[] {
-  return sessions
-    .filter((session) => session.bestS1 > 0)
-    .map((session, index) => ({
-      idx: index + 1,
-      S1: session.bestS1 / 1000,
-      S2: session.bestS2 / 1000,
-      S3: session.bestS3 / 1000,
-    }));
-}
-
-function buildConsistencyTrend(
-  sessions: readonly TrackSessionData[],
-): ConsistencyTrendPoint[] {
-  return sessions
-    .filter((session) => session.stdDevMs > 0)
-    .map((session, index) => ({
-      idx: index + 1,
-      stdDev: +(session.stdDevMs / 1000).toFixed(3),
-      label: `${formatSessionType(
-        session.summary.sessionType,
-        session.summary.formula,
-      )} · ${formatTime(session.summary.date)}`,
-    }));
-}
-
 function getValidSetupFromSession(
   session: TrackSessionData | null,
 ): CarSetup | null {
@@ -452,44 +399,54 @@ function getValidSetupFromSession(
   return setup?.["is-valid"] ? setup : null;
 }
 
-function buildLapScatterSeries(
+function buildLapTimesBySession(
   sessions: readonly TrackSessionData[],
-): LapScatterSeries {
-  const validPoints: LapScatterPoint[] = [];
-  const invalidPoints: LapScatterPoint[] = [];
-  const bestPoints: LapScatterPoint[] = [];
+): LapTimesBySession {
+  const validLaps: LapTimePoint[] = [];
+  const invalidLaps: LapTimePoint[] = [];
+  let previousDay = "";
 
-  sessions.forEach((session, index) => {
-    const sessionIndex = index + 1;
-    const sessionLabel = `${formatSessionType(
-      session.summary.sessionType,
-      session.summary.formula,
-    )} · ${formatTime(session.summary.date)}`;
-    const bestSec = session.bestLapMs > 0 ? session.bestLapMs / 1000 : null;
-
+  const columns = sessions.map((session, index): SessionLapTimes => {
+    const idx = index + 1;
+    const { date } = session.summary;
+    let validLapCount = 0;
     for (const lap of session.allLaps) {
-      const point = {
-        idx: sessionIndex,
-        timeSec: lap.timeSec,
-        label: `${sessionLabel} Lap ${lap.lapNum}`,
-      };
       if (lap.valid) {
-        validPoints.push(point);
-        if (bestSec !== null && Math.abs(lap.timeSec - bestSec) < 0.001) {
-          bestPoints.push(point);
-        }
+        validLapCount += 1;
+        validLaps.push({ idx, timeSec: lap.timeSec });
       } else {
-        invalidPoints.push(point);
+        invalidLaps.push({ idx, timeSec: lap.timeSec });
       }
     }
+    // Several sessions a day are common, so only a day's first column names
+    // the day; the rest show their clock time.
+    const day = new Date(date).toDateString();
+    const tick = day === previousDay ? formatTime(date) : formatShortDate(date);
+    previousDay = day;
+
+    return {
+      idx,
+      tick,
+      label: joinMetaParts([
+        formatSessionType(session.summary.sessionType, session.summary.formula),
+        formatDate(date),
+        formatTime(date),
+      ]),
+      bestLapSec: session.bestLapMs > 0 ? session.bestLapMs / 1000 : null,
+      validLapCount,
+      invalidLapCount: session.allLaps.length - validLapCount,
+      stdDevSec: session.stdDevMs > 0 ? session.stdDevMs / 1000 : null,
+    };
   });
 
-  return {
-    validPoints,
-    invalidPoints,
-    bestPoints,
-    allPoints: [...validPoints, ...invalidPoints],
-  };
+  return { sessions: columns, validLaps, invalidLaps };
+}
+
+function sectorTrendMs(
+  sessions: readonly TrackSessionData[],
+  sector: "bestS1" | "bestS2" | "bestS3",
+): number[] {
+  return sessions.map((session) => session[sector]).filter((ms) => ms > 0);
 }
 
 function buildPaceAnalysis(
@@ -525,27 +482,27 @@ function buildPaceAnalysis(
     latest,
     bestSession,
     bestSetup: getValidSetupFromSession(bestSession),
-    lapTrend: buildLapTrend(sessions),
-    sectorTrend: buildSectorTrend(sessions),
-    consistencyTrend: buildConsistencyTrend(sessions),
+    lapTimes: buildLapTimesBySession(sessions),
     sectorCards: [
       {
         label: "S1",
         bestMs: theoreticalS1,
         latestMs: latest?.bestS1 ?? 0,
+        trendMs: sectorTrendMs(sessions, "bestS1"),
       },
       {
         label: "S2",
         bestMs: theoreticalS2,
         latestMs: latest?.bestS2 ?? 0,
+        trendMs: sectorTrendMs(sessions, "bestS2"),
       },
       {
         label: "S3",
         bestMs: theoreticalS3,
         latestMs: latest?.bestS3 ?? 0,
+        trendMs: sectorTrendMs(sessions, "bestS3"),
       },
     ],
-    scatter: buildLapScatterSeries(sessions),
   };
 }
 
