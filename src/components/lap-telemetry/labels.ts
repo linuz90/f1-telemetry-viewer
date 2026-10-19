@@ -11,15 +11,25 @@ export function driverLabel(name: string, isPlayer: boolean): string {
   return isPlayer ? "You" : titleCaseName(name);
 }
 
-/** "Short Quali · 5 Oct 20:49", prefixed "Imported" for a browser import. */
+/**
+ * "Short Quali · 5 Oct 20:49". An import says where it came from: "Imported"
+ * on its owner's laps, "Marco's session" on the other cars of a friend's file.
+ */
 export function recordingLabel(
   recording: Pick<
     LapRecordingSummary,
-    "sessionType" | "formula" | "date" | "imported"
-  >,
+    "sessionType" | "formula" | "date" | "imported" | "friendIndex"
+  > & { drivers: readonly { index: number; name: string }[] },
+  driverIndex?: number,
 ): string {
   const label = `${formatSessionType(recording.sessionType, recording.formula)} · ${formatShortDate(recording.date)} ${formatTime(recording.date)}`;
-  return recording.imported ? `Imported · ${label}` : label;
+  if (!recording.imported) return label;
+  const friend = recording.drivers.find(
+    (driver) => driver.index === recording.friendIndex,
+  );
+  return friend && driverIndex !== undefined && driverIndex !== friend.index
+    ? `${titleCaseName(friend.name)}'s session · ${label}`
+    : `Imported · ${label}`;
 }
 
 /**

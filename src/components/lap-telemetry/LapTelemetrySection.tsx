@@ -356,7 +356,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
     [familyPool, sessionPool],
   );
   const presets = useMemo(
-    () => (selected[0] ? resolvePresets(selected[0].ref, presetPool) : []),
+    () => (selected[0] ? resolvePresets(selected[0], presetPool) : []),
     [selected, presetPool],
   );
 
@@ -380,7 +380,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
             : undefined,
           candidate.recording.slug === ownRecordingSlug
             ? undefined
-            : recordingLabel(candidate.recording),
+            : recordingLabel(candidate.recording, candidate.ref.driverIndex),
           `Lap ${candidate.ref.lapNumber}`,
           candidate.compound,
         ]
@@ -388,6 +388,10 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
           .join(" · "),
       })),
     [selected, presets, ownRecordingSlug],
+  );
+  const slotsByKey = useMemo(
+    () => new Map(slots.map((slot) => [slot.key, slot.slot])),
+    [slots],
   );
 
   const writeSelection = (next: readonly LapCandidate[]) => {
@@ -564,7 +568,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
       {pickerSlot !== null && family && (
         <LapPicker
           slotName={SLOT_NAMES[Math.min(pickerSlot, SLOT_NAMES.length - 1)]}
-          slotsByKey={new Map(slots.map((slot) => [slot.key, slot.slot]))}
+          slotsByKey={slotsByKey}
           trackName={trackName}
           kind={family.kind}
           sessionRecording={sessionRecording}
@@ -572,6 +576,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
           trackRecordings={trackRecordings}
           listedSessionSlugs={listedSessionSlugs}
           presets={pickerSlot > 0 ? presets : []}
+          current={selected[pickerSlot]}
           onPick={pickLap}
           onClose={() => setPickerSlot(null)}
         />

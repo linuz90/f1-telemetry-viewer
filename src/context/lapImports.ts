@@ -61,6 +61,7 @@ export function applyImportOwner(
     slug,
     sessionSlug: undefined,
     playerIndex: owner && owner.name === null ? owner.driverIndex : undefined,
+    friendIndex: friendName ? owner?.driverIndex : undefined,
     imported: true,
     drivers: raw.drivers.map((driver) =>
       friendName && driver.index === owner?.driverIndex

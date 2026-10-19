@@ -53,6 +53,46 @@ export function recordingPairKey(fileName: string): string {
     .toLowerCase();
 }
 
+/**
+ * A `_Manual_` save can be stamped a second or two after the recording it
+ * belongs to (`Race_Suzuka_..._10_34_13.pngt` beside
+ * `Race_Suzuka_Manual_..._10_34_14.json`).
+ */
+const PAIR_TOLERANCE_S = 2;
+
+function shiftPairKey(key: string, seconds: number): string | undefined {
+  const match = key.match(
+    /^(.*)_(\d{4})_(\d{2})_(\d{2})_(\d{2})_(\d{2})_(\d{2})$/,
+  );
+  if (!match) return undefined;
+  const [, prefix, y, mo, d, h, mi, s] = match;
+  // UTC arithmetic: only the wall-clock digits matter, rollovers included.
+  const date = new Date(
+    Date.UTC(+y, +mo - 1, +d, +h, +mi, +s) + seconds * 1000,
+  );
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${prefix}_${date.getUTCFullYear()}_${pad(date.getUTCMonth() + 1)}_${pad(date.getUTCDate())}_${pad(date.getUTCHours())}_${pad(date.getUTCMinutes())}_${pad(date.getUTCSeconds())}`;
+}
+
+/**
+ * The session key a recording pairs with: its own name, else the closest
+ * within `PAIR_TOLERANCE_S` that no other recording matches exactly.
+ */
+export function resolvePairKey(
+  recordingFileName: string,
+  hasSession: (key: string) => boolean,
+  recordingKeys: ReadonlySet<string>,
+): string | undefined {
+  const own = recordingPairKey(recordingFileName);
+  if (hasSession(own)) return own;
+  for (let s = 1; s <= PAIR_TOLERANCE_S; s += 1) {
+    for (const key of [shiftPairKey(own, s), shiftPairKey(own, -s)]) {
+      if (key && hasSession(key) && !recordingKeys.has(key)) return key;
+    }
+  }
+  return undefined;
+}
+
 function finitePositive(value: unknown): number | undefined {
   const number = typeof value === "string" ? Number(value) : value;
   return typeof number === "number" && Number.isFinite(number) && number > 0
@@ -495,6 +535,7 @@ export function summarizeLapRecording(
     trackLengthM: manifest.trackLengthM,
     playerIndex: manifest.playerIndex,
     imported: manifest.imported,
+    friendIndex: manifest.friendIndex,
     completeLapCount,
     drivers,
   };

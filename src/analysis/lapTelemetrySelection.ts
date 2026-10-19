@@ -88,6 +88,8 @@ export interface LapCandidate {
   driverName: string;
   team?: string;
   isPlayer: boolean;
+  /** Driven by the friend whose file was imported. */
+  isFriend: boolean;
   compound?: string;
   recording: LapRecordingSummary;
   /** Fit to stand as a "best": valid, no pit, not a race's standing start. */
@@ -95,6 +97,19 @@ export interface LapCandidate {
   valid: boolean;
   pitLap: boolean;
   standingStart: boolean;
+}
+
+/**
+ * Identifies a lap across recordings. A session saved twice (a Manual save,
+ * then Just_in_case) writes a second recording with the same laps, and
+ * comparing a lap with its own copy says nothing.
+ */
+export function lapIdentity(candidate: LapCandidate): string {
+  return `${candidate.recording.track}|${candidate.recording.sessionType}|${candidate.driverName}|${candidate.ref.lapNumber}|${candidate.lapTimeMs}`;
+}
+
+function isSameLap(a: LapCandidate, b: LapCandidate): boolean {
+  return sameLapRef(a.ref, b.ref) || lapIdentity(a) === lapIdentity(b);
 }
 
 /** Recordings in one comparison family: same circuit, formula scope and session kind. */
@@ -148,6 +163,7 @@ export function bestLapCandidates(
               driverName: driver.name,
               team: driver.team,
               isPlayer: driver.index === recording.playerIndex,
+              isFriend: driver.index === recording.friendIndex,
               compound: driver.best.compound,
               recording,
               eligible: true,
@@ -179,6 +195,7 @@ export function manifestCandidates(
         driverName: driver.name,
         team: driver.team,
         isPlayer: driver.index === manifest.playerIndex,
+        isFriend: driver.index === manifest.friendIndex,
         compound: lap.compound,
         recording,
         eligible: isEligibleBestLap(lap, manifest.sessionType),
@@ -218,7 +235,7 @@ export interface LapPreset {
   id: LapPresetId;
   label: string;
   candidate?: LapCandidate;
-  /** Why the preset is disabled, e.g. lap A already is that lap. */
+  /** Why the preset is disabled, short enough to sit beside its label. */
   reason?: string;
 }
 
@@ -227,7 +244,7 @@ export interface LapPreset {
  * disabled with the reason rather than quietly picking the next-best lap.
  */
 export function resolvePresets(
-  a: LapRef,
+  a: LapCandidate,
   pool: readonly LapCandidate[],
 ): LapPreset[] {
   const eligible = pool.filter((candidate) => candidate.eligible);
@@ -235,33 +252,28 @@ export function resolvePresets(
     id: LapPresetId,
     label: string,
     candidates: readonly LapCandidate[],
-    isA: string,
+    none: string,
   ): LapPreset => {
     const best = fastest(candidates);
-    if (!best) return { id, label, reason: "No complete lap qualifies" };
-    return sameLapRef(best.ref, a)
-      ? { id, label, reason: isA }
+    if (!best) return { id, label, reason: none };
+    return isSameLap(best, a)
+      ? { id, label, reason: "already lap A" }
       : { id, label, candidate: best };
   };
   return [
     resolve(
       "session-best",
       "Session best",
-      eligible.filter((c) => c.ref.recordingSlug === a.recordingSlug),
-      "Lap A is the session best",
+      eligible.filter((c) => c.ref.recordingSlug === a.ref.recordingSlug),
+      "none in lap A's session",
     ),
     resolve(
       "my-best",
       "My best here",
       eligible.filter((c) => c.isPlayer),
-      "Lap A is your best here",
+      "none of yours yet",
     ),
-    resolve(
-      "fastest-here",
-      "Fastest by anyone here",
-      eligible,
-      "Lap A is the fastest here",
-    ),
+    resolve("fastest-here", "Fastest by anyone here", eligible, "none yet"),
   ];
 }
 
@@ -340,7 +352,7 @@ export function defaultComparison(
       (c) =>
         c.standingStart &&
         c.ref.recordingSlug === a.ref.recordingSlug &&
-        !sameLapRef(c.ref, a.ref),
+        !isSameLap(c, a),
     );
     const start =
       fastest(
@@ -350,7 +362,7 @@ export function defaultComparison(
       fastest(starts);
     if (start) return start;
   }
-  const others = pool.filter((c) => c.eligible && !sameLapRef(c.ref, a.ref));
+  const others = pool.filter((c) => c.eligible && !isSameLap(c, a));
   if (options.rivalDriverIndex != null) {
     const rival = fastest(
       others.filter(

@@ -427,6 +427,7 @@ function candidate(
     lapTimeMs,
     driverName: `D${driverIndex}`,
     isPlayer: driverIndex === 21,
+    isFriend: false,
     recording: recording(slug),
     eligible: true,
     valid: true,
@@ -462,12 +463,18 @@ test("default laps: focused driver first, then the rival, else the quickest lap"
 test("the fastest lap compares with the player's best from another run", () => {
   const pool = [
     candidate("q-2049", 21, 1, 77_164),
+    // The same session saved again: an identical lap, not another run.
+    candidate("q-2049-resave", 21, 1, 77_164),
     candidate("q-2053", 21, 1, 77_268),
     candidate("q-2049", 3, 1, 77_666),
   ];
   const a = defaultLapA(pool, {})!;
   assert.equal(a.lapTimeMs, 77_164);
   assert.equal(defaultComparison(a, pool)?.lapTimeMs, 77_268);
+  assert.equal(
+    resolvePresets(pool[1], pool).find((p) => p.id === "my-best")?.reason,
+    "already lap A",
+  );
 });
 
 test("lap refs in the URL ignore junk and duplicates", () => {
@@ -551,15 +558,21 @@ test("a friend's imported laps carry their name and never count as yours", () =>
   assert.equal(friend.playerIndex, undefined);
   assert.equal(theirs.driverName, "Marco");
   assert.equal(theirs.isPlayer, false);
+  // Only the friend's car is theirs; the rest of the file is their session.
+  assert.equal(theirs.isFriend, true);
+  assert.equal(
+    bestLapCandidates([friend]).find((c) => c.ref.driverIndex === 10)?.isFriend,
+    false,
+  );
 
   // Faster than your lap, yet "My best here" stays yours.
   const race = ownSuzuka("race-suzuka", "Race", 91_577);
   const pool = bestLapCandidates([race, friend]);
-  const myBest = resolvePresets(pool[0].ref, pool).find(
+  const myBest = resolvePresets(pool[0], pool).find(
     (preset) => preset.id === "my-best",
   );
   assert.equal(myBest?.candidate, undefined);
-  assert.equal(myBest?.reason, "Lap A is your best here");
+  assert.equal(myBest?.reason, "already lap A");
 
   // Your same-kind best opens as A, even when a race lap is quicker.
   const quali = ownSuzuka(

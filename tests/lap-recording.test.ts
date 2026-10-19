@@ -12,6 +12,7 @@ import {
   openLapRecording,
   parseLapTrace,
   recordingPairKey,
+  resolvePairKey,
 } from "../src/utils/lapRecording/reader";
 import type {
   LapRecordingManifest,
@@ -165,6 +166,35 @@ test("a recording pairs with its Just_in_case session JSON", () => {
     sectorStartsM: [1757.05, 3178.6],
     weather: "Clear",
   });
+
+  // A Manual save stamped a second after its recording still pairs, across a
+  // minute rollover too, unless another recording owns that save outright.
+  const sessions = new Set([
+    recordingPairKey("Race_Suzuka_Manual_2026_10_17_10_34_14.json"),
+    recordingPairKey("Race_Suzuka_Manual_2026_10_18_10_41_00.json"),
+  ]);
+  const pair = (fileName: string, recordings: string[] = [fileName]) =>
+    resolvePairKey(
+      fileName,
+      (key) => sessions.has(key),
+      new Set(recordings.map(recordingPairKey)),
+    );
+  assert.equal(
+    pair("Race_Suzuka_2026_10_17_10_34_13.pngt"),
+    "race_suzuka_2026_10_17_10_34_14",
+  );
+  assert.equal(
+    pair("Race_Suzuka_2026_10_18_10_40_59.pngt"),
+    "race_suzuka_2026_10_18_10_41_00",
+  );
+  assert.equal(
+    pair("Race_Suzuka_2026_10_17_10_34_13.pngt", [
+      "Race_Suzuka_2026_10_17_10_34_13.pngt",
+      "Race_Suzuka_2026_10_17_10_34_14.pngt",
+    ]),
+    undefined,
+  );
+  assert.equal(pair("Race_Suzuka_2026_10_17_10_34_11.pngt"), undefined);
 });
 
 test("the API lists, describes and serves recorded laps from a telemetry folder", async (t) => {

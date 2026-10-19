@@ -89,6 +89,8 @@ export interface LapRecordingManifest {
   weather?: string;
   /** Imported into this browser (a friend's file), not read from the telemetry folder. */
   imported?: boolean;
+  /** The friend's car in an import; the other cars are the rest of their session. */
+  friendIndex?: number;
   drivers: RecordedDriver[];
 }
 
@@ -110,6 +112,7 @@ export interface LapRecordingSummary {
   trackLengthM: number;
   playerIndex?: number;
   imported?: boolean;
+  friendIndex?: number;
   completeLapCount: number;
   drivers: {
     index: number;
@@ -117,7 +120,7 @@ export interface LapRecordingSummary {
     team?: string;
     /** Fastest lap eligible as a "best" (complete, valid, no pit, no race lap 1). */
     best?: RecordedLapSummary;
-    /** A faster timed lap the recording did not capture whole, for honest pickers. */
+    /** A faster timed lap the recording did not capture whole, named when nothing is comparable. */
     fasterIncomplete?: RecordedLapSummary & { reason: string };
   }[];
 }

@@ -4,6 +4,7 @@ import {
   openLapArchive,
   openLapRecording,
   recordingPairKey,
+  resolvePairKey,
   summarizeLapRecording,
   type LapArchive,
 } from "../utils/lapRecording/reader.ts";
@@ -139,10 +140,17 @@ export function createLapRecordingIndex(options: {
       const key = recordingPairKey(basename(sessionPath));
       sessionsByKey.set(key, [...(sessionsByKey.get(key) ?? []), sessionPath]);
     }
+    const recordingKeys = new Set(
+      recordingPaths.map((path) => recordingPairKey(basename(path))),
+    );
     const pairedSessionPaths = new Map<string, string>();
     for (const recordingPath of recordingPaths) {
-      const candidates =
-        sessionsByKey.get(recordingPairKey(basename(recordingPath))) ?? [];
+      const key = resolvePairKey(
+        basename(recordingPath),
+        (candidate) => sessionsByKey.has(candidate),
+        recordingKeys,
+      );
+      const candidates = (key && sessionsByKey.get(key)) || [];
       const dayFolder = dirname(dirname(recordingPath));
       const match =
         candidates.find((path) => dirname(dirname(path)) === dayFolder) ??

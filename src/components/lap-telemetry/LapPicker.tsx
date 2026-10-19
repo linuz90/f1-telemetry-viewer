@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   bestLapCandidates,
+  lapIdentity,
   lapRefKey,
   manifestCandidates,
   type LapCandidate,
@@ -14,6 +15,7 @@ import type {
   LapRecordingSummary,
 } from "../../utils/lapRecording/types";
 import { trackTabForSessionType } from "../../utils/routes";
+import { TRACK_KIND_META } from "../sessionTypeMeta";
 import { Badge } from "../ui/Badge";
 import { Modal } from "../ui/Modal";
 import { SegmentedControl } from "../ui/SegmentedControl";
@@ -26,15 +28,16 @@ const KIND_LABELS: Record<TrackSessionKind, string> = {
   "time-trial": "Time Trial",
 };
 
+type Who = "everyone" | "mine" | "friends";
+
 interface PickerRow {
   key: string;
-  candidate?: LapCandidate;
+  candidate: LapCandidate;
   lapTimeMs: number;
   driver: string;
   team?: string;
   context: string;
   badges: string[];
-  reason?: string;
 }
 
 function RowButton({
@@ -48,15 +51,13 @@ function RowButton({
   fastest: boolean;
   onPick: (candidate: LapCandidate) => void;
 }) {
-  const disabled = !row.candidate;
   return (
     <button
       type="button"
-      disabled={disabled}
-      onClick={() => row.candidate && onPick(row.candidate)}
+      data-slot={slot}
+      onClick={() => onPick(row.candidate)}
       className={cn(
-        "grid w-full grid-cols-[1.5rem_5rem_1fr_auto] items-center gap-x-3 rounded-lg px-2.5 py-1.5 text-left transition-colors",
-        disabled ? "cursor-not-allowed opacity-45" : "hover:bg-zinc-800/60",
+        "grid w-full grid-cols-[1.5rem_5rem_1fr_auto] items-center gap-x-3 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-zinc-800/60",
         slot && "bg-zinc-800/50",
       )}
     >
@@ -77,20 +78,21 @@ function RowButton({
           style={{ backgroundColor: recordingTeamColor(row.team) }}
         />
         <span className="truncate text-sm text-zinc-200">{row.driver}</span>
+        {row.candidate.isFriend && (
+          <Badge tone="sky" size="xs" shape="square" className="shrink-0">
+            Friend
+          </Badge>
+        )}
         <span className="hidden truncate text-xs text-zinc-500 sm:inline">
           {row.context}
         </span>
       </span>
       <span className="flex items-center gap-1">
-        {row.reason ? (
-          <span className="text-2xs text-zinc-500">{row.reason}</span>
-        ) : (
-          row.badges.map((badge) => (
-            <Badge key={badge} tone="zinc" size="xs" shape="square">
-              {badge}
-            </Badge>
-          ))
-        )}
+        {row.badges.map((badge) => (
+          <Badge key={badge} tone="zinc" size="xs" shape="square">
+            {badge}
+          </Badge>
+        ))}
       </span>
     </button>
   );
@@ -115,6 +117,7 @@ export function LapPicker({
   trackRecordings,
   listedSessionSlugs,
   presets,
+  current,
   onPick,
   onClose,
 }: {
@@ -129,13 +132,22 @@ export function LapPicker({
   listedSessionSlugs: ReadonlySet<string>;
   /** One-click comparison laps, resolved against lap A. */
   presets: readonly LapPreset[];
+  /** The lap in the slot being changed; the picker opens where it lives. */
+  current?: LapCandidate;
   onPick: (candidate: LapCandidate) => void;
   onClose: () => void;
 }) {
+  const currentInSession =
+    !!current &&
+    !!sessionManifest &&
+    current.ref.recordingSlug === sessionManifest.slug;
   const [view, setView] = useState<"session" | "track">(
-    sessionManifest ? "session" : "track",
+    sessionManifest && (!current || currentInSession) ? "session" : "track",
   );
-  const [who, setWho] = useState<"mine" | "everyone">("everyone");
+  const [who, setWho] = useState<Who>(current?.isPlayer ? "mine" : "everyone");
+  const hasFriends = trackRecordings.some(
+    (recording) => recording.friendIndex !== undefined,
+  );
   const kinds = useMemo(
     () =>
       (Object.keys(KIND_LABELS) as TrackSessionKind[]).filter((option) =>
@@ -146,99 +158,118 @@ export function LapPicker({
       ),
     [trackRecordings],
   );
-  const [selectedKind, setSelectedKind] = useState<TrackSessionKind>(kind);
+  // A track tab can hold a lap of another kind, e.g. your race lap against a
+  // friend's qualifying lap, so the slot's own lap decides.
+  const [selectedKind, setSelectedKind] = useState<TrackSessionKind>(
+    current ? trackTabForSessionType(current.recording.sessionType) : kind,
+  );
   const sessionDrivers = useMemo(() => {
     if (!sessionManifest || !sessionRecording) return [];
     const candidates = manifestCandidates(sessionManifest, sessionRecording);
-    return sessionManifest.drivers
-      .map((driver) => {
-        const laps = candidates.filter(
-          (c) => c.ref.driverIndex === driver.index,
-        );
-        const best = laps
-          .filter((c) => c.eligible)
-          .sort((a, b) => a.lapTimeMs - b.lapTimeMs)[0];
-        return { driver, laps, best };
-      })
-      .filter((entry) => entry.driver.laps.some((lap) => lap.lapTimeMs))
-      .sort(
-        (a, b) =>
-          (a.best?.lapTimeMs ?? Infinity) - (b.best?.lapTimeMs ?? Infinity),
-      );
+    return (
+      sessionManifest.drivers
+        .map((driver) => {
+          const laps = candidates.filter(
+            (c) => c.ref.driverIndex === driver.index,
+          );
+          const best = laps
+            .filter((c) => c.eligible)
+            .sort((a, b) => a.lapTimeMs - b.lapTimeMs)[0];
+          return { driver, laps, best };
+        })
+        // Partial laps cannot be compared, so drivers without a whole lap go.
+        .filter((entry) => entry.laps.length > 0)
+        .sort(
+          (a, b) =>
+            (a.best?.lapTimeMs ?? Infinity) - (b.best?.lapTimeMs ?? Infinity),
+        )
+    );
   }, [sessionManifest, sessionRecording]);
   const [sessionDriver, setSessionDriver] = useState<number | undefined>(
     () =>
+      (currentInSession ? current?.ref.driverIndex : undefined) ??
       sessionDrivers.find(
         (entry) => entry.driver.index === sessionManifest?.playerIndex,
-      )?.driver.index ?? sessionDrivers[0]?.driver.index,
+      )?.driver.index ??
+      sessionDrivers[0]?.driver.index,
   );
 
-  const trackRows = useMemo(() => {
+  const trackRows = useMemo((): PickerRow[] => {
     const recordings = trackRecordings.filter(
       (recording) =>
         trackTabForSessionType(recording.sessionType) === selectedKind,
     );
-    const rows: PickerRow[] = [];
+    // The same session saved twice (a Manual save, then Just_in_case) holds
+    // identical laps: list each once, keeping the copy in a slot, else the
+    // one whose session is listed.
+    const byLap = new Map<
+      string,
+      PickerRow & { rank: number; restarted: boolean }
+    >();
+    // A kept re-save reads as the listed session it copies, not a restart.
+    const listedContext = new Map<string, string>();
     for (const candidate of bestLapCandidates(recordings)) {
       if (who === "mine" && !candidate.isPlayer) continue;
-      rows.push({
-        key: lapRefKey(candidate.ref),
+      if (who === "friends" && !candidate.isFriend) continue;
+      const key = lapRefKey(candidate.ref);
+      // Dedupe hides superseded restarts; their recordings stay pickable.
+      const restarted =
+        !!candidate.recording.sessionSlug &&
+        !listedSessionSlugs.has(candidate.recording.sessionSlug);
+      const row = {
+        key,
         candidate,
         lapTimeMs: candidate.lapTimeMs,
         driver: driverLabel(candidate.driverName, candidate.isPlayer),
         team: candidate.team,
-        // Dedupe hides superseded restarts; their recordings stay pickable.
-        context: `${recordingLabel(candidate.recording)}${
-          candidate.recording.sessionSlug &&
-          !listedSessionSlugs.has(candidate.recording.sessionSlug)
-            ? " · restarted run"
-            : ""
-        }`,
+        context: `${recordingLabel(candidate.recording, candidate.ref.driverIndex)}${restarted ? " · restarted run" : ""}`,
         badges: candidateBadges(candidate),
-      });
+        rank: slotsByKey.has(key) ? 0 : restarted ? 2 : 1,
+        restarted,
+      };
+      const lapId = lapIdentity(candidate);
+      if (!restarted) listedContext.set(lapId, row.context);
+      const kept = byLap.get(lapId);
+      if (!kept || row.rank < kept.rank) byLap.set(lapId, row);
     }
-    const partial: PickerRow[] = [];
-    for (const recording of recordings) {
-      for (const driver of recording.drivers) {
-        const isPlayer = driver.index === recording.playerIndex;
-        if (!driver.fasterIncomplete || (who === "mine" && !isPlayer)) continue;
-        partial.push({
-          key: lapRefKey({
-            recordingSlug: recording.slug,
-            driverIndex: driver.index,
-            lapNumber: driver.fasterIncomplete.lapNumber,
-          }),
-          lapTimeMs: driver.fasterIncomplete.lapTimeMs,
-          driver: driverLabel(driver.name, isPlayer),
-          team: driver.team,
-          context: recordingLabel(recording),
-          badges: [],
-          reason: driver.fasterIncomplete.reason,
-        });
-      }
-    }
-    rows.sort((a, b) => a.lapTimeMs - b.lapTimeMs);
-    partial.sort((a, b) => a.lapTimeMs - b.lapTimeMs);
-    return { rows, partial };
-  }, [listedSessionSlugs, selectedKind, trackRecordings, who]);
+    return [...byLap.entries()]
+      .map(([lapId, row]) => ({
+        ...row,
+        // Only a kept restart borrows the listed copy's label; a listed row
+        // keeps its own, or picking it would open a different copy's session.
+        context: row.restarted
+          ? (listedContext.get(lapId) ?? row.context)
+          : row.context,
+      }))
+      .sort((a, b) => a.lapTimeMs - b.lapTimeMs);
+  }, [listedSessionSlugs, selectedKind, slotsByKey, trackRecordings, who]);
 
   const activeDriver = sessionDrivers.find(
     (entry) => entry.driver.index === sessionDriver,
   );
   const sessionFastest = sessionDrivers[0]?.best?.lapTimeMs;
 
+  // Long lists open scrolled to the lap being replaced.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bodyRef.current
+      ?.querySelector(`[data-slot="${slotName}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [slotName]);
+
   return (
     <Modal onClose={onClose} className="max-h-[85vh] max-w-2xl overflow-hidden">
-      <div className="flex min-h-0 flex-col gap-3 p-5">
+      <div ref={bodyRef} className="flex min-h-0 flex-col gap-3 p-5">
         <div className="pr-8">
           <h3 className="text-lg font-semibold text-zinc-100">
             Choose lap {slotName}
           </h3>
           <p className="text-xs text-zinc-500">
-            Only laps recorded start to finish can be compared.
+            Only laps recorded start to finish are listed.
           </p>
         </div>
-        {presets.length > 0 && (
+        {/* A row of nothing but reasons says nothing the list does not. */}
+        {presets.some((preset) => preset.candidate) && (
           <div className="flex flex-wrap gap-1.5">
             {presets.map((preset) => {
               const current =
@@ -249,11 +280,10 @@ export function LapPicker({
                   key={preset.id}
                   type="button"
                   disabled={!preset.candidate}
-                  title={preset.reason}
                   onClick={() => preset.candidate && onPick(preset.candidate)}
                   aria-pressed={current}
                   className={cn(
-                    "flex items-baseline gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                    "flex items-baseline gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors disabled:cursor-default disabled:opacity-60",
                     current
                       ? "bg-zinc-700/70 ring-1 ring-inset ring-white/[0.08]"
                       : "bg-zinc-800/60 enabled:hover:bg-zinc-700/50",
@@ -262,17 +292,21 @@ export function LapPicker({
                   <span className="font-medium text-zinc-200">
                     {preset.label}
                   </span>
-                  {preset.candidate && (
-                    <span className="text-zinc-500">
-                      {driverLabel(
-                        preset.candidate.driverName,
-                        preset.candidate.isPlayer,
-                      )}{" "}
-                      <span className="font-mono tabular-nums">
-                        {msToLapTime(preset.candidate.lapTimeMs)}
-                      </span>
-                    </span>
-                  )}
+                  <span className="text-zinc-500">
+                    {preset.candidate ? (
+                      <>
+                        {driverLabel(
+                          preset.candidate.driverName,
+                          preset.candidate.isPlayer,
+                        )}{" "}
+                        <span className="font-mono tabular-nums">
+                          {msToLapTime(preset.candidate.lapTimeMs)}
+                        </span>
+                      </>
+                    ) : (
+                      preset.reason
+                    )}
+                  </span>
                 </button>
               );
             })}
@@ -300,6 +334,7 @@ export function LapPicker({
               options={kinds.map((option) => ({
                 value: option,
                 label: KIND_LABELS[option],
+                icon: TRACK_KIND_META[option].icon,
               }))}
             />
           )}
@@ -312,6 +347,9 @@ export function LapPicker({
               options={[
                 { value: "everyone", label: "Everyone" },
                 { value: "mine", label: "Mine" },
+                ...(hasFriends
+                  ? [{ value: "friends" as const, label: "Friends" }]
+                  : []),
               ]}
             />
           )}
@@ -359,55 +397,43 @@ export function LapPicker({
               ))}
             </ul>
             <div className="max-h-[22rem] space-y-0.5 overflow-y-auto sm:max-h-[50vh]">
-              {activeDriver?.driver.laps
-                .filter((lap) => lap.lapTimeMs)
-                .map((lap) => {
-                  const candidate = activeDriver.laps.find(
-                    (c) => c.ref.lapNumber === lap.lapNumber,
-                  );
-                  const key = lapRefKey({
-                    recordingSlug: sessionManifest.slug,
-                    driverIndex: activeDriver.driver.index,
-                    lapNumber: lap.lapNumber,
-                  });
-                  return (
-                    <RowButton
-                      key={key}
-                      slot={slotsByKey.get(key)}
-                      fastest={
-                        !!candidate?.eligible &&
-                        lap.lapTimeMs === sessionFastest
-                      }
-                      onPick={onPick}
-                      row={{
-                        key,
-                        candidate,
-                        lapTimeMs: lap.lapTimeMs!,
-                        driver: `Lap ${lap.lapNumber}`,
-                        team: activeDriver.driver.team,
-                        context: "",
-                        badges: candidate
-                          ? candidateBadges(candidate)
-                          : lap.compound
-                            ? [lap.compound]
-                            : [],
-                        reason: candidate
-                          ? undefined
-                          : (lap.incompleteReason ?? "partial trace"),
-                      }}
-                    />
-                  );
-                })}
+              {activeDriver?.laps.map((candidate) => {
+                const key = lapRefKey(candidate.ref);
+                return (
+                  <RowButton
+                    key={key}
+                    slot={slotsByKey.get(key)}
+                    fastest={
+                      candidate.eligible &&
+                      candidate.lapTimeMs === sessionFastest
+                    }
+                    onPick={onPick}
+                    row={{
+                      key,
+                      candidate,
+                      lapTimeMs: candidate.lapTimeMs,
+                      driver: `Lap ${candidate.ref.lapNumber}`,
+                      team: candidate.team,
+                      context: "",
+                      badges: candidateBadges(candidate),
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
         ) : (
           <div className="max-h-[55vh] space-y-0.5 overflow-y-auto">
-            {trackRows.rows.length === 0 && (
+            {trackRows.length === 0 && (
               <p className="px-2.5 py-4 text-sm text-zinc-500">
-                No complete laps recorded here yet.
+                {who === "mine"
+                  ? "No complete lap of yours here yet."
+                  : who === "friends"
+                    ? "No complete lap from a friend here yet."
+                    : "No complete laps recorded here yet."}
               </p>
             )}
-            {trackRows.rows.map((row, index) => (
+            {trackRows.map((row, index) => (
               <RowButton
                 key={row.key}
                 row={row}
@@ -416,21 +442,6 @@ export function LapPicker({
                 onPick={onPick}
               />
             ))}
-            {trackRows.partial.length > 0 && (
-              <>
-                <p className="px-2.5 pb-1 pt-3 font-mono text-2xs uppercase tracking-wider text-zinc-600">
-                  Recorded, but not the whole lap
-                </p>
-                {trackRows.partial.map((row) => (
-                  <RowButton
-                    key={row.key}
-                    row={row}
-                    fastest={false}
-                    onPick={onPick}
-                  />
-                ))}
-              </>
-            )}
           </div>
         )}
       </div>

@@ -6,6 +6,7 @@ import {
   buildRecordingPairing,
   openLapRecording,
   recordingPairKey,
+  resolvePairKey,
 } from "../utils/lapRecording/reader";
 import type { RecordingPairing } from "../utils/lapRecording/types";
 import { buildSessionSummary } from "../utils/sessionSummary";
@@ -45,11 +46,19 @@ export async function openLoadedRecordings(
   pairings: ReadonlyMap<string, RecordingPairing>,
 ): Promise<LapRecordingStore> {
   const store: LapRecordingStore = new Map();
+  const recordingKeys = new Set(
+    files.map((file) => recordingPairKey(file.fileName)),
+  );
   for (const file of files) {
     try {
+      const key = resolvePairKey(
+        file.fileName,
+        (candidate) => pairings.has(candidate),
+        recordingKeys,
+      );
       const recording = await openLapRecording(file.data, {
         fileName: file.fileName,
-        pairing: pairings.get(recordingPairKey(file.fileName)),
+        pairing: key ? pairings.get(key) : undefined,
       });
       store.set(recording.manifest.slug, recording);
     } catch {
