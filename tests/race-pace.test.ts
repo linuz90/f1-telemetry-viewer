@@ -9,6 +9,7 @@ import {
   hasSufficientRacePaceCompletion,
   isRacePaceRankEligible,
 } from "../src/utils/stats/racePace";
+import { calculatePeakPace } from "../src/utils/stats/peakPace";
 
 function sample(timeMs: number, lapNumber: number): RacePaceLapSample {
   return {
@@ -118,4 +119,19 @@ test("historical pace requires a classified finish near race distance", () => {
     false,
   );
   assert.equal(hasSufficientRacePaceCompletion(driverAt(10), 0), false);
+});
+
+test("peak pace is unavailable below the three-lap window", () => {
+  assert.equal(calculatePeakPace([]), null);
+  assert.equal(calculatePeakPace(samples(90_000, 90_200)), null);
+});
+
+test("peak pace averages the fastest three laps and reports the lap count", () => {
+  // One battery-dump flyer (88.2) only moves the window by a third of its gap.
+  const estimate = calculatePeakPace(
+    samples(90_400, 88_200, 90_000, 91_500, 90_100, 92_000),
+  );
+  assert.ok(estimate);
+  assert.equal(estimate.timeMs, (88_200 + 90_000 + 90_100) / 3);
+  assert.equal(estimate.sampleCount, 6);
 });

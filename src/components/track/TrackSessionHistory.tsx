@@ -1,15 +1,18 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type {
   TrackSessionData,
   TrackSessionKind,
 } from "../../analysis/trackAnalysis";
 import type { SpeedQuality } from "../../analysis/speedAnalysis";
+import { SESSION_HISTORY_OPEN_STORAGE_KEY } from "../../constants/storage";
+import { useTrackDisclosure } from "../../hooks/useTrackDisclosure";
 import type { SessionSummary } from "../../types/telemetry";
 import {
   formatRelativeDate,
   formatTime,
   joinMetaParts,
   msToLapTime,
+  pluralize,
 } from "../../utils/format";
 import { sessionSaveSlugs } from "../../utils/deduplicateSessions";
 import { sessionSummaryPath, trackTabForSessionType } from "../../utils/routes";
@@ -21,6 +24,7 @@ import { RecordedLapsIcon } from "../lap-telemetry/RecordedLapsIcon";
 import { SessionTypeBadge } from "../SessionTypeBadge";
 import { SESSION_TYPE_FILTER_META } from "../sessionTypeMeta";
 import { Badge } from "../ui/Badge";
+import { DisclosureToggle } from "../ui/DisclosureToggle";
 import { SectionHeader } from "../ui/SectionHeader";
 import { SegmentedControl, type SegmentedOption } from "../ui/SegmentedControl";
 
@@ -129,7 +133,11 @@ function detailedHistoryRow(session: TrackSessionData): HistoryRow {
   };
 }
 
-/** Track-scoped history with a contextual session-type default and local override. */
+/**
+ * Track-scoped history with a contextual session-type default and local
+ * override. It closes every page, so it starts collapsed to its header and
+ * remembers being opened per circuit, like the lap tips.
+ */
 export function TrackSessionHistory({
   sessions = [],
   summarySessions = [],
@@ -224,14 +232,40 @@ export function TrackSessionHistory({
     }
   }
 
+  // Every row belongs to the same circuit, so any of them names it.
+  const track = sessionRows[0]?.summary.track ?? allSpectatorSessions[0]?.track;
+  const [storedOpen, setOpen] = useTrackDisclosure(
+    SESSION_HISTORY_OPEN_STORAGE_KEY,
+    track,
+  );
+  // With only spectator saves, this list is the whole page: keep it open.
+  const spectatorOnly = sessionRows.length === 0;
+  const open = storedOpen || spectatorOnly;
+  const listId = useId();
+
   if (totalRowCount === 0) return null;
 
   return (
     <section>
       <SectionHeader
-        title="Session History"
+        className={open ? undefined : "mb-0"}
+        title={
+          spectatorOnly ? (
+            "Session History"
+          ) : (
+            <DisclosureToggle
+              open={open}
+              onOpenChange={setOpen}
+              controls={listId}
+              className="-mx-1 px-1 hover:text-white"
+            >
+              Session History
+            </DisclosureToggle>
+          )
+        }
+        hint={pluralize(totalRowCount, "session")}
         action={
-          availableKinds.length > 1 ? (
+          open && availableKinds.length > 1 ? (
             <SegmentedControl<HistoryFilter>
               ariaLabel="Filter session history"
               size="sm"
@@ -246,125 +280,127 @@ export function TrackSessionHistory({
         }
       />
 
-      <div className="space-y-1.5">
-        {filteredSessions.map((session) => {
-          const isAllTimeBest =
-            session.bestLapMs > 0 &&
-            session.bestLapMs === bestLapMsByKind[session.kind];
-          const showOffline = session.kind !== "time-trial";
+      {open && (
+        <div id={listId} className="space-y-1.5">
+          {filteredSessions.map((session) => {
+            const isAllTimeBest =
+              session.bestLapMs > 0 &&
+              session.bestLapMs === bestLapMsByKind[session.kind];
+            const showOffline = session.kind !== "time-trial";
 
-          return (
-            <SessionRow
-              key={session.summary.relativePath}
-              to={
-                session.summary.isSynthetic
-                  ? null
-                  : sessionSummaryPath(session.summary)
-              }
-              leading={
-                <>
-                  <HistoryDateTime date={session.summary.date} />
-                  <SessionTypeBadge
-                    sessionType={session.summary.sessionType}
-                    formula={session.summary.formula}
-                    compactLabel={HISTORY_KIND_META[session.kind].label}
+            return (
+              <SessionRow
+                key={session.summary.relativePath}
+                to={
+                  session.summary.isSynthetic
+                    ? null
+                    : sessionSummaryPath(session.summary)
+                }
+                leading={
+                  <>
+                    <HistoryDateTime date={session.summary.date} />
+                    <SessionTypeBadge
+                      sessionType={session.summary.sessionType}
+                      formula={session.summary.formula}
+                      compactLabel={HISTORY_KIND_META[session.kind].label}
+                    />
+                    <SessionResultStatusBadge
+                      status={session.summary.playerRaceResult?.status}
+                    />
+                    <RecordedLapsIcon
+                      sessionSlugs={sessionSaveSlugs(session.summary)}
+                    />
+                    {session.attemptCount > 1 && (
+                      <Badge tone="amber" className="max-sm:hidden">
+                        ×{session.attemptCount}
+                      </Badge>
+                    )}
+                    <SessionModeLabel
+                      isOnline={session.summary.isOnline}
+                      aiDifficulty={session.summary.aiDifficulty}
+                      showOffline={showOffline}
+                      className="shrink-0 text-xs max-sm:hidden"
+                    />
+                  </>
+                }
+                meta={joinMetaParts([
+                  session.weather || null,
+                  ...historyComparisonLabels(session),
+                ])}
+                trailing={
+                  <SessionResultMetric
+                    session={session.summary}
+                    kind={session.kind}
+                    lapTime={session.bestLapLabel}
+                    lapTimeMs={session.bestLapMs}
+                    lapTone={
+                      session.bestLapMs <= 0
+                        ? "muted"
+                        : isAllTimeBest
+                          ? "purple"
+                          : "cyan"
+                    }
                   />
-                  <SessionResultStatusBadge
-                    status={session.summary.playerRaceResult?.status}
-                  />
-                  <RecordedLapsIcon
-                    sessionSlugs={sessionSaveSlugs(session.summary)}
-                  />
-                  {session.attemptCount > 1 && (
-                    <Badge tone="amber" className="max-sm:hidden">
-                      ×{session.attemptCount}
+                }
+              />
+            );
+          })}
+
+          {filteredSpectatorSessions.length > 0 &&
+            filteredSessions.length > 0 && (
+              <div className="px-3 pb-1 pt-4 text-xs text-zinc-600">
+                Spectator saves are shown for inspection only and do not affect
+                player PBs, setup picks, tyre life, fuel, or race-result
+                calculations.
+              </div>
+            )}
+
+          {filteredSpectatorSessions.map((summary) => {
+            const kind = spectatorKind(summary);
+            const showOffline = kind !== "time-trial";
+            const trailingValue =
+              summary.bestLapTime ?? `${summary.validLapCount} laps`;
+
+            return (
+              <SessionRow
+                key={summary.relativePath}
+                to={summary.isSynthetic ? null : sessionSummaryPath(summary)}
+                leading={
+                  <>
+                    <HistoryDateTime date={summary.date} />
+                    <SessionTypeBadge
+                      sessionType={summary.sessionType}
+                      formula={summary.formula}
+                      compactLabel={HISTORY_KIND_META[kind].label}
+                    />
+                    <Badge tone="zinc">
+                      <span className="sm:hidden">Spec.</span>
+                      <span className="max-sm:hidden">Spectator</span>
                     </Badge>
-                  )}
-                  <SessionModeLabel
-                    isOnline={session.summary.isOnline}
-                    aiDifficulty={session.summary.aiDifficulty}
-                    showOffline={showOffline}
-                    className="shrink-0 text-xs max-sm:hidden"
-                  />
-                </>
-              }
-              meta={joinMetaParts([
-                session.weather || null,
-                ...historyComparisonLabels(session),
-              ])}
-              trailing={
-                <SessionResultMetric
-                  session={session.summary}
-                  kind={session.kind}
-                  lapTime={session.bestLapLabel}
-                  lapTimeMs={session.bestLapMs}
-                  lapTone={
-                    session.bestLapMs <= 0
-                      ? "muted"
-                      : isAllTimeBest
-                        ? "purple"
-                        : "cyan"
-                  }
-                />
-              }
-            />
-          );
-        })}
-
-        {filteredSpectatorSessions.length > 0 &&
-          filteredSessions.length > 0 && (
-            <div className="px-3 pb-1 pt-4 text-xs text-zinc-600">
-              Spectator saves are shown for inspection only and do not affect
-              player PBs, setup picks, tyre life, fuel, or race-result
-              calculations.
-            </div>
-          )}
-
-        {filteredSpectatorSessions.map((summary) => {
-          const kind = spectatorKind(summary);
-          const showOffline = kind !== "time-trial";
-          const trailingValue =
-            summary.bestLapTime ?? `${summary.validLapCount} laps`;
-
-          return (
-            <SessionRow
-              key={summary.relativePath}
-              to={summary.isSynthetic ? null : sessionSummaryPath(summary)}
-              leading={
-                <>
-                  <HistoryDateTime date={summary.date} />
-                  <SessionTypeBadge
-                    sessionType={summary.sessionType}
-                    formula={summary.formula}
-                    compactLabel={HISTORY_KIND_META[kind].label}
-                  />
-                  <Badge tone="zinc">
-                    <span className="sm:hidden">Spec.</span>
-                    <span className="max-sm:hidden">Spectator</span>
-                  </Badge>
-                  <SessionModeLabel
-                    isOnline={summary.isOnline}
-                    aiDifficulty={summary.aiDifficulty}
-                    showOffline={showOffline}
-                    className="shrink-0 text-xs max-sm:hidden"
-                  />
-                </>
-              }
-              meta={joinMetaParts([
-                summary.weather || null,
-                summary.classifiedDriverCount
-                  ? `${summary.classifiedDriverCount} drivers`
-                  : null,
-              ])}
-              trailing={
-                <div className="inline-flex h-9 items-center justify-center rounded-lg bg-zinc-900/70 px-2.5 font-mono text-sm font-bold tabular-nums text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
-                  {trailingValue}
-                </div>
-              }
-            />
-          );
-        })}
-      </div>
+                    <SessionModeLabel
+                      isOnline={summary.isOnline}
+                      aiDifficulty={summary.aiDifficulty}
+                      showOffline={showOffline}
+                      className="shrink-0 text-xs max-sm:hidden"
+                    />
+                  </>
+                }
+                meta={joinMetaParts([
+                  summary.weather || null,
+                  summary.classifiedDriverCount
+                    ? `${summary.classifiedDriverCount} drivers`
+                    : null,
+                ])}
+                trailing={
+                  <div className="inline-flex h-9 items-center justify-center rounded-lg bg-zinc-900/70 px-2.5 font-mono text-sm font-bold tabular-nums text-zinc-400 ring-1 ring-inset ring-white/[0.06]">
+                    {trailingValue}
+                  </div>
+                }
+              />
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

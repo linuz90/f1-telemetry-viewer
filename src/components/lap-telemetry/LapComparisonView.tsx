@@ -7,6 +7,8 @@ import {
   type LapTip,
   type PreparedLap,
 } from "../../analysis/lapTelemetryAnalysis";
+import { LAP_TIPS_OPEN_STORAGE_KEY } from "../../constants/storage";
+import { useTrackDisclosure } from "../../hooks/useTrackDisclosure";
 import { getTrackCorners } from "../../utils/tracks";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { createHoverStore } from "./hoverStore";
@@ -44,6 +46,11 @@ export function LapComparisonView({
   const [selectedTipId, setSelectedTipId] = useState<string | null>(null);
   // Hovering a row lights up its stretch on the map, and the other way round.
   const [hoveredTipId, setHoveredTipId] = useState<string | null>(null);
+  // The list is long, so it starts collapsed; opening it sticks per circuit.
+  const [tipsOpen, setTipsOpen] = useTrackDisclosure(
+    LAP_TIPS_OPEN_STORAGE_KEY,
+    track,
+  );
 
   useEffect(() => {
     if (!zoom) return;
@@ -173,6 +180,8 @@ export function LapComparisonView({
             sectorDeltasS={sectorDeltasS}
             selectedTipId={selectedTipId}
             hoveredTipId={hoveredTipId}
+            expanded={tipsOpen}
+            onExpandedChange={setTipsOpen}
             onSelectTip={selectTip}
             onHoverTip={(tip) => setHoveredTipId(tip?.id ?? null)}
           />

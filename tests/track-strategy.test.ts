@@ -225,3 +225,58 @@ test("full wets get their own plan after Inters", () => {
     assert.equal(sum(strategy.stintLaps), 20);
   }
 });
+
+test("compound life projects each stint's wear curve and keeps the longest stint's evidence", () => {
+  const stats = aggregateCompoundLife([
+    buildRace({
+      totalLaps: 20,
+      stints: [{ compound: "Medium", laps: 10, wearPerLap: 5 }],
+    }),
+    buildRace({
+      totalLaps: 20,
+      stints: [{ compound: "Medium", laps: 6, wearPerLap: 5 }],
+    }),
+  ]);
+  assert.equal(stats.length, 1);
+  const [medium] = stats;
+  assert.ok(medium);
+  assert.equal(medium.compound, "Medium");
+  assert.equal(medium.stintCount, 2);
+  assert.equal(medium.longestStint, 10);
+  assert.equal(medium.longestStintEndWear, 50);
+  // 5%/lap reaches the 75% threshold on lap 15 from either stint.
+  assert.equal(medium.estMaxLife, 15);
+  // The fixture has no lap history, so there is no peak pace to show.
+  assert.equal(medium.peakPaceMs, 0);
+  assert.equal(medium.peakPaceLapCount, 0);
+});
+
+test("compound life reads the threshold off a stint that actually reached it", () => {
+  const [hard] = aggregateCompoundLife([
+    buildRace({
+      totalLaps: 30,
+      stints: [{ compound: "Hard", laps: 25, wearPerLap: 4 }],
+    }),
+  ]);
+  assert.ok(hard);
+  // 4%/lap crosses 75% on lap 19 even though the stint ran to 100%.
+  assert.equal(hard.estMaxLife, 19);
+  assert.equal(hard.longestStintEndWear, 100);
+});
+
+test("compound life cards run softest to hardest regardless of first use", () => {
+  const stats = aggregateCompoundLife([
+    buildRace({
+      totalLaps: 20,
+      stints: [
+        { compound: "Hard", laps: 8, wearPerLap: 3 },
+        { compound: "Soft", laps: 6, wearPerLap: 7 },
+        { compound: "Medium", laps: 6, wearPerLap: 5 },
+      ],
+    }),
+  ]);
+  assert.deepEqual(
+    stats.map((compound) => compound.compound),
+    ["Soft", "Medium", "Hard"],
+  );
+});

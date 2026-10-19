@@ -2,11 +2,17 @@ import type { ReactNode } from "react";
 import { cn } from "../utils/cn";
 import { getCompoundColor } from "../utils/colors";
 import { dynamicAccentCardStyle } from "./Card";
+import { Tooltip } from "./Tooltip";
 import { HStack } from "./ui/Stack";
 import { tableRowClass } from "./ui/table";
 
 export interface CompoundStatCardRow {
   label: string;
+  /** Muted evidence suffix after the label (e.g. "33 laps"); wraps as a unit
+   *  on narrow cards instead of splitting mid-phrase. */
+  note?: string;
+  /** Hover explanation of how the value is calculated */
+  tooltip?: string;
   value: string;
   comparisonValue?: string;
   className?: string;
@@ -28,9 +34,10 @@ interface CompoundStatCardProps {
   rows: CompoundStatCardRow[];
   /** Large hero number displayed prominently above the rows */
   hero?: CompoundStatCardHero;
+  /** Rendered between the hero and the rows (evidence bars, captions) */
+  belowHero?: ReactNode;
   valueLabel?: string;
   comparisonLabel?: string;
-  progress?: { ratio: number };
   className?: string;
   children?: ReactNode;
 }
@@ -40,9 +47,9 @@ export function CompoundStatCard({
   subtitle,
   rows,
   hero,
+  belowHero,
   valueLabel = "Main",
   comparisonLabel,
-  progress,
   className,
   children,
 }: CompoundStatCardProps) {
@@ -116,6 +123,7 @@ export function CompoundStatCard({
           </div>
         </div>
       )}
+      {belowHero && <div className="mb-2">{belowHero}</div>}
       <div className="text-xs text-zinc-400 space-y-1.5">
         {hasComparison && (
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.75rem,5.75rem)_minmax(4.75rem,5.75rem)] items-baseline gap-2 text-2xs text-zinc-600">
@@ -133,7 +141,12 @@ export function CompoundStatCard({
             {row.divider && <div className={cn(tableRowClass, "my-2")} />}
             {hasComparison ? (
               <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.75rem,5.75rem)_minmax(4.75rem,5.75rem)] items-baseline gap-2">
-                <span className="min-w-0 truncate">{row.label}</span>
+                <span className="min-w-0 truncate">
+                  {row.label}
+                  {row.note && (
+                    <span className="text-zinc-600"> · {row.note}</span>
+                  )}
+                </span>
                 <span
                   className={cn(
                     "truncate text-right tabular-nums",
@@ -153,30 +166,45 @@ export function CompoundStatCard({
               </div>
             ) : (
               <HStack justify="between">
-                <span>{row.label}</span>
-                <span className={row.className ?? "text-zinc-300 font-mono"}>
+                {row.tooltip ? (
+                  <Tooltip text={row.tooltip}>
+                    <span className="cursor-help">
+                      {row.label}
+                      {row.note && (
+                        <>
+                          {" "}
+                          <span className="whitespace-nowrap text-zinc-600">
+                            · {row.note}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  </Tooltip>
+                ) : (
+                  <span>
+                    {row.label}
+                    {row.note && (
+                      <>
+                        {" "}
+                        <span className="whitespace-nowrap text-zinc-600">
+                          · {row.note}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    "whitespace-nowrap",
+                    row.className ?? "text-zinc-300 font-mono",
+                  )}
+                >
                   {row.value}
                 </span>
               </HStack>
             )}
           </div>
         ))}
-        {progress && (
-          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden mt-2">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${Math.min(Math.round(progress.ratio * 100), 100)}%`,
-                backgroundColor:
-                  progress.ratio > 0.8
-                    ? "#ef4444"
-                    : progress.ratio > 0.6
-                      ? "#f59e0b"
-                      : "#22c55e",
-              }}
-            />
-          </div>
-        )}
         {children && <div className="mt-2">{children}</div>}
       </div>
     </div>

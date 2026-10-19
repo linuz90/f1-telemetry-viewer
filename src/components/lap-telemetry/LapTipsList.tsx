@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type CSSProperties,
@@ -22,6 +23,8 @@ import {
   type TipCategory,
 } from "../../analysis/lapTelemetryAnalysis";
 import { cn } from "../../utils/cn";
+import { pluralize } from "../../utils/format";
+import { DisclosureToggle } from "../ui/DisclosureToggle";
 import { Eyebrow } from "../ui/Eyebrow";
 import { ScrollArea } from "../ui/ScrollArea";
 
@@ -106,6 +109,8 @@ export function LapTipsList({
   sectorDeltasS,
   selectedTipId,
   hoveredTipId,
+  expanded,
+  onExpandedChange,
   onSelectTip,
   onHoverTip,
 }: {
@@ -117,6 +122,9 @@ export function LapTipsList({
   selectedTipId: string | null;
   /** Set from the track map, so hovering a stretch lights up its row. */
   hoveredTipId: string | null;
+  /** Collapsed keeps the headline, sector gaps and a tip picked on the map. */
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
   onSelectTip: (tip: LapTip | null) => void;
   onHoverTip: (tip: LapTip | null) => void;
 }) {
@@ -127,27 +135,15 @@ export function LapTipsList({
   const largest = Math.max(...tips.map((tip) => Math.abs(tip.timeS)), 0);
   const differs = comparability.filter((item) => item.tone === "differs");
   const same = comparability.filter((item) => item.tone === "same");
-  const groups = groupBySector(tips);
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const rowRefs = useRef(new Map<string, HTMLLIElement>());
-  const fade = useEdgeFade(scrollRef);
-  // A tip picked on the map can sit below the fold of the capped list.
-  useEffect(() => {
-    const container = scrollRef.current;
-    const row = selectedTipId ? rowRefs.current.get(selectedTipId) : undefined;
-    if (!container || !row) return;
-    const top = row.offsetTop;
-    const bottom = top + row.offsetHeight;
-    if (top < container.scrollTop) {
-      container.scrollTo({ top: top - 32, behavior: "smooth" });
-    } else if (bottom > container.scrollTop + container.clientHeight) {
-      container.scrollTo({
-        top: bottom - container.clientHeight + 32,
-        behavior: "smooth",
-      });
-    }
-  }, [selectedTipId]);
+  const listId = useId();
+  const selectedIndex = tips.findIndex((tip) => tip.id === selectedTipId);
+  const rowProps = {
+    largest,
+    selectedTipId,
+    hoveredTipId,
+    onSelectTip,
+    onHoverTip,
+  };
 
   return (
     <div className="min-w-0">
@@ -193,58 +189,49 @@ export function LapTipsList({
           {TIP_FLOOR_S} s, the smallest gap the recording measures reliably.
         </p>
       ) : (
-        <ScrollArea
-          ref={scrollRef}
-          tone="subtle"
-          className="relative mt-3 max-h-100"
-          style={fade}
-        >
-          {groups.map((group, groupIndex) => (
-            <section key={`${group.sector ?? "lap"}-${groupIndex}`}>
-              {group.sector && sectorDeltasS && (
-                <div
-                  className={cn(
-                    "flex items-baseline justify-between px-2.5 pb-1",
-                    groupIndex > 0 && "pt-3",
-                  )}
-                >
-                  <Eyebrow className="text-zinc-600">
-                    Sector {group.sector}
-                  </Eyebrow>
-                  <span
-                    className={cn(
-                      "font-mono text-2xs tabular-nums",
-                      timeClass(sectorDeltasS[group.sector - 1]),
-                    )}
-                  >
-                    {signed(sectorDeltasS[group.sector - 1])}
-                  </span>
-                </div>
-              )}
-              <ol>
-                {group.tips.map(({ tip, number }) => (
-                  <TipRow
-                    key={tip.id}
-                    ref={(el) => {
-                      if (el) rowRefs.current.set(tip.id, el);
-                      else rowRefs.current.delete(tip.id);
-                    }}
-                    tip={tip}
-                    number={number}
-                    largest={largest}
-                    selected={tip.id === selectedTipId}
-                    hovered={tip.id === hoveredTipId}
-                    onSelectTip={onSelectTip}
-                    onHoverTip={onHoverTip}
-                  />
-                ))}
-              </ol>
-            </section>
-          ))}
-        </ScrollArea>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <DisclosureToggle
+            open={expanded}
+            onOpenChange={onExpandedChange}
+            controls={listId}
+            className="bg-zinc-800/60 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+          >
+            {expanded ? "Hide tips" : `Show ${pluralize(tips.length, "tip")}`}
+          </DisclosureToggle>
+          {!expanded && sectorDeltasS && (
+            <span className="flex flex-wrap gap-x-3 font-mono text-xs tabular-nums">
+              {sectorDeltasS.map((delta, index) => (
+                <span key={index}>
+                  <span className="text-zinc-600">S{index + 1}</span>{" "}
+                  <span className={timeClass(delta)}>{signed(delta)}</span>
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
       )}
 
-      {tips.length > 0 && remainderCount > 0 && (
+      {tips.length > 0 && expanded && (
+        <TipGroups
+          id={listId}
+          tips={tips}
+          sectorDeltasS={sectorDeltasS}
+          {...rowProps}
+        />
+      )}
+      {/* A stretch picked on the map still shows its advice while the list
+          is collapsed. */}
+      {!expanded && selectedIndex >= 0 && (
+        <ol id={listId} className="mt-2">
+          <TipRow
+            tip={tips[selectedIndex]}
+            number={selectedIndex + 1}
+            {...rowProps}
+          />
+        </ol>
+      )}
+
+      {tips.length > 0 && expanded && remainderCount > 0 && (
         <p className="mt-2 flex justify-between border-t border-zinc-800/80 px-2.5 pt-2 font-mono text-xs tabular-nums text-zinc-600">
           <span>
             {remainderCount} smaller stretch{remainderCount === 1 ? "" : "es"}
@@ -256,25 +243,111 @@ export function LapTipsList({
   );
 }
 
+/** The full list, grouped by sector, scrolling once it outgrows its cap. */
+function TipGroups({
+  id,
+  tips,
+  sectorDeltasS,
+  selectedTipId,
+  ...rowProps
+}: {
+  id: string;
+  tips: readonly LapTip[];
+  sectorDeltasS?: readonly [number, number, number];
+} & Omit<TipRowProps, "ref" | "tip" | "number">) {
+  const groups = groupBySector(tips);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef(new Map<string, HTMLLIElement>());
+  const fade = useEdgeFade(scrollRef);
+  // A tip picked on the map can sit below the fold of the capped list.
+  useEffect(() => {
+    const container = scrollRef.current;
+    const row = selectedTipId ? rowRefs.current.get(selectedTipId) : undefined;
+    if (!container || !row) return;
+    const top = row.offsetTop;
+    const bottom = top + row.offsetHeight;
+    if (top < container.scrollTop) {
+      container.scrollTo({ top: top - 32, behavior: "smooth" });
+    } else if (bottom > container.scrollTop + container.clientHeight) {
+      container.scrollTo({
+        top: bottom - container.clientHeight + 32,
+        behavior: "smooth",
+      });
+    }
+  }, [selectedTipId]);
+
+  return (
+    <ScrollArea
+      ref={scrollRef}
+      id={id}
+      tone="subtle"
+      className="relative mt-3 max-h-100"
+      style={fade}
+    >
+      {groups.map((group, groupIndex) => (
+        <section key={`${group.sector ?? "lap"}-${groupIndex}`}>
+          {group.sector && sectorDeltasS && (
+            <div
+              className={cn(
+                "flex items-baseline justify-between px-2.5 pb-1",
+                groupIndex > 0 && "pt-3",
+              )}
+            >
+              <Eyebrow className="text-zinc-600">Sector {group.sector}</Eyebrow>
+              <span
+                className={cn(
+                  "font-mono text-2xs tabular-nums",
+                  timeClass(sectorDeltasS[group.sector - 1]),
+                )}
+              >
+                {signed(sectorDeltasS[group.sector - 1])}
+              </span>
+            </div>
+          )}
+          <ol>
+            {group.tips.map(({ tip, number }) => (
+              <TipRow
+                key={tip.id}
+                ref={(el) => {
+                  if (el) rowRefs.current.set(tip.id, el);
+                  else rowRefs.current.delete(tip.id);
+                }}
+                tip={tip}
+                number={number}
+                selectedTipId={selectedTipId}
+                {...rowProps}
+              />
+            ))}
+          </ol>
+        </section>
+      ))}
+    </ScrollArea>
+  );
+}
+
+interface TipRowProps {
+  ref?: (el: HTMLLIElement | null) => void;
+  tip: LapTip;
+  number: number;
+  largest: number;
+  selectedTipId: string | null;
+  hoveredTipId: string | null;
+  onSelectTip: (tip: LapTip | null) => void;
+  onHoverTip: (tip: LapTip | null) => void;
+}
+
 function TipRow({
   ref,
   tip,
   number,
   largest,
-  selected,
-  hovered,
+  selectedTipId,
+  hoveredTipId,
   onSelectTip,
   onHoverTip,
-}: {
-  ref: (el: HTMLLIElement | null) => void;
-  tip: LapTip;
-  number: number;
-  largest: number;
-  selected: boolean;
-  hovered: boolean;
-  onSelectTip: (tip: LapTip | null) => void;
-  onHoverTip: (tip: LapTip | null) => void;
-}) {
+}: TipRowProps) {
+  const selected = tip.id === selectedTipId;
+  const hovered = tip.id === hoveredTipId;
   // Battery deployment moves the gap without any driving to copy, so those
   // rows say so and their bar steps back.
   const notDriving = tip.category === "Battery" && tip.kind === "note";

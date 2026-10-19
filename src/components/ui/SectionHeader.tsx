@@ -4,7 +4,7 @@ import { cn } from "../../utils/cn";
 /**
  * Canonical section header. Used for top-level sections OUTSIDE cards
  * (Insights, Tracks, Strategy…) and for the title block INSIDE chart cards
- * (Pace Evolution, Best Lap Over Time…). Same font / weight / color in both
+ * (Pace Evolution, Lap Times by Session…). Same font / weight / color in both
  * positions so the page reads as one family.
  */
 export function SectionHeader({

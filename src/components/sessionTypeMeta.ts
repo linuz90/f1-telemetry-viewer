@@ -1,4 +1,5 @@
 import { Flag, Gauge, Target, Timer, type LucideIcon } from "lucide-react";
+import type { TrackSessionKind } from "../analysis/trackAnalysis";
 import type { BadgeTone } from "./ui/Badge";
 import {
   isQualifyingSessionType,
@@ -90,6 +91,17 @@ export const SESSION_TYPE_FILTER_META = {
   "race" | "quali" | "tt",
   SessionTypeMeta & { label: string; buttonLabel: string }
 >;
+
+/**
+ * Meta for a session kind as Track Progress groups them. Qualifying pools
+ * Short Quali and One-Shot, so it takes the Timer: the more generic
+ * timed-session cue than One-Shot's Target.
+ */
+export const TRACK_KIND_META = {
+  qualifying: META["Short Quali"],
+  race: META.Race,
+  "time-trial": META["Time Trial"],
+} satisfies Record<TrackSessionKind, SessionTypeMeta>;
 
 export function getSessionTypeMeta(label: string): SessionTypeMeta {
   const explicit = META[label];

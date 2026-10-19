@@ -43,6 +43,9 @@ const TONE: Record<BadgeTone, string> = {
  * - `tone`: optional palette preset. Omit when the caller wants to supply
  *   bg/text colors via `className` (e.g. semantic colors like `text-behind`
  *   for invalid-lap chips that need higher contrast on tinted row bg).
+ *
+ * Remaining span props (ref, handlers, data attributes) pass through so a
+ * Badge can be a `<Tooltip>` trigger directly.
  */
 export function Badge({
   tone,
@@ -50,15 +53,15 @@ export function Badge({
   shape = "pill",
   className,
   children,
-}: {
+  ...props
+}: React.ComponentProps<"span"> & {
   tone?: BadgeTone;
   size?: BadgeSize;
   shape?: BadgeShape;
-  className?: string;
-  children: React.ReactNode;
 }) {
   return (
     <span
+      {...props}
       className={cn(
         "inline-flex shrink-0 items-center",
         SHAPE[shape],

@@ -29,7 +29,7 @@ pnpm test                     # Run all focused Node test suites
 pnpm test:tracks              # Run canonical track identity/alias regressions
 pnpm test:session-index       # Run the focused Node session-index suite
 pnpm test:lap-stats           # Run complete-lap timing regressions
-pnpm test:race-pace           # Run Race Pace estimator/matching regressions
+pnpm test:race-pace           # Run Race Pace estimator/matching and Classification regressions
 pnpm test:energy-stats        # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                # Run fuel aggregation and recommendation tests
 pnpm test:speed               # Run canonical speed/aero inference regressions
@@ -179,6 +179,7 @@ Tyre wear:
 - Compact `session-history.tyre-stints-history-data[].end-lap` is one lap before the detailed outgoing stint boundary; use `getDriverStints()` instead of raw compact data so pit-in/out filtering stays aligned.
 - PnG may emit a fresh incoming-tyre `0%` snapshot on the previous pit-boundary lap. Normalize duplicate lap wear via shared tyre helpers so outgoing worn tyres are not overwritten by incoming fresh tyres.
 - Absolute strategy timing anchors require real tyre-wear history; synthesized/basic-only stints can describe compound sequence and pit laps but must not anchor race-duration estimates as zero-wear stints.
+- Track Progress Tyre Life is a stint length, not a race lap: `estMaxLife` is the median of each stint's own curve projection to `PUNCTURE_THRESHOLD` (`projectLapsToWear()`), and the card shows the longest observed stint and its end wear beside it because practice races are mostly partial and the number is usually an extrapolation.
 
 Lap timing validity:
 
@@ -189,8 +190,11 @@ Race pace:
 
 - Bare `Race Pace` means the arithmetic mean returned by `getRacePaceEstimate()`: every eligible complete green-flag lap after lap-one, SC/VSC, pit-transition, and per-stint outlier filtering.
 - At least three eligible laps are required to show Race Pace. Rankings, highlights, and PBs additionally require at least half the session's maximum eligible sample count.
-- Carry sample counts/confidence into user-facing evidence. Keep same-compound rival pace, stint pace, strategy modelling, and three-lap peak pace explicitly named because they answer different questions.
+- Carry sample counts/confidence into user-facing evidence. Keep same-compound rival pace, stint pace, strategy modelling, and Peak pace explicitly named because they answer different questions.
+- `Peak pace` is `calculatePeakPace()`: the mean of the fastest three eligible race-pace laps, with the lap count beside it. Every surface that shows it (Peak Pace Evolution, Tyre Life cards, any driver table) uses that function and that label; the window and the reasons for it live in `src/utils/stats/peakPace.ts`.
 - Historical Race Pace PBs compare only within the same race-distance lap count.
+- Race Pace is never a fastest-N window: a mean does not improve with more laps to pick from, a fastest-N does. Mixed strategies are handled by scoping, not trimming: the Classification compound filter recomputes Best Lap and Race Pace on one compound's laps (`buildRaceDriverStats(..., compound)`), keeping the ranking floor within that compound.
+- Matched Pace (`compareCompoundMatchedRacePace()`) is the same-compound Race Pace mean, so its delta matches the filtered table. Its delta is persisted in rival summaries; changing it needs a `SESSION_SUMMARY_CACHE_VERSION` bump.
 
 Analysis layer:
 
@@ -231,7 +235,7 @@ Strategy timing:
 Lap telemetry:
 
 - A recorded lap is complete only by `judgeLapCoverage()`: timed, first and last samples within 30 m of the line, no gap over 30 m. Never trust the exporter's `is_good`; most flagged laps start mid-lap.
-- Keep recordings out of `SessionSummary` and the session index. They pair with session JSON by `recordingPairKey()` and stay reachable when `deduplicateSessions` hides their session, which is where restarted qualifying runs keep their only complete laps: the surviving row claims them through `duplicateSlugs` (`sessionSaveSlugs()`) for its glyph and session page.
+- Keep recordings out of `SessionSummary` and the session index. They pair with session JSON through `resolvePairKey()` (a `_Manual_` save can be stamped up to 2 s after its recording) and stay reachable when `deduplicateSessions` hides their session, which is where restarted qualifying runs keep their only complete laps: the surviving row claims them through `duplicateSlugs` (`sessionSaveSlugs()`) for its glyph and session page.
 - Player index, track length and sector starts come from the paired session JSON; the recording has none of them.
 - A `.pngt` dropped on its own is a browser import (`src/context/lapImports.ts`, IndexedDB), never written to `TELEMETRY_DIR`. "Whose laps are these?" names its owner: a friend's car takes the friend's name and is never `isPlayer`, even when a paired JSON marks it as the player. Imports sit in the shared lap-recording store, which every mode reads first, so they work in the embedded Pits n' Giggles viewer too; an unpaired lap borrows sector starts from the other selected lap.
 - Tips come from `compareLaps()` corner units, which telescope to the official lap-time gap; keep tips plus remainder equal to it. `TIP_FLOOR_S` (0.03 s) is about three times the error of one stretch measured against official sector times.

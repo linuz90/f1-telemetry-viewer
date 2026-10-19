@@ -12,6 +12,7 @@ import {
 import { useState, type ReactNode } from "react";
 import { Card } from "../components/Card";
 import { CompoundStatCard } from "../components/CompoundStatCard";
+import { TyreLifeEvidenceBar } from "../components/track/TyreLifeEvidenceBar";
 import { LapComparisonView } from "../components/lap-telemetry/LapComparisonView";
 import type { SlotLap } from "../components/lap-telemetry/types";
 import { DamageTimeline } from "../components/DamageTimeline";
@@ -53,6 +54,8 @@ import type {
 } from "../types/telemetry";
 import { cn } from "../utils/cn";
 import { msToLapTime, msToSectorTime } from "../utils/format";
+import { PEAK_PACE_LABEL, PEAK_PACE_TOOLTIP } from "../utils/stats/peakPace";
+import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
 import type { TrackRivalBenchmark } from "../analysis/rivalStats";
 import type { SessionInsight } from "../analysis/sessionInsightSummary";
 import type { DriverSpeedComparison } from "../analysis/speedAnalysis";
@@ -861,20 +864,39 @@ export function UiDebugPage() {
             <CompoundStatCard
               key={compound}
               compound={compound}
-              subtitle={`${6 + index * 3} laps`}
-              hero={{ value: `~${10 + index * 6}`, label: "pit by lap" }}
+              subtitle={`${3 - index} stint${index === 2 ? "" : "s"}`}
+              hero={{
+                value: `~${10 + index * 6} laps`,
+                label: `to ${PUNCTURE_THRESHOLD}% wear`,
+              }}
+              belowHero={
+                <TyreLifeEvidenceBar
+                  compound={compound}
+                  seenLaps={6 + index * 3}
+                  seenWear={48 + index * 6}
+                  estLife={10 + index * 6}
+                />
+              }
               rows={[
-                { label: "Best lap", value: msToLapTime(82200 + index * 380) },
                 {
-                  label: "Avg worst/lap",
+                  label: "Best lap",
+                  value: msToLapTime(82200 + index * 380),
+                  className: "font-mono text-best",
+                  divider: true,
+                },
+                {
+                  label: PEAK_PACE_LABEL,
+                  note: `${12 + index * 4} laps`,
+                  tooltip: PEAK_PACE_TOOLTIP,
+                  value: msToLapTime(82900 + index * 410),
+                },
+                {
+                  label: "Wear",
                   value: `${(7.8 - index * 2.1).toFixed(1)}%/lap`,
+                  divider: true,
                 },
-                {
-                  label: "Stints",
-                  value: `${6 + index * 3}-${9 + index * 4} laps`,
-                },
+                { label: "Avg stint", value: `${5 + index * 3} laps` },
               ]}
-              progress={{ ratio: 0.42 + index * 0.18 }}
             />
           ))}
         </div>
@@ -1016,6 +1038,7 @@ const lapTelemetryFixture = (() => {
       driverName: lap.context.driverName,
       team: lap.context.team,
       isPlayer: lap.context.isPlayer,
+      isFriend: false,
       compound: "Soft",
       recording: {
         slug: "fixture",

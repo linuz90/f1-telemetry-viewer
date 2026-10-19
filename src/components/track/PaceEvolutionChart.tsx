@@ -15,6 +15,7 @@ import type {
 import { CHART_THEME, TOOLTIP_STYLE } from "../../constants/colors";
 import { getCompoundColor } from "../../utils/colors";
 import { msToLapTime } from "../../utils/format";
+import { PEAK_PACE_WINDOW } from "../../utils/stats/peakPace";
 import { cardClass } from "../Card";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { SectionHeader } from "../ui/SectionHeader";
@@ -27,11 +28,10 @@ import { HStack } from "../ui/Stack";
  * split by compound, so the comparison is the one drivers actually care about
  * ("is my Hard pace improving here?").
  *
- * The metric is the average of the FASTEST 3 race-pace laps on that compound —
- * not the median across the whole stint, which would unfairly penalize long
- * stints whose median is dragged down by tyre-deg laps in the tail. See the
- * header comment on `buildPaceEvolution` in `utils/stats/trackPaceEvolution`
- * for the rationale.
+ * The metric is Peak pace (`calculatePeakPace` in `utils/stats/peakPace`):
+ * the mean of the fastest 3 race-pace laps on that compound, the same number
+ * the Tyre Life cards show. See that module for why not a stint median or
+ * the single best lap.
  *
  * Compounds with < 3 race-pace laps in a session are gated out upstream so a
  * tiny stint doesn't yank a line around.
@@ -111,8 +111,8 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
   return (
     <section className={cardClass}>
       <SectionHeader
-        title="3-Lap Pace Evolution"
-        hint="Fastest-three clean-lap average by compound, race-on-race"
+        title="Peak Pace Evolution"
+        hint={`Peak pace by compound, race-on-race · mean of your fastest ${PEAK_PACE_WINDOW} clean laps`}
         action={
           showFilter ? (
             <SegmentedControl<ContextFilter>
