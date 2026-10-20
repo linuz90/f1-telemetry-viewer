@@ -240,13 +240,20 @@ export interface LapPreset {
 }
 
 /**
- * One-click comparisons for slot B. A preset that resolves to lap A itself is
- * disabled with the reason rather than quietly picking the next-best lap.
+ * One-click picks, resolved against the lap on the other side of the
+ * comparison (`anchor`, named `anchorSlot`): picking B anchors on A, picking A
+ * anchors on B. A preset that resolves to the anchor itself is disabled with
+ * the reason rather than quietly picking the next-best lap, and
+ * one that lands on a lap an earlier preset already offers is dropped: the
+ * session best is often the fastest lap anywhere, and two buttons for one lap
+ * read as two choices.
  */
 export function resolvePresets(
   a: LapCandidate,
   pool: readonly LapCandidate[],
+  anchorSlot = "A",
 ): LapPreset[] {
+  const taken = `already lap ${anchorSlot}`;
   const eligible = pool.filter((candidate) => candidate.eligible);
   const resolve = (
     id: LapPresetId,
@@ -257,15 +264,15 @@ export function resolvePresets(
     const best = fastest(candidates);
     if (!best) return { id, label, reason: none };
     return isSameLap(best, a)
-      ? { id, label, reason: "already lap A" }
+      ? { id, label, reason: taken }
       : { id, label, candidate: best };
   };
-  return [
+  const presets = [
     resolve(
       "session-best",
       "Session best",
       eligible.filter((c) => c.ref.recordingSlug === a.ref.recordingSlug),
-      "none in lap A's session",
+      `none in lap ${anchorSlot}'s session`,
     ),
     resolve(
       "my-best",
@@ -275,6 +282,18 @@ export function resolvePresets(
     ),
     resolve("fastest-here", "Fastest by anyone here", eligible, "none yet"),
   ];
+  const lapOf = (preset: LapPreset) =>
+    preset.candidate ?? (preset.reason === taken ? a : undefined);
+  return presets.filter((preset, index) => {
+    const lap = lapOf(preset);
+    return (
+      !lap ||
+      !presets.slice(0, index).some((earlier) => {
+        const earlierLap = lapOf(earlier);
+        return !!earlierLap && isSameLap(earlierLap, lap);
+      })
+    );
+  });
 }
 
 /**

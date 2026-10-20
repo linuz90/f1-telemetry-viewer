@@ -471,9 +471,39 @@ test("the fastest lap compares with the player's best from another run", () => {
   const a = defaultLapA(pool, {})!;
   assert.equal(a.lapTimeMs, 77_164);
   assert.equal(defaultComparison(a, pool)?.lapTimeMs, 77_268);
-  assert.equal(
-    resolvePresets(pool[1], pool).find((p) => p.id === "my-best")?.reason,
-    "already lap A",
+  // Every preset lands on lap A's own copy, so one disabled button says so.
+  assert.deepEqual(
+    resolvePresets(pool[1], pool).map((p) => [p.id, p.reason]),
+    [["session-best", "already lap A"]],
+  );
+});
+
+test("presets landing on the same lap are offered once", () => {
+  const pool = [
+    candidate("race", 21, 2, 92_741),
+    candidate("race", 3, 4, 90_100),
+    candidate("race", 16, 2, 92_405),
+  ];
+  // The session best is also the fastest lap anywhere.
+  assert.deepEqual(
+    resolvePresets(pool[2], pool).map((p) => p.id),
+    ["session-best", "my-best"],
+  );
+  // Lap A is the fastest anywhere: one disabled button says so, not two.
+  assert.deepEqual(
+    resolvePresets(pool[1], pool).map((p) => [p.id, p.reason]),
+    [
+      ["session-best", "already lap A"],
+      ["my-best", undefined],
+    ],
+  );
+  // Picking lap A anchors on lap B instead.
+  assert.deepEqual(
+    resolvePresets(pool[1], pool, "B").map((p) => [p.id, p.reason]),
+    [
+      ["session-best", "already lap B"],
+      ["my-best", undefined],
+    ],
   );
 });
 
@@ -568,11 +598,11 @@ test("a friend's imported laps carry their name and never count as yours", () =>
   // Faster than your lap, yet "My best here" stays yours.
   const race = ownSuzuka("race-suzuka", "Race", 91_577);
   const pool = bestLapCandidates([race, friend]);
-  const myBest = resolvePresets(pool[0], pool).find(
-    (preset) => preset.id === "my-best",
+  // It resolves to lap A, which the session-best preset already says.
+  assert.equal(
+    resolvePresets(pool[0], pool).find((preset) => preset.id === "my-best"),
+    undefined,
   );
-  assert.equal(myBest?.candidate, undefined);
-  assert.equal(myBest?.reason, "already lap A");
 
   // Your same-kind best opens as A, even when a race lap is quicker.
   const quali = ownSuzuka(

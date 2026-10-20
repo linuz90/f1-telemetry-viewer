@@ -17,6 +17,8 @@ import type {
 import { trackTabForSessionType } from "../../utils/routes";
 import { TRACK_KIND_META } from "../sessionTypeMeta";
 import { Badge } from "../ui/Badge";
+import { CompoundSwatchLabel } from "../ui/CompoundSwatchLabel";
+import { Eyebrow } from "../ui/Eyebrow";
 import { Modal } from "../ui/Modal";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { driverLabel, recordingLabel, recordingTeamColor } from "./labels";
@@ -29,6 +31,19 @@ const KIND_LABELS: Record<TrackSessionKind, string> = {
 };
 
 type Who = "everyone" | "mine" | "friends";
+
+/** F1 timing colours: purple for the fastest lap of all, green for a
+ *  driver's own best. */
+type LapHighlight = "fastest" | "personal";
+
+type LapOrder = "lap" | "time";
+
+const PRESET_COLUMNS = [
+  "",
+  "sm:grid-cols-1",
+  "sm:grid-cols-2",
+  "sm:grid-cols-3",
+];
 
 interface PickerRow {
   key: string;
@@ -43,12 +58,15 @@ interface PickerRow {
 function RowButton({
   row,
   slot,
-  fastest,
+  highlight,
+  showTeam = true,
   onPick,
 }: {
   row: PickerRow;
   slot?: SlotName;
-  fastest: boolean;
+  highlight?: LapHighlight;
+  /** Off in one driver's lap list, where every row shares the colour. */
+  showTeam?: boolean;
   onPick: (candidate: LapCandidate) => void;
 }) {
   return (
@@ -67,16 +85,22 @@ function RowButton({
       <span
         className={cn(
           "font-mono text-sm tabular-nums",
-          fastest ? "text-best font-semibold" : "text-zinc-200",
+          highlight === "fastest"
+            ? "text-best font-semibold"
+            : highlight === "personal"
+              ? "text-ahead font-semibold"
+              : "text-zinc-200",
         )}
       >
         {msToLapTime(row.lapTimeMs)}
       </span>
       <span className="flex min-w-0 items-center gap-2">
-        <span
-          className="h-3.5 w-1 shrink-0 rounded-full"
-          style={{ backgroundColor: recordingTeamColor(row.team) }}
-        />
+        {showTeam && (
+          <span
+            className="h-3.5 w-1 shrink-0 rounded-full"
+            style={{ backgroundColor: recordingTeamColor(row.team) }}
+          />
+        )}
         <span className="truncate text-sm text-zinc-200">{row.driver}</span>
         {row.candidate.isFriend && (
           <Badge tone="sky" size="xs" shape="square" className="shrink-0">
@@ -87,7 +111,14 @@ function RowButton({
           {row.context}
         </span>
       </span>
-      <span className="flex items-center gap-1">
+      <span className="flex items-center gap-1.5">
+        {row.candidate.compound && (
+          <CompoundSwatchLabel
+            compound={row.candidate.compound}
+            size="xs"
+            className="mr-0.5"
+          />
+        )}
         {row.badges.map((badge) => (
           <Badge key={badge} tone="zinc" size="xs" shape="square">
             {badge}
@@ -100,7 +131,6 @@ function RowButton({
 
 function candidateBadges(candidate: LapCandidate): string[] {
   return [
-    ...(candidate.compound ? [candidate.compound] : []),
     ...(candidate.valid ? [] : ["Invalid"]),
     ...(candidate.pitLap ? ["Pit"] : []),
     ...(candidate.standingStart ? ["Start"] : []),
@@ -130,7 +160,7 @@ export function LapPicker({
   /** Same circuit and formula scope, any session kind. */
   trackRecordings: readonly LapRecordingSummary[];
   listedSessionSlugs: ReadonlySet<string>;
-  /** One-click comparison laps, resolved against lap A. */
+  /** One-click picks, resolved against the other lap in the comparison. */
   presets: readonly LapPreset[];
   /** The lap in the slot being changed; the picker opens where it lives. */
   current?: LapCandidate;
@@ -179,8 +209,11 @@ export function LapPicker({
         })
         // Partial laps cannot be compared, so drivers without a whole lap go.
         .filter((entry) => entry.laps.length > 0)
+        // You lead the list whatever your pace; everyone else by best lap.
         .sort(
           (a, b) =>
+            Number(b.driver.index === sessionManifest.playerIndex) -
+              Number(a.driver.index === sessionManifest.playerIndex) ||
             (a.best?.lapTimeMs ?? Infinity) - (b.best?.lapTimeMs ?? Infinity),
         )
     );
@@ -244,10 +277,19 @@ export function LapPicker({
       .sort((a, b) => a.lapTimeMs - b.lapTimeMs);
   }, [listedSessionSlugs, selectedKind, slotsByKey, trackRecordings, who]);
 
+  const [lapOrder, setLapOrder] = useState<LapOrder>("lap");
   const activeDriver = sessionDrivers.find(
     (entry) => entry.driver.index === sessionDriver,
   );
-  const sessionFastest = sessionDrivers[0]?.best?.lapTimeMs;
+  const activeLaps =
+    lapOrder === "time"
+      ? [...(activeDriver?.laps ?? [])].sort(
+          (a, b) => a.lapTimeMs - b.lapTimeMs,
+        )
+      : (activeDriver?.laps ?? []);
+  const sessionFastest = Math.min(
+    ...sessionDrivers.map((entry) => entry.best?.lapTimeMs ?? Infinity),
+  );
 
   // Long lists open scrolled to the lap being replaced.
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -270,43 +312,59 @@ export function LapPicker({
         </div>
         {/* A row of nothing but reasons says nothing the list does not. */}
         {presets.some((preset) => preset.candidate) && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className={cn("grid gap-2", PRESET_COLUMNS[presets.length])}>
             {presets.map((preset) => {
-              const current =
-                !!preset.candidate &&
-                slotsByKey.get(lapRefKey(preset.candidate.ref)) === slotName;
+              const lap = preset.candidate;
+              const slot = lap && slotsByKey.get(lapRefKey(lap.ref));
               return (
                 <button
                   key={preset.id}
                   type="button"
-                  disabled={!preset.candidate}
-                  onClick={() => preset.candidate && onPick(preset.candidate)}
-                  aria-pressed={current}
+                  disabled={!lap}
+                  onClick={() => lap && onPick(lap)}
+                  aria-pressed={slot === slotName}
                   className={cn(
-                    "flex items-baseline gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors disabled:cursor-default disabled:opacity-60",
-                    current
-                      ? "bg-zinc-700/70 ring-1 ring-inset ring-white/[0.08]"
-                      : "bg-zinc-800/60 enabled:hover:bg-zinc-700/50",
+                    "flex min-w-0 flex-col gap-1 rounded-xl px-3 py-2 text-left ring-1 ring-inset transition-colors disabled:cursor-default",
+                    slot === slotName
+                      ? "bg-zinc-800 ring-white/[0.1]"
+                      : "bg-zinc-800/40 ring-white/[0.04] enabled:hover:bg-zinc-800/80",
                   )}
                 >
-                  <span className="font-medium text-zinc-200">
-                    {preset.label}
-                  </span>
-                  <span className="text-zinc-500">
-                    {preset.candidate ? (
-                      <>
-                        {driverLabel(
-                          preset.candidate.driverName,
-                          preset.candidate.isPlayer,
-                        )}{" "}
-                        <span className="font-mono tabular-nums">
-                          {msToLapTime(preset.candidate.lapTimeMs)}
-                        </span>
-                      </>
-                    ) : (
-                      preset.reason
+                  <span className="flex items-center justify-between gap-2">
+                    <Eyebrow>{preset.label}</Eyebrow>
+                    {slot && (
+                      <span className="font-mono text-2xs font-semibold text-zinc-400">
+                        {slot}
+                      </span>
                     )}
                   </span>
+                  {lap ? (
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-3.5 w-1 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor: recordingTeamColor(lap.team),
+                        }}
+                      />
+                      <span className="truncate text-sm text-zinc-200">
+                        {driverLabel(lap.driverName, lap.isPlayer)}
+                      </span>
+                      <span
+                        className={cn(
+                          "ml-auto font-mono text-sm tabular-nums",
+                          preset.id === "my-best"
+                            ? "text-zinc-100"
+                            : "text-best",
+                        )}
+                      >
+                        {msToLapTime(lap.lapTimeMs)}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="block text-sm text-zinc-500 first-letter:uppercase">
+                      {preset.reason}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -359,7 +417,13 @@ export function LapPicker({
           <div className="grid min-h-0 gap-3 overflow-hidden sm:grid-cols-[13rem_1fr]">
             <ul className="max-h-[22rem] space-y-0.5 overflow-y-auto sm:max-h-[50vh]">
               {sessionDrivers.map(({ driver, best }) => (
-                <li key={driver.index}>
+                <li
+                  key={driver.index}
+                  className={cn(
+                    driver.index === sessionManifest.playerIndex &&
+                      "mb-1 border-b border-white/[0.06] pb-1",
+                  )}
+                >
                   <button
                     type="button"
                     onClick={() => setSessionDriver(driver.index)}
@@ -376,7 +440,13 @@ export function LapPicker({
                         backgroundColor: recordingTeamColor(driver.team),
                       }}
                     />
-                    <span className="flex-1 truncate">
+                    <span
+                      className={cn(
+                        "flex-1 truncate",
+                        driver.index === sessionManifest.playerIndex &&
+                          "font-medium text-zinc-100",
+                      )}
+                    >
                       {driverLabel(
                         driver.name,
                         driver.index === sessionManifest.playerIndex,
@@ -396,30 +466,56 @@ export function LapPicker({
                 </li>
               ))}
             </ul>
-            <div className="max-h-[22rem] space-y-0.5 overflow-y-auto sm:max-h-[50vh]">
-              {activeDriver?.laps.map((candidate) => {
-                const key = lapRefKey(candidate.ref);
-                return (
-                  <RowButton
-                    key={key}
-                    slot={slotsByKey.get(key)}
-                    fastest={
-                      candidate.eligible &&
-                      candidate.lapTimeMs === sessionFastest
-                    }
-                    onPick={onPick}
-                    row={{
-                      key,
-                      candidate,
-                      lapTimeMs: candidate.lapTimeMs,
-                      driver: `Lap ${candidate.ref.lapNumber}`,
-                      team: candidate.team,
-                      context: "",
-                      badges: candidateBadges(candidate),
-                    }}
-                  />
-                );
-              })}
+            <div className="flex min-h-0 flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2 pl-2.5">
+                <span className="truncate text-xs text-zinc-500">
+                  {activeDriver &&
+                    `${driverLabel(
+                      activeDriver.driver.name,
+                      activeDriver.driver.index === sessionManifest.playerIndex,
+                    )} · ${activeDriver.laps.length} ${activeDriver.laps.length === 1 ? "lap" : "laps"}`}
+                </span>
+                <SegmentedControl
+                  ariaLabel="Lap order"
+                  size="sm"
+                  value={lapOrder}
+                  onChange={setLapOrder}
+                  options={[
+                    { value: "lap", label: "Lap" },
+                    { value: "time", label: "Time" },
+                  ]}
+                />
+              </div>
+              <div className="max-h-[22rem] space-y-0.5 overflow-y-auto sm:max-h-[50vh]">
+                {activeLaps.map((candidate) => {
+                  const key = lapRefKey(candidate.ref);
+                  return (
+                    <RowButton
+                      key={key}
+                      slot={slotsByKey.get(key)}
+                      highlight={
+                        candidate.eligible &&
+                        candidate.lapTimeMs === sessionFastest
+                          ? "fastest"
+                          : candidate === activeDriver?.best
+                            ? "personal"
+                            : undefined
+                      }
+                      showTeam={false}
+                      onPick={onPick}
+                      row={{
+                        key,
+                        candidate,
+                        lapTimeMs: candidate.lapTimeMs,
+                        driver: `Lap ${candidate.ref.lapNumber}`,
+                        team: candidate.team,
+                        context: "",
+                        badges: candidateBadges(candidate),
+                      }}
+                    />
+                  );
+                })}
+              </div>
             </div>
           </div>
         ) : (
@@ -438,7 +534,7 @@ export function LapPicker({
                 key={row.key}
                 row={row}
                 slot={slotsByKey.get(row.key)}
-                fastest={index === 0}
+                highlight={index === 0 ? "fastest" : undefined}
                 onPick={onPick}
               />
             ))}
