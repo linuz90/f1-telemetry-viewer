@@ -359,6 +359,12 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
     () => (selected[0] ? resolvePresets(selected[0], presetPool) : []),
     [selected, presetPool],
   );
+  // Picking A anchors on B when there is one, so "My best here" and friends
+  // work from either side; alone, A anchors on itself.
+  const pickerPresets = useMemo(() => {
+    if (pickerSlot !== 0) return presets;
+    return selected[1] ? resolvePresets(selected[1], presetPool, "B") : presets;
+  }, [pickerSlot, presets, selected, presetPool]);
 
   const ownRecordingSlug = ownRecording?.slug;
   const slots = useMemo(
@@ -575,7 +581,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
           sessionManifest={sessionManifest}
           trackRecordings={trackRecordings}
           listedSessionSlugs={listedSessionSlugs}
-          presets={pickerSlot > 0 ? presets : []}
+          presets={pickerPresets}
           current={selected[pickerSlot]}
           onPick={pickLap}
           onClose={() => setPickerSlot(null)}

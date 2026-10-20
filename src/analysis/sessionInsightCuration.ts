@@ -4,11 +4,15 @@ import type { SessionInsight } from "./sessionInsightSummary";
 
 /**
  * Product rules for turning raw session facts into a compact card grid. This is
- * where related rows are merged (fuel, sectors, ERS) and capped to the visible
- * insight budget; telemetry extraction itself stays in `sessionInsightSummary`.
+ * where related facts share a card (result + race flow, tyres + fuel + pit
+ * timing, speed + ERS, events) and supporting evidence moves into tooltips so a
+ * race page never shows more than two short rows; telemetry extraction itself
+ * stays in `sessionInsightSummary`.
  */
 
-const MAX_SESSION_INSIGHTS = 9;
+// Two rows of three on desktop. Every race-page topic has a home inside this
+// budget, so the set of cards does not change with the number of incidents.
+const MAX_SESSION_INSIGHTS = 6;
 
 function compactMetricLine(prefix: string, insight: SessionInsight): string {
   return `${prefix}: ${insight.value}${insight.detail ? ` (${insight.detail})` : ""}`;
@@ -53,6 +57,14 @@ function compactEventItem(insight: SessionInsight): string {
 
 function uniqueLines(lines: (string | undefined)[]): string[] {
   return [...new Set(lines.filter((line): line is string => Boolean(line)))];
+}
+
+function joinTooltips(tooltips: (string | undefined)[]): string | undefined {
+  return (
+    uniqueLines(tooltips)
+      .map((line) => (/[.!?]$/.test(line) ? line : `${line}.`))
+      .join(" ") || undefined
+  );
 }
 
 function startsWithLabel(insight: SessionInsight, label: string): boolean {
@@ -287,13 +299,10 @@ function mergeErsInsights(
     findByLabel(ersInsights, "ERS Harv");
   const primary = deploy ?? harvest;
   if (!primary) return undefined;
-  const tooltip =
-    uniqueLines([deploy?.tooltip, harvest?.tooltip])
-      .map((line) => (/[.!?]$/.test(line) ? line : `${line}.`))
-      .join(" ") || undefined;
+  const tooltip = joinTooltips([deploy?.tooltip, harvest?.tooltip]);
 
-  // Speed owns a separate, typed card. Keeping ERS independent avoids deriving
-  // one metric's semantics by parsing another metric's presentation copy.
+  // ERS stands alone only when there is no Speed card to join (head-to-head
+  // pages, sparse exports); otherwise `mergeSpeedAndErs` folds it under speed.
   return {
     ...primary,
     label: deploy && harvest ? "ERS Usage" : primary.label,
@@ -409,11 +418,165 @@ function appendIfPresent(
   if (insight) target.push(insight);
 }
 
+function mergeResultAndRaceFlow(
+  result: SessionInsight | undefined,
+  raceFlow: SessionInsight | undefined,
+): SessionInsight | undefined {
+  if (!result) return raceFlow;
+  if (!raceFlow) return result;
+
+  // Grid-to-finish movement and passes are the story behind the finishing
+  // position. "P3 to P11" already implies the signed move, so the value is
+  // kept only when there was no grid position to anchor it.
+  const hasGridMove = /^P\d+ to P\d+/.test(raceFlow.detail);
+  return {
+    ...result,
+    extraDetails: uniqueLines([
+      ...(result.extraDetails ?? []),
+      hasGridMove ? raceFlow.detail : `${raceFlow.value} · ${raceFlow.detail}`,
+    ]),
+  };
+}
+
+function personalBestLine(insight: SessionInsight): string {
+  if (/matched/i.test(insight.detail)) {
+    return insight.detail.replace(/^./, (char) => char.toUpperCase());
+  }
+  return `${insight.value.replace(/!$/, "")} · ${insight.detail}`;
+}
+
+function mergeBestLapWithPersonalBest(
+  lap: SessionInsight | undefined,
+  personalBest: SessionInsight | undefined,
+): SessionInsight | undefined {
+  if (!lap || !personalBest) return lap;
+
+  // A new all-time race lap reads purple like a session-best lap: both mean
+  // "fastest", and the card keeps its session delta as the primary detail.
+  return {
+    ...lap,
+    tone: "best",
+    accent: "purple",
+    extraDetails: uniqueLines([
+      ...(lap.extraDetails ?? []),
+      personalBestLine(personalBest),
+    ]),
+  };
+}
+
+function mergePaceInsights(
+  pace: SessionInsight | undefined,
+  personalBest: SessionInsight | undefined,
+): SessionInsight | undefined {
+  if (!pace || !personalBest) return pace;
+  return {
+    ...pace,
+    extraDetails: uniqueLines([
+      ...(pace.extraDetails ?? []),
+      personalBestLine(personalBest),
+    ]),
+  };
+}
+
+const FUEL_MARGIN_TOOLTIP =
+  "Fuel margin is the game's own estimate at the last recorded lap, not a viewer recommendation.";
+
+function mergeTyreInsights(
+  tyre: SessionInsight | undefined,
+  fuel: SessionInsight | undefined,
+  firstPit: SessionInsight | undefined,
+): SessionInsight | undefined {
+  if (!tyre) return fuel ?? firstPit;
+
+  // Tyre wear, pit timing and fuel margin all answer "how did I manage the
+  // car"; tyre rank keeps the headline because it is the only ranked metric.
+  // Fuel keeps one line, the game's signed margin; tank and burn evidence sits
+  // in the tooltip instead of three more rows on the card.
+  const lines = uniqueLines([
+    ...(tyre.extraDetails ?? []),
+    firstPit
+      ? `First stop ${firstPit.value.toLowerCase()} · ${firstPit.detail}`
+      : undefined,
+    fuel
+      ? fuel.value === "—"
+        ? `Fuel ${fuel.detail}`
+        : `Fuel ${fuel.value} · ${fuel.detail}`
+      : undefined,
+  ]);
+  if (lines.length === 0) return tyre;
+  return {
+    ...tyre,
+    label: fuel ? "Tyres & Fuel" : tyre.label,
+    tooltip: fuel
+      ? joinTooltips([
+          tyre.tooltip,
+          FUEL_MARGIN_TOOLTIP,
+          ...(fuel.extraDetails ?? []),
+        ])
+      : tyre.tooltip,
+    extraDetails: lines,
+  };
+}
+
+interface ErsFact {
+  line: string;
+  tooltip?: string;
+}
+
+function ersFacts(ersInsights: SessionInsight[]): ErsFact[] {
+  const deploy = findByLabel(ersInsights, "ERS Deploy");
+  const harvest = findByLabel(ersInsights, "ERS Harvest");
+  const harvestEnergy = findByLabel(ersInsights, "ERS Harv");
+  const facts: (ErsFact | undefined)[] = [
+    deploy
+      ? { line: rankedMetricLine("ERS deploy", deploy), tooltip: deploy.tooltip }
+      : undefined,
+    harvest
+      ? {
+          line: `ERS harvest ${harvest.value} of the MGU-K limit · ${harvest.detail}`,
+        }
+      : undefined,
+    harvestEnergy
+      ? {
+          line: rankedMetricLine("ERS harvest", harvestEnergy),
+          tooltip: harvestEnergy.tooltip,
+        }
+      : undefined,
+  ];
+  return facts.filter((fact): fact is ErsFact => fact != null);
+}
+
+function mergeSpeedAndErs(
+  speed: SessionInsight | undefined,
+  ersInsights: SessionInsight[],
+): SessionInsight | undefined {
+  if (!speed) return mergeErsInsights(ersInsights);
+  const [primary, ...secondary] = ersFacts(ersInsights);
+  if (!primary) return speed;
+
+  // Peak speed and ERS deployment are one straight-line story in F1 26, where
+  // deploy energy sets the peak. Speed keeps the headline and its rank, the
+  // first ERS fact (deploy when present) gets a line, and harvest, which sits
+  // near 100% on most laps, moves to the tooltip. ERS rows come from typed
+  // ERS facts, never from parsing the speed copy.
+  return {
+    ...speed,
+    label: "Speed & ERS",
+    tooltip: joinTooltips([
+      speed.tooltip,
+      primary.tooltip,
+      ...secondary.map((fact) => fact.line),
+    ]),
+    extraDetails: uniqueLines([...(speed.extraDetails ?? []), primary.line]),
+  };
+}
+
 export function curateSessionInsights(
   session: TelemetrySession,
   insights: SessionInsight[],
   limit?: number,
 ): SessionInsight[] {
+  const isRace = isRaceSession(session);
   const isTimeTrial = isTimeTrialSessionType(
     session["session-info"]["session-type"],
   );
@@ -435,9 +598,26 @@ export function curateSessionInsights(
   const timeTrialPersonalBest = isTimeTrial
     ? timeTrialNewPersonalBest(historyInsights)
     : undefined;
+  // Race pages have no room for a history card, so only notable PBs survive,
+  // folded under the lap or pace they improve on.
+  const raceLapPersonalBest = isRace
+    ? historyInsights.find(
+        (insight) =>
+          insight.label === "vs Best Race Lap" && isHighValueHistory(insight),
+      )
+    : undefined;
+  const racePacePersonalBest = isRace
+    ? historyInsights.find(
+        (insight) =>
+          insight.label === "Race Pace vs Best" && isHighValueHistory(insight),
+      )
+    : undefined;
   const lap = isTimeTrial
     ? mergeTimeTrialNewPersonalBestIntoLap(bestLap, historyInsights)
-    : mergeBestLapInsight(bestLap, theoreticalBest);
+    : mergeBestLapWithPersonalBest(
+        mergeBestLapInsight(bestLap, theoreticalBest),
+        raceLapPersonalBest,
+      );
   const timeTrialTheoretical = isTimeTrial
     ? timeTrialTheoreticalInsight(theoreticalBest)
     : undefined;
@@ -459,12 +639,14 @@ export function curateSessionInsights(
   takeByLabel(remaining, "Consistency");
   const firstPit = takeByLabel(remaining, "First Pit Stop");
   const fuel = takeByLabel(remaining, "Fuel Margin");
-  const sectors = mergeSectorInsights(
-    takeWhere(remaining, (insight) => insight.type === "sector"),
+  const sectorInsights = takeWhere(
+    remaining,
+    (insight) => insight.type === "sector",
   );
   const speed = takeByLabel(remaining, "Speed Profile");
-  const power = mergeErsInsights(
-    takeWhere(remaining, (insight) => insight.type === "ers"),
+  const ersInsights = takeWhere(
+    remaining,
+    (insight) => insight.type === "ers",
   );
   const history = mergeHistoryInsights(
     timeTrialPersonalBest
@@ -476,52 +658,39 @@ export function curateSessionInsights(
       : historyInsights,
   );
 
+  // Events close every list so the first cards keep their places whether or
+  // not the session had incidents.
   const curated: SessionInsight[] = [];
-  appendIfPresent(curated, result);
-  appendIfPresent(curated, lap);
-  appendIfPresent(curated, raceFlow);
-  curated.push(...events);
-
-  if (isRaceSession(session)) {
-    appendIfPresent(curated, racePace);
-    appendIfPresent(curated, tyre);
-    appendIfPresent(curated, fuel);
-    appendIfPresent(curated, sectors);
-    appendIfPresent(curated, speed);
-    appendIfPresent(curated, power);
-    appendIfPresent(curated, firstPit);
-    // Race screens already have many tactical cards, so history only earns a
-    // slot when it is actually notable (PB/matched PB/new best style signals).
-    if (isHighValueHistory(history)) appendIfPresent(curated, history);
+  if (isRace) {
+    // Whole-race sector averages are not actionable on a race page, so the
+    // race sector facts are taken off the list above and dropped here;
+    // qualifying keeps its one-lap Sector Split card.
+    appendIfPresent(curated, mergeResultAndRaceFlow(result, raceFlow));
+    appendIfPresent(curated, lap);
+    appendIfPresent(curated, mergePaceInsights(racePace, racePacePersonalBest));
+    appendIfPresent(curated, mergeTyreInsights(tyre, fuel, firstPit));
+    appendIfPresent(curated, mergeSpeedAndErs(speed, ersInsights));
+    curated.push(...events);
   } else if (isTimeTrial) {
     // Time Trial is lap-first by nature: Key Insights shows run-level lap
     // potential and historical PBs, while Sector Benchmarks owns sector detail.
-    curated.length = 0;
     appendIfPresent(curated, lap);
     appendIfPresent(curated, timeTrialTheoretical);
     appendIfPresent(curated, timeTrialTrackPb);
     appendIfPresent(curated, result);
-    appendIfPresent(curated, sectors);
-    appendIfPresent(curated, speed);
-    appendIfPresent(curated, power);
+    appendIfPresent(curated, mergeSectorInsights(sectorInsights));
+    appendIfPresent(curated, mergeSpeedAndErs(speed, ersInsights));
     curated.push(...events);
   } else {
-    appendIfPresent(curated, sectors);
-    appendIfPresent(curated, speed);
-    appendIfPresent(curated, power);
+    appendIfPresent(curated, result);
+    appendIfPresent(curated, lap);
+    appendIfPresent(curated, mergeSectorInsights(sectorInsights));
+    appendIfPresent(curated, mergeSpeedAndErs(speed, ersInsights));
     appendIfPresent(curated, history);
     if (!result) appendIfPresent(curated, qualifying);
+    curated.push(...events);
   }
 
   curated.push(...remaining);
-
-  const requestedLimit = limit ?? MAX_SESSION_INSIGHTS;
-  // Speed and ERS used to share one presentation-driven card. They now have
-  // distinct semantics, so the default budget grows by one only when both are
-  // present instead of silently discarding either metric on dense race pages.
-  const semanticLimit =
-    limit == null && speed != null && power != null
-      ? requestedLimit + 1
-      : requestedLimit;
-  return curated.slice(0, semanticLimit);
+  return curated.slice(0, limit ?? MAX_SESSION_INSIGHTS);
 }

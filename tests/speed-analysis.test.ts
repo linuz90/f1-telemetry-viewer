@@ -6,8 +6,6 @@ import {
 } from "../src/analysis/speedAnalysis";
 import { buildTrackInsights } from "../src/analysis/dashboardInsights";
 import type { DashboardResultStats } from "../src/analysis/dashboardResultStats";
-import { curateSessionInsights } from "../src/analysis/sessionInsightCuration";
-import type { SessionInsight } from "../src/analysis/sessionInsightSummary";
 import { buildTrackSessionData } from "../src/analysis/trackAnalysis";
 import type {
   CarDamage,
@@ -770,35 +768,4 @@ test("dashboard speed-trap rank normalizes placement across field sizes", () => 
     ),
     undefined,
   );
-});
-
-test("dense race curation preserves separate speed and ERS cards", () => {
-  const fact = (
-    type: SessionInsight["type"],
-    label: string,
-  ): SessionInsight => ({ type, label, value: "Test", detail: "Test" });
-  const denseInsights = [
-    fact("result", "Result"),
-    fact("lap", "Best Lap"),
-    fact("race-flow", "Race Flow"),
-    fact("context", "Neutralized Laps"),
-    fact("pace", "Race Pace"),
-    fact("tyre", "Tyre Management"),
-    fact("fuel", "Fuel Strategy"),
-    fact("sector", "Weakest Sector"),
-    fact("speed", "Speed Profile"),
-    fact("ers", "ERS Deploy"),
-    fact("ers", "ERS Harvest"),
-    fact("pit", "First Pit Stop"),
-  ];
-  const race = {
-    "session-info": { "session-type": "Race" },
-    "classification-data": [],
-  } as unknown as TelemetrySession;
-
-  const curated = curateSessionInsights(race, denseInsights);
-  assert.equal(curated.length, 10);
-  assert.ok(curated.some(({ label }) => label === "Speed Profile"));
-  assert.ok(curated.some(({ label }) => label === "ERS Usage"));
-  assert.equal(curateSessionInsights(race, denseInsights, 9).length, 9);
 });

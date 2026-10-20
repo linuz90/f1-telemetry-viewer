@@ -10,8 +10,9 @@ F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON ex
 - Local dev indexes telemetry summaries and streams raw telemetry JSON from disk.
 - Production/demo mode reads committed demo data or user-uploaded JSON/zip/`.pngt` files.
 - Focused Node test suites cover the session-summary index, complete-lap timing,
-  Race Pace estimation, fuel aggregation, Track Strategy synthesis, and lap
-  recordings and their tips. No general UI test runner or linter is configured.
+  Race Pace estimation, fuel aggregation, session Key Insights curation, Track
+  Strategy synthesis, and lap recordings and their tips. No general UI test
+  runner or linter is configured.
 
 ## Commands
 
@@ -33,6 +34,7 @@ pnpm test:race-pace           # Run Race Pace estimator/matching and Classificat
 pnpm test:energy-stats        # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                # Run fuel aggregation and recommendation tests
 pnpm test:speed               # Run canonical speed/aero inference regressions
+pnpm test:session-insights    # Run session Key Insights card merging and budget regressions
 pnpm test:share-text          # Run plain-text setup/strategy copy formats
 pnpm test:strategy            # Run Track Strategy synthesis regressions (dry + wet)
 pnpm test:lap-recording       # Run .pngt reader, completeness and API regressions
@@ -208,8 +210,9 @@ Fuel recommendations:
 
 - Session pages are retrospective: lead with the game's signed lap-margin
   estimate at the finish or last captured lap, with recorded tank kilograms
-  and observed burn as supporting evidence. Do not turn one session into a
-  future-load recommendation or present the game estimate as physical range.
+  and observed burn as supporting evidence in the tooltip. Do not turn one
+  session into a future-load recommendation or present the game estimate as
+  physical range.
 - Actionable initial-fuel targets belong on Track Progress, where they use
   same-distance, UID-independent evidence, pooled P75 burn, and confidence.
 
@@ -247,6 +250,12 @@ Lap telemetry:
 - Layouts without published geometry (short, reverse, Madring) keep lap-distance names, and their map falls back to the outline drawing lined up by `calibrateOutline()`.
 - On full-throttle stretches, check battery before driving; a flat-out difference with equal battery is car, setup or tow and gets no driving advice. Imperative advice is only for the player's own lap A.
 - The reader rejects unknown `.pngt` format versions and decodes only the channels in `LapChannel`; it is the one place to adapt when the beta format changes.
+
+Session Key Insights:
+
+- `curateSessionInsights()` caps the session grid at six cards, two rows on desktop. Add a new fact to an existing card's lines rather than a seventh card.
+- Race homes: Result also carries race flow; Race Pace carries only a notable pace PB; Tyre Management carries first-stop timing and one fuel-margin line (`Tyres & Fuel`); Speed Profile carries the ERS deploy line (`Speed & ERS`); events close the list so the other cards keep their places.
+- Supporting evidence (tank kilograms, burn rate, ERS harvest) goes in the card tooltip, not on the card. Race pages show no sector split: whole-race sector averages are not actionable. Qualifying keeps its one-lap Sector Split card.
 
 Rivals roster:
 
