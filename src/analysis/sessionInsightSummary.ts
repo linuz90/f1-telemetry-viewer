@@ -769,7 +769,7 @@ function buildSpeedProfileInsight(
     rankTotal: peak.fieldSize,
     accent: "sky",
     extraDetails: trap
-      ? [`Speed trap: ${trap.kmh.toFixed(1)} km/h${trapRank}`]
+      ? [`Speed trap ${trap.kmh.toFixed(1)} km/h${trapRank}`]
       : undefined,
   };
 }
