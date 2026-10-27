@@ -107,7 +107,11 @@ interface PairableSession {
     "sector-3-lap-distance-start"?: unknown;
     weather?: unknown;
   };
-  "classification-data"?: { index: number; "is-player"?: boolean }[];
+  "classification-data"?: {
+    index: number;
+    "is-player"?: boolean;
+    "car-status"?: { "ers-max-capacity"?: unknown };
+  }[];
 }
 
 /** Context the recording lacks, read from the paired session JSON. */
@@ -119,14 +123,18 @@ export function buildRecordingPairing(
   // Beta exports write sector starts as strings and older ones as 0.0.
   const sector2 = finitePositive(info["sector-2-lap-distance-start"]);
   const sector3 = finitePositive(info["sector-3-lap-distance-start"]);
+  const drivers = session["classification-data"];
   return {
     sessionSlug: toSlug(stripExtension(sessionFileName)),
-    playerIndex: session["classification-data"]?.find((d) => d["is-player"])
-      ?.index,
+    playerIndex: drivers?.find((d) => d["is-player"])?.index,
     trackLengthM: finitePositive(info["track-length"]),
     sectorStartsM:
       sector2 && sector3 && sector3 > sector2 ? [sector2, sector3] : undefined,
     weather: typeof info.weather === "string" ? info.weather : undefined,
+    // Every car runs the same store, so the first car that reports it will do.
+    ersMaxCapacityJ: drivers
+      ?.map((d) => finitePositive(d["car-status"]?.["ers-max-capacity"]))
+      .find((capacity) => capacity !== undefined),
   };
 }
 
@@ -445,6 +453,7 @@ export async function openLapRecording(
     playerIndex: pairing?.playerIndex,
     sectorStartsM: pairing?.sectorStartsM,
     weather: pairing?.weather,
+    ersMaxCapacityJ: pairing?.ersMaxCapacityJ,
     drivers,
   };
 

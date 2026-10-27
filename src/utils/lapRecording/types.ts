@@ -68,6 +68,8 @@ export interface RecordingPairing {
   /** Lap distances where sectors 2 and 3 start. */
   sectorStartsM?: [number, number];
   weather?: string;
+  /** Battery store size; 5.0.0-beta.2 records the store only as a percentage of it. */
+  ersMaxCapacityJ?: number;
 }
 
 export interface LapRecordingManifest {
@@ -87,6 +89,7 @@ export interface LapRecordingManifest {
   playerIndex?: number;
   sectorStartsM?: [number, number];
   weather?: string;
+  ersMaxCapacityJ?: number;
   /** Imported into this browser (a friend's file), not read from the telemetry folder. */
   imported?: boolean;
   /** The friend's car in an import; the other cars are the rest of their session. */
