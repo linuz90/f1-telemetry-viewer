@@ -102,6 +102,9 @@ export function syntheticLap(options: SyntheticLapOptions): {
   }
   const inputs = distance.map((d) => inputsAt(Math.max(d, 0)));
   const speed = distance.map((d) => speedAt(Math.max(d, 0)));
+  const battery = distance.map(
+    (d) => options.battery?.(Math.max(d, 0)) ?? 2_000_000,
+  );
   return {
     lapTimeMs,
     channels: {
@@ -114,10 +117,9 @@ export function syntheticLap(options: SyntheticLapOptions): {
       gear: speed.map((v) => Math.max(1, Math.min(8, Math.ceil(v / 40)))),
       engine_rpm: speed.map((v) => 8000 + (v % 40) * 100),
       "ers.deploy_mode": distance.map(() => 0),
-      "ers.store_energy_j": distance.map(
-        (d) => options.battery?.(Math.max(d, 0)) ?? 2_000_000,
-      ),
-      "ers.store_energy": distance.map(() => 50),
+      "ers.store_energy_j": battery,
+      // Percent of the 4 MJ store, the only battery channel in 5.0.0-beta.2.
+      "ers.store_energy": battery.map((joules) => joules / 40_000),
       "tyre_wear.fl": distance.map(() => 3),
       "tyre_wear.fr": distance.map(() => 3),
       "tyre_wear.rl": distance.map(() => 2),

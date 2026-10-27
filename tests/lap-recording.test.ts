@@ -154,8 +154,12 @@ test("a recording pairs with its Just_in_case session JSON", () => {
         weather: "Clear",
       },
       "classification-data": [
-        { index: 3, "is-player": false },
-        { index: 21, "is-player": true },
+        { index: 3, "is-player": false, "car-status": {} },
+        {
+          index: 21,
+          "is-player": true,
+          "car-status": { "ers-max-capacity": 4_000_000 },
+        },
       ],
     },
   );
@@ -165,6 +169,7 @@ test("a recording pairs with its Just_in_case session JSON", () => {
     trackLengthM: 5276,
     sectorStartsM: [1757.05, 3178.6],
     weather: "Clear",
+    ersMaxCapacityJ: 4_000_000,
   });
 
   // A Manual save stamped a second after its recording still pairs, across a

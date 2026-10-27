@@ -192,23 +192,49 @@ test("running out of battery on a straight is blamed on battery, not driving", (
   // but A arrives with half the energy, runs dry 450 m sooner and slows.
   const deploy = (stored: number) => (d: number) =>
     d < 2800 ? stored : Math.max(0, stored - ((d - 2800) / 900) * 1_500_000);
-  const a = lap("a", {
-    battery: deploy(750_000),
-    speedLoss: (d) => (d > 3250 ? Math.min(10, (d - 3250) * 0.03) : 0),
-  });
-  const b = lap("b", { battery: deploy(1_500_000) });
-  const comparison = compareLaps(a, b);
-  assert.equal(comparison.tips.length, 1);
-  const [tip] = comparison.tips;
-  assert.equal(tip.category, "Battery");
-  assert.equal(
-    tip.headline,
-    "Arrive at the straight out of the 2.50 km corner with more battery",
-  );
-  assert.match(
-    tip.evidence,
-    /^You arrived with 0\.75 MJ against 1\.50 MJ, ran dry 4[45]\d m sooner/,
-  );
+  // Pits n' Giggles 5.0.0-beta.2 records the store only as a percentage.
+  const percentOnly = (channels: SyntheticChannels) => {
+    delete channels["ers.store_energy_j"];
+  };
+  for (const tweak of [undefined, percentOnly]) {
+    const a = lap(
+      "a",
+      {
+        battery: deploy(750_000),
+        speedLoss: (d) => (d > 3250 ? Math.min(10, (d - 3250) * 0.03) : 0),
+      },
+      {},
+      tweak,
+    );
+    const b = lap("b", { battery: deploy(1_500_000) }, {}, tweak);
+    const comparison = compareLaps(a, b);
+    assert.equal(comparison.tips.length, 1);
+    const [tip] = comparison.tips;
+    assert.equal(tip.category, "Battery");
+    assert.equal(
+      tip.headline,
+      "Arrive at the straight out of the 2.50 km corner with more battery",
+    );
+    assert.match(
+      tip.evidence,
+      /^You arrived with 0\.75 MJ against 1\.50 MJ, ran dry 4[45]\d m sooner/,
+    );
+  }
+});
+
+test("a store percentage becomes energy with the session's capacity, else 4 MJ", () => {
+  const storeAt = (percent: number) => (channels: SyntheticChannels) => {
+    delete channels["ers.store_energy_j"];
+    channels["ers.store_energy"] = channels["ers.store_energy"].map(
+      () => percent,
+    );
+  };
+  const [fallback, session] = buildLapSeries([
+    lap("a", {}, {}, storeAt(25)),
+    lap("b", {}, { ersMaxCapacityJ: 2_000_000 }, storeAt(25)),
+  ]).laps;
+  assert.ok(fallback.channels.ersMj.every((mj) => mj === 1));
+  assert.ok(session.channels.ersMj.every((mj) => mj === 0.5));
 });
 
 test("deploying less after a faster exit is still blamed on battery", () => {

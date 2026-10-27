@@ -249,7 +249,7 @@ Lap telemetry:
 - Turn numbers and map paths come from real reference laps in the generated `src/constants/trackGeometry.ts` (`pnpm generate-track-geometry`, MultiViewer), read through `getTrackCorners()` and `getTrackPath()`. Markers sit up to about 50 m from the game's slowest point, so `nameUnits()` matches them by stretch, not exact distance.
 - Layouts without published geometry (short, reverse, Madring) keep lap-distance names, and their map falls back to the outline drawing lined up by `calibrateOutline()`.
 - On full-throttle stretches, check battery before driving; a flat-out difference with equal battery is car, setup or tow and gets no driving advice. Imperative advice is only for the player's own lap A.
-- The reader rejects unknown `.pngt` format versions and decodes only the channels in `LapChannel`; it is the one place to adapt when the beta format changes.
+- The reader rejects unknown `.pngt` format versions and decodes only the channels in `LapChannel`; it is the one place to adapt when the beta format changes, except channel units, which `prepareLap()` normalises.
 
 Session Key Insights:
 

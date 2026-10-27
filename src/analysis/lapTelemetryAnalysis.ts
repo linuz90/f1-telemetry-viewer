@@ -194,11 +194,14 @@ const FLAT_SHARE_DIFF = 0.05;
 const LATE_STRETCH_SHARE = 1 / 3;
 
 // --- Battery ---------------------------------------------------------------
-// Stored energy is exact in the recording (joules), so these are about what
-// is worth saying, not about measurement. For scale, the F1 26 qualifying laps
-// checked cross the line with about 3 MJ and finish empty.
+// Stored energy is exact in the recording (joules, or a float percentage of
+// the store in 5.0.0-beta.2), so these are about what is worth saying, not
+// about measurement. For scale, the F1 26 qualifying laps checked cross the
+// line with about 3 MJ and finish empty.
 
 const MJ = 1_000_000;
+/** Store size when no paired session reports `ers-max-capacity`: 4 MJ in F1 25 and F1 26. */
+const DEFAULT_ERS_CAPACITY_J = 4 * MJ;
 /**
  * Battery counts as empty below this. The store settles at a few kJ rather
  * than zero once deployment stops (0.00–0.01 MJ in the Melbourne traces).
@@ -246,6 +249,8 @@ export interface LapContext {
   lapTimeMs: number;
   compound?: string;
   weather?: string;
+  /** Battery store size from the paired session JSON, joules. */
+  ersMaxCapacityJ?: number;
 }
 
 export interface PreparedLap {
@@ -416,6 +421,12 @@ export function prepareLap(
     .map((name) => channel(name)[0])
     .filter(Number.isFinite);
 
+  // 5.0.0-beta.2 records the store only as a percentage of its capacity.
+  const capacityJ = context.ersMaxCapacityJ ?? DEFAULT_ERS_CAPACITY_J;
+  const ersJ = trace["ers.store_energy_j"]
+    ? channel("ers.store_energy_j")
+    : channel("ers.store_energy").map((percent) => (percent / 100) * capacityJ);
+
   return {
     context,
     trackLengthM,
@@ -427,7 +438,7 @@ export function prepareLap(
     steering: channel("steering"),
     gear: channel("gear"),
     rpm: channel("engine_rpm"),
-    ersJ: channel("ers.store_energy_j"),
+    ersJ,
     ersMode: channel("ers.deploy_mode"),
     wearStartPct: wear.length > 0 ? Math.max(...wear) : undefined,
   };

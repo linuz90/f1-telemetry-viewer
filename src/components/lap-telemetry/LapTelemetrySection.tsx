@@ -314,6 +314,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
               lapTimeMs: candidate.lapTimeMs,
               compound: candidate.compound,
               weather: manifest.weather,
+              ersMaxCapacityJ: manifest.ersMaxCapacityJ,
             },
             manifest.trackLengthM,
           ),

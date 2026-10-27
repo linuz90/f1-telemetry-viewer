@@ -176,6 +176,7 @@ async function main(): Promise<void> {
                 lapTimeMs: recorded.lapTimeMs,
                 compound: recorded.compound,
                 weather: manifest.weather,
+                ersMaxCapacityJ: manifest.ersMaxCapacityJ,
               },
               manifest.trackLengthM,
             ),
