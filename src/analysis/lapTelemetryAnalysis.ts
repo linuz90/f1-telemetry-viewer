@@ -84,6 +84,37 @@ const GAP_SMOOTHING_HALF_WINDOW_M = 50;
  */
 const UNIT_GAP_HALF_WINDOW_M = 20;
 
+// --- Clock -----------------------------------------------------------------
+// Online, another car's lap clock is the game's local estimate, not the
+// server's timing: it resets to 0 when the lap start arrives, 8–30 m past
+// the line (up to 0.9 s late on a laggy connection), and one network update
+// after each sector line it jumps to the official split. Between corrections
+// it ticks at the right rate. The player's own clock and offline AI cars are
+// exact. Measured on Bahrain, Oct 2026: 354 laps of 18 online rivals.
+
+/**
+ * Corrections land within this distance after the line or a sector start
+ * (47 m the furthest seen), so only clock steps there are checked.
+ */
+const CLOCK_RESYNC_WINDOW_M = 80;
+/**
+ * A clock step that disagrees with distance over speed by more than this,
+ * within the window, is a correction. Steady steps agree to a few ms;
+ * corrections are 40–350 ms. Outside the window lap distance can run up to
+ * 0.1 s per sample ahead of speed in hairpins (it follows the track's
+ * reference line, not the car's), so steps there are trusted.
+ */
+const CLOCK_RESYNC_TOLERANCE_S = 0.04;
+/** A longer step is the car standing in its pit box, which the clock times right. */
+const CLOCK_RESYNC_MAX_S = 0.5;
+/**
+ * A lap whose rebuilt clock misses its official lap time by more than this
+ * is flagged: its trace is not the lap that was timed, or the car warped.
+ * Repaired laps land within 0.03 s; the PnG 5.0.0-beta.1 online qualifying
+ * laps that ran 1–19 s long, and laps with a network warp, do not.
+ */
+export const CLOCK_DRIFT_LIMIT_S = 0.3;
+
 // --- Corner detection ------------------------------------------------------
 
 /**
@@ -247,6 +278,8 @@ export interface LapContext {
   sessionType: string;
   lapNumber: number;
   lapTimeMs: number;
+  /** Official elapsed time at the ends of sectors 1 and 2, from the paired session JSON. */
+  sectorEndsMs?: [number, number];
   compound?: string;
   weather?: string;
   /** Battery store size from the paired session JSON, joules. */
@@ -260,6 +293,11 @@ export interface PreparedLap {
   d: Float64Array;
   /** Seconds since the line, pinned to the official lap time at the end. */
   t: Float64Array;
+  /**
+   * The rebuilt clock's lap time minus the official one, before pinning.
+   * Undefined when the trace has no clock and time comes from speed.
+   */
+  clockDriftS?: number;
   speed: Float64Array;
   throttle: Float64Array;
   brake: Float64Array;
@@ -319,14 +357,145 @@ function fillGaps(values: Float64Array): void {
 }
 
 /**
- * Clean one recorded lap: drop samples before the line, fill NaNs, replace
- * stale clock samples by interpolation, and pin the clock to 0 at the line
- * and the official lap time at the track length.
+ * Elapsed seconds at every sample of a prepared lap (`d` runs from 0 to the
+ * track length; `clock` holds the recorded clock of samples 1 to n - 2),
+ * pinned to 0 at the line and the official lap time at the end.
+ *
+ * The clock is rebuilt from its own steps, so another car's late reset and
+ * line corrections (see Clock in Tuning) never become time: the first sample
+ * is reached from the line at its own speed, and a step near a timing line
+ * that disagrees with distance over speed is replaced by it. Without a clock,
+ * time comes from speed. The official sector splits, when known, then anchor
+ * either at the sector starts.
+ */
+function lapClock(
+  d: Float64Array,
+  speed: Float64Array,
+  clock: readonly number[],
+  context: LapContext,
+  sectorStartsM: readonly [number, number] | undefined,
+): { t: Float64Array; clockDriftS?: number } {
+  const n = d.length;
+  const trackLengthM = d[n - 1];
+  const lapTimeS = context.lapTimeMs / 1000;
+  const sectors =
+    sectorStartsM &&
+    sectorStartsM[0] > 0 &&
+    sectorStartsM[0] < sectorStartsM[1] &&
+    sectorStartsM[1] < trackLengthM
+      ? sectorStartsM
+      : undefined;
+  // Seconds from the line to each sample at the speeds between: the time when
+  // there is no clock, and the yardstick for clock steps when there is.
+  const travel = new Float64Array(n);
+  for (let i = 1; i < n; i += 1) {
+    travel[i] =
+      travel[i - 1] +
+      (d[i] - d[i - 1]) / Math.max((speed[i] + speed[i - 1]) / 7.2, 1);
+  }
+
+  // The exporter repeats the previous clock value on alternate samples, so
+  // only samples where it moved count; a clock frozen at one value is none.
+  let moved = 0;
+  for (let i = 1; i < clock.length; i += 1) {
+    if (clock[i] > clock[i - 1]) moved += 1;
+  }
+  let t: Float64Array;
+  let clockDriftS: number | undefined;
+  if (moved < clock.length / 4) {
+    t = Float64Array.from(travel);
+  } else {
+    const lines = [0, ...(sectors ?? [])];
+    const nearLine = (x: number) =>
+      x > trackLengthM - CLOCK_RESYNC_WINDOW_M ||
+      lines.some((line) => x >= line && x <= line + CLOCK_RESYNC_WINDOW_M);
+    t = new Float64Array(n).fill(Number.NaN);
+    t[0] = 0;
+    t[1] = travel[1];
+    // A race's first lap starts on the grid, the clock running from lights
+    // out, so past the line it already holds that time. Read it after the
+    // last reset near the line: another car's clock can be stale at first.
+    if (isRaceSessionType(context.sessionType) && context.lapNumber === 1) {
+      let start = 1;
+      for (let i = 2; i < n - 1 && d[i] <= CLOCK_RESYNC_WINDOW_M; i += 1) {
+        if (clock[i - 1] < clock[i - 2]) start = i;
+      }
+      const gridClock = clock[start - 1] - (travel[start] - travel[1]);
+      if (gridClock >= 0 && gridClock < lapTimeS) t[1] = gridClock;
+    }
+    let last = 1;
+    for (let i = 2; i < n - 1; i += 1) {
+      // A repeated or missing value is filled in by distance below.
+      if (!Number.isFinite(clock[i - 1]) || clock[i - 1] === clock[last - 1])
+        continue;
+      // Negative for a reset, a flashback, or the previous lap's clock still
+      // running past the line.
+      const step = clock[i - 1] - clock[last - 1];
+      const expected = travel[i] - travel[last];
+      const correction =
+        nearLine(d[i]) &&
+        Math.abs(step - expected) > CLOCK_RESYNC_TOLERANCE_S &&
+        step < CLOCK_RESYNC_MAX_S;
+      t[i] = t[last] + (step >= 0 && !correction ? step : expected);
+      last = i;
+    }
+    t[n - 1] = t[last] + travel[n - 1] - travel[last];
+    let previous = 0;
+    for (let i = 1; i < n; i += 1) {
+      if (Number.isNaN(t[i])) continue;
+      for (let j = previous + 1; j < i; j += 1) {
+        t[j] =
+          t[previous] +
+          ((t[i] - t[previous]) * (d[j] - d[previous])) / (d[i] - d[previous]);
+      }
+      previous = i;
+    }
+    clockDriftS = t[n - 1] - lapTimeS;
+  }
+
+  // Stretch each stretch between anchors onto the official time.
+  const ends = context.sectorEndsMs;
+  const anchors: [number, number][] =
+    sectors &&
+    ends &&
+    0 < ends[0] &&
+    ends[0] < ends[1] &&
+    ends[1] < context.lapTimeMs
+      ? [
+          [0, 0],
+          [sectors[0], ends[0] / 1000],
+          [sectors[1], ends[1] / 1000],
+          [trackLengthM, lapTimeS],
+        ]
+      : [
+          [0, 0],
+          [trackLengthM, lapTimeS],
+        ];
+  const from = anchors.map(([x]) => valueAt(d, t, x));
+  const rebuilt = Float64Array.from(t);
+  let k = 0;
+  for (let i = 1; i < n; i += 1) {
+    while (k < anchors.length - 2 && d[i] > anchors[k + 1][0]) k += 1;
+    const [, to0] = anchors[k];
+    const [, to1] = anchors[k + 1];
+    t[i] =
+      to0 + ((rebuilt[i] - from[k]) * (to1 - to0)) / (from[k + 1] - from[k]);
+  }
+  t[n - 1] = lapTimeS;
+  return { t, clockDriftS };
+}
+
+/**
+ * Clean one recorded lap: drop samples before the line, fill NaNs, rebuild
+ * the clock (`lapClock`) and pin it to 0 at the line and the official lap
+ * time at the track length. `sectorStartsM` lets the rebuild find another
+ * car's clock corrections at the sector lines and anchor the official splits.
  */
 export function prepareLap(
   trace: LapTrace,
   context: LapContext,
   trackLengthM: number,
+  sectorStartsM?: readonly [number, number],
 ): PreparedLap {
   const rawDistance = trace.lap_distance;
   if (!rawDistance) throw new Error("Lap trace has no distance channel");
@@ -366,55 +535,13 @@ export function prepareLap(
   };
 
   const speed = channel("speed");
-  const lapTimeS = context.lapTimeMs / 1000;
-  const t = new Float64Array(n).fill(Number.NaN);
-  const rawClock = trace.lap_time_ms;
-  let lastClock = 0;
-  let clockSamples = 0;
-  if (rawClock) {
-    keep.forEach((sourceIndex, i) => {
-      const value = rawClock[sourceIndex] / 1000;
-      // The exporter repeats the previous clock value on alternate samples;
-      // treat repeats as missing and interpolate them by distance instead.
-      if (Number.isFinite(value) && value > lastClock && value < lapTimeS + 1) {
-        t[i + 1] = value;
-        lastClock = value;
-        clockSamples += 1;
-      }
-    });
-  }
-
-  if (clockSamples < keep.length / 4) {
-    // No usable clock: integrate speed instead, then scale to the lap time.
-    t[0] = 0;
-    for (let i = 1; i < n; i += 1) {
-      const v = Math.max((speed[i] + speed[i - 1]) / 7.2, 1);
-      t[i] = t[i - 1] + (d[i] - d[i - 1]) / v;
-    }
-    const scale = lapTimeS / t[n - 1];
-    for (let i = 1; i < n; i += 1) t[i] *= scale;
-  } else {
-    // Estimate the clock at the line from the last good sample and its speed,
-    // then scale the lap so it ends exactly on the official time.
-    let lastGood = n - 2;
-    while (lastGood > 0 && !Number.isFinite(t[lastGood])) lastGood -= 1;
-    const tailSpeed = Math.max(speed[lastGood] / 3.6, 5);
-    const estimate = t[lastGood] + (trackLengthM - d[lastGood]) / tailSpeed;
-    const scale = estimate > 0 ? lapTimeS / estimate : 1;
-    for (let i = 1; i < n - 1; i += 1) t[i] *= scale;
-    t[0] = 0;
-    t[n - 1] = lapTimeS;
-    let previous = 0;
-    for (let i = 1; i < n; i += 1) {
-      if (!Number.isFinite(t[i])) continue;
-      for (let j = previous + 1; j < i; j += 1) {
-        t[j] =
-          t[previous] +
-          ((t[i] - t[previous]) * (d[j] - d[previous])) / (d[i] - d[previous]);
-      }
-      previous = i;
-    }
-  }
+  const { t, clockDriftS } = lapClock(
+    d,
+    speed,
+    keep.map((sourceIndex) => (trace.lap_time_ms?.[sourceIndex] ?? NaN) / 1000),
+    context,
+    sectorStartsM,
+  );
 
   const wear = ["tyre_wear.fl", "tyre_wear.fr", "tyre_wear.rl", "tyre_wear.rr"]
     .filter((name) => trace[name])
@@ -432,6 +559,7 @@ export function prepareLap(
     trackLengthM,
     d,
     t,
+    clockDriftS,
     speed,
     throttle: channel("throttle"),
     brake: channel("brake"),
@@ -1073,7 +1201,7 @@ export interface LapTip {
 export type ComparabilityTone = "same" | "differs";
 
 export interface ComparabilityItem {
-  id: "car" | "tyres" | "battery" | "weather" | "start" | "traffic";
+  id: "car" | "tyres" | "battery" | "weather" | "start" | "traffic" | "clock";
   label: string;
   tone: ComparabilityTone;
 }
@@ -1984,6 +2112,23 @@ function compareContext(
     items.push({
       id: "traffic",
       label: "Race lap: traffic and tow can play a part",
+      tone: "differs",
+    });
+  }
+  // Pinned to the official lap time either way, so only the gap along the
+  // lap is in doubt, by up to the drift.
+  const drifted = [a, b].flatMap((lap, i) =>
+    Math.abs(lap.clockDriftS ?? 0) > CLOCK_DRIFT_LIMIT_S
+      ? [`Lap ${i === 0 ? "A" : "B"}`]
+      : [],
+  );
+  if (drifted.length > 0) {
+    const worst = Math.max(
+      ...[a, b].map((lap) => Math.abs(lap.clockDriftS ?? 0)),
+    );
+    items.push({
+      id: "clock",
+      label: `${drifted.join(" and ")} timing is off by up to ${worst.toFixed(1)} s along the lap`,
       tone: "differs",
     });
   }

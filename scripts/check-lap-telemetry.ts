@@ -22,6 +22,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   buildLapSeries,
+  CLOCK_DRIFT_LIMIT_S,
   compareLaps,
   prepareLap,
   TIP_FLOOR_S,
@@ -43,6 +44,7 @@ const PAIRS_PER_LAP = 3;
 const GRID_STEP_M = 2;
 
 interface CheckedLap {
+  /** Prepared without the official splits, so its clock can be checked against them. */
   lap: PreparedLap;
   manifest: LapRecordingManifest;
   /** Official elapsed ms at the end of sectors 1 and 2, when exported. */
@@ -179,6 +181,7 @@ async function main(): Promise<void> {
                 ersMaxCapacityJ: manifest.ersMaxCapacityJ,
               },
               manifest.trackLengthM,
+              manifest.sectorStartsM,
             ),
             officialMs: officialSectorEnds(
               session,
@@ -211,11 +214,17 @@ async function main(): Promise<void> {
   if (allLaps.length < 2) return;
 
   // --- Clock accuracy ------------------------------------------------------
-  const perLapErrors: number[] = [];
+  // Other cars' clocks are the game's online estimate (see Clock in the
+  // analysis Tuning section), so they are reported apart from the player's.
+  const perLapErrors = { player: [] as number[], others: [] as number[] };
+  let drifted = 0;
   for (const { lap, manifest, officialMs } of allLaps) {
+    if (Math.abs(lap.clockDriftS ?? 0) > CLOCK_DRIFT_LIMIT_S) drifted += 1;
     if (!officialMs || !manifest.sectorStartsM) continue;
     manifest.sectorStartsM.forEach((start, k) => {
-      perLapErrors.push(valueAt(lap.d, lap.t, start) - officialMs[k] / 1000);
+      perLapErrors[lap.context.isPlayer ? "player" : "others"].push(
+        valueAt(lap.d, lap.t, start) - officialMs[k] / 1000,
+      );
     });
   }
   const gapErrors = new Map<number, number[]>(WINDOWS_M.map((w) => [w, []]));
@@ -288,12 +297,18 @@ async function main(): Promise<void> {
   }
 
   console.log("\nClock accuracy against official sector times");
-  if (perLapErrors.length === 0) {
+  console.log(
+    `  ${drifted} laps whose rebuilt clock misses the lap time by over ${CLOCK_DRIFT_LIMIT_S} s`,
+  );
+  if (perLapErrors.player.length + perLapErrors.others.length === 0) {
     console.log("  no laps with official sector times and sector starts");
   } else {
-    console.log(
-      `  one lap's clock at a sector end: mean ${ms(mean(perLapErrors))}, RMS ${ms(rms(perLapErrors))}, worst ${ms(maxAbs(perLapErrors))} (n=${perLapErrors.length})`,
-    );
+    for (const [who, errors] of Object.entries(perLapErrors)) {
+      if (errors.length === 0) continue;
+      console.log(
+        `  one lap's clock at a sector end, ${who}: mean ${ms(mean(errors))}, RMS ${ms(rms(errors))}, worst ${ms(maxAbs(errors))} (n=${errors.length})`,
+      );
+    }
     for (const window of WINDOWS_M) {
       const errors = gapErrors.get(window)!;
       if (errors.length === 0) continue;

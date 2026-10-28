@@ -34,6 +34,8 @@ export interface RecordedLap {
   lapNumber: number;
   /** Official lap time; null for untimed laps. */
   lapTimeMs: number | null;
+  /** Official elapsed time at the ends of sectors 1 and 2, from the paired session JSON. */
+  sectorEndsMs?: [number, number];
   valid: boolean;
   compound?: string;
   /** Tyre age in laps at the start of this lap, as exported. */
@@ -70,6 +72,13 @@ export interface RecordingPairing {
   weather?: string;
   /** Battery store size; 5.0.0-beta.2 records the store only as a percentage of it. */
   ersMaxCapacityJ?: number;
+  /** Each driver's official timing by lap (index 0 = lap 1), keyed by driver index. */
+  lapTimings?: Record<number, PairedLapTiming[]>;
+}
+
+export interface PairedLapTiming {
+  lapTimeMs: number;
+  sectorEndsMs?: [number, number];
 }
 
 export interface LapRecordingManifest {
