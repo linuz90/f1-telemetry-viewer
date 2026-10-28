@@ -6,6 +6,7 @@ import {
   prepareLap,
   sectorGaps,
   TIP_FLOOR_S,
+  valueAt,
   type LapContext,
   type PreparedLap,
 } from "../src/analysis/lapTelemetryAnalysis";
@@ -44,6 +45,7 @@ const CORNERS = [
   { apex: 1000, minKmh: 120 },
   { apex: 2500, minKmh: 160 },
 ];
+const SECTOR_STARTS: [number, number] = [1800, 3000];
 
 function lap(
   key: string,
@@ -78,6 +80,7 @@ function lap(
       ...context,
     },
     TRACK_LENGTH,
+    SECTOR_STARTS,
   );
 }
 
@@ -112,7 +115,7 @@ test("sector deltas put the loss in its sector and add up to the lap gap", () =>
   const a = lap("a", { corners: [{ apex: 1000, minKmh: 112 }, CORNERS[1]] });
   const b = lap("b");
   const total = (a.context.lapTimeMs - b.context.lapTimeMs) / 1000;
-  const [{ key, deltasS }] = sectorGaps(buildLapSeries([a, b]), [1800, 3000]);
+  const [{ key, deltasS }] = sectorGaps(buildLapSeries([a, b]), SECTOR_STARTS);
   assert.equal(key, "b");
   assert.ok(Math.abs(deltasS[0] + deltasS[1] + deltasS[2] - total) < 1e-6);
   assert.ok(deltasS[0] > TIP_FLOOR_S);
@@ -172,6 +175,91 @@ test("tips name the official turn, or lap distance when no marker is near", () =
   assert.equal(headline(1400), "Brake later into the 1.00 km corner");
 });
 
+/** Elapsed seconds at `x` metres on a clean recorded clock. */
+function clockAt(channels: SyntheticChannels, x: number): number {
+  const d = channels.lap_distance;
+  const t = channels.lap_time_ms;
+  const j = d.findIndex((value) => value >= x);
+  return (
+    (t[j - 1] + ((t[j] - t[j - 1]) * (x - d[j - 1])) / (d[j] - d[j - 1])) / 1000
+  );
+}
+
+/**
+ * The clock the game keeps for another car online: it resets `resetLagS`
+ * late, the previous lap's time still running until then, and jumps to the
+ * official split `syncLagS` after each sector line.
+ */
+function remoteClock(resetLagS: number, syncLagS: number) {
+  return (channels: SyntheticChannels) => {
+    const splits = SECTOR_STARTS.map((x) => clockAt(channels, x));
+    channels.lap_time_ms = channels.lap_time_ms.map((ms, i) => {
+      const t = ms / 1000;
+      if (channels.lap_distance[i] <= 0 || t < resetLagS) return 91_000 + ms;
+      let clock = t - resetLagS;
+      for (const split of splits) {
+        if (t >= split + syncLagS) clock = t - syncLagS;
+      }
+      return clock * 1000;
+    });
+  };
+}
+
+test("another car's late-reset, line-synced clock is rebuilt to the official splits", () => {
+  const { channels } = syntheticLap({
+    trackLengthM: TRACK_LENGTH,
+    corners: CORNERS,
+  });
+  const splits = SECTOR_STARTS.map((x) => clockAt(channels, x));
+  const sectorEndsMs = splits.map((s) => Math.round(s * 1000)) as [
+    number,
+    number,
+  ];
+  const truth = lap("truth");
+  for (const [resetLagS, syncLagS] of [
+    [0.3, 0.1],
+    [0.1, 0.09],
+    [0.7, 0.3],
+  ]) {
+    const remote = (context: Partial<LapContext>) =>
+      lap("remote", {}, context, remoteClock(resetLagS, syncLagS));
+    for (const [prepared, tolerance] of [
+      [remote({}), 0.02],
+      [remote({ sectorEndsMs }), 0.005],
+    ] as const) {
+      SECTOR_STARTS.forEach((x, k) => {
+        const error = valueAt(prepared.d, prepared.t, x) - splits[k];
+        assert.ok(
+          Math.abs(error) < tolerance,
+          `lag ${resetLagS}/${syncLagS}: ${error.toFixed(3)} s at ${x} m`,
+        );
+      });
+      // No jump in the gap just after the line.
+      const { gaps } = buildLapSeries([truth, prepared]);
+      assert.ok(Math.abs(gaps[0].gapS[20]) < tolerance);
+      assert.ok(Math.abs(prepared.clockDriftS ?? 1) < 0.02);
+      assert.equal(
+        compareLaps(truth, prepared).comparability.some(
+          (item) => item.id === "clock",
+        ),
+        false,
+      );
+    }
+  }
+});
+
+test("a lap whose clock misses its lap time is flagged as unreliable", () => {
+  const slow = lap("slow", {}, {}, (channels) => {
+    channels.lap_time_ms = channels.lap_time_ms.map((ms) => ms * 1.03);
+  });
+  assert.ok((slow.clockDriftS ?? 0) > 1);
+  const clock = compareLaps(lap("a"), slow).comparability.find(
+    (item) => item.id === "clock",
+  );
+  assert.equal(clock?.tone, "differs");
+  assert.match(clock?.label ?? "", /Lap B/);
+});
+
 test("a stale clock on alternate samples does not change the verdict", () => {
   const options = {
     corners: [{ apex: 1000, minKmh: 120, brakeFor: 175 }, CORNERS[1]],
@@ -185,6 +273,79 @@ test("a stale clock on alternate samples does not change the verdict", () => {
     stale.tips.map((tip) => [tip.headline, tip.timeS.toFixed(2)]),
     clean.tips.map((tip) => [tip.headline, tip.timeS.toFixed(2)]),
   );
+  // Against a clean copy of itself, through a hairpin where one stale sample
+  // is worth 0.2 s.
+  const hairpin = { corners: [{ apex: 1000, minKmh: 40 }, CORNERS[1]] };
+  assert.deepEqual(
+    compareLaps(lap("a", { ...hairpin, staleClock: true }), lap("b", hairpin))
+      .tips,
+    [],
+  );
+});
+
+test("a race's first lap keeps the time from the grid to the line", () => {
+  const { channels, lapTimeMs } = syntheticLap({
+    trackLengthM: TRACK_LENGTH,
+    corners: CORNERS,
+  });
+  const gridS = 6.75;
+  // Another car's clock can also still hold a stale value for the first
+  // metres past the line.
+  for (const staleUntilM of [0, 20]) {
+    const prepared = lap(
+      "start",
+      {},
+      {
+        sessionType: "Race",
+        lapNumber: 1,
+        lapTimeMs: lapTimeMs + gridS * 1000,
+      },
+      (c) => {
+        c.lap_time_ms = c.lap_time_ms.map((ms, i) =>
+          c.lap_distance[i] > 0 && c.lap_distance[i] < staleUntilM
+            ? 20_012 + ms
+            : ms + gridS * 1000,
+        );
+      },
+    );
+    const error = valueAt(prepared.d, prepared.t, 500) - clockAt(channels, 500);
+    assert.ok(Math.abs(error - gridS) < 0.02, `${error.toFixed(3)} s`);
+    assert.ok(Math.abs(prepared.clockDriftS ?? 1) < 0.02);
+  }
+});
+
+test("a lap without a usable clock takes its time from speed, anchored to the splits", () => {
+  const { channels } = syntheticLap({
+    trackLengthM: TRACK_LENGTH,
+    corners: CORNERS,
+  });
+  const splits = SECTOR_STARTS.map((x) => clockAt(channels, x));
+  const sectorEndsMs = splits.map((s) => Math.round(s * 1000)) as [
+    number,
+    number,
+  ];
+  // Speed reads 5% low in sector 1, so integrating it alone runs slow there.
+  const slowSpeed = (c: SyntheticChannels) => {
+    c.speed = c.speed.map((v, i) =>
+      c.lap_distance[i] < SECTOR_STARTS[0] ? v * 0.95 : v,
+    );
+  };
+  for (const clock of [
+    (c: SyntheticChannels) => delete c.lap_time_ms,
+    (c: SyntheticChannels) => (c.lap_time_ms = c.lap_time_ms.map(() => 0)),
+  ]) {
+    const prepared = lap("noclock", {}, { sectorEndsMs }, (c) => {
+      slowSpeed(c);
+      clock(c);
+    });
+    assert.ok(prepared.t.every(Number.isFinite));
+    assert.equal(prepared.clockDriftS, undefined);
+    SECTOR_STARTS.forEach((x, k) => {
+      assert.ok(
+        Math.abs(valueAt(prepared.d, prepared.t, x) - splits[k]) < 0.005,
+      );
+    });
+  }
 });
 
 test("running out of battery on a straight is blamed on battery, not driving", () => {

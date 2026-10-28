@@ -154,7 +154,28 @@ test("a recording pairs with its Just_in_case session JSON", () => {
         weather: "Clear",
       },
       "classification-data": [
-        { index: 3, "is-player": false, "car-status": {} },
+        {
+          index: 3,
+          "is-player": false,
+          "car-status": {},
+          "session-history": {
+            "lap-history-data": [
+              {
+                "lap-time-in-ms": 81_250,
+                "sector-1-time-in-ms": 27_100,
+                "sector-2-time-in-ms": 21_400,
+              },
+              {
+                "lap-time-in-ms": 95_000,
+                "sector-1-time-in-ms": 2_000,
+                "sector-1-time-minutes": 1,
+                "sector-2-time-in-ms": 20_000,
+              },
+              // A partial lap: PnG copies its one sector into the lap time.
+              { "lap-time-in-ms": 27_900, "sector-1-time-in-ms": 27_900 },
+            ],
+          },
+        },
         {
           index: 21,
           "is-player": true,
@@ -170,6 +191,14 @@ test("a recording pairs with its Just_in_case session JSON", () => {
     sectorStartsM: [1757.05, 3178.6],
     weather: "Clear",
     ersMaxCapacityJ: 4_000_000,
+    lapTimings: {
+      3: [
+        { lapTimeMs: 81_250, sectorEndsMs: [27_100, 48_500] },
+        { lapTimeMs: 95_000, sectorEndsMs: [62_000, 82_000] },
+        { lapTimeMs: 27_900 },
+      ],
+      21: [],
+    },
   });
 
   // A Manual save stamped a second after its recording still pairs, across a

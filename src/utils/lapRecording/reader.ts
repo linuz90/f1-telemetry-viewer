@@ -9,6 +9,7 @@ import {
   type LapRecordingManifest,
   type LapRecordingSummary,
   type LapTrace,
+  type PairedLapTiming,
   type RecordedDriver,
   type RecordedLap,
   type RecordingPairing,
@@ -111,7 +112,28 @@ interface PairableSession {
     index: number;
     "is-player"?: boolean;
     "car-status"?: { "ers-max-capacity"?: unknown };
+    "session-history"?: { "lap-history-data"?: PairableLapHistory[] };
   }[];
+}
+
+interface PairableLapHistory {
+  "lap-time-in-ms"?: unknown;
+  "sector-1-time-in-ms"?: unknown;
+  "sector-1-time-minutes"?: unknown;
+  "sector-2-time-in-ms"?: unknown;
+  "sector-2-time-minutes"?: unknown;
+}
+
+function pairedLapTiming(lap: PairableLapHistory): PairedLapTiming {
+  const ms = (millis: unknown, minutes: unknown) =>
+    (finitePositive(millis) ?? 0) + (finitePositive(minutes) ?? 0) * 60_000;
+  const lapTimeMs = finitePositive(lap["lap-time-in-ms"]) ?? 0;
+  const s1 = ms(lap["sector-1-time-in-ms"], lap["sector-1-time-minutes"]);
+  const s2 = ms(lap["sector-2-time-in-ms"], lap["sector-2-time-minutes"]);
+  // Partial laps copy a sector into the lap time; their splits stay out.
+  return s1 > 0 && s2 > 0 && s1 + s2 < lapTimeMs
+    ? { lapTimeMs, sectorEndsMs: [s1, s1 + s2] }
+    : { lapTimeMs };
 }
 
 /** Context the recording lacks, read from the paired session JSON. */
@@ -135,6 +157,18 @@ export function buildRecordingPairing(
     ersMaxCapacityJ: drivers
       ?.map((d) => finitePositive(d["car-status"]?.["ers-max-capacity"]))
       .find((capacity) => capacity !== undefined),
+    // Online, another car's recorded clock is off at the lines; its official
+    // splits let `prepareLap` re-anchor it.
+    lapTimings: drivers
+      ? Object.fromEntries(
+          drivers.map((d) => [
+            d.index,
+            (d["session-history"]?.["lap-history-data"] ?? []).map(
+              pairedLapTiming,
+            ),
+          ]),
+        )
+      : undefined,
   };
 }
 
@@ -408,13 +442,21 @@ export async function openLapRecording(
       team: driver.team,
       carNumber: driver.carNumber,
       laps: driver.laps
-        .map(
-          ({ coverage, ...lap }): RecordedLap => ({
+        .map(({ coverage, ...lap }): RecordedLap => {
+          // Only when the history agrees on the lap time, so a renumbered lap
+          // never borrows another lap's splits.
+          const timing =
+            pairing?.lapTimings?.[driver.index]?.[lap.lapNumber - 1];
+          return {
             ...lap,
+            sectorEndsMs:
+              timing && timing.lapTimeMs === lap.lapTimeMs
+                ? timing.sectorEndsMs
+                : undefined,
             ...coverage,
             ...judgeLapCoverage(lap.lapTimeMs, coverage, trackLengthM),
-          }),
-        )
+          };
+        })
         .sort((a, b) => a.lapNumber - b.lapNumber),
     }))
     .sort((a, b) => a.index - b.index);

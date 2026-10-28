@@ -286,6 +286,15 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
     useMemo(() => selected.map((c) => c.ref), [selected]),
   );
 
+  // Sectors come from a paired session JSON; an imported lap has none, but
+  // the other lap, at the same circuit, usually does.
+  const sectorStarts = selected
+    .map(
+      (candidate) =>
+        selectedManifests.get(candidate.ref.recordingSlug)?.sectorStartsM,
+    )
+    .find(Boolean);
+
   // "failed" shows the load error instead of a skeleton that never ends.
   const prepared = useMemo((): PreparedLap[] | "failed" | null => {
     if (selected.length === 0) return null;
@@ -300,6 +309,9 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
       const trace = traces[index]?.trace;
       const manifest = selectedManifests.get(candidate.ref.recordingSlug);
       if (!trace || !manifest) return null;
+      const recorded = manifest.drivers
+        .find((driver) => driver.index === candidate.ref.driverIndex)
+        ?.laps.find((lap) => lap.lapNumber === candidate.ref.lapNumber);
       try {
         laps.push(
           prepareLap(
@@ -312,11 +324,13 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
               sessionType: candidate.recording.sessionType,
               lapNumber: candidate.ref.lapNumber,
               lapTimeMs: candidate.lapTimeMs,
+              sectorEndsMs: recorded?.sectorEndsMs,
               compound: candidate.compound,
               weather: manifest.weather,
               ersMaxCapacityJ: manifest.ersMaxCapacityJ,
             },
             manifest.trackLengthM,
+            sectorStarts,
           ),
         );
       } catch {
@@ -324,17 +338,15 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
       }
     }
     return laps;
-  }, [selected, traces, selectedManifests, failedSelectedManifests]);
+  }, [
+    selected,
+    traces,
+    selectedManifests,
+    failedSelectedManifests,
+    sectorStarts,
+  ]);
   const preparedLaps = prepared === "failed" ? null : prepared;
 
-  // Sectors come from a paired session JSON; an imported lap has none, but
-  // the other lap, at the same circuit, usually does.
-  const sectorStarts = selected
-    .map(
-      (candidate) =>
-        selectedManifests.get(candidate.ref.recordingSlug)?.sectorStartsM,
-    )
-    .find(Boolean);
   // Scroll once per navigation, after the section has laps to show: on a
   // reload or shared link the list loads after the first render.
   const scrolledFor = useRef<string | null>(null);
