@@ -69,21 +69,19 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
           data={analysis.data}
           margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
+          <CartesianGrid vertical={false} stroke={CHART_THEME.grid} />
           <XAxis
             dataKey="lap"
             stroke={CHART_THEME.axis}
+            tickLine={false}
+            tickFormatter={(lap) => `L${lap}`}
+            minTickGap={16}
             fontSize={11}
-            label={{
-              value: "Lap",
-              position: "insideBottom",
-              offset: -2,
-              fill: CHART_THEME.axis,
-              fontSize: 11,
-            }}
           />
           <YAxis
             stroke={CHART_THEME.axis}
+            tickLine={false}
+            axisLine={false}
             fontSize={11}
             domain={[0, 100]}
             ticks={[0, 25, 50, 75, 100]}
@@ -99,9 +97,10 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
             ) => [value != null ? `${value.toFixed(0)}%` : "–", name ?? ""]}
           />
           {activeFields.map((field) => (
+            // Damage arrives in jumps, so the line steps rather than curves.
             <Area
               key={field.key}
-              type="monotone"
+              type="stepAfter"
               dataKey={field.key}
               name={field.label}
               stroke={DAMAGE_FIELD_COLORS[field.key]}
@@ -112,6 +111,21 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
           ))}
         </AreaChart>
       </ResponsiveContainer>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tone-400">
+        {activeFields.map((field) => (
+          <span key={field.key} className="inline-flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="size-2 rounded-full"
+              style={{ backgroundColor: DAMAGE_FIELD_COLORS[field.key] }}
+            />
+            {field.label}
+            <b className="font-semibold text-tone-100 tabular-nums">
+              {Math.max(...analysis.data.map((row) => row[field.key]))}%
+            </b>
+          </span>
+        ))}
+      </div>
       {analysis.faults.length > 0 && <FaultBadges faults={analysis.faults} />}
     </div>
   );

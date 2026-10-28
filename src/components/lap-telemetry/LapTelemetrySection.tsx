@@ -466,17 +466,17 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
     return (
       <SectionShell>
         <SectionHeader
-          title="Lap Telemetry"
+          title="Lap telemetry"
           hint="Recorded laps, aligned by distance"
         />
         <div className="flex items-start gap-3">
-          <CircleOff className="mt-0.5 size-4 shrink-0 text-zinc-600" />
-          <p className="text-sm text-zinc-400">
+          <CircleOff className="mt-0.5 size-4 shrink-0 text-tone-600" />
+          <p className="text-sm text-tone-400">
             This session was recorded, but no lap start to finish
             {partial ? (
               <>
                 : {whose === "You" ? "your" : `${whose}'s`}{" "}
-                <span className="font-mono text-zinc-200">
+                <span className="font-mono text-tone-200">
                   {msToLapTime(partial.lapTimeMs)}
                 </span>{" "}
                 on lap {partial.lapNumber} is incomplete ({partial.reason})
@@ -538,7 +538,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   return (
     <SectionShell>
       <SectionHeader
-        title="Lap Telemetry"
+        title="Lap telemetry"
         hint="Recorded laps, aligned by distance"
       />
 
@@ -555,19 +555,19 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
       />
 
       {slots.length === 1 && !canAdd && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-tone-500">
           No other complete lap is recorded here to compare against yet.
         </p>
       )}
       {traceFailed && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-tone-500">
           Could not load the recorded traces for these laps.
         </p>
       )}
       {loading && (
         <div
           role="status"
-          className="h-64 animate-pulse rounded-xl bg-zinc-800/30"
+          className="h-64 animate-pulse rounded-xl bg-tone-800/30"
           aria-label="Loading lap traces"
         />
       )}

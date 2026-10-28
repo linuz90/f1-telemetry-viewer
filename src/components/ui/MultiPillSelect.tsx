@@ -87,11 +87,11 @@ export function MultiPillSelect({
         )}
       >
         <span className="truncate">{triggerLabel}</span>
-        <ChevronDown className="size-3 shrink-0 text-zinc-500" />
+        <ChevronDown className="size-3 shrink-0 text-tone-500" />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[12rem] overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 py-1 shadow-lg shadow-black/20">
+        <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[12rem] overflow-hidden rounded-md border border-tone-800 bg-tone-900 py-1 shadow-lg shadow-black/20">
           <CheckboxMenuItem
             checked={value.length === 0}
             onToggle={() => onChange([])}
@@ -99,7 +99,7 @@ export function MultiPillSelect({
             {allOption?.label}
           </CheckboxMenuItem>
 
-          <div className="my-1 h-px bg-zinc-800" />
+          <div className="my-1 h-px bg-tone-800" />
 
           {typeOptions.map((option) => (
             <CheckboxMenuItem

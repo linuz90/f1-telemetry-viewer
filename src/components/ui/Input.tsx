@@ -66,7 +66,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       {leftAdornment && (
         <span
           className={cn(
-            "pointer-events-none absolute top-1/2 -translate-y-1/2 text-zinc-600",
+            "pointer-events-none absolute top-1/2 -translate-y-1/2 text-tone-600",
             styles.leftAdornment,
           )}
         >
@@ -76,7 +76,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       <input
         ref={ref}
         className={cn(
-          "w-full min-w-0 border border-zinc-800/80 bg-zinc-950/70 text-zinc-200 outline-none transition-colors placeholder:text-zinc-600 hover:border-zinc-700 focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600/50 disabled:cursor-not-allowed disabled:opacity-50",
+          "w-full min-w-0 border border-tone-800/80 bg-tone-950/70 text-tone-200 outline-none transition-colors placeholder:text-tone-600 hover:border-tone-700 focus:border-tone-600 focus:ring-1 focus:ring-tone-600/50 disabled:cursor-not-allowed disabled:opacity-50",
           styles.input,
           leftAdornment && styles.leftPadding,
           rightAdornment && styles.rightPadding,
@@ -87,7 +87,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       {rightAdornment && (
         <span
           className={cn(
-            "absolute top-1/2 -translate-y-1/2 text-zinc-500",
+            "absolute top-1/2 -translate-y-1/2 text-tone-500",
             styles.rightAdornment,
           )}
         >

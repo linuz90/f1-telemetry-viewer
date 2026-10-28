@@ -118,10 +118,10 @@ function OwnerForm({ entry }: { entry: LapImport }) {
         }}
       >
         <div className="pr-8">
-          <h3 id={titleId} className="text-lg font-semibold text-zinc-100">
+          <h3 id={titleId} className="text-lg font-semibold text-tone-100">
             Whose laps are these?
           </h3>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-tone-500">
             {getTrackDisplayName(entry.raw.track)} · {recordingLabel(entry.raw)}{" "}
             · {entry.fileName}
           </p>
@@ -153,7 +153,7 @@ function OwnerForm({ entry }: { entry: LapImport }) {
         </div>
 
         <div className="min-h-0 space-y-1">
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-tone-500">
             Lap files don't say who was driving. Which car was{" "}
             {who === "me" ? "yours" : "theirs"}?
           </p>
@@ -172,8 +172,8 @@ function OwnerForm({ entry }: { entry: LapImport }) {
                 className={cn(
                   "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
                   driver.index === driverIndex
-                    ? "bg-zinc-800 text-zinc-100 ring-1 ring-inset ring-white/[0.08]"
-                    : "text-zinc-400 hover:bg-zinc-800/50",
+                    ? "bg-tone-800 text-tone-100 ring-1 ring-inset ring-tone-0/[0.08]"
+                    : "text-tone-400 hover:bg-tone-800/50",
                 )}
               >
                 <span
@@ -182,11 +182,11 @@ function OwnerForm({ entry }: { entry: LapImport }) {
                 />
                 <span className="flex-1 truncate">
                   {driver.name}{" "}
-                  <span className="ml-1 text-xs text-zinc-600">
+                  <span className="ml-1 text-xs text-tone-600">
                     {driver.team}
                   </span>
                 </span>
-                <span className="font-mono text-xs tabular-nums text-zinc-500">
+                <span className="font-mono text-xs tabular-nums text-tone-500">
                   {driver.best
                     ? msToLapTime(driver.best.lapTimeMs)
                     : driver.complete > 0
@@ -200,7 +200,7 @@ function OwnerForm({ entry }: { entry: LapImport }) {
             <button
               type="button"
               onClick={() => setShowAll(true)}
-              className="px-2.5 text-xs text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+              className="px-2.5 text-xs text-tone-500 underline-offset-2 hover:text-tone-300 hover:underline"
             >
               {comparable.length === 0
                 ? "No car has a complete lap; show all"
@@ -210,7 +210,7 @@ function OwnerForm({ entry }: { entry: LapImport }) {
         </div>
 
         {picked && !picked.best && (
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-tone-500">
             {picked.complete > 0
               ? "Its complete laps are all invalid or pit laps"
               : "The file has no complete lap of this car"}
@@ -219,7 +219,7 @@ function OwnerForm({ entry }: { entry: LapImport }) {
           </p>
         )}
         {!scopeLoaded && (
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-tone-500">
             No {entry.raw.formula ?? "matching"} sessions are loaded, so these
             laps will show once some are.
           </p>

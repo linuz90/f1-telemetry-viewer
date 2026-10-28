@@ -75,11 +75,11 @@ function RowButton({
       data-slot={slot}
       onClick={() => onPick(row.candidate)}
       className={cn(
-        "grid w-full grid-cols-[1.5rem_5rem_1fr_auto] items-center gap-x-3 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-zinc-800/60",
-        slot && "bg-zinc-800/50",
+        "grid w-full grid-cols-[1.5rem_5rem_1fr_auto] items-center gap-x-3 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-tone-800/60",
+        slot && "bg-tone-800/50",
       )}
     >
-      <span className="font-mono text-2xs font-semibold text-zinc-400">
+      <span className="font-mono text-2xs font-semibold text-tone-400">
         {slot ?? ""}
       </span>
       <span
@@ -89,7 +89,7 @@ function RowButton({
             ? "text-best font-semibold"
             : highlight === "personal"
               ? "text-ahead font-semibold"
-              : "text-zinc-200",
+              : "text-tone-200",
         )}
       >
         {msToLapTime(row.lapTimeMs)}
@@ -101,13 +101,13 @@ function RowButton({
             style={{ backgroundColor: recordingTeamColor(row.team) }}
           />
         )}
-        <span className="truncate text-sm text-zinc-200">{row.driver}</span>
+        <span className="truncate text-sm text-tone-200">{row.driver}</span>
         {row.candidate.isFriend && (
           <Badge tone="sky" size="xs" shape="square" className="shrink-0">
             Friend
           </Badge>
         )}
-        <span className="hidden truncate text-xs text-zinc-500 sm:inline">
+        <span className="hidden truncate text-xs text-tone-500 sm:inline">
           {row.context}
         </span>
       </span>
@@ -303,10 +303,10 @@ export function LapPicker({
     <Modal onClose={onClose} className="max-h-[85vh] max-w-2xl overflow-hidden">
       <div ref={bodyRef} className="flex min-h-0 flex-col gap-3 p-5">
         <div className="pr-8">
-          <h3 className="text-lg font-semibold text-zinc-100">
+          <h3 className="text-lg font-semibold text-tone-100">
             Choose lap {slotName}
           </h3>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-tone-500">
             Only laps recorded start to finish are listed.
           </p>
         </div>
@@ -326,14 +326,14 @@ export function LapPicker({
                   className={cn(
                     "flex min-w-0 flex-col gap-1 rounded-xl px-3 py-2 text-left ring-1 ring-inset transition-colors disabled:cursor-default",
                     slot === slotName
-                      ? "bg-zinc-800 ring-white/[0.1]"
-                      : "bg-zinc-800/40 ring-white/[0.04] enabled:hover:bg-zinc-800/80",
+                      ? "bg-tone-800 ring-tone-0/[0.1]"
+                      : "bg-tone-800/40 ring-tone-0/[0.04] enabled:hover:bg-tone-800/80",
                   )}
                 >
                   <span className="flex items-center justify-between gap-2">
                     <Eyebrow>{preset.label}</Eyebrow>
                     {slot && (
-                      <span className="font-mono text-2xs font-semibold text-zinc-400">
+                      <span className="font-mono text-2xs font-semibold text-tone-400">
                         {slot}
                       </span>
                     )}
@@ -346,14 +346,14 @@ export function LapPicker({
                           backgroundColor: recordingTeamColor(lap.team),
                         }}
                       />
-                      <span className="truncate text-sm text-zinc-200">
+                      <span className="truncate text-sm text-tone-200">
                         {driverLabel(lap.driverName, lap.isPlayer)}
                       </span>
                       <span
                         className={cn(
                           "ml-auto font-mono text-sm tabular-nums",
                           preset.id === "my-best"
-                            ? "text-zinc-100"
+                            ? "text-tone-100"
                             : "text-best",
                         )}
                       >
@@ -361,7 +361,7 @@ export function LapPicker({
                       </span>
                     </span>
                   ) : (
-                    <span className="block text-sm text-zinc-500 first-letter:uppercase">
+                    <span className="block text-sm text-tone-500 first-letter:uppercase">
                       {preset.reason}
                     </span>
                   )}
@@ -421,7 +421,7 @@ export function LapPicker({
                   key={driver.index}
                   className={cn(
                     driver.index === sessionManifest.playerIndex &&
-                      "mb-1 border-b border-white/[0.06] pb-1",
+                      "mb-1 border-b border-tone-0/[0.06] pb-1",
                   )}
                 >
                   <button
@@ -430,8 +430,8 @@ export function LapPicker({
                     className={cn(
                       "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
                       driver.index === sessionDriver
-                        ? "bg-zinc-800 text-zinc-100"
-                        : "text-zinc-400 hover:bg-zinc-800/50",
+                        ? "bg-tone-800 text-tone-100"
+                        : "text-tone-400 hover:bg-tone-800/50",
                     )}
                   >
                     <span
@@ -444,7 +444,7 @@ export function LapPicker({
                       className={cn(
                         "flex-1 truncate",
                         driver.index === sessionManifest.playerIndex &&
-                          "font-medium text-zinc-100",
+                          "font-medium text-tone-100",
                       )}
                     >
                       {driverLabel(
@@ -457,7 +457,7 @@ export function LapPicker({
                         "font-mono text-xs tabular-nums",
                         best && best.lapTimeMs === sessionFastest
                           ? "text-best"
-                          : "text-zinc-500",
+                          : "text-tone-500",
                       )}
                     >
                       {best ? msToLapTime(best.lapTimeMs) : "–"}
@@ -468,7 +468,7 @@ export function LapPicker({
             </ul>
             <div className="flex min-h-0 flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2 pl-2.5">
-                <span className="truncate text-xs text-zinc-500">
+                <span className="truncate text-xs text-tone-500">
                   {activeDriver &&
                     `${driverLabel(
                       activeDriver.driver.name,
@@ -521,7 +521,7 @@ export function LapPicker({
         ) : (
           <div className="max-h-[55vh] space-y-0.5 overflow-y-auto">
             {trackRows.length === 0 && (
-              <p className="px-2.5 py-4 text-sm text-zinc-500">
+              <p className="px-2.5 py-4 text-sm text-tone-500">
                 {who === "mine"
                   ? "No complete lap of yours here yet."
                   : who === "friends"

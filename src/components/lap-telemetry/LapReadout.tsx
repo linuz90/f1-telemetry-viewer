@@ -146,11 +146,11 @@ export function LapReadout({
           .join(" · ");
 
   return (
-    <div className="rounded-xl bg-zinc-950/40 px-3 py-2 ring-1 ring-inset ring-white/[0.04]">
+    <div className="rounded-xl bg-tone-950/40 px-3 py-2 ring-1 ring-inset ring-tone-0/[0.04]">
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <PlaybackControls playback={playback} />
-          <span className="truncate font-mono text-2xs tabular-nums text-zinc-500">
+          <span className="truncate font-mono text-2xs tabular-nums text-tone-500">
             {head}
           </span>
         </div>
@@ -260,29 +260,29 @@ function InputCard({
 
   return (
     <div
-      className="flex flex-col gap-1.5 rounded-lg bg-zinc-950/60 px-2.5 py-2"
+      className="flex flex-col gap-1.5 rounded-lg bg-tone-950/60 px-2.5 py-2"
       style={{
         boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${slot.color} 28%, transparent)`,
       }}
     >
       <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="min-w-0 truncate text-zinc-300">
+        <span className="min-w-0 truncate text-tone-300">
           <span
             className="mr-1.5 inline-block size-2 rounded-full align-middle"
             style={{ backgroundColor: slot.color }}
           />
-          <span className="text-zinc-500">{slot.slot}</span> {slot.label}
+          <span className="text-tone-500">{slot.slot}</span> {slot.label}
         </span>
         {gapS !== null && (
           <span className="shrink-0 font-mono text-2xs tabular-nums">
-            <span className="text-zinc-600">A </span>
+            <span className="text-tone-600">A </span>
             <span
               className={cn(
                 gapS > 0.0005
                   ? "text-behind"
                   : gapS < -0.0005
                     ? "text-ahead"
-                    : "text-zinc-400",
+                    : "text-tone-400",
               )}
             >
               {gapS >= 0 ? "+" : "−"}
@@ -366,39 +366,39 @@ function InputCard({
           {ghostChannels && at !== null && (
             <SteeringWheel
               steering={read(ghostChannels.steering)}
-              className="absolute text-zinc-300 opacity-25"
+              className="absolute text-tone-300 opacity-25"
             />
           )}
           <SteeringWheel
             steering={steering}
             className={cn(
               "relative",
-              steering === null ? "text-zinc-700" : "text-zinc-300",
+              steering === null ? "text-tone-700" : "text-tone-300",
             )}
           />
         </div>
         <div className="flex w-14 shrink-0 flex-col items-end justify-center font-mono tabular-nums leading-none">
           {/* Captioned so the big number never reads as a turn number. */}
           <span className="flex items-baseline gap-1">
-            <span className="text-[9px] uppercase text-zinc-600">Gear</span>
-            <span className="text-2xl font-semibold text-zinc-100">
+            <span className="text-[9px] uppercase text-tone-600">Gear</span>
+            <span className="text-2xl font-semibold text-tone-100">
               {gear === null ? "–" : gear <= 0 ? "N" : Math.round(gear)}
             </span>
           </span>
-          <span className="mt-1 text-sm text-zinc-300">
+          <span className="mt-1 text-sm text-tone-300">
             {speed === null ? "–" : Math.round(speed)}
           </span>
-          <span className="mt-0.5 text-[9px] text-zinc-600">km/h</span>
+          <span className="mt-0.5 text-[9px] text-tone-600">km/h</span>
           {showBattery && (
             // Never empty, so the centred column cannot jump.
             <span
               className={cn(
                 "mt-1 text-[9px] font-semibold uppercase tracking-wide",
                 derating
-                  ? "text-zinc-600"
+                  ? "text-tone-600"
                   : ersModeValue !== null && Math.round(ersModeValue) === 3
                     ? "text-warning"
-                    : "text-zinc-500",
+                    : "text-tone-500",
               )}
               title={
                 derating
@@ -458,7 +458,7 @@ function InputTrail({
     <svg
       viewBox="0 -4 100 108"
       preserveAspectRatio="none"
-      className="min-w-0 flex-1 rounded bg-white/[0.015]"
+      className="min-w-0 flex-1 rounded bg-tone-0/[0.015]"
       aria-hidden
     >
       {[
@@ -525,12 +525,12 @@ function InputBar({
       title={title}
     >
       <span
-        className="whitespace-nowrap font-mono text-2xs font-medium leading-none tabular-nums text-zinc-400"
+        className="whitespace-nowrap font-mono text-2xs font-medium leading-none tabular-nums text-tone-400"
         style={readoutColor ? { color: readoutColor } : undefined}
       >
         {readout}
       </span>
-      <div className="relative w-5 flex-1 overflow-hidden rounded-sm bg-white/[0.06]">
+      <div className="relative w-5 flex-1 overflow-hidden rounded-sm bg-tone-0/[0.06]">
         {ghostValue !== null && (
           <div
             className="absolute inset-x-0 bottom-0 opacity-30"
@@ -542,7 +542,7 @@ function InputBar({
           style={{ height: `${fill}%`, backgroundColor: color }}
         />
       </div>
-      <span className="text-[9px] leading-none text-zinc-600">{label}</span>
+      <span className="text-[9px] leading-none text-tone-600">{label}</span>
     </div>
   );
 }

@@ -51,7 +51,7 @@ export function SegmentedControl<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       className={cn(
-        "flex rounded-lg bg-zinc-900/60",
+        "flex rounded-lg bg-tone-900/60",
         styles.container,
         scrollable && ["max-w-full", scrollAxisClass.x, scrollbarClass.subtle],
         className,
@@ -77,12 +77,12 @@ export function SegmentedControl<T extends string>({
             }
             onClick={() => onChange(opt.value)}
             className={cn(
-              "rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600",
+              "rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-tone-600",
               styles.button,
               fullWidth ? "flex-1" : "shrink-0",
               active
-                ? "bg-zinc-800 text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-300",
+                ? "bg-tone-800 text-tone-100"
+                : "text-tone-500 hover:text-tone-300",
             )}
           >
             <span className="inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap">
@@ -118,8 +118,8 @@ export function SegmentedControl<T extends string>({
               {opt.meta != null && (
                 <span
                   className={cn(
-                    `font-mono text-2xs font-medium leading-none`,
-                    active ? "text-zinc-400/75" : "text-zinc-600",
+                    `text-2xs font-medium leading-none tabular-nums`,
+                    active ? "text-tone-400/75" : "text-tone-600",
                   )}
                 >
                   {opt.meta}

@@ -4,25 +4,38 @@ import {
   SESSION_FILTERS_STORAGE_KEY,
 } from "../constants/storage";
 import type { SessionSummary } from "../types/telemetry";
-import {
-  isQualifyingSessionType,
-  isRaceSessionType,
-  isTimeTrialSessionType,
-} from "../utils/sessionTypes";
+import { summaryKind } from "../analysis/sessionKind";
+import { getTrackId } from "../utils/tracks";
 import { readStoredString, writeStoredString } from "../utils/storage";
 
-export type SessionTypeFilter = "all" | "race" | "quali" | "tt";
+export type SessionTypeFilter = "all" | "race" | "long-run" | "quali" | "tt";
 export type SessionModeFilter = "all" | "online" | "ai";
 
+/**
+ * The session log's filters. Shared by the log, the top-bar menu and the
+ * session pages' ‹ ›, which step through the log as filtered; the Sessions page
+ * mirrors them into its URL so a filtered log can be linked.
+ */
 export interface SessionListFilters {
   type: SessionTypeFilter;
   mode: SessionModeFilter;
+  /** Canonical track id, or null for every track. */
+  track: string | null;
 }
 
 export const DEFAULT_FILTERS: SessionListFilters = {
   type: "all",
   mode: "all",
+  track: null,
 };
+
+export const SESSION_TYPE_FILTERS: readonly SessionTypeFilter[] = [
+  "all",
+  "race",
+  "long-run",
+  "quali",
+  "tt",
+];
 
 const DEFAULT_FILTERS_SNAPSHOT = JSON.stringify(DEFAULT_FILTERS);
 
@@ -32,11 +45,14 @@ function normalizeFilters(
   value: Partial<SessionListFilters> | null | undefined,
 ): SessionListFilters {
   return {
-    type:
-      value?.type === "race" || value?.type === "quali" || value?.type === "tt"
-        ? value.type
-        : "all",
+    type: SESSION_TYPE_FILTERS.includes(value?.type as SessionTypeFilter)
+      ? (value!.type as SessionTypeFilter)
+      : "all",
     mode: value?.mode === "online" || value?.mode === "ai" ? value.mode : "all",
+    track:
+      typeof value?.track === "string" && value.track !== ""
+        ? value.track
+        : null,
   };
 }
 
@@ -119,7 +135,8 @@ export function useSessionFilters(): readonly [
 export function areSessionFiltersDefault(filters: SessionListFilters): boolean {
   return (
     filters.type === DEFAULT_FILTERS.type &&
-    filters.mode === DEFAULT_FILTERS.mode
+    filters.mode === DEFAULT_FILTERS.mode &&
+    filters.track === DEFAULT_FILTERS.track
   );
 }
 
@@ -127,11 +144,12 @@ export function matchesSessionFilters(
   session: SessionSummary,
   filters: SessionListFilters,
 ): boolean {
-  if (filters.type === "race" && !isRaceSessionType(session.sessionType))
-    return false;
-  if (filters.type === "quali" && !isQualifyingSessionType(session.sessionType))
-    return false;
-  if (filters.type === "tt" && !isTimeTrialSessionType(session.sessionType))
+  const kind = summaryKind(session);
+  if (filters.type === "race" && kind !== "race") return false;
+  if (filters.type === "long-run" && kind !== "long-run") return false;
+  if (filters.type === "quali" && kind !== "qualifying") return false;
+  if (filters.type === "tt" && kind !== "time-trial") return false;
+  if (filters.track && getTrackId(session.track) !== filters.track)
     return false;
   if (filters.mode === "online" && session.isOnline !== true) return false;
   if (
@@ -141,4 +159,39 @@ export function matchesSessionFilters(
     return false;
   }
   return true;
+}
+
+const TYPE_PARAM: Record<SessionTypeFilter, string> = {
+  all: "",
+  race: "races",
+  "long-run": "long-runs",
+  quali: "qualifying",
+  tt: "time-trial",
+};
+
+/** Filters as URL search params (`?type=races&online=1&track=sakhir`). */
+export function sessionFiltersToParams(
+  filters: SessionListFilters,
+): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.type !== "all") params.set("type", TYPE_PARAM[filters.type]);
+  if (filters.mode !== "all") params.set("mode", filters.mode);
+  if (filters.track) params.set("track", filters.track);
+  return params;
+}
+
+export function sessionFiltersFromParams(
+  params: URLSearchParams,
+): SessionListFilters | null {
+  if (!params.has("type") && !params.has("mode") && !params.has("track")) {
+    return null;
+  }
+  const type = (Object.entries(TYPE_PARAM).find(
+    ([, value]) => value !== "" && value === params.get("type"),
+  )?.[0] ?? "all") as SessionTypeFilter;
+  return normalizeFilters({
+    type,
+    mode: params.get("mode") as SessionModeFilter,
+    track: params.get("track"),
+  });
 }

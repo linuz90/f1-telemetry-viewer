@@ -1,10 +1,9 @@
 import { cn } from "../../utils/cn";
 
 /**
- * Section-caption "eyebrow" — the mono uppercase tracking label used above
- * stats, in card headers, and as group titles. Defaults to `text-zinc-500`;
- * tinted variants (e.g. `InsightTile` matching its accent) pass a color
- * override via `className`.
+ * Section-caption "eyebrow" — the small sentence-case label used above
+ * stats, in card headers, and as group titles. Defaults to `text-tone-500`;
+ * tinted variants pass a color override via `className`.
  */
 export function Eyebrow({
   className,
@@ -13,15 +12,6 @@ export function Eyebrow({
   className?: string;
   children: React.ReactNode;
 }) {
-  const tone = className ?? "text-zinc-500";
-  return (
-    <span
-      className={cn(
-        "text-2xs font-mono font-semibold uppercase tracking-wider",
-        tone,
-      )}
-    >
-      {children}
-    </span>
-  );
+  const tone = className ?? "text-tone-500";
+  return <span className={cn("text-xs font-medium", tone)}>{children}</span>;
 }

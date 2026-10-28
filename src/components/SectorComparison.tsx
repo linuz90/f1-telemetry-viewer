@@ -29,22 +29,22 @@ type SectorTone = PerformanceTone;
 const SECTOR_TONE_CLASS: Record<SectorTone, string> = {
   best: "bg-purple-500/10 ring-purple-400/25",
   worst: "bg-amber-500/10 ring-amber-400/20",
-  normal: "bg-white/[0.03] ring-white/[0.06]",
-  invalid: "bg-white/[0.03] ring-white/[0.06]",
+  normal: "bg-tone-0/[0.03] ring-tone-0/[0.06]",
+  invalid: "bg-tone-0/[0.03] ring-tone-0/[0.06]",
 };
 
 const SECTOR_LABEL_CLASS: Record<SectorTone, string> = {
   best: "text-purple-200/60",
   worst: "text-amber-200/60",
-  normal: "text-zinc-500",
-  invalid: "text-zinc-500",
+  normal: "text-tone-500",
+  invalid: "text-tone-500",
 };
 
 const SECTOR_VALUE_CLASS: Record<SectorTone, string> = {
-  best: "text-white font-semibold",
+  best: "text-tone-0 font-semibold",
   worst: "text-amber-50",
-  normal: "text-zinc-100",
-  invalid: "text-zinc-100",
+  normal: "text-tone-100",
+  invalid: "text-tone-100",
 };
 
 function sectorTone({
@@ -77,7 +77,7 @@ export function SectorComparison({
   const [showInvalidLaps, setShowInvalidLaps] = useState(false);
   const model = buildSectorBreakdownModel({ laps, stints, perLapInfo });
   if (!model.laps.length) {
-    return <p className="text-sm text-zinc-500">No lap data for comparison.</p>;
+    return <p className="text-sm text-tone-500">No lap data for comparison.</p>;
   }
 
   const invalidLapCount = model.laps.filter((lap) => !lap.valid).length;
@@ -93,7 +93,7 @@ export function SectorComparison({
     <div>
       <SectionHeader
         size="sm"
-        title="Your Lap Breakdown"
+        title="Your laps"
         action={
           canFilterInvalidLaps ? (
             <FocusToggle
@@ -121,14 +121,14 @@ export function SectorComparison({
             <div key={d.lap}>
               <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-zinc-300">
+                  <span className="text-sm font-semibold text-tone-300">
                     Lap {d.lap}
                   </span>
                   {traceHref && <LapTraceLink href={traceHref} />}
                   {d.compound && (
                     <CompoundSwatchLabel
                       compound={d.compound}
-                      labelClassName="text-zinc-400"
+                      labelClassName="text-tone-400"
                     />
                   )}
                   {!d.valid && (
@@ -142,7 +142,7 @@ export function SectorComparison({
                   <span
                     className={cn(
                       "font-semibold",
-                      isBest ? "text-best" : "text-zinc-200",
+                      isBest ? "text-best" : "text-tone-200",
                     )}
                   >
                     {msToLapTime(d.total * 1000)}
@@ -153,9 +153,9 @@ export function SectorComparison({
                         BEST
                       </Badge>
                     ) : delta !== null ? (
-                      <span className="text-zinc-500">+{delta.toFixed(3)}</span>
+                      <span className="text-tone-500">+{delta.toFixed(3)}</span>
                     ) : (
-                      <span className="text-zinc-700">–</span>
+                      <span className="text-tone-700">–</span>
                     )}
                   </span>
                 </div>
@@ -172,10 +172,10 @@ export function SectorComparison({
                         "flex items-center gap-1",
                         d.deployMj != null && d.deployMj > 0
                           ? "text-ahead"
-                          : "text-zinc-600",
+                          : "text-tone-600",
                       )}
                     >
-                      <Eyebrow className="text-zinc-500">Dep</Eyebrow>
+                      <Eyebrow className="text-tone-500">Dep</Eyebrow>
                       <span>
                         {d.deployMj != null && d.deployMj > 0
                           ? `${d.deployMj.toFixed(1)} MJ`
@@ -189,10 +189,10 @@ export function SectorComparison({
                         "flex items-center gap-1",
                         d.harvMj != null && d.harvMj > 0
                           ? "text-sky-400"
-                          : "text-zinc-600",
+                          : "text-tone-600",
                       )}
                     >
-                      <Eyebrow className="text-zinc-500">Harv</Eyebrow>
+                      <Eyebrow className="text-tone-500">Harv</Eyebrow>
                       <span>
                         {d.harvMj != null && d.harvMj > 0
                           ? `${d.harvMj.toFixed(1)} MJ`
@@ -201,7 +201,7 @@ export function SectorComparison({
                     </span>
                   )}
                   {d.deployMj == null && d.harvMj == null && (
-                    <span className="text-zinc-600 text-2xs italic">
+                    <span className="text-tone-600 text-2xs italic">
                       no per-lap telemetry captured
                     </span>
                   )}

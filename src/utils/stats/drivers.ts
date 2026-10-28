@@ -2,6 +2,7 @@ import type {
   DriverData,
   FinalClassification,
   TelemetrySession,
+  TyreStintHistoryV2Entry,
 } from "../../types/telemetry";
 import {
   isRaceSession as isRaceTelemetrySession,
@@ -42,6 +43,34 @@ export function sessionDriverBestLapTimeMs(
   return isTimeTrialSessionType(session["session-info"]["session-type"])
     ? getBestLapTime(driver["session-history"]["lap-history-data"])
     : driverBestLapTimeMs(driver);
+}
+
+/**
+ * Identity key for a driver name across sessions (the rivals roster, ⌘K, the
+ * Results driver panel). NFKC and collapsed whitespace, because online names
+ * can carry non-breaking spaces that read the same.
+ */
+export function driverNameKey(name: string | undefined): string {
+  return (name ?? "")
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+/**
+ * The driver's row in `tyre-stint-history-v2`, which keeps a result status
+ * and position for saves with no final classification (a retirement saved
+ * before the flag).
+ */
+export function findStintResult(
+  session: TelemetrySession,
+  driver: DriverData,
+): TyreStintHistoryV2Entry | undefined {
+  return session["tyre-stint-history-v2"]?.find(
+    (entry) =>
+      entry.index === driver.index || entry.name === driver["driver-name"],
+  );
 }
 
 export function findPlayer(session: TelemetrySession): DriverData | undefined {

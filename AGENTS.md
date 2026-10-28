@@ -9,10 +9,7 @@ F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON ex
 - No database.
 - Local dev indexes telemetry summaries and streams raw telemetry JSON from disk.
 - Production/demo mode reads committed demo data or user-uploaded JSON/zip/`.pngt` files.
-- Focused Node test suites cover the session-summary index, complete-lap timing,
-  Race Pace estimation, fuel aggregation, tyre wear rates, session Key Insights
-  curation, Track Strategy synthesis, and lap recordings and their tips. No
-  general UI test runner or linter is configured.
+- Focused Node test suites cover the session-summary index, complete-lap timing, Race Pace estimation, fuel aggregation, tyre wear rates, the race story and session log, Track Strategy synthesis, and lap recordings and their tips. No general UI test runner or linter is configured.
 
 ## Commands
 
@@ -34,7 +31,7 @@ pnpm test:race-pace           # Run Race Pace estimator/matching and Classificat
 pnpm test:energy-stats        # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                # Run fuel aggregation and recommendation tests
 pnpm test:speed               # Run canonical speed/aero inference regressions
-pnpm test:session-insights    # Run session Key Insights card merging and budget regressions
+pnpm test:session-story       # Run session kind, session log, race story and online form regressions
 pnpm test:share-text          # Run plain-text setup/strategy copy formats
 pnpm test:strategy            # Run Track Strategy synthesis regressions (dry + wet)
 pnpm test:tyre-wear           # Run green-flag tyre wear rate regressions
@@ -84,9 +81,11 @@ Data flow:
 Routes:
 
 - `/` -> newest available formula scope.
-- `/:formulaKey` -> dashboard, e.g. `/f1-26`.
-- `/:formulaKey/sessions/*` -> session detail.
-- `/:formulaKey/tracks/:trackId` -> track progress.
+- `/:formulaKey` -> Sessions home, e.g. `/f1-26`: latest race, online form, then the session log. Log filters live in the URL (`type`, `mode`, `track`).
+- `/:formulaKey/sessions/*` -> session page; `?tab=` picks the tab, `?driver=` opens a driver in Results.
+- `/:formulaKey/tracks` -> tracks index.
+- `/:formulaKey/tracks/:trackId` -> track page; `?tab=` is one of `TRACK_PAGE_TABS`.
+- `/:formulaKey/form` -> online form, every online race.
 - `/ui-debug` -> dev-only UI fixture page.
 
 Telemetry filenames follow `[SessionType]_[Track]_YYYY_MM_DD_HH_mm_ss.json`. Filename parsing gives stable dates/slugs; `session-info` wins for display metadata.
@@ -105,26 +104,24 @@ Entry and data:
 
 Product surfaces:
 
-- `src/pages/DashboardPage.tsx`
-- `src/pages/RaceSessionView.tsx`
-- `src/pages/QualifyingSessionView.tsx`
-- `src/pages/TrackProgressPage.tsx`
+- `src/pages/SessionsPage.tsx` — Sessions home.
+- `src/pages/SessionPage.tsx` — picks the view by `sessionKind()`: `src/pages/session/` `RaceView`, `LongRunView`, `QualifyingView`, `TimeTrialView`.
+- `src/pages/TrackProgressPage.tsx`, `src/pages/TracksPage.tsx`, `src/pages/FormPage.tsx`
 - `src/pages/UiDebugPage.tsx`
-- `src/components/lap-telemetry/` — Lap Telemetry section (session pages and each Track Progress tab).
+- `src/components/lap-telemetry/` — Lap Telemetry tab (session pages and the track page).
 
 Shared UI:
 
-- `src/components/Layout.tsx`
-- `src/components/SessionList.tsx`
-- `src/components/SessionHeader.tsx`
-- `src/components/SessionInsightsGrid.tsx`
-- `src/components/dashboard/`
+- `src/components/Layout.tsx` and `src/components/shell/` — top bar with the Sessions and Tracks hover menus, ⌘K palette, scroll memory.
+- `src/components/session/` — `SessionShell` (‹ › and J/K through the filtered log, day switcher, tabs) and `SessionParts` (`Panel`, `StatDoors`, `WorthList`, `SetupSheet`).
+- `src/components/sessions/SessionLog.tsx` — the session log, grouped by day, track and online event.
+- `src/components/charts/` — `LapChart`, `TrendChart`, `FormChart`.
 - `src/components/track/`
-- `src/components/ui/` (`InsightTile`, `StintChip`, `PillSelect`, table recipes, etc.)
+- `src/components/ui/` (`StintChip`, `PillSelect`, table recipes, etc.)
 
 Telemetry intelligence:
 
-- `src/analysis/` — product-facing models, rankings, buckets, insight curation, chart-ready data.
+- `src/analysis/` — product-facing models, rankings, buckets, chart-ready data. Page models: `sessionKind`, `sessionLog`, `raceStory`, `worthALook`, `lapChartModel`, `onlineForm`, `trackIndex`, `trackBriefing`, `trackSetups`.
 - `src/utils/stats/` — low-level reusable telemetry/math primitives.
 - `src/constants/` — shared tokens, routes, storage keys, setup ranges, track calendars.
 - `src/utils/tracks.ts` is the one entry point for track identity and per-track lookups; per-track tables in `src/constants/` are keyed by its canonical ids.
@@ -153,7 +150,7 @@ Start reaction:
 - Use `session-info["start-reaction-time"]` only; it is the player's exported reaction time as a float in seconds.
 - `0`, missing, non-finite, or negative values mean unavailable.
 - Current exports do not provide per-driver reaction times; do not build all-driver rankings unless a real per-driver field is added.
-- Use a compact `0.0s` to `0.5s` visual rail; values over `0.5s` should clamp and read as a severe/terrible start.
+- The race hero's Start chip shows it on every race that has it, beside the places gained or lost; values over `0.5s` read as a severe start.
 - Do not estimate reaction time from session duration, system time, race-control events, packet timestamps, or lap-one movement.
 - This value depends on the telemetry format, not only formula scope: F1 25 and F2 sessions can include it when recorded with the 2026 format.
 
@@ -183,7 +180,7 @@ Tyre wear:
 - Compact `session-history.tyre-stints-history-data[].end-lap` is one lap before the detailed outgoing stint boundary; use `getDriverStints()` instead of raw compact data so pit-in/out filtering stays aligned.
 - PnG may emit a fresh incoming-tyre `0%` snapshot on the previous pit-boundary lap. Normalize duplicate lap wear via shared tyre helpers so outgoing worn tyres are not overwritten by incoming fresh tyres.
 - Absolute strategy timing anchors require real tyre-wear history; synthesized/basic-only stints can describe compound sequence and pit laps but must not anchor race-duration estimates as zero-wear stints.
-- Track Progress Tyre Life is a stint length in green-flag laps, not a race lap: `estMaxLife` is where the median of the stints' own green-flag curve projections reaches `PUNCTURE_THRESHOLD` (`projectCompoundLapsToWear()`), and the card shows the longest green-flag run and the wear it added beside it because practice races are mostly partial and the number is usually an extrapolation. Strategy stint wear never reads below that same median (`projectCompoundWear()`), even where one real stint covers the plan, so only a managed-tyres plan outlasts the card.
+- The track page's Tyre Life is a stint length in green-flag laps, not a race lap: `estMaxLife` is where the median of the stints' own green-flag curve projections reaches `PUNCTURE_THRESHOLD` (`projectCompoundLapsToWear()`), and the card shows the longest green-flag run and the wear it added beside it because practice races are mostly partial and the number is usually an extrapolation. Strategy stint wear never reads below that same median (`projectCompoundWear()`), even where one real stint covers the plan, so only a managed-tyres plan outlasts the card.
 
 Lap timing validity:
 
@@ -197,7 +194,7 @@ Race pace:
 - Carry sample counts/confidence into user-facing evidence. Keep same-compound rival pace, stint pace, strategy modelling, and Peak pace explicitly named because they answer different questions.
 - `Peak pace` is `calculatePeakPace()`: the mean of the fastest three eligible race-pace laps, with the lap count beside it. Every surface that shows it (Peak Pace Evolution, Tyre Life cards, any driver table) uses that function and that label; the window and the reasons for it live in `src/utils/stats/peakPace.ts`.
 - Historical Race Pace PBs compare only within the same race-distance lap count.
-- Race Pace is never a fastest-N window: a mean does not improve with more laps to pick from, a fastest-N does. Mixed strategies are handled by scoping, not trimming: the Classification compound filter recomputes Best Lap and Race Pace on one compound's laps (`buildRaceDriverStats(..., compound)`), keeping the ranking floor within that compound.
+- Race Pace is never a fastest-N window: a mean does not improve with more laps to pick from, a fastest-N does. Mixed strategies are handled by scoping, not trimming: the Results table's compound filter recomputes Best Lap and Race Pace on one compound's laps (`buildRaceDriverStats(..., compound)`), keeping the ranking floor within that compound.
 - Matched Pace (`compareCompoundMatchedRacePace()`) is the same-compound Race Pace mean, so its delta matches the filtered table. Its delta is persisted in rival summaries; changing it needs a `SESSION_SUMMARY_CACHE_VERSION` bump.
 
 Analysis layer:
@@ -210,13 +207,8 @@ Analysis layer:
 
 Fuel recommendations:
 
-- Session pages are retrospective: lead with the game's signed lap-margin
-  estimate at the finish or last captured lap, with recorded tank kilograms
-  and observed burn as supporting evidence in the tooltip. Do not turn one
-  session into a future-load recommendation or present the game estimate as
-  physical range.
-- Actionable initial-fuel targets belong on Track Progress, where they use
-  same-distance, UID-independent evidence, pooled P75 burn, and confidence.
+- Session pages are retrospective: lead with the game's signed lap-margin estimate at the finish or last captured lap. Do not turn one session into a future-load recommendation or present the game estimate as physical range.
+- Actionable initial-fuel targets belong on the track page, where they use same-distance, UID-independent evidence, pooled P75 burn, and confidence.
 
 Session summary cache:
 
@@ -260,22 +252,31 @@ Lap telemetry:
 - On full-throttle stretches, check battery before driving; a flat-out difference with equal battery is car, setup or tow and gets no driving advice. Imperative advice is only for the player's own lap A.
 - The reader rejects unknown `.pngt` format versions and decodes only the channels in `LapChannel`; it is the one place to adapt when the beta format changes, except channel units, which `prepareLap()` normalises.
 
-Session Key Insights:
+Pages:
 
-- `curateSessionInsights()` caps the session grid at six cards, two rows on desktop. Add a new fact to an existing card's lines rather than a seventh card.
-- Race homes: Result also carries race flow; Race Pace carries only a notable pace PB; Tyre Management carries first-stop timing and one fuel-margin line (`Tyres & Fuel`); Speed Profile carries the ERS deploy line (`Speed & ERS`); events close the list so the other cards keep their places.
-- Supporting evidence (tank kilograms, burn rate, ERS harvest) goes in the card tooltip, not on the card. Race pages show no sector split: whole-race sector averages are not actionable. Qualifying keeps its one-lap Sector Split card.
+- Every element answers a driver question for its page, and every summary card opens the tab or page with the full story.
+- `summaryKind()` / `sessionKind()` decide which page a session gets: race, long run (an offline race with no final classification status), qualifying, or time trial. Use them rather than matching session-type strings.
+- Each session page leads with a hero headline. A new insight goes into the ranked Worth a look list (`src/analysis/worthALook.ts`), never a new tile or card.
+- Worth a look takes every item that clears its threshold in the Tuning section; `WorthList` shows five and folds the rest behind "Show N more". `rankWorthItems()` ranks places before seconds. The list carries no padding or placeholder items and never repeats the headline, and imperative advice comes only from lap-telemetry tips.
+- Position changes come from `buildRaceStory()`: a pit cycle nets out once nearby cars have made their matching stop, and a swap that comes back within two laps reads as steady, so chips and headlines never credit a pit cycle or a back-and-forth as places gained.
+- Anything per lap is drawn by `LapChart`: a line on a normal time axis (quicker laps lower, pit and SC laps in an "off scale" gutter above), the compound strip beneath, SC/VSC as grey washes, pit hairlines, and the driver's own events lane. A faded dot is a lap Race Pace leaves out (`buildDriverLapSeries()`), a flat line a stint average. Dates are progress lines (`TrendChart`), drivers are sorted bars, places on track use the circuit map; no donuts. You are `--color-chart-you` (cyan), the comparison driver `--color-chart-compare` (orange), purple the fastest.
+- Race pages show no whole-race sector split: it is not actionable. Qualifying keeps its one-lap sector cards.
+- Circuit maps are `TrackOutline`, drawn from `trackGeometry.ts` in the brand red. `detail` adds the chequered timing line, sector splits (lap fractions from `session-info` `sector-2/3-lap-distance-start`, which older exports leave at 0) and turn numbers, each label placed on the side of the track with the most room.
+- The track Setups tab shows the quali setup (fastest or latest), the race setup and every setup run there; `setupIdentity()` ignores brake bias and fuel, which drivers change mid-session.
 
 Rivals roster:
 
 - Online race summaries may include `SessionSummary.rivals`.
 - Identity key: normalized `driver-name`.
-- Dashboard aggregation lives in `src/analysis/rivalStats.ts`.
+- Rival facts appear in context, not on a page of their own: the Results driver panel (`DriverPanel`: races together, average matched pace) and ⌘K driver search.
 - Qualifying and offline-AI sessions skip the roster to keep summaries slim.
 
 Styling:
 
-- Dark Tailwind UI.
+- Light and dark themes: `index.html` sets `data-theme` before first paint (`?theme=light|dark`, else the system setting) and `src/index.css` overrides tokens for light.
+- Neutrals use the theme-aware `tone-*` scale (`bg-tone-900`, `text-tone-500`, `ring-tone-0/[0.06]`), never `zinc-*`, `white` or `black`, which stay fixed in light mode. Inline and SVG colours use `var(--color-tone-*)`; for a translucent dynamic colour use `color-mix(in oklab, <color> N%, transparent)`, since compound and chart colours can be CSS variables and break hex-alpha suffixes.
+- Accent text in 200–400 shades is remapped to darker shades in light mode; meaning-bearing colour goes through `best`/`ahead`/`behind`/`warning`/`active` and `CHART_THEME`.
+- `brand` is the logo's red (`AppLogo`, track maps, the What's new dot). It never carries data, so a loss is always `behind`.
 - Reuse shared primitives before adding one-off styles.
 - Keep chart/card constants in `src/constants/` or shared UI modules.
 - Color carries meaning (semantic tokens in `src/index.css`): purple (`best`, the `purple` accent) means fastest or session best, as in F1 broadcasts; green and red (`ahead`, `behind`) mean gaining or losing against a rival or a previous result.

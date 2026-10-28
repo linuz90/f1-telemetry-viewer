@@ -4,7 +4,7 @@ import { usePlayerOnly } from "../hooks/usePlayerOnly";
 import { msToLapTime, msToSectorTime } from "../utils/format";
 import { getTeamColor, getTeamName } from "../utils/colors";
 import { cn } from "../utils/cn";
-import { formatQualifyingTableTitle } from "../analysis/sessionInsightSummary";
+import { isTimeTrialSessionType } from "../utils/sessionTypes";
 import { FocusToggle } from "./ui/FocusToggle";
 import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
@@ -52,7 +52,7 @@ export function QualifyingTable({
               <th className={tableHeadCellClass()}>Driver</th>
               <th className={tableHeadCellClass()}>Team</th>
               <th className={tableHeadCellClass({ align: "right" })}>
-                Best Lap
+                Best lap
               </th>
               <th className={tableHeadCellClass({ align: "right" })}>S1</th>
               <th className={tableHeadCellClass({ align: "right" })}>S2</th>
@@ -78,7 +78,7 @@ export function QualifyingTable({
                   key={row.driver.index}
                   className={cn(
                     tableRowClass,
-                    isFocused && "bg-zinc-800/40 text-white font-medium",
+                    isFocused && "bg-tone-800/40 text-tone-0 font-medium",
                   )}
                 >
                   <td className={tableCellClass()}>{row.position}</td>
@@ -90,7 +90,7 @@ export function QualifyingTable({
                     {row.driver["driver-name"]}
                   </td>
                   <td
-                    className={tableCellClass({ className: "text-zinc-400" })}
+                    className={tableCellClass({ className: "text-tone-400" })}
                   >
                     {getTeamName(row.driver.team)}
                   </td>
@@ -113,7 +113,7 @@ export function QualifyingTable({
                         model.bestS1 !== null &&
                         rowS1 === model.bestS1
                         ? "text-best font-bold"
-                        : "text-zinc-400",
+                        : "text-tone-400",
                     )}
                   >
                     {row.bestLap ? msToSectorTime(rowS1) : "–"}
@@ -125,7 +125,7 @@ export function QualifyingTable({
                         model.bestS2 !== null &&
                         rowS2 === model.bestS2
                         ? "text-best font-bold"
-                        : "text-zinc-400",
+                        : "text-tone-400",
                     )}
                   >
                     {row.bestLap ? msToSectorTime(rowS2) : "–"}
@@ -137,7 +137,7 @@ export function QualifyingTable({
                         model.bestS3 !== null &&
                         rowS3 === model.bestS3
                         ? "text-best font-bold"
-                        : "text-zinc-400",
+                        : "text-tone-400",
                     )}
                   >
                     {row.bestLap ? msToSectorTime(rowS3) : "–"}
@@ -158,4 +158,11 @@ export function QualifyingTable({
       </ScrollArea>
     </div>
   );
+}
+
+function formatQualifyingTableTitle(session: TelemetrySession): string {
+  const type = session["session-info"]["session-type"];
+  if (isTimeTrialSessionType(type)) return "Time Trial Laps";
+  if (/shootout/i.test(type)) return "Shootout Results";
+  return "Results";
 }

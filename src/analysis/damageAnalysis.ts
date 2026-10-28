@@ -30,7 +30,7 @@ export interface DamageAnalysis {
 export const DAMAGE_SERIES_FIELDS: DamageSeriesField[] = [
   {
     key: "frontWing",
-    label: "Front Wing",
+    label: "Front wing",
     // The game reports front wing damage per side, but the chart is a single
     // readable component. Max side damage best matches what the driver feels.
     getValue: (lap) =>
@@ -41,7 +41,7 @@ export const DAMAGE_SERIES_FIELDS: DamageSeriesField[] = [
   },
   {
     key: "rearWing",
-    label: "Rear Wing",
+    label: "Rear wing",
     getValue: (lap) => lap["car-damage-data"]["rear-wing-damage"] ?? 0,
   },
   {
@@ -75,10 +75,10 @@ const FAULT_CHECKS: {
   key: keyof PerLapInfo["car-damage-data"];
   label: string;
 }[] = [
-  { key: "drs-fault", label: "DRS Fault" },
-  { key: "ers-fault", label: "ERS Fault" },
-  { key: "engine-blown", label: "Engine Blown" },
-  { key: "engine-seized", label: "Engine Seized" },
+  { key: "drs-fault", label: "DRS fault" },
+  { key: "ers-fault", label: "ERS fault" },
+  { key: "engine-blown", label: "Engine blown" },
+  { key: "engine-seized", label: "Engine seized" },
 ];
 
 export function detectDamageFaults(
@@ -119,37 +119,4 @@ export function buildDamageAnalysis(
     ).map((field) => field.key),
     faults: detectDamageFaults(perLapInfo),
   };
-}
-
-const DAMAGE_INCREASE_FIELDS = [
-  "front-left-wing-damage",
-  "front-right-wing-damage",
-  "rear-wing-damage",
-  "floor-damage",
-  "diffuser-damage",
-  "sidepod-damage",
-  "engine-damage",
-  "gear-box-damage",
-] as const;
-
-/**
- * Laps where a damage component increased. LapTimeChart uses these as a small
- * red backdrop so incidents line up with pace drops without duplicating the
- * full damage chart.
- */
-export function buildDamageIncreaseLaps(
-  perLapInfo: readonly PerLapInfo[],
-): number[] {
-  const laps: number[] = [];
-  for (let index = 1; index < perLapInfo.length; index++) {
-    const previous = perLapInfo[index - 1]!["car-damage-data"];
-    const current = perLapInfo[index]!["car-damage-data"];
-    for (const field of DAMAGE_INCREASE_FIELDS) {
-      if ((current[field] ?? 0) > (previous[field] ?? 0)) {
-        laps.push(perLapInfo[index]!["lap-number"]);
-        break;
-      }
-    }
-  }
-  return laps;
 }

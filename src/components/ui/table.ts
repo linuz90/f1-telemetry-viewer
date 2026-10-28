@@ -1,15 +1,15 @@
 import { cn } from "../../utils/cn";
 
 /** Shared row divider for data tables — matches the inset highlight on cards. */
-export const tableRowClass = "border-t border-white/[0.04]";
+export const tableRowClass = "border-t border-tone-0/[0.04]";
 
 /**
- * Shared <thead> styling for data tables. `text-zinc-500` is the muted header
+ * Shared <thead> styling for data tables. `text-tone-500` is the muted header
  * tone; the `[&_th]:font-normal` descendant selector pins each cell's weight
  * directly (Geist sans at 400 still reads heavier than the mono data rows, so
  * inheriting via thead alone isn't enough — apply the rule on the th itself).
  */
-export const tableHeadClass = "text-zinc-500 [&_th]:font-normal";
+export const tableHeadClass = "text-tone-500 [&_th]:font-normal";
 
 export const tableClass = "w-full text-xs";
 export const tableClassLoose = "w-full text-sm";

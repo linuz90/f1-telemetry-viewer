@@ -1,4 +1,3 @@
-import { Timer } from "lucide-react";
 import {
   CartesianGrid,
   ComposedChart,
@@ -18,11 +17,7 @@ import type {
   SectorCardModel,
   TrackPaceAnalysis,
 } from "../../analysis/trackAnalysis";
-import {
-  CHART_THEME,
-  SECTOR_COLORS,
-  TOOLTIP_STYLE,
-} from "../../constants/colors";
+import { CHART_THEME, TOOLTIP_STYLE } from "../../constants/colors";
 import {
   joinMetaParts,
   msToLapTime,
@@ -30,8 +25,7 @@ import {
   pluralize,
 } from "../../utils/format";
 import { cardClass } from "../Card";
-import { InsightDetail, InsightValue } from "../ui/InsightText";
-import { InsightTile } from "../ui/InsightTile";
+import { formatLapTick, lapTimeAxis } from "../charts/lapTimeAxis";
 import { SectionHeader } from "../ui/SectionHeader";
 
 /**
@@ -44,7 +38,7 @@ export function TrackPaceTrends({
   sectorTitle,
 }: {
   pace: TrackPaceAnalysis;
-  /** Sector tile eyebrow after "S1 — ", e.g. "All-Time Best". */
+  /** Sector tile label after "Sector 1 ", e.g. "best". */
   sectorTitle: string;
 }) {
   const { lapTimes, sectorCards, theoreticalBestMs, latest, theoreticalS1 } =
@@ -60,11 +54,11 @@ export function TrackPaceTrends({
         />
       )}
       {latest && theoreticalS1 > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {sectorCards.map((card) => (
             <SectorBestTile
               key={card.label}
-              title={`${card.label} — ${sectorTitle}`}
+              title={`${card.label.replace(/^S/, "Sector ")} ${sectorTitle}`}
               card={card}
             />
           ))}
@@ -83,19 +77,29 @@ function LapTimesChart({
 }) {
   const { sessions, validLaps, invalidLaps } = lapTimes;
   const byIdx = new Map(sessions.map((session) => [session.idx, session]));
+  // The scale fits valid laps and the theoretical best; a wild invalid lap
+  // clips at the top instead of flattening the rest.
+  const fitted = [
+    ...validLaps.map((lap) => lap.timeSec * 1000),
+    ...(theoreticalBestMs > 0 ? [theoreticalBestMs] : []),
+  ];
+  const axis = lapTimeAxis(
+    Math.min(...(fitted.length ? fitted : [0])),
+    Math.max(...(fitted.length ? fitted : [1])),
+  );
 
   return (
     <section className={cardClass}>
       <SectionHeader
-        title="Lap Times by Session"
-        hint={`every timed lap · best per session joined · ${pluralize(sessions.length, "session")}`}
+        title="Lap times by session"
+        hint={`Every timed lap, each session's best joined · ${pluralize(sessions.length, "session")}`}
       />
       <ResponsiveContainer width="100%" height={280}>
         <ComposedChart
           data={sessions}
           margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
+          <CartesianGrid vertical={false} stroke={CHART_THEME.grid} />
           <XAxis
             dataKey="idx"
             type="number"
@@ -109,11 +113,17 @@ function LapTimesChart({
           />
           <YAxis
             type="number"
-            domain={["auto", "auto"]}
-            tickFormatter={(value: number) => msToLapTime(value * 1000)}
+            domain={[axis.domain[0] / 1000, axis.domain[1] / 1000]}
+            ticks={axis.ticks.map((t) => t / 1000)}
+            allowDataOverflow
+            tickFormatter={(value: number) =>
+              formatLapTick(value * 1000, axis.stepMs)
+            }
             stroke={CHART_THEME.axis}
+            tickLine={false}
+            axisLine={false}
             fontSize={11}
-            width={64}
+            width={52}
           />
           <ZAxis range={[48, 48]} />
           <Tooltip
@@ -130,9 +140,9 @@ function LapTimesChart({
                     ...TOOLTIP_STYLE.contentStyle,
                     padding: "8px 12px",
                   }}
-                  className="space-y-0.5 text-zinc-300"
+                  className="space-y-0.5 text-tone-300"
                 >
-                  <div className="mb-1 text-2xs text-zinc-400">
+                  <div className="mb-1 text-2xs text-tone-400">
                     {session.label}
                   </div>
                   <div className="font-mono text-best">
@@ -149,7 +159,7 @@ function LapTimesChart({
                     ])}
                   </div>
                   {session.stdDevSec != null && (
-                    <div className="font-mono text-zinc-400">
+                    <div className="font-mono text-tone-400">
                       Spread ±{session.stdDevSec.toFixed(3)} s
                     </div>
                   )}
@@ -189,15 +199,15 @@ function LapTimesChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
-        <LegendDot className="bg-cyan-400">Valid lap</LegendDot>
-        <LegendDot className="bg-red-500/50">Invalid lap</LegendDot>
-        <LegendDot className="bg-purple-400">Best per session</LegendDot>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tone-500">
+        <LegendDot className="bg-chart-you/70">Valid lap</LegendDot>
+        <LegendDot className="bg-behind/50">Invalid lap</LegendDot>
+        <LegendDot className="bg-best">Best per session</LegendDot>
         {theoreticalBestMs > 0 && (
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-3.5 border-t-2 border-dashed border-ahead" />
             Theoretical best{" "}
-            <span className="font-mono text-zinc-400">
+            <span className="font-mono text-tone-400">
               {msToLapTime(theoreticalBestMs)}
             </span>
           </span>
@@ -223,10 +233,10 @@ function LegendDot({
 }
 
 /**
- * All-time best sector tile in the shared `InsightTile` family. Only the
- * number is tinted; the sparkline under it shows each session's best in that
- * sector on its own scale, which a chart shared by 17 s and 39 s sectors
- * flattens out.
+ * Best sector card, in the stat style the session pages use. Only the number
+ * is tinted; the sparkline under it shows each session's best in that sector
+ * on its own scale, which a chart shared by 17 s and 39 s sectors flattens
+ * out.
  */
 function SectorBestTile({
   title,
@@ -237,17 +247,17 @@ function SectorBestTile({
 }) {
   const { bestMs, latestMs, trendMs } = card;
   const deltaMs = latestMs > 0 && bestMs > 0 ? latestMs - bestMs : 0;
-  const color = SECTOR_COLORS[card.label as keyof typeof SECTOR_COLORS];
 
   return (
-    <InsightTile title={title} icon={Timer} accent="purple">
-      <InsightValue size="md" tone="text-best">
+    <div className="rounded-2xl bg-tone-900 p-4 ring-1 ring-tone-800">
+      <div className="text-xs text-tone-500">{title}</div>
+      <div className="mt-1 font-mono text-xl font-semibold tracking-tight text-best">
         {bestMs > 0 ? msToSectorTime(bestMs) : "–"}
-      </InsightValue>
+      </div>
       {latestMs > 0 && (
-        <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
-          <span className="text-zinc-500">Latest: </span>
-          <span className="font-mono text-zinc-300">
+        <div className="mt-0.5 text-xs text-tone-500">
+          Latest{" "}
+          <span className="font-mono text-tone-300">
             {msToSectorTime(latestMs)}
           </span>
           {deltaMs > 0 && (
@@ -256,18 +266,18 @@ function SectorBestTile({
             </span>
           )}
           {deltaMs === 0 && bestMs > 0 && (
-            <span className="ml-1 font-mono text-ahead">PB</span>
+            <span className="ml-1 font-mono text-best">PB</span>
           )}
-        </InsightDetail>
+        </div>
       )}
       {trendMs.length > 1 && (
         <SectorSparkline
           label={`${card.label} best per session, oldest to newest`}
           values={trendMs}
-          color={color ?? CHART_THEME.axis}
+          color={CHART_THEME.muted}
         />
       )}
-    </InsightTile>
+    </div>
   );
 }
 

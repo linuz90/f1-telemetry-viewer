@@ -22,9 +22,9 @@ import type { SessionSummary } from "../types/telemetry";
 import { toTrackSlug } from "../utils/tracks";
 
 export interface TrackPBs {
-  /** All-time best qualifying-style lap time (ms) on this track. */
+  /** Best qualifying lap (ms) on this track; Time Trial is kept separate. */
   bestQualiLapMs: number;
-  /** All-time best sector times (ms) across all qualifying-style sessions. */
+  /** Best sector times (ms) across qualifying sessions, Time Trial excluded. */
   bestS1Ms: number;
   bestS2Ms: number;
   bestS3Ms: number;
@@ -39,13 +39,14 @@ export interface TrackPBs {
   bestRaceLapMs: number;
   /** Best evidence-qualified average race pace (ms) at the same race distance. */
   bestRacePaceMs: number;
-  /** Number of previous sessions on this track (excluding current) */
+  /** Number of earlier sessions on this track. */
   sessionCount: number;
 }
 
 /**
- * Load all sessions for the same track and compute all-time PBs.
- * Excludes the current session (by slug) so comparisons are always "vs history".
+ * Load the earlier sessions at the same track and compute the PBs they set.
+ * Only sessions before the current one count, so opening an old session
+ * compares it with what came before it, never with later runs.
  */
 export function useTrackHistory(
   trackName: string | undefined,
@@ -71,7 +72,10 @@ export function useTrackHistory(
       getFormulaComparisonKey(s.formula, s.gameYear) ===
         getFormulaComparisonKey(formula, gameYear),
   );
-  const trackSessions = historySessions.filter((s) => s.slug !== currentSlug);
+  const current = historySessions.find((s) => s.slug === currentSlug);
+  const trackSessions = historySessions.filter(
+    (s) => s.slug !== currentSlug && (!current || s.date < current.date),
+  );
   const trackSessionKey = trackSessions.map((s) => s.slug).join("|");
 
   useEffect(() => {
@@ -162,11 +166,14 @@ export function useTrackHistory(
               bestRacePaceMs = playerEstimate.timeMs;
             }
           } else {
-            // Keep the long-standing qualifying-style bucket for existing
-            // history cards, then mirror TT into dedicated fields so TT-only
-            // cards avoid quali laps with different fuel/traffic assumptions.
+            // Qualifying and Time Trial PBs stay apart: a hot lap on low fuel
+            // with no traffic is not a quali lap.
             const best = sessionDriverBestLapTimeMs(sessionData, player);
-            if (best > 0 && (bestQualiLapMs === 0 || best < bestQualiLapMs)) {
+            if (
+              !isTimeTrial &&
+              best > 0 &&
+              (bestQualiLapMs === 0 || best < bestQualiLapMs)
+            ) {
               bestQualiLapMs = best;
             }
             if (isTimeTrial && best > 0) timeTrialSessionCount += 1;
@@ -183,11 +190,11 @@ export function useTrackHistory(
               const s2 = bestSectorTimeMs(valid, 2);
               const s3 = bestSectorTimeMs(valid, 3);
 
-              if (s1 > 0 && (bestS1Ms === 0 || s1 < bestS1Ms)) bestS1Ms = s1;
-              if (s2 > 0 && (bestS2Ms === 0 || s2 < bestS2Ms)) bestS2Ms = s2;
-              if (s3 > 0 && (bestS3Ms === 0 || s3 < bestS3Ms)) bestS3Ms = s3;
-
-              if (isTimeTrial) {
+              if (!isTimeTrial) {
+                if (s1 > 0 && (bestS1Ms === 0 || s1 < bestS1Ms)) bestS1Ms = s1;
+                if (s2 > 0 && (bestS2Ms === 0 || s2 < bestS2Ms)) bestS2Ms = s2;
+                if (s3 > 0 && (bestS3Ms === 0 || s3 < bestS3Ms)) bestS3Ms = s3;
+              } else {
                 if (
                   s1 > 0 &&
                   (bestTimeTrialS1Ms === 0 || s1 < bestTimeTrialS1Ms)

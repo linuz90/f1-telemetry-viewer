@@ -46,14 +46,14 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal onClose={onClose} className="max-w-[680px] max-h-[70vh]">
       {/* Header */}
-      <div className="flex items-center gap-4 px-6 pt-5 pb-4 border-b border-white/[0.05] pr-14">
-        <h2 className="text-base font-semibold text-zinc-100">What's new</h2>
+      <div className="flex items-center gap-4 px-6 pt-5 pb-4 border-b border-tone-0/[0.05] pr-14">
+        <h2 className="text-base font-semibold text-tone-100">What's new</h2>
         <div className="flex items-center gap-1">
           <a
             href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-tone-400 hover:text-tone-200 hover:bg-tone-0/[0.04] transition-colors"
           >
             <Github className="h-3.5 w-3.5" />
             GitHub
@@ -62,7 +62,7 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
             href={AUTHOR_TWITTER_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-tone-400 hover:text-tone-200 hover:bg-tone-0/[0.04] transition-colors"
           >
             <XIcon className="h-3 w-3" />
             {AUTHOR_TWITTER_HANDLE}
@@ -73,11 +73,11 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
       {/* Content */}
       <ScrollArea axis="y" className="px-6 py-4 space-y-5">
         {dates.length === 0 && (
-          <p className="text-sm text-zinc-500">No changelog available.</p>
+          <p className="text-sm text-tone-500">No changelog available.</p>
         )}
         {dates.map((date) => (
           <div key={date}>
-            <h3 className="text-xs font-medium text-zinc-500 mb-2">
+            <h3 className="text-xs font-medium text-tone-500 mb-2">
               {formatDate(date)}
             </h3>
             <ul className="space-y-1.5">
@@ -95,7 +95,7 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
                         <config.icon className={cn("h-3 w-3", config.fg)} />
                       </span>
                     )}
-                    <span className="text-sm text-zinc-300 leading-snug">
+                    <span className="text-sm text-tone-300 leading-snug">
                       {entry.message}
                       {entry.pr && (
                         <>
@@ -104,7 +104,7 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
                             href={pullRequestUrl(entry.pr)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center rounded px-1.5 py-0.5 text-2xs leading-none font-medium bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 transition-colors align-middle"
+                            className="inline-flex items-center rounded px-1.5 py-0.5 text-2xs leading-none font-medium bg-tone-800 text-tone-500 hover:bg-tone-700 hover:text-tone-300 transition-colors align-middle"
                           >
                             #{entry.pr}
                           </a>

@@ -17,11 +17,12 @@ import { cn } from "../utils/cn";
  *  (gradient heroes, list-row links, empty states) can opt in for visual parity
  *  with shared `cardClass*` variants. Skip on accented/colored tiles — they
  *  already carry their own ring of the appropriate hue. */
-export const cardHighlight = "shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
+export const cardHighlight =
+  "shadow-[inset_0_1px_0_var(--color-card-highlight)]";
 
-export const cardClass = `rounded-2xl bg-zinc-900/70 p-5 ${cardHighlight}`;
-export const cardClassCompact = `rounded-2xl bg-zinc-900/70 p-4 ${cardHighlight}`;
-export const cardClassFeature = `rounded-2xl bg-gradient-to-br from-zinc-800/90 via-zinc-900/80 to-zinc-900/50 p-5 ${cardHighlight}`;
+export const cardClass = `rounded-2xl bg-tone-900/70 p-5 ${cardHighlight}`;
+
+export const cardClassFeature = `rounded-2xl bg-gradient-to-br from-tone-800/90 via-tone-900/80 to-tone-900/50 p-5 ${cardHighlight}`;
 
 /**
  * Accent card recipe — the single source of truth for any nested card surface
@@ -48,24 +49,26 @@ export function accentCardClass(accent: AccentColor): string {
  *  color (e.g. non-best sector cards in Sectors-vs-Best). Pairs visually with
  *  the accent variant so a row of mixed cards reads as one family. */
 export const neutralCardClass =
-  "ring-1 ring-inset ring-white/[0.06] bg-gradient-to-br from-zinc-800/40 via-zinc-900/40 to-zinc-900/20";
+  "ring-1 ring-inset ring-tone-0/[0.06] bg-gradient-to-br from-tone-800/40 via-tone-900/40 to-tone-900/20";
 
 /** Same recipe as `accentCardClass`, expressed as inline CSS, for cases where
- *  the accent color is runtime-dynamic (e.g. tyre-compound hexes). Hex suffixes:
- *    1f ≈ 0.12 alpha (matches Tailwind `/[0.12]` gradient stop)
- *    47 ≈ 0.26 alpha — top edge bright highlight
- *    0f ≈ 0.06 alpha — bottom + side dim edges
+ *  the accent color is runtime-dynamic (e.g. tyre-compound colours). Any CSS
+ *  colour works, including the theme-aware `var(--color-compound-hard)`:
+ *    12% — gradient stop (matches Tailwind `/[0.12]`)
+ *    28% — top edge bright highlight
+ *    6% — bottom + side dim edges
  *  Keep the four-stop shadow alphas in sync with `ACCENT_TOKENS.*.topLit` so
- *  static and dynamic accent cards read at the same weight side-by-side.
- *  zinc-900 surface = rgb(24 24 27). */
-export function dynamicAccentCardStyle(hex: string): CSSProperties {
+ *  static and dynamic accent cards read at the same weight side-by-side. */
+export function dynamicAccentCardStyle(color: string): CSSProperties {
+  const tint = (pct: number) =>
+    `color-mix(in oklab, ${color} ${pct}%, transparent)`;
   return {
-    background: `linear-gradient(to bottom right, ${hex}1f 0%, rgba(24, 24, 27, 0.6) 50%, rgba(24, 24, 27, 0.4) 100%)`,
+    background: `linear-gradient(to bottom right, ${tint(12)} 0%, color-mix(in oklab, var(--color-tone-900) 60%, transparent) 50%, color-mix(in oklab, var(--color-tone-900) 40%, transparent) 100%)`,
     boxShadow: [
-      `inset 0 1px 0 0 ${hex}47`,
-      `inset 0 -1px 0 0 ${hex}0f`,
-      `inset 1px 0 0 0 ${hex}0f`,
-      `inset -1px 0 0 0 ${hex}0f`,
+      `inset 0 1px 0 0 ${tint(28)}`,
+      `inset 0 -1px 0 0 ${tint(6)}`,
+      `inset 1px 0 0 0 ${tint(6)}`,
+      `inset -1px 0 0 0 ${tint(6)}`,
     ].join(", "),
   };
 }

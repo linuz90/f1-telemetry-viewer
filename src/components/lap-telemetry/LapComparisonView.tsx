@@ -231,7 +231,7 @@ export function LapComparisonView({
             />
           </div>
           <span
-            className="text-zinc-600 transition-colors hover:text-zinc-400"
+            className="text-tone-600 transition-colors hover:text-tone-400"
             title="Drag across the traces to zoom; double-click or Esc to reset"
           >
             <CircleHelp

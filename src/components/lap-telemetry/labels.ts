@@ -37,7 +37,7 @@ export function recordingLabel(
  * forms ("RB"), unlike session JSON; match them onto the shared team colours.
  */
 export function recordingTeamColor(team: string | undefined): string {
-  if (!team) return "#a1a1aa";
+  if (!team) return "var(--color-tone-400)";
   const base = team.replace(/\s*'\d{2}$/, "").trim();
   if (TEAM_COLORS[base]) return TEAM_COLORS[base];
   const match = Object.keys(TEAM_COLORS).find(
@@ -45,5 +45,5 @@ export function recordingTeamColor(team: string | undefined): string {
       Number.isNaN(Number(key)) &&
       (key.startsWith(base) || base.startsWith(key)),
   );
-  return match ? TEAM_COLORS[match] : "#a1a1aa";
+  return match ? TEAM_COLORS[match] : "var(--color-tone-400)";
 }

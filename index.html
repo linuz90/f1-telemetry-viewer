@@ -1,7 +1,26 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Theme before first paint so there is no flash: ?theme=light|dark
+      // (Pits n' Giggles or a test can force one), else the system setting,
+      // followed live. index.css styles :root[data-theme="light"].
+      (function () {
+        var media = window.matchMedia("(prefers-color-scheme: light)");
+        var forced = new URLSearchParams(location.search).get("theme");
+        function apply() {
+          document.documentElement.dataset.theme =
+            forced === "light" || forced === "dark"
+              ? forced
+              : media.matches
+                ? "light"
+                : "dark";
+        }
+        apply();
+        media.addEventListener("change", apply);
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -29,7 +48,7 @@
     />
     <meta name="twitter:image" content="/og-image.png" />
   </head>
-  <body class="bg-zinc-950 text-zinc-100 antialiased">
+  <body class="bg-tone-950 text-tone-100 antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

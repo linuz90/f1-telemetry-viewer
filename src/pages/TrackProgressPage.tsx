@@ -1,9 +1,8 @@
 import {
   ArrowLeft,
-  Gauge,
-  Target,
-  Timer,
-  TimerReset,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -15,18 +14,19 @@ import {
 } from "react-router-dom";
 import { ActionEmptyState } from "../components/ActionEmptyState";
 import { cardClass } from "../components/Card";
-import { CarSetupCard } from "../components/CarSetupCard";
 import { CompoundStatCard } from "../components/CompoundStatCard";
-import { EventLocationPieChart } from "../components/EventLocationPieChart";
-import { RaceSetupComparison } from "../components/RaceSetupComparison";
-import { TRACK_KIND_META } from "../components/sessionTypeMeta";
 import { PaceEvolutionChart } from "../components/track/PaceEvolutionChart";
 import { TyreLifeEvidenceBar } from "../components/track/TyreLifeEvidenceBar";
-import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
 import { TrackPaceTrends } from "../components/track/TrackPaceTrends";
-import { TrackQualifyingInsights } from "../components/track/TrackQualifyingInsights";
-import { TrackSessionHistory } from "../components/track/TrackSessionHistory";
 import { TrackStrategySection } from "../components/track/TrackStrategySection";
+import { TrackOutline } from "../components/TrackOutline";
+import { TrendChart, type TrendPoint } from "../components/charts/TrendChart";
+import {
+  Panel,
+  SetupSheet,
+  WorthList,
+} from "../components/session/SessionParts";
+import { SessionLog } from "../components/sessions/SessionLog";
 import { LapTelemetrySection } from "../components/lap-telemetry/LapTelemetrySection";
 import {
   LAPS_QUERY_PARAM,
@@ -35,17 +35,14 @@ import {
 import { TrackFlag } from "../components/TrackFlag";
 import { Badge } from "../components/ui/Badge";
 import { Button, buttonVariants } from "../components/ui/Button";
-import { InsightValue } from "../components/ui/InsightText";
-import { InsightTile } from "../components/ui/InsightTile";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
-import { HStack, VStack } from "../components/ui/Stack";
+import { HStack } from "../components/ui/Stack";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useLapRecordingList } from "../hooks/useLapRecordings";
 import { useSessionList } from "../hooks/useSessionList";
 import {
   buildRaceAnalysisBuckets,
-  buildRaceSetupCandidates,
   buildTrackAnalysisData,
   buildTrackSessionData,
   deduplicateTrackRuns,
@@ -55,26 +52,45 @@ import {
   type TrackSessionKind,
 } from "../analysis/trackAnalysis";
 import {
-  buildTrackLocationBreakdowns,
-  hasLocationBreakdownEvents,
-} from "../analysis/eventLocationBreakdown";
-import { buildTrackRivalBenchmark } from "../analysis/rivalStats";
+  buildTrackBriefing,
+  type TrackBriefingItem,
+} from "../analysis/trackBriefing";
+import { buildTrackSetups, type TrackSetups } from "../analysis/trackSetups";
+import { buildSessionLog, sessionBestLapMs } from "../analysis/sessionLog";
+import { sessionKindLabel, summaryKind } from "../analysis/sessionKind";
+import type { TrackIndexEntry } from "../analysis/trackIndex";
+import type {
+  TrackRaceRecommendation,
+  TrackStrategySuggestion,
+} from "../analysis/trackStrategyTypes";
+import { formatSetupText } from "../analysis/shareText";
+import { useTrackIndex } from "../hooks/useSessionLog";
+import type { SessionSummary } from "../types/telemetry";
+import type { CompoundLifeStats } from "../utils/stats/trackAggregates";
+import { getCompoundColor } from "../utils/colors";
+import { cn } from "../utils/cn";
 import { getSessionFormulaScopeKey } from "../utils/formulaScope";
-import { formatDate, formatSessionType, msToLapTime } from "../utils/format";
-import { getRaceControlEvents } from "../utils/raceControl";
+import { formatDate, msToLapTime } from "../utils/format";
 import {
+  getTrackCountryName,
   getTrackDisplayName,
   getTrackId,
   isTrackSlugMatch,
 } from "../utils/tracks";
 import {
   dashboardPath,
+  isTrackPageTab,
   isTrackSessionTab,
   sessionSummaryPath,
   trackPath,
   trackTabForSessionType,
+  tracksPath,
 } from "../utils/routes";
-import { TRACK_TAB_QUERY_PARAM } from "../constants/routes";
+import {
+  TRACK_PAGE_TABS,
+  TRACK_TAB_QUERY_PARAM,
+  type TrackPageTab,
+} from "../constants/routes";
 import { aggregateCompoundLife } from "../utils/stats/trackAggregates";
 import {
   PEAK_PACE_LABEL,
@@ -84,18 +100,6 @@ import {
 import { buildPaceEvolution } from "../utils/stats/trackPaceEvolution";
 import { buildTrackRaceRecommendation } from "../analysis/trackRaceRecommendation";
 import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
-
-const TRACK_TAB_LABELS: Record<TrackSessionKind, string> = {
-  qualifying: "Qualifying",
-  race: "Race",
-  "time-trial": "Time Trial",
-};
-
-const TRACK_TAB_MOBILE_LABELS: Record<TrackSessionKind, string> = {
-  qualifying: "Quali",
-  race: "Race",
-  "time-trial": "TT",
-};
 
 export function TrackProgressPage() {
   const { trackId } = useParams<{ trackId: string }>();
@@ -114,9 +118,18 @@ export function TrackProgressPage() {
   const [data, setData] = useState<TrackSessionData[]>([]);
   const [loading, setLoading] = useState(true);
   const requestedTab = searchParams.get(TRACK_TAB_QUERY_PARAM);
-  const [activeTab, setActiveTab] = useState<TrackSessionKind>(() =>
-    isTrackSessionTab(requestedTab) ? requestedTab : "race",
+  const [pageTab, setPageTab] = useState<TrackPageTab>(() =>
+    isTrackPageTab(requestedTab) ? requestedTab : "overview",
   );
+  // The kind whose laps the Lap telemetry tab shows; spectator and
+  // recorded-laps-only states reuse it for their single list.
+  const [lapKindChoice, setLapKindChoice] = useState<TrackSessionKind | null>(
+    () => (isTrackSessionTab(requestedTab) ? requestedTab : null),
+  );
+  const activeTab: TrackSessionKind = isTrackSessionTab(pageTab)
+    ? pageTab
+    : (lapKindChoice ?? "race");
+  const trackIndex = useTrackIndex();
   const requestedRaceLaps = searchParams.get("raceLaps");
   const canonicalTrackId = trackId ? getTrackId(trackId) : "";
   const search = searchParams.toString();
@@ -143,9 +156,8 @@ export function TrackProgressPage() {
   }, [activeFormulaKey, canonicalTrackId, navigate, search, trackId]);
 
   useEffect(() => {
-    if (isTrackSessionTab(requestedTab)) {
-      setActiveTab(requestedTab);
-    }
+    if (isTrackPageTab(requestedTab)) setPageTab(requestedTab);
+    else if (!requestedTab) setPageTab("overview");
   }, [requestedTab]);
 
   // Route slugs are canonical circuit ids (`yas-marina`), while telemetry may
@@ -243,33 +255,6 @@ export function TrackProgressPage() {
     () => aggregateCompoundLife(raceSessions),
     [raceSessions],
   );
-  // Overtake/collision locations aggregated across every race at this track.
-  // Location distribution isn't race-length dependent, so we pool all races
-  // (not the length bucket) for the strongest sample. Races without located
-  // incidents are excluded from the pies (see helper) and reported via
-  // excludedRaceCount so we can note the coverage.
-  const raceEventLists = useMemo(
-    () => raceSessions.map((session) => getRaceControlEvents(session)),
-    [raceSessions],
-  );
-  const {
-    overtakes: overtakeLocations,
-    collisions: collisionLocations,
-    events: locationEvents,
-    locatedRaceCount,
-    excludedRaceCount,
-  } = useMemo(
-    () => buildTrackLocationBreakdowns(raceEventLists),
-    [raceEventLists],
-  );
-  const hasLocationEvents = useMemo(
-    () => hasLocationBreakdownEvents(locationEvents),
-    [locationEvents],
-  );
-  const allRaceSetupCandidates = useMemo(
-    () => buildRaceSetupCandidates(raceDataAll),
-    [raceDataAll],
-  );
   const raceAnalysisBuckets = useMemo(
     () => buildRaceAnalysisBuckets(raceDataAll),
     [raceDataAll],
@@ -295,23 +280,6 @@ export function TrackProgressPage() {
     ? selectedRaceAnalysisBucket.sessions
     : raceSessions;
   const selectedTrackFuelStats = selectedRaceAnalysisBucket?.fuelStats ?? null;
-  // Fastest online rival at this track — computed off raw session summaries
-  // (not the race-length bucket) because pace comparisons stay valid across
-  // short and long races, and at single-track scope we want all the evidence
-  // we can get.
-  const trackRivalBenchmark = useMemo(
-    () =>
-      buildTrackRivalBenchmark(
-        sessions,
-        activeFormulaKey,
-        getSessionFormulaScopeKey,
-        (s) => isTrackSlugMatch(s.track, trackId),
-      ),
-    [sessions, activeFormulaKey, trackId],
-  );
-  const selectedRaceSetupCandidates = selectedRaceAnalysisBucket
-    ? selectedRaceAnalysisBucket.setupCandidates
-    : allRaceSetupCandidates;
   const raceLengthOptions = raceAnalysisBuckets.map((bucket) => ({
     value: bucket.value,
     label: bucket.label,
@@ -335,7 +303,7 @@ export function TrackProgressPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-zinc-500">
+      <div className="flex items-center justify-center h-full text-tone-500">
         Loading track data...
       </div>
     );
@@ -379,7 +347,7 @@ export function TrackProgressPage() {
               <TrackFlag track={trackSourceName} className="mr-2" />
               {displayTrackName}
             </h2>
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-tone-500">
               {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
               {spectatorTrackSessions.length} spectator session
               {spectatorTrackSessions.length !== 1 ? "s" : ""}
@@ -389,10 +357,10 @@ export function TrackProgressPage() {
 
           <section className={cardClass}>
             <Badge tone="zinc">Spectator</Badge>
-            <h3 className="mt-3 text-base font-semibold text-zinc-100">
+            <h3 className="mt-3 text-base font-semibold text-tone-100">
               Spectator sessions only
             </h3>
-            <p className="mt-1 max-w-2xl text-sm text-zinc-500">
+            <p className="mt-1 max-w-2xl text-sm text-tone-500">
               These saves do not mark any driver as the player, so they are kept
               out of PBs, tyre life, fuel, setup, and race-result calculations.
               You can still open each session to inspect the focused driver from
@@ -400,9 +368,9 @@ export function TrackProgressPage() {
             </p>
           </section>
 
-          <TrackSessionHistory
-            activeKind={activeTab}
-            spectatorSessions={spectatorHistory}
+          <SessionLog
+            days={buildSessionLog(spectatorHistory)}
+            isPb={() => false}
           />
         </div>
       );
@@ -419,7 +387,7 @@ export function TrackProgressPage() {
               <TrackFlag track={trackSourceName} className="mr-2" />
               {displayTrackName}
             </h2>
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-tone-500">
               {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
               No sessions of yours here yet, only recorded laps
             </p>
@@ -501,446 +469,898 @@ export function TrackProgressPage() {
   const raceData = trackAnalysis.raceData;
   const timeTrialData = trackAnalysis.timeTrial.sessions;
   const actualBestQualiMs = trackAnalysis.qualifying.bestLapMs;
-  const qualifyingInsights = trackAnalysis.qualifyingInsights;
-  const bestQualiSession = trackAnalysis.qualifying.bestSession;
-  const bestQualiSetup = trackAnalysis.qualifying.bestSetup;
-  const theoreticalTimeTrialMs = trackAnalysis.timeTrial.theoreticalBestMs;
   const bestTimeTrialMs = trackAnalysis.timeTrial.bestLapMs;
-  const timeTrialGapMs = trackAnalysis.timeTrial.gapToTheoreticalMs;
-  const bestTimeTrialSession = trackAnalysis.timeTrial.bestSession;
-  const bestTimeTrialSetup = trackAnalysis.timeTrial.bestSetup;
+  const availableKinds = trackAnalysis.availableTabs;
 
-  // Race-on-race peak pace per compound — feeds Peak Pace Evolution
-  // chart. Uses bucket-scoped sessions so a 5-lap repro doesn't get plotted
-  // against a 30-lap race in the same line. The set identity match is by
-  // TelemetrySession reference, which is stable across renders here.
+  // Race-on-race peak pace per compound for the selected race length.
   const selectedRaceSessionSet = new Set(selectedRaceSessions);
   const paceEvolutionData = buildPaceEvolution(
     raceData
       .filter((d) => selectedRaceSessionSet.has(d.session))
       .map((d) => ({ session: d.session, date: d.summary.date })),
   );
+  // Shared by the Overview race plan and the Race tab's strategy section.
+  const recommendation = buildTrackRaceRecommendation(
+    selectedRaceSessions,
+    selectedCompoundLifeStats,
+    selectedTrackFuelStats,
+    { bestQualiLapMs: actualBestQualiMs, pitLossRaceSessions: raceSessions },
+  );
+  const briefing = buildTrackBriefing({
+    data,
+    recommendation,
+    compoundLife: selectedCompoundLifeStats,
+  });
+  const setups = buildTrackSetups(data);
 
-  const availableTabs = trackAnalysis.availableTabs;
-  const selectedTab = availableTabs.includes(activeTab)
-    ? activeTab
-    : getPreferredTrackTab(availableTabs);
-  const tabOptions = availableTabs.map((value) => ({
-    value,
-    label: TRACK_TAB_LABELS[value],
-    mobileLabel: TRACK_TAB_MOBILE_LABELS[value],
-    icon: TRACK_KIND_META[value].icon,
-  }));
+  const tabs = TRACK_PAGE_TABS.filter((tab) => {
+    if (tab === "qualifying") return qualiData.length > 0;
+    if (tab === "race") return raceData.length > 0;
+    if (tab === "time-trial") return timeTrialData.length > 0;
+    return true;
+  });
+  const selectedTab = tabs.includes(pageTab) ? pageTab : "overview";
+  const lapKind: TrackSessionKind = isTrackSessionTab(lapKindChoice)
+    ? lapKindChoice
+    : getPreferredTrackTab(availableKinds);
+
+  const setTab = (tab: TrackPageTab) => {
+    setPageTab(tab);
+    const nextParams = new URLSearchParams(searchParams);
+    if (tab === "overview") nextParams.delete(TRACK_TAB_QUERY_PARAM);
+    else nextParams.set(TRACK_TAB_QUERY_PARAM, tab);
+    nextParams.delete(LAPS_QUERY_PARAM);
+    setSearchParams(nextParams, { replace: true });
+  };
   const handleRaceLengthChange = (raceLaps: string) => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("raceLaps", raceLaps);
-    setSearchParams(nextParams);
-  };
-  const handleTabChange = (tab: TrackSessionKind) => {
-    setActiveTab(tab);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set(TRACK_TAB_QUERY_PARAM, tab);
-    // A lap selection belongs to one tab's session kind.
-    nextParams.delete(LAPS_QUERY_PARAM);
-    setSearchParams(nextParams);
+    setSearchParams(nextParams, { replace: true });
   };
 
-  // Qualifying and Time Trial put it right under Key Insights: the tiles say
-  // how far off a lap is, the recorded laps say where. Race places it after
-  // Strategy. Renders nothing without recordings.
-  const lapTelemetry = activeFormulaKey ? (
-    <LapTelemetrySection
-      key={selectedTab}
-      scope={{
-        kind: "track",
-        track: trackSourceName,
-        formulaKey: activeFormulaKey,
-        sessionKind: selectedTab,
-      }}
-    />
-  ) : null;
+  // ‹ › walk the calendar among tracks driven in this scope, keeping the tab.
+  const calendarIndex = trackIndex.entries.findIndex(
+    (entry) => entry.trackId === canonicalTrackId,
+  );
+  const previousTrack =
+    calendarIndex > 0 ? trackIndex.entries[calendarIndex - 1] : undefined;
+  const nextTrack =
+    calendarIndex >= 0 ? trackIndex.entries[calendarIndex + 1] : undefined;
+  const trackLink = (trackKey: string) =>
+    activeFormulaKey
+      ? trackPath(
+          activeFormulaKey,
+          trackKey,
+          selectedTab === "overview" ? undefined : selectedTab,
+        )
+      : "#";
+
+  const onlineQualiBest = qualiData
+    .filter((d) => d.summary.isOnline && d.bestLapMs > 0)
+    .sort((a, b) => a.bestLapMs - b.bestLapMs)[0];
+  const bestRaceLap = raceData
+    .filter((d) => d.bestLapMs > 0)
+    .sort((a, b) => a.bestLapMs - b.bestLapMs)[0];
+  const bestTimeTrialSession = trackAnalysis.timeTrial.bestSession;
+  const pbItems: {
+    label: string;
+    ms: number;
+    note: string;
+    to?: string;
+    best?: boolean;
+  }[] = [];
+  if (actualBestQualiMs > 0 && trackAnalysis.qualifying.bestSession) {
+    pbItems.push({
+      label: "Quali PB",
+      ms: actualBestQualiMs,
+      note: formatShortDate(trackAnalysis.qualifying.bestSession.summary.date),
+      to: sessionSummaryPath(trackAnalysis.qualifying.bestSession.summary),
+      best: true,
+    });
+  }
+  if (onlineQualiBest && onlineQualiBest.bestLapMs !== actualBestQualiMs) {
+    pbItems.push({
+      label: "Online quali",
+      ms: onlineQualiBest.bestLapMs,
+      note: `${formatShortDate(onlineQualiBest.summary.date)}${onlineQualiBest.summary.qualifyingPosition ? ` · P${onlineQualiBest.summary.qualifyingPosition}` : ""}`,
+      to: sessionSummaryPath(onlineQualiBest.summary),
+    });
+  }
+  if (bestRaceLap) {
+    pbItems.push({
+      label: "Race best lap",
+      ms: bestRaceLap.bestLapMs,
+      note: formatShortDate(bestRaceLap.summary.date),
+      to: sessionSummaryPath(bestRaceLap.summary),
+    });
+  }
+  if (bestTimeTrialSession && bestTimeTrialMs > 0) {
+    pbItems.push({
+      label: "Time trial",
+      ms: bestTimeTrialMs,
+      note: formatShortDate(bestTimeTrialSession.summary.date),
+      to: sessionSummaryPath(bestTimeTrialSession.summary),
+    });
+  }
+
+  const qualiTrend: TrendPoint[] = (() => {
+    const byDay = new Map<string, number>();
+    for (const d of qualiData) {
+      if (d.bestLapMs <= 0) continue;
+      const day = d.summary.date.split("T")[0];
+      byDay.set(day, Math.min(byDay.get(day) ?? Infinity, d.bestLapMs));
+    }
+    const points = [...byDay].sort(([a], [b]) => a.localeCompare(b));
+    const best = Math.min(...points.map(([, ms]) => ms));
+    return points.map(([day, ms]) => ({
+      key: day,
+      label: formatShortDate(day),
+      ms,
+      pb: ms === best,
+    }));
+  })();
+  const trendGain =
+    qualiTrend.length > 1
+      ? qualiTrend[0].ms - Math.min(...qualiTrend.map((p) => p.ms))
+      : 0;
+
+  const trackSessionLog = buildSessionLog(
+    trackSessions.filter((s) => s.isSpectator !== true),
+  );
+  const pbByTrack = actualBestQualiMs;
+  const isPbSession = (s: SessionSummary) =>
+    summaryKind(s) === "qualifying" && sessionBestLapMs(s) === pbByTrack;
+
+  const openBriefing = (item: TrackBriefingItem) => {
+    if (item.sessionSlug) {
+      const session = sessions.find((s) => s.slug === item.sessionSlug);
+      if (session) navigate(sessionSummaryPath(session));
+      return;
+    }
+    if (tabs.includes(item.target as TrackPageTab))
+      setTab(item.target as TrackPageTab);
+  };
+
+  const raceLengthSelector =
+    showRaceLengthSelector && selectedRaceAnalysisBucket ? (
+      <SegmentedControl
+        ariaLabel="Race length"
+        options={raceLengthOptions}
+        value={selectedRaceLengthValue}
+        onChange={handleRaceLengthChange}
+        size="sm"
+        scrollable
+      />
+    ) : null;
+
+  const plan = recommendation?.recommended;
+  // Sector splits for the map, from the newest session that reports them
+  // (older exports write 0).
+  const sectorStarts = (() => {
+    for (let i = data.length - 1; i >= 0; i--) {
+      const info = data[i].session["session-info"] as unknown as Record<
+        string,
+        unknown
+      >;
+      const length = Number(info["track-length"]);
+      const s2 = Number(info["sector-2-lap-distance-start"]);
+      const s3 = Number(info["sector-3-lap-distance-start"]);
+      if (length > 0 && s2 > 0 && s3 > s2 && s3 < length) {
+        return [s2 / length, s3 / length] as const;
+      }
+    }
+    return null;
+  })();
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="text-xl font-bold mb-1">
+    <div className="mx-auto max-w-6xl px-4 pt-5 pb-16 sm:px-6">
+      <section className="relative overflow-hidden rounded-2xl bg-tone-900 p-5 ring-1 ring-tone-800 sm:p-7">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_140%_at_85%_30%,color-mix(in_oklab,var(--color-brand)_8%,transparent)_0%,transparent_55%)]"
+        />
+        <div className="pointer-events-none absolute inset-y-6 right-7 hidden w-[44%] md:block">
+          <TrackOutline
+            track={trackSourceName}
+            glow
+            detail={{ level: "full", sectorStarts }}
+            className="h-full w-full"
+          />
+        </div>
+        <div className="relative max-w-xl">
+          <div className="text-xs text-tone-500">
+            <Link
+              to={activeFormulaKey ? tracksPath(activeFormulaKey) : "/"}
+              className="hover:text-tone-200"
+            >
+              Tracks
+            </Link>{" "}
+            ›{" "}
             <TrackFlag
               track={trackSourceName}
-              size="medium"
-              className="mr-2 -translate-y-px"
+              className="mx-0.5 -translate-y-px"
+            />{" "}
+            {getTrackCountryName(trackSourceName) ?? displayTrackName}
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <h1 className="text-5xl font-bold tracking-tighter text-tone-50 sm:text-6xl">
+              {displayTrackName}
+            </h1>
+            <TrackSwitcher
+              current={canonicalTrackId}
+              entries={trackIndex.entries}
+              linkFor={trackLink}
             />
-            {displayTrackName}
-          </h2>
-          <p className="text-sm text-zinc-500">
-            {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
-            {data.length} session{data.length !== 1 ? "s" : ""}
-            {bestTimeTrialSession && bestTimeTrialMs > 0 && (
-              <>
-                {" · "}
+            <div className="ml-1 flex gap-1.5 self-center">
+              {[previousTrack, nextTrack].map((entry, i) => (
                 <Link
-                  to={sessionSummaryPath(bestTimeTrialSession.summary)}
-                  className="inline-flex items-center gap-1 whitespace-nowrap text-zinc-400 transition-colors hover:text-cyan-200"
+                  key={i}
+                  to={entry ? trackLink(entry.trackId) : "#"}
+                  aria-disabled={!entry}
+                  title={entry ? getTrackDisplayName(entry.track) : undefined}
+                  className={cn(
+                    "grid size-8 place-items-center rounded-lg text-tone-200 ring-1 ring-tone-800 hover:bg-tone-800",
+                    !entry && "pointer-events-none opacity-35",
+                  )}
                 >
-                  <Gauge className="size-3 text-cyan-300" />
-                  <span className="text-cyan-300/80">Best TT</span>
-                  <span className="whitespace-nowrap font-mono text-zinc-300">
-                    {msToLapTime(bestTimeTrialMs)}
-                  </span>
+                  {i === 0 ? (
+                    <ChevronLeft className="size-4" />
+                  ) : (
+                    <ChevronRight className="size-4" />
+                  )}
                 </Link>
-              </>
-            )}
+              ))}
+            </div>
+          </div>
+          <p className="mt-1 text-sm text-tone-500">
+            {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
+            {playerTrackSessions.length} session
+            {playerTrackSessions.length !== 1 ? "s" : ""}
+            {data.length > 0 &&
+              ` · last driven ${formatShortDate(data[data.length - 1].summary.date)}`}
           </p>
+          {pbItems.length > 0 && (
+            <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-4 sm:flex sm:flex-wrap">
+              {pbItems.map((item) => (
+                <Link key={item.label} to={item.to ?? "#"} className="group">
+                  <div className="text-xs text-tone-500">{item.label}</div>
+                  <div
+                    className={cn(
+                      "mt-0.5 font-mono text-xl font-semibold tracking-tight",
+                      item.best ? "text-best" : "text-tone-50",
+                    )}
+                  >
+                    {msToLapTime(item.ms)}
+                  </div>
+                  <div className="text-xs text-tone-500 group-hover:text-tone-300">
+                    {item.note}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
+      </section>
 
-        <VStack align="start" className="gap-2 sm:shrink-0 sm:items-end">
-          {/* Tab switcher: interactive when multiple analysis buckets exist, static otherwise. */}
-          {tabOptions.length > 1 && (
-            <SegmentedControl<TrackSessionKind>
-              ariaLabel="Session type"
-              options={tabOptions}
-              value={selectedTab}
-              onChange={handleTabChange}
-            />
-          )}
-          {tabOptions.length === 1 && (
-            <SegmentedControl<TrackSessionKind>
-              ariaLabel="Session type"
-              options={tabOptions}
-              value={tabOptions[0].value}
-              onChange={() => {}}
-            />
-          )}
-        </VStack>
+      <div
+        role="tablist"
+        className="mt-5 flex gap-5 overflow-x-auto border-b border-tone-800 text-sm"
+      >
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={tab === selectedTab}
+            onClick={() => setTab(tab)}
+            className={cn(
+              "-mb-px border-b-2 pb-2.5 whitespace-nowrap transition-colors",
+              tab === selectedTab
+                ? "border-tone-50 font-medium text-tone-50"
+                : "border-transparent text-tone-400 hover:text-tone-100",
+            )}
+          >
+            {TRACK_PAGE_TAB_LABELS[tab]}
+            {tab === "sessions" && (
+              <span className="ml-1 text-tone-500">
+                {playerTrackSessions.length}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* ── Qualifying Section ── */}
-      {qualiData.length > 0 && selectedTab === "qualifying" && (
-        <>
-          {qualifyingInsights && (
-            <TrackQualifyingInsights insights={qualifyingInsights} />
-          )}
-
-          {lapTelemetry}
-
-          <TrackPaceTrends
-            pace={trackAnalysis.qualifying}
-            sectorTitle="All-Time Best"
-          />
-
-          {/* Best qualifying setup */}
-          {bestQualiSetup && bestQualiSession && (
-            <section className={cardClass}>
-              <SectionHeader
-                title="Your Best Qualifying Setup"
+      <div className="mt-5 space-y-5">
+        {selectedTab === "overview" && (
+          <>
+            <div className="grid gap-5 lg:grid-cols-2">
+              {qualiTrend.length > 1 ? (
+                <Panel
+                  title="Qualifying progress"
+                  hint="Best lap per day"
+                  action={
+                    trendGain > 0 ? (
+                      <span className="text-sm text-ahead">
+                        −{(trendGain / 1000).toFixed(3)} s since{" "}
+                        {qualiTrend[0].label}
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  <TrendChart points={qualiTrend} height={240} />
+                </Panel>
+              ) : (
+                <Panel title="Qualifying progress">
+                  <p className="text-sm text-tone-500">
+                    One qualifying day here so far.
+                  </p>
+                </Panel>
+              )}
+              <Panel
+                title="Race plan"
                 hint={
-                  <>
-                    From{" "}
-                    <Link
-                      to={sessionSummaryPath(bestQualiSession.summary)}
-                      className="text-zinc-400 hover:text-zinc-200 transition-colors"
-                    >
-                      {formatSessionType(
-                        bestQualiSession.summary.sessionType,
-                        bestQualiSession.summary.formula,
-                      )}{" "}
-                      · {formatDate(bestQualiSession.summary.date)} ·{" "}
-                      {msToLapTime(bestQualiSession.bestLapMs)}
-                    </Link>
-                  </>
+                  recommendation
+                    ? `From your ${recommendation.totalLaps}-lap races here`
+                    : "Race here to build a plan"
                 }
-              />
-              <CarSetupCard setup={bestQualiSetup} />
-            </section>
-          )}
-        </>
-      )}
+                action={raceLengthSelector}
+              >
+                {plan ? (
+                  <RacePlanSummary
+                    plan={plan}
+                    alternative={recommendation?.alternative ?? null}
+                    totalLaps={recommendation!.totalLaps}
+                    fuel={recommendation?.fuelTarget ?? null}
+                    life={selectedCompoundLifeStats}
+                    setup={setups.race}
+                    onOpenRace={() => setTab("race")}
+                    onOpenSetups={() => setTab("setups")}
+                  />
+                ) : (
+                  <p className="text-sm text-tone-500">
+                    No race with tyre data at this length yet. A long run is
+                    enough to start one.
+                  </p>
+                )}
+              </Panel>
+            </div>
+            <WorthList
+              title="Before you race here"
+              items={briefing}
+              onOpen={(target) => {
+                const item = briefing.find((b) => b.target === target);
+                if (item) openBriefing(item);
+              }}
+            />
+          </>
+        )}
 
-      {/* ── Time Trial Section ── */}
-      {timeTrialData.length > 0 && selectedTab === "time-trial" && (
-        <>
-          <SectionHeader
-            title="Key Insights"
-            hint={`${timeTrialData.length} attempt${timeTrialData.length === 1 ? "" : "s"}`}
-          />
+        {selectedTab === "qualifying" && qualiData.length > 0 && (
+          <TrackPaceTrends pace={trackAnalysis.qualifying} sectorTitle="best" />
+        )}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <InsightTile title="Best TT Lap" icon={Timer} accent="purple">
-              <InsightValue tone="text-best">
-                {bestTimeTrialMs > 0 ? msToLapTime(bestTimeTrialMs) : "–"}
-              </InsightValue>
-            </InsightTile>
-            <InsightTile
-              title="Theoretical Best"
-              icon={Target}
-              accent="emerald"
-            >
-              <InsightValue tone="text-ahead">
-                {theoreticalTimeTrialMs > 0
-                  ? msToLapTime(theoreticalTimeTrialMs)
-                  : "–"}
-              </InsightValue>
-            </InsightTile>
-            <InsightTile
-              title="Gap to Theoretical"
-              icon={TimerReset}
-              accent="amber"
-            >
-              <InsightValue tone="text-warning">
-                {timeTrialGapMs > 0
-                  ? `+${(timeTrialGapMs / 1000).toFixed(3)}s`
-                  : "–"}
-              </InsightValue>
-            </InsightTile>
-          </div>
-
-          {lapTelemetry}
-
+        {selectedTab === "time-trial" && timeTrialData.length > 0 && (
           <TrackPaceTrends
             pace={trackAnalysis.timeTrial}
-            sectorTitle="TT Best"
+            sectorTitle="best in time trial"
           />
+        )}
 
-          {bestTimeTrialSetup && bestTimeTrialSession && (
-            <section className={cardClass}>
-              <SectionHeader
-                title="Your Best Time Trial Setup"
-                hint={
-                  <>
-                    From{" "}
-                    <Link
-                      to={sessionSummaryPath(bestTimeTrialSession.summary)}
-                      className="text-zinc-400 hover:text-zinc-200 transition-colors"
-                    >
-                      {formatSessionType(
-                        bestTimeTrialSession.summary.sessionType,
-                        bestTimeTrialSession.summary.formula,
-                      )}{" "}
-                      · {formatDate(bestTimeTrialSession.summary.date)} ·{" "}
-                      {msToLapTime(bestTimeTrialSession.bestLapMs)}
-                    </Link>
-                  </>
-                }
+        {selectedTab === "race" && raceData.length > 0 && (
+          <>
+            {raceLengthSelector && (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <span className="text-xs text-tone-500">Race length</span>
+                {raceLengthSelector}
+              </div>
+            )}
+            {selectedCompoundLifeStats.length > 0 && (
+              <div>
+                <SectionHeader
+                  title="Tyre life"
+                  hint={`${selectedRaceAnalysisBucket ? `${selectedRaceAnalysisBucket.totalLaps}-lap races · ` : ""}${selectedTyreLifeStintCount} stint${selectedTyreLifeStintCount !== 1 ? "s" : ""} across ${selectedTyreLifeRaceCount} race${selectedTyreLifeRaceCount !== 1 ? "s" : ""}`}
+                />
+                <div
+                  className="grid gap-2"
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.min(selectedCompoundLifeStats.length, 4)}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {selectedCompoundLifeStats.map((cs) => (
+                    <CompoundStatCard
+                      key={cs.compound}
+                      compound={cs.compound}
+                      subtitle={`${cs.stintCount} stint${cs.stintCount !== 1 ? "s" : ""}`}
+                      hero={{
+                        value: `~${cs.estMaxLife} laps`,
+                        label: `to ${PUNCTURE_THRESHOLD}% wear`,
+                      }}
+                      belowHero={
+                        <TyreLifeEvidenceBar
+                          compound={cs.compound}
+                          seenLaps={cs.longestGreenRun}
+                          seenWear={cs.longestGreenRunWear}
+                          estLife={cs.estMaxLife}
+                        />
+                      }
+                      rows={[
+                        ...(cs.bestLapMs > 0
+                          ? [
+                              {
+                                label: "Best lap",
+                                value: msToLapTime(cs.bestLapMs),
+                                className: "font-mono text-best",
+                                divider: true,
+                              },
+                            ]
+                          : []),
+                        ...(cs.peakPaceMs > 0
+                          ? [
+                              {
+                                label: PEAK_PACE_LABEL,
+                                note: `${cs.peakPaceLapCount} laps`,
+                                tooltip: PEAK_PACE_TOOLTIP,
+                                value: msToLapTime(cs.peakPaceMs),
+                                divider: cs.bestLapMs <= 0,
+                              },
+                            ]
+                          : []),
+                        {
+                          label: "Wear",
+                          value: `${cs.avgWearRatePerLap.toFixed(1)}%/lap`,
+                          divider: true,
+                        },
+                        {
+                          label: "Avg stint",
+                          value: `${cs.avgStintLength} laps`,
+                        },
+                      ]}
+                    />
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-tone-500">
+                  Solid = longest green-flag run on that compound and the
+                  worst-wheel wear it added; stripes = projection to the{" "}
+                  {PUNCTURE_THRESHOLD}% puncture risk threshold along your
+                  stints&apos; wear curves. {PEAK_PACE_LABEL} is the mean of
+                  your fastest {PEAK_PACE_WINDOW} clean laps.
+                </p>
+              </div>
+            )}
+            {recommendation?.hasEvidence && (
+              <TrackStrategySection
+                recommended={recommendation.recommended}
+                alternative={recommendation.alternative}
+                wetStrategies={recommendation.wetStrategies}
+                totalLaps={recommendation.totalLaps}
+                raceLengthLabel={selectedRaceLengthLabel}
               />
-              <CarSetupCard setup={bestTimeTrialSetup} />
-            </section>
-          )}
+            )}
+            {paceEvolutionData.length > 1 && (
+              <PaceEvolutionChart data={paceEvolutionData} />
+            )}
+          </>
+        )}
+
+        {selectedTab === "lap-telemetry" && activeFormulaKey && (
+          <>
+            {availableKinds.length > 1 && (
+              <SegmentedControl<TrackSessionKind>
+                ariaLabel="Laps from"
+                options={availableKinds.map((value) => ({
+                  value,
+                  label: TRACK_KIND_LABELS[value],
+                }))}
+                value={lapKind}
+                onChange={(value) => {
+                  setLapKindChoice(value);
+                  const nextParams = new URLSearchParams(searchParams);
+                  nextParams.delete(LAPS_QUERY_PARAM);
+                  setSearchParams(nextParams, { replace: true });
+                }}
+              />
+            )}
+            <LapTelemetrySection
+              key={lapKind}
+              scope={{
+                kind: "track",
+                track: trackSourceName,
+                formulaKey: activeFormulaKey,
+                sessionKind: lapKind,
+              }}
+            />
+          </>
+        )}
+
+        {selectedTab === "setups" && <TrackSetupsTab setups={setups} />}
+
+        {selectedTab === "sessions" && (
+          <SessionLog days={trackSessionLog} isPb={isPbSession} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+const TRACK_PAGE_TAB_LABELS: Record<TrackPageTab, string> = {
+  overview: "Overview",
+  qualifying: "Qualifying",
+  race: "Race",
+  "time-trial": "Time trial",
+  "lap-telemetry": "Lap telemetry",
+  setups: "Setups",
+  sessions: "Sessions",
+};
+
+const TRACK_KIND_LABELS: Record<TrackSessionKind, string> = {
+  qualifying: "Qualifying",
+  race: "Race",
+  "time-trial": "Time trial",
+};
+
+function formatShortDate(date: string): string {
+  return new Date(
+    date.length <= 10 ? `${date}T12:00:00` : date,
+  ).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function TrackSwitcher({
+  current,
+  entries,
+  linkFor,
+}: {
+  current: string;
+  entries: TrackIndexEntry[];
+  linkFor: (trackId: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  if (entries.length < 2) return null;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label="Switch track"
+        className="grid size-8 place-items-center rounded-lg text-tone-500 hover:bg-tone-800 hover:text-tone-100"
+      >
+        <ChevronDown className="size-5" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 z-40 mt-1.5 max-h-96 w-80 overflow-y-auto rounded-xl bg-tone-900 p-1.5 shadow-2xl shadow-tone-1000/40 ring-1 ring-tone-800">
+          <div className="px-2.5 pt-1.5 pb-1 text-xs text-tone-500">
+            Calendar order · switching keeps your tab
+          </div>
+          {entries.map((entry) => (
+            <Link
+              key={entry.trackId}
+              to={linkFor(entry.trackId)}
+              onClick={() => setOpen(false)}
+              className={cn(
+                "flex items-center justify-between gap-4 rounded-lg px-2.5 py-1.5 text-sm",
+                entry.trackId === current
+                  ? "bg-active/10 text-tone-50"
+                  : "text-tone-200 hover:bg-tone-800",
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <TrackFlag track={entry.track} />
+                {getTrackDisplayName(entry.track)}
+              </span>
+              <span className="font-mono text-xs text-tone-400">
+                {entry.qualiPbMs ? msToLapTime(entry.qualiPbMs) : "—"} ·{" "}
+                {entry.sessionCount}
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StintBar({
+  plan,
+  thin = false,
+}: {
+  plan: TrackStrategySuggestion;
+  thin?: boolean;
+}) {
+  const total = plan.stintLaps.reduce((a, b) => a + b, 0) || 1;
+  return (
+    <div className={cn("flex gap-0.5", thin ? "h-5" : "h-7")}>
+      {plan.compounds.map((compound, i) => (
+        <div
+          key={i}
+          className="grid place-items-center rounded-md text-xs font-semibold"
+          style={{
+            flex: plan.stintLaps[i] / total,
+            backgroundColor: getCompoundColor(compound),
+            color:
+              compound === "Soft" || compound === "Wet" ? "#fff" : "#18181b",
+          }}
+        >
+          {thin
+            ? `${compound.charAt(0)} · ${plan.stintLaps[i]}`
+            : `${compound} · ${plan.stintLaps[i]}`}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RacePlanSummary({
+  plan,
+  alternative,
+  totalLaps,
+  fuel,
+  life,
+  setup,
+  onOpenRace,
+  onOpenSetups,
+}: {
+  plan: TrackStrategySuggestion;
+  alternative: TrackStrategySuggestion | null;
+  totalLaps: number;
+  fuel: TrackRaceRecommendation["fuelTarget"];
+  life: CompoundLifeStats[];
+  setup: TrackSetups["race"];
+  onOpenRace: () => void;
+  onOpenSetups: () => void;
+}) {
+  const predicted = plan.timeEstimate?.predictedTotalRaceMs;
+  return (
+    <div>
+      <div className="text-xs text-tone-500">
+        Recommended{predicted ? ` · ~${formatRaceTime(predicted)}` : ""} ·{" "}
+        {totalLaps} laps
+      </div>
+      <div className="mt-1.5">
+        <StintBar plan={plan} />
+      </div>
+      {plan.pitWindows.length > 0 && (
+        <p className="mt-1.5 text-xs text-tone-400">
+          {plan.pitWindows
+            .map(
+              (w, i) =>
+                `Pit ${plan.pitWindows.length > 1 ? `${i + 1} ` : ""}lap ${w.target} (${w.earliest}–${w.latest})`,
+            )
+            .join(" · ")}
+        </p>
+      )}
+      {alternative && (
+        <>
+          <div className="mt-4 text-xs text-tone-500">
+            Alternative
+            {alternative.timeEstimate
+              ? ` · +${(alternative.timeEstimate.deltaToFastestMs / 1000).toFixed(1)} s`
+              : ""}
+          </div>
+          <div className="mt-1.5">
+            <StintBar plan={alternative} thin />
+          </div>
         </>
       )}
+      <div className="mt-4 grid grid-cols-2 gap-4 border-t border-tone-800 pt-3 text-sm">
+        {fuel && (
+          <div>
+            <div className="text-xs text-tone-500">Start fuel</div>
+            <div className="font-semibold text-tone-50">
+              {fuel.recommendedFuelKg.toFixed(1)} kg
+            </div>
+            <div className="text-xs text-tone-500">
+              {fuel.recommendedDeltaLaps >= 0 ? "+" : ""}
+              {fuel.recommendedDeltaLaps.toFixed(1)} laps · {fuel.confidence}{" "}
+              confidence
+            </div>
+          </div>
+        )}
+        {life.length > 0 && (
+          <div>
+            <div className="text-xs text-tone-500">
+              Tyre life to {PUNCTURE_THRESHOLD}%
+            </div>
+            <div className="font-semibold text-tone-50">
+              {life
+                .map((c) => `${c.compound.charAt(0)} ${c.estMaxLife}`)
+                .join(" · ")}
+            </div>
+            <div className="text-xs text-tone-500">
+              laps, projected from your stints
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-tone-800 pt-3 text-sm">
+        {setup && (
+          <button
+            type="button"
+            onClick={onOpenSetups}
+            className="text-left text-tone-400 hover:text-tone-100"
+          >
+            Setup{" "}
+            <b className="font-mono font-semibold text-tone-100">
+              {formatSetupText(setup.setup)
+                .split("\n")[0]
+                .replace("Aerodynamics: ", "")}
+            </b>{" "}
+            from {formatShortDate(setup.data.summary.date)} →
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onOpenRace}
+          className="ml-auto text-tone-500 hover:text-tone-100"
+        >
+          Full strategy →
+        </button>
+      </div>
+    </div>
+  );
+}
 
-      {/* ── Race Section ── */}
-      {raceData.length > 0 &&
-        selectedTab === "race" &&
-        (() => {
-          // Shared recommendation drives Key Insights AND the Strategy section
-          // below Tyre Life. Both reuse the same wear/pace synthesis so
-          // there's a single source of truth per race-length bucket.
-          const recommendation = buildTrackRaceRecommendation(
-            selectedRaceSessions,
-            selectedCompoundLifeStats,
-            selectedTrackFuelStats,
-            {
-              bestQualiLapMs: actualBestQualiMs,
-              pitLossRaceSessions: raceSessions,
-            },
-          );
-          return (
-            <>
-              {showRaceLengthSelector && selectedRaceAnalysisBucket && (
-                <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
-                  <span className="shrink-0 font-mono text-xs font-medium uppercase tracking-wider text-zinc-600">
-                    Race length
-                  </span>
-                  <SegmentedControl
-                    ariaLabel="Race length"
-                    options={raceLengthOptions}
-                    value={selectedRaceLengthValue}
-                    onChange={handleRaceLengthChange}
-                    size="sm"
-                    scrollable
-                  />
-                </div>
-              )}
+function formatRaceTime(ms: number): string {
+  const totalSeconds = Math.round(ms / 1000);
+  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
+}
 
-              {/* Key Insights — synthesizes the rest of the tab into "what should
-                I actually do here?". Reacts to the same race-length selector that
-                drives the Tyre Life cards below. */}
-              {recommendation && (
-                <TrackKeyInsights
-                  recommendation={recommendation}
-                  raceLengthLabel={selectedRaceLengthLabel}
-                  rivalBenchmark={trackRivalBenchmark}
-                />
-              )}
-
-              {/* Tyre life cards. The hero is a stint length (laps to the
-                puncture threshold), not a race lap: the Strategy section owns
-                pit laps. Practice races are mostly partial, so the bar shows
-                how far real driving went before the projection takes over. */}
-              {selectedCompoundLifeStats.length > 0 && (
-                <div>
-                  <SectionHeader
-                    title="Tyre Life"
-                    hint={`${
-                      selectedRaceAnalysisBucket
-                        ? `${selectedRaceAnalysisBucket.totalLaps}-lap races · `
-                        : ""
-                    }${selectedTyreLifeStintCount} stint${
-                      selectedTyreLifeStintCount !== 1 ? "s" : ""
-                    } across ${selectedTyreLifeRaceCount} race${
-                      selectedTyreLifeRaceCount !== 1 ? "s" : ""
-                    }`}
-                  />
-                  <div
-                    className="grid gap-2"
-                    style={{
-                      gridTemplateColumns: `repeat(${Math.min(selectedCompoundLifeStats.length, 4)}, minmax(0, 1fr))`,
-                    }}
-                  >
-                    {selectedCompoundLifeStats.map((cs) => (
-                      <CompoundStatCard
-                        key={cs.compound}
-                        compound={cs.compound}
-                        subtitle={`${cs.stintCount} stint${cs.stintCount !== 1 ? "s" : ""}`}
-                        hero={{
-                          value: `~${cs.estMaxLife} laps`,
-                          label: `to ${PUNCTURE_THRESHOLD}% wear`,
-                        }}
-                        belowHero={
-                          <TyreLifeEvidenceBar
-                            compound={cs.compound}
-                            seenLaps={cs.longestGreenRun}
-                            seenWear={cs.longestGreenRunWear}
-                            estLife={cs.estMaxLife}
-                          />
-                        }
-                        rows={[
-                          ...(cs.bestLapMs > 0
-                            ? [
-                                {
-                                  label: "Best lap",
-                                  value: msToLapTime(cs.bestLapMs),
-                                  className: "font-mono text-best",
-                                  divider: true,
-                                },
-                              ]
-                            : []),
-                          ...(cs.peakPaceMs > 0
-                            ? [
-                                {
-                                  label: PEAK_PACE_LABEL,
-                                  note: `${cs.peakPaceLapCount} laps`,
-                                  tooltip: PEAK_PACE_TOOLTIP,
-                                  value: msToLapTime(cs.peakPaceMs),
-                                  divider: cs.bestLapMs <= 0,
-                                },
-                              ]
-                            : []),
-                          {
-                            label: "Wear",
-                            value: `${cs.avgWearRatePerLap.toFixed(1)}%/lap`,
-                            divider: true,
-                          },
-                          {
-                            label: "Avg stint",
-                            value: `${cs.avgStintLength} laps`,
-                          },
-                        ]}
-                      />
+function TrackSetupsTab({ setups }: { setups: TrackSetups }) {
+  const [qualiChoice, setQualiChoice] = useState<"fastest" | "latest">(
+    "fastest",
+  );
+  const quali =
+    qualiChoice === "fastest" ? setups.qualiFastest : setups.qualiLatest;
+  const sessionLabel = (use: NonNullable<TrackSetups["race"]>) =>
+    `${use.data.summary.isOnline ? "Online" : "Practice"} ${sessionKindLabel(use.kind).toLowerCase()} · ${formatShortDate(use.data.summary.date)}`;
+  if (!setups.qualiFastest && !setups.race) {
+    return (
+      <p className="text-sm text-tone-500">
+        No setups recorded here yet: the game exports your own setup with each
+        save.
+      </p>
+    );
+  }
+  return (
+    <>
+      <div className="grid gap-5 lg:grid-cols-2">
+        {quali && (
+          <Panel>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-xs text-tone-500">Qualifying setup</span>
+              {setups.qualiLatest &&
+                setups.qualiFastest &&
+                setups.qualiLatest !== setups.qualiFastest && (
+                  <div className="flex rounded-lg bg-tone-800/60 p-0.5 text-xs">
+                    {(["fastest", "latest"] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setQualiChoice(value)}
+                        className={cn(
+                          "rounded-md px-2.5 py-1",
+                          qualiChoice === value
+                            ? "bg-tone-900 text-tone-50 ring-1 ring-tone-700"
+                            : "text-tone-400",
+                        )}
+                      >
+                        {value === "fastest" ? "Fastest" : "Latest"}
+                      </button>
                     ))}
                   </div>
-                  <p className="text-xs text-zinc-600 mt-1.5">
-                    Solid = longest green-flag run on that compound and the
-                    worst-wheel wear it added; stripes = projection to the{" "}
-                    {PUNCTURE_THRESHOLD}% puncture risk threshold along your
-                    stints&apos; wear curves. {PEAK_PACE_LABEL} is the mean of
-                    your fastest {PEAK_PACE_WINDOW} clean laps.
-                  </p>
-                </div>
-              )}
-
-              {/* Strategy — ranks feasible wear-gated shapes by bucket-scoped
-                tyre pace/wear plus same-track or default pit-loss time, with
-                separate wet plans when Inters/Full Wet stints exist. */}
-              {recommendation?.hasEvidence && (
-                <TrackStrategySection
-                  recommended={recommendation.recommended}
-                  alternative={recommendation.alternative}
-                  wetStrategies={recommendation.wetStrategies}
-                  totalLaps={recommendation.totalLaps}
-                  raceLengthLabel={selectedRaceLengthLabel}
-                />
-              )}
-
-              {/* The race plan above is what this tab is opened for, so the
-                recorded laps follow it instead of splitting it up. */}
-              {lapTelemetry}
-
-              {/* Peak three-lap pace evolution, race-on-race by compound. */}
-              {paceEvolutionData.length > 1 && (
-                <PaceEvolutionChart data={paceEvolutionData} />
-              )}
-
-              {/* Where overtakes and collisions happen at this track,
-                  aggregated across the races that carry location data. Gated on
-                  total (not located) events so tracks whose races lack location
-                  fields still render the cards with an explanation instead of
-                  silently disappearing. */}
-              {hasLocationEvents && (
-                <div>
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <section className={cardClass}>
-                      <EventLocationPieChart
-                        title="Overtake Locations"
-                        unit="overtake"
-                        breakdown={overtakeLocations}
-                        emptyMessage="No overtakes were recorded at this track."
-                        source={{
-                          events: locationEvents,
-                          messageType: "OVERTAKE",
-                        }}
-                        pitLaneToggle
-                      />
-                    </section>
-                    <section className={cardClass}>
-                      <EventLocationPieChart
-                        title="Collision Locations"
-                        unit="collision"
-                        breakdown={collisionLocations}
-                        emptyMessage="No collisions were recorded at this track."
-                      />
-                    </section>
-                  </div>
-                  {locatedRaceCount > 0 && excludedRaceCount > 0 && (
-                    <p className="mt-2 text-xs text-zinc-600">
-                      Based on {locatedRaceCount} race
-                      {locatedRaceCount === 1 ? "" : "s"} with track-location
-                      data. {excludedRaceCount} race
-                      {excludedRaceCount === 1 ? "" : "s"} without
-                      track-location data{" "}
-                      {excludedRaceCount === 1 ? "is" : "are"} excluded.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Race setup comparison */}
-              {selectedRaceSetupCandidates.length > 0 && (
-                <RaceSetupComparison
-                  candidates={selectedRaceSetupCandidates}
-                  raceLengthLabel={selectedRaceLengthLabel}
-                />
-              )}
-            </>
-          );
-        })()}
-
-      <TrackSessionHistory
-        activeKind={selectedTab}
-        sessions={trackAnalysis.sessionHistory}
-        spectatorSessions={spectatorHistory}
-      />
-    </div>
+                )}
+            </div>
+            <SetupSheet
+              setup={quali.setup}
+              title={
+                <>
+                  {qualiChoice === "fastest" ? "PB lap" : "Latest"}{" "}
+                  <span
+                    className={cn(
+                      "font-mono",
+                      qualiChoice === "fastest" && "text-best",
+                    )}
+                  >
+                    {msToLapTime(quali.data.bestLapMs)}
+                  </span>
+                </>
+              }
+              meta={sessionLabel(quali)}
+            />
+          </Panel>
+        )}
+        {setups.race && (
+          <Panel>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-xs text-tone-500">Race setup</span>
+              <span className="text-xs text-tone-500">
+                {setups.raceIsFastest
+                  ? "latest, and your fastest race lap here"
+                  : "latest"}
+              </span>
+            </div>
+            <SetupSheet
+              setup={setups.race.setup}
+              title={
+                <>
+                  Best lap{" "}
+                  <span className="font-mono">
+                    {msToLapTime(setups.race.data.bestLapMs)}
+                  </span>
+                </>
+              }
+              meta={sessionLabel(setups.race)}
+            />
+          </Panel>
+        )}
+      </div>
+      <Panel
+        title="Every setup you've run here"
+        hint="Newest first. Brake bias changed from the wheel doesn't count as a new setup."
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-tone-500">
+                <th className="py-2 pr-4 font-normal">Last used</th>
+                <th className="py-2 pr-4 font-normal">Used for</th>
+                <th className="py-2 pr-4 font-normal">Aero</th>
+                <th className="py-2 pr-4 font-normal">Diff</th>
+                <th className="py-2 pr-4 font-normal">ARB</th>
+                <th className="py-2 pr-4 text-right font-normal">Sessions</th>
+                <th className="py-2 text-right font-normal">Best lap</th>
+              </tr>
+            </thead>
+            <tbody>
+              {setups.history.map((group) => {
+                const lines = Object.fromEntries(
+                  formatSetupText(group.setup)
+                    .split("\n")
+                    .map((line) => line.split(/:\s*/)),
+                );
+                const isPb =
+                  setups.qualiFastest &&
+                  group.bestLapMs === setups.qualiFastest.data.bestLapMs;
+                return (
+                  <tr key={group.key} className="border-t border-tone-800/70">
+                    <td className="py-2 pr-4 text-tone-300">
+                      {formatShortDate(group.lastDate)}
+                    </td>
+                    <td className="py-2 pr-4 text-tone-300">
+                      {group.kinds.map((k) => sessionKindLabel(k)).join(", ")}
+                    </td>
+                    <td className="py-2 pr-4 font-mono text-tone-100">
+                      {lines.Aerodynamics}
+                    </td>
+                    <td className="py-2 pr-4 font-mono text-tone-100">
+                      {lines.Transmission}
+                    </td>
+                    <td className="py-2 pr-4 font-mono text-tone-100">
+                      {lines.Suspension?.split(" ")[1]}
+                    </td>
+                    <td className="py-2 pr-4 text-right text-tone-400">
+                      {group.sessionCount}
+                    </td>
+                    <td
+                      className={cn(
+                        "py-2 text-right font-mono",
+                        isPb ? "text-best" : "text-tone-100",
+                      )}
+                    >
+                      {msToLapTime(group.bestLapMs)}
+                      <span className="ml-1.5 font-sans text-xs text-tone-500">
+                        {sessionKindLabel(group.bestKind).toLowerCase()}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </>
   );
 }

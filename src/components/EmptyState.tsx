@@ -13,9 +13,9 @@ interface EmptyStateProps {
 export function EmptyState({ title, message }: EmptyStateProps) {
   return (
     <HStack className="gap-3 py-1">
-      <CircleOff className="size-4 text-zinc-600 shrink-0" />
-      <p className="text-sm text-zinc-500">
-        <span className="font-medium text-zinc-400">{title}</span>
+      <CircleOff className="size-4 text-tone-600 shrink-0" />
+      <p className="text-sm text-tone-500">
+        <span className="font-medium text-tone-400">{title}</span>
         {" - "}
         {message}
       </p>

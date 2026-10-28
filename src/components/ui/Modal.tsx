@@ -61,7 +61,7 @@ export function Modal({
         aria-labelledby={labelledBy}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "relative flex w-full flex-col rounded-3xl bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950 shadow-2xl ring-1 ring-white/[0.06] transition-all duration-[180ms] ease-out",
+          "relative flex w-full flex-col rounded-3xl bg-gradient-to-br from-tone-800 via-tone-900 to-tone-950 shadow-2xl ring-1 ring-tone-0/[0.06] transition-all duration-[180ms] ease-out",
           open ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]",
           className,
         )}
@@ -69,7 +69,7 @@ export function Modal({
         {onClose && (
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 z-10 rounded-lg p-1 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+            className="absolute top-4 right-4 z-10 rounded-lg p-1 text-tone-500 hover:text-tone-300 hover:bg-tone-900 transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />

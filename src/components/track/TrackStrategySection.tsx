@@ -62,7 +62,7 @@ export function TrackStrategySection({
   const subtitleParts: string[] = [];
   if (raceLengthLabel) subtitleParts.push(raceLengthLabel);
   subtitleParts.push(
-    `based on ${sampleCount} ${sampleKind}${sampleCount === 1 ? "" : "s"} in this bucket`,
+    `From ${sampleCount} ${sampleKind}${sampleCount === 1 ? "" : "s"} at this length`,
   );
 
   return (
@@ -118,7 +118,7 @@ export function TrackStrategySection({
         <div
           className={cn(
             "space-y-7",
-            recommended && "border-t border-white/5 pt-7",
+            recommended && "border-t border-tone-0/5 pt-7",
           )}
         >
           {wetStrategies.map((strategy) => (
@@ -140,7 +140,7 @@ function StrategyEvidenceHelp({ text }: { text: string }) {
     <Tooltip text={text}>
       <button
         type="button"
-        className="inline-flex size-7 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-white/[0.03] hover:text-zinc-300 focus-visible:outline focus-visible:outline-1 focus-visible:outline-zinc-500"
+        className="inline-flex size-7 items-center justify-center rounded-full text-tone-600 transition-colors hover:bg-tone-0/[0.03] hover:text-tone-300 focus-visible:outline focus-visible:outline-1 focus-visible:outline-tone-500"
         aria-label="How strategy is calculated"
       >
         <CircleHelp className="size-4" aria-hidden="true" />
@@ -176,7 +176,7 @@ function StrategyRow({
     ? "text-amber-300"
     : isWet
       ? "text-sky-300"
-      : "text-zinc-300";
+      : "text-tone-300";
   const label = isRecommended
     ? "Recommended"
     : isWet
@@ -200,26 +200,26 @@ function StrategyRow({
       <HStack wrap className="gap-2">
         <span
           className={cn(
-            "inline-flex items-center gap-1.5 font-mono text-xs font-medium uppercase tracking-wider",
+            "inline-flex items-center gap-1.5 text-sm font-semibold",
             labelTone,
           )}
         >
           <Icon className="h-3.5 w-3.5" />
           {label}
         </span>
-        <span className="text-xs text-zinc-500">· {tagline}</span>
+        <span className="text-xs text-tone-500">· {tagline}</span>
         {timingLabel && (
           <Tooltip text={formatTimingTooltip(strategy)}>
             <span
               className={cn(
                 "inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none ring-1",
                 strategy.timeEstimate?.confidence === "low"
-                  ? "text-zinc-400 ring-white/10"
+                  ? "text-tone-400 ring-tone-0/10"
                   : isRecommended
                     ? "text-amber-200 ring-amber-300/30"
                     : isWet
                       ? "text-sky-200 ring-sky-300/30"
-                      : "text-zinc-200 ring-white/15",
+                      : "text-tone-200 ring-tone-0/15",
               )}
             >
               {timingLabel}
@@ -368,7 +368,7 @@ function StintRibbon({
 
   return (
     <div>
-      <div className="relative h-9 rounded-md ring-1 ring-white/5">
+      <div className="relative h-9 rounded-md ring-1 ring-tone-0/5">
         <div className="flex h-full">
           {compounds.map((compound, i) => {
             const laps = stintLaps[i];
@@ -428,7 +428,7 @@ function StintRibbon({
       {/* Lap axis — start / each pit target / flag. Position labels at the
           same percentages as the bar segments so the eye can trace pit lap to
           stint boundary directly. */}
-      <div className="relative mt-2 h-5 text-xs text-zinc-500">
+      <div className="relative mt-2 h-5 text-xs text-tone-500">
         {lapMarks.map((lap, i) => {
           const pct = (lap / totalLaps) * 100;
           // Anchor: leftmost label flush left, rightmost flush right, the rest centered.
@@ -477,8 +477,8 @@ function formatWearPercent(wear: number): string {
 }
 
 function wearBadgeTone(wear: number): string {
-  if (wear >= 75) return "bg-zinc-950/85 text-red-300 ring-red-300/45";
-  if (wear >= 65) return "bg-zinc-950/85 text-amber-300 ring-amber-300/40";
+  if (wear >= 75) return "bg-tone-950/85 text-red-300 ring-red-300/45";
+  if (wear >= 65) return "bg-tone-950/85 text-amber-300 ring-amber-300/40";
   return "bg-zinc-950/55 text-white/80 ring-white/15";
 }
 
@@ -503,5 +503,5 @@ function PitDetail({
       `${formatStopCount(closeStopCount.stopCount)} ${formatSignedSeconds(closeStopCount.deltaMs, 1)}`,
     );
   }
-  return <p className="text-xs text-zinc-500">{parts.join(" · ")}</p>;
+  return <p className="text-xs text-tone-500">{parts.join(" · ")}</p>;
 }

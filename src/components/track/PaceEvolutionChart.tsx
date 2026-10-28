@@ -19,6 +19,7 @@ import { PEAK_PACE_WINDOW } from "../../utils/stats/peakPace";
 import { cardClass } from "../Card";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { SectionHeader } from "../ui/SectionHeader";
+import { formatLapTick, lapTimeAxis } from "../charts/lapTimeAxis";
 import { HStack } from "../ui/Stack";
 
 /**
@@ -107,12 +108,22 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
     }
     return row;
   });
+  const values = flatData.flatMap((row) =>
+    compounds
+      .map((c) => row[c])
+      .filter((v): v is number => typeof v === "number")
+      .map((v) => v * 1000),
+  );
+  const axis = lapTimeAxis(
+    values.length ? Math.min(...values) : 0,
+    values.length ? Math.max(...values) : 1,
+  );
 
   return (
     <section className={cardClass}>
       <SectionHeader
-        title="Peak Pace Evolution"
-        hint={`Peak pace by compound, race-on-race · mean of your fastest ${PEAK_PACE_WINDOW} clean laps`}
+        title="Peak pace evolution"
+        hint={`Race by race, per compound: the mean of your fastest ${PEAK_PACE_WINDOW} clean laps`}
         action={
           showFilter ? (
             <SegmentedControl<ContextFilter>
@@ -126,7 +137,7 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
       />
 
       {filtered.length === 0 ? (
-        <div className="py-12 text-center text-sm text-zinc-500">
+        <div className="py-12 text-center text-sm text-tone-500">
           No races match this filter.
         </div>
       ) : (
@@ -135,18 +146,23 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
             data={flatData}
             margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.grid} />
+            <CartesianGrid vertical={false} stroke={CHART_THEME.grid} />
             <XAxis
               dataKey="idx"
               stroke={CHART_THEME.axis}
+              tickLine={false}
               fontSize={11}
               tickFormatter={(v) => `R${v}`}
             />
             <YAxis
               stroke={CHART_THEME.axis}
+              tickLine={false}
+              axisLine={false}
               fontSize={11}
-              tickFormatter={(v) => msToLapTime(v * 1000)}
-              domain={["auto", "auto"]}
+              width={52}
+              ticks={axis.ticks.map((t) => t / 1000)}
+              tickFormatter={(v) => formatLapTick(v * 1000, axis.stepMs)}
+              domain={[axis.domain[0] / 1000, axis.domain[1] / 1000]}
             />
             <Tooltip
               {...TOOLTIP_STYLE}
@@ -165,12 +181,12 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
                     style={{
                       ...TOOLTIP_STYLE.contentStyle,
                       padding: "8px 12px",
-                      color: "#e4e4e7",
+                      color: "var(--color-tone-200)",
                     }}
                   >
                     <div
                       style={{
-                        color: "#a1a1aa",
+                        color: "var(--color-tone-400)",
                         marginBottom: 2,
                         fontSize: 11,
                       }}
@@ -180,7 +196,7 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
                     {point && (
                       <div
                         style={{
-                          color: "#71717a",
+                          color: "var(--color-tone-500)",
                           marginBottom: 6,
                           fontSize: 11,
                         }}
@@ -213,12 +229,22 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
                               backgroundColor: getCompoundColor(c),
                             }}
                           />
-                          <span style={{ color: "#d4d4d8", minWidth: 60 }}>
+                          <span
+                            style={{
+                              color: "var(--color-tone-300)",
+                              minWidth: 60,
+                            }}
+                          >
                             {c}
                           </span>
                           <span>{msToLapTime(ms)}</span>
                           {n != null && (
-                            <span style={{ color: "#71717a", fontSize: 11 }}>
+                            <span
+                              style={{
+                                color: "var(--color-tone-500)",
+                                fontSize: 11,
+                              }}
+                            >
                               ({n} laps)
                             </span>
                           )}
@@ -234,7 +260,7 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
               return (
                 <Line
                   key={c}
-                  type="monotone"
+                  type="linear"
                   dataKey={c}
                   stroke={color}
                   strokeWidth={2}
@@ -249,7 +275,7 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
         </ResponsiveContainer>
       )}
       {filtered.length > 0 && (
-        <HStack wrap className="mt-2 gap-3 text-xs text-zinc-500">
+        <HStack wrap className="mt-2 gap-3 text-xs text-tone-500">
           {compounds.map((c) => (
             <HStack as="span" key={c} className="gap-1.5">
               <span

@@ -3,7 +3,7 @@ import { cn } from "../../utils/cn";
 import type { LapPlayback } from "./useLapPlayback";
 
 const iconButton =
-  "inline-flex size-6 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600";
+  "inline-flex size-6 items-center justify-center rounded-md text-tone-400 transition-colors hover:bg-tone-800 hover:text-tone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-tone-600";
 
 /** Play/pause, restart and speed for the lap cursor. */
 export function PlaybackControls({ playback }: { playback: LapPlayback }) {
@@ -15,7 +15,7 @@ export function PlaybackControls({ playback }: { playback: LapPlayback }) {
         onClick={toggle}
         aria-label={playing ? "Pause" : "Play lap"}
         title={playing ? "Pause" : "Play lap"}
-        className={cn(iconButton, "bg-zinc-800/70 text-zinc-100")}
+        className={cn(iconButton, "bg-tone-800/70 text-tone-100")}
       >
         {playing ? (
           <Pause className="size-3.5" fill="currentColor" strokeWidth={0} />

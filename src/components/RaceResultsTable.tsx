@@ -43,6 +43,9 @@ interface RaceResultsTableProps {
   speedAnalysis?: SessionSpeedAnalysis;
   focusedDriverIndex: number;
   raceControlEvents?: RaceControlEvent[];
+  /** Row click: open that driver's panel. */
+  onDriverSelect?: (name: string) => void;
+  selectedDriverName?: string | null;
 }
 
 const HIGH_VALUE_FIRST_SORT_KEYS = new Set<RaceResultSortKey>([
@@ -146,7 +149,12 @@ export function RaceResultsTable({
   speedAnalysis,
   focusedDriverIndex,
   raceControlEvents = [],
+  onDriverSelect,
+  selectedDriverName,
 }: RaceResultsTableProps) {
+  // Speed and ERS answer a different question than the result, so they stay
+  // one switch away instead of widening every row.
+  const [showSpeed, setShowSpeed] = useState(false);
   const [sortKey, setSortKey] = useState<RaceResultSortKey>("pos");
   const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [compoundChoice, setCompoundChoice] = useState<string>(ALL_COMPOUNDS);
@@ -244,17 +252,37 @@ export function RaceResultsTable({
       <div>
         <SectionHeader
           size="sm"
-          title="Classification"
+          title="Results"
+          hint={
+            onDriverSelect
+              ? "Click a driver for your history with them"
+              : undefined
+          }
           action={
-            raceCompounds.length > 1 ? (
-              <SegmentedControl
-                ariaLabel="Pace compound"
-                options={compoundOptions}
-                value={compound ?? ALL_COMPOUNDS}
-                onChange={setCompoundChoice}
-                size="sm"
-              />
-            ) : undefined
+            <div className="flex flex-wrap items-center gap-2">
+              {raceCompounds.length > 1 && (
+                <SegmentedControl
+                  ariaLabel="Pace compound"
+                  options={compoundOptions}
+                  value={compound ?? ALL_COMPOUNDS}
+                  onChange={setCompoundChoice}
+                  size="sm"
+                />
+              )}
+              <button
+                type="button"
+                aria-pressed={showSpeed}
+                onClick={() => setShowSpeed((v) => !v)}
+                className={cn(
+                  "rounded-lg px-2.5 py-1 text-xs ring-1 transition-colors",
+                  showSpeed
+                    ? "bg-tone-800 text-tone-50 ring-tone-700"
+                    : "text-tone-400 ring-tone-800 hover:text-tone-100",
+                )}
+              >
+                Speed &amp; ERS
+              </button>
+            </div>
           }
         />
         <ScrollArea axis="x">
@@ -266,7 +294,7 @@ export function RaceResultsTable({
                   <SortIcon column="pos" sortKey={sortKey} sortDir={sortDir} />
                 </th>
                 <th className={tableHeadCellClass()}>Driver</th>
-                <th className={tableHeadCellClass()}>Team</th>
+                <th className={tableHeadCellClass({ align: "right" })}>Grid</th>
                 <th
                   className={thClass("right")}
                   {...sortableHeaderProps("gap")}
@@ -290,7 +318,7 @@ export function RaceResultsTable({
                     side="left"
                   />
                   <span className="whitespace-nowrap">
-                    Best Lap
+                    Best lap
                     <CompoundScope compound={compound} />
                   </span>
                 </th>
@@ -313,23 +341,25 @@ export function RaceResultsTable({
                     </span>
                   </Tooltip>
                 </th>
-                <th
-                  className={thClass("right")}
-                  {...sortableHeaderProps("sessionPeak")}
-                >
-                  <Tooltip text="Highest credible speed recorded anywhere in the session. Session-only fallback values remain visible but are not ranked.">
-                    <span>
-                      <SortIcon
-                        column="sessionPeak"
-                        sortKey={sortKey}
-                        sortDir={sortDir}
-                        side="left"
-                      />
-                      Peak (km/h)
-                    </span>
-                  </Tooltip>
-                </th>
-                {highlights.hasSpeedTrap && (
+                {showSpeed && (
+                  <th
+                    className={thClass("right")}
+                    {...sortableHeaderProps("sessionPeak")}
+                  >
+                    <Tooltip text="Highest credible speed recorded anywhere in the session. Session-only fallback values remain visible but are not ranked.">
+                      <span>
+                        <SortIcon
+                          column="sessionPeak"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          side="left"
+                        />
+                        Peak (km/h)
+                      </span>
+                    </Tooltip>
+                  </th>
+                )}
+                {showSpeed && highlights.hasSpeedTrap && (
                   <th
                     className={thClass("right")}
                     {...sortableHeaderProps("speedTrap")}
@@ -347,23 +377,25 @@ export function RaceResultsTable({
                     </Tooltip>
                   </th>
                 )}
-                <th
-                  className={thClass("right")}
-                  {...sortableHeaderProps("ers")}
-                >
-                  <Tooltip text="Average ERS energy deployed per lap. Green-flag laps only; pre-race baseline and final reset snapshot excluded.">
-                    <span>
-                      <SortIcon
-                        column="ers"
-                        sortKey={sortKey}
-                        sortDir={sortDir}
-                        side="left"
-                      />
-                      ERS Dep
-                    </span>
-                  </Tooltip>
-                </th>
-                {highlights.hasErsHarv && (
+                {showSpeed && (
+                  <th
+                    className={thClass("right")}
+                    {...sortableHeaderProps("ers")}
+                  >
+                    <Tooltip text="Average ERS energy deployed per lap. Green-flag laps only; pre-race baseline and final reset snapshot excluded.">
+                      <span>
+                        <SortIcon
+                          column="ers"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          side="left"
+                        />
+                        ERS Dep
+                      </span>
+                    </Tooltip>
+                  </th>
+                )}
+                {showSpeed && highlights.hasErsHarv && (
                   <th
                     className={thClass("right")}
                     {...sortableHeaderProps("ersHarv")}
@@ -381,7 +413,7 @@ export function RaceResultsTable({
                     </Tooltip>
                   </th>
                 )}
-                {highlights.hasErsHarvestPct && (
+                {showSpeed && highlights.hasErsHarvestPct && (
                   <th
                     className={thClass("right")}
                     {...sortableHeaderProps("ersHarvestPct")}
@@ -400,7 +432,7 @@ export function RaceResultsTable({
                   </th>
                 )}
                 <th className={tableHeadCellClass({ align: "right" })}>
-                  Strategy
+                  Tyres
                 </th>
               </tr>
             </thead>
@@ -446,13 +478,24 @@ export function RaceResultsTable({
                   ersHarv > 0 &&
                   Math.abs(ersHarv - highlights.bestErsHarv) < 0.1;
                 const penalties = penaltiesByDriver.get(entry.name) ?? [];
+                const grid = entry["grid-position"];
+                const gridGain = grid > 0 ? grid - entry.position : null;
 
                 return (
                   <tr
                     key={`${entry.name}-${entry.team}`}
+                    onClick={
+                      onDriverSelect && !isFocused
+                        ? () => onDriverSelect(entry.name)
+                        : undefined
+                    }
                     className={cn(
                       tableRowClass,
-                      isFocused && "bg-zinc-800/40 text-white font-medium",
+                      isFocused && "bg-active/10 text-tone-0 font-medium",
+                      onDriverSelect &&
+                        !isFocused &&
+                        "cursor-pointer hover:bg-tone-800/50",
+                      selectedDriverName === entry.name && "bg-tone-800/60",
                     )}
                   >
                     <td className={tableCellClass()}>{entry.position}</td>
@@ -462,14 +505,42 @@ export function RaceResultsTable({
                           className="h-3 w-1 shrink-0 rounded-sm"
                           style={{ backgroundColor: getTeamColor(entry.team) }}
                         />
-                        <span>{entry.name}</span>
+                        <span>
+                          {isFocused &&
+                          drivers.find((d) => d.index === entryDriverIndex)?.[
+                            "is-player"
+                          ]
+                            ? "You"
+                            : entry.name}
+                        </span>
+                        <span className="text-xs font-normal text-tone-500">
+                          {getTeamName(entry.team)}
+                        </span>
                         <PenaltyBadge penalties={penalties} />
                       </span>
                     </td>
-                    <td
-                      className={tableCellClass({ className: "text-zinc-400" })}
-                    >
-                      {getTeamName(entry.team)}
+                    <td className={tableCellClass({ align: "right" })}>
+                      <span className="whitespace-nowrap tabular-nums">
+                        {grid > 0 ? `P${grid}` : "–"}{" "}
+                        {gridGain != null && (
+                          <span
+                            className={cn(
+                              "text-xs",
+                              gridGain > 0
+                                ? "text-ahead"
+                                : gridGain < 0
+                                  ? "text-behind"
+                                  : "text-tone-500",
+                            )}
+                          >
+                            {gridGain > 0
+                              ? `+${gridGain}`
+                              : gridGain < 0
+                                ? `−${-gridGain}`
+                                : "0"}
+                          </span>
+                        )}
+                      </span>
                     </td>
                     <td
                       className={cn(
@@ -493,33 +564,35 @@ export function RaceResultsTable({
                         isBestPace && "text-best",
                         racePace > 0 &&
                           !stats?.racePaceRankEligible &&
-                          "text-zinc-500",
+                          "text-tone-500",
                       )}
                     >
                       <div>{racePace > 0 ? msToLapTime(racePace) : "–"}</div>
-                      <div className="mt-0.5 whitespace-nowrap font-sans text-2xs font-normal text-zinc-500">
+                      <div className="mt-0.5 whitespace-nowrap font-sans text-2xs font-normal text-tone-500">
                         {racePaceEvidenceLabel(stats, compound)}
                       </div>
                     </td>
-                    <td
-                      className={cn(
-                        tableCellClass({ align: "right", mono: true }),
-                        isBestSessionPeak && "text-best",
-                        stats?.sessionPeakQuality === "limited" &&
-                          "text-zinc-500",
-                      )}
-                      title={
-                        stats?.sessionPeakQuality === "limited"
-                          ? "Limited: only the session-level speed was available, so this value is not ranked."
-                          : undefined
-                      }
-                    >
-                      <SessionPeakValue
-                        kmh={sessionPeakKmh}
-                        limited={stats?.sessionPeakQuality === "limited"}
-                      />
-                    </td>
-                    {highlights.hasSpeedTrap && (
+                    {showSpeed && (
+                      <td
+                        className={cn(
+                          tableCellClass({ align: "right", mono: true }),
+                          isBestSessionPeak && "text-best",
+                          stats?.sessionPeakQuality === "limited" &&
+                            "text-tone-500",
+                        )}
+                        title={
+                          stats?.sessionPeakQuality === "limited"
+                            ? "Limited: only the session-level speed was available, so this value is not ranked."
+                            : undefined
+                        }
+                      >
+                        <SessionPeakValue
+                          kmh={sessionPeakKmh}
+                          limited={stats?.sessionPeakQuality === "limited"}
+                        />
+                      </td>
+                    )}
+                    {showSpeed && highlights.hasSpeedTrap && (
                       <td
                         className={cn(
                           tableCellClass({ align: "right", mono: true }),
@@ -529,15 +602,17 @@ export function RaceResultsTable({
                         {speedTrapKmh != null ? speedTrapKmh.toFixed(1) : "–"}
                       </td>
                     )}
-                    <td
-                      className={cn(
-                        tableCellClass({ align: "right", mono: true }),
-                        isBestErs && "text-best",
-                      )}
-                    >
-                      {ers > 0 ? ers.toFixed(1) : "–"}
-                    </td>
-                    {highlights.hasErsHarv && (
+                    {showSpeed && (
+                      <td
+                        className={cn(
+                          tableCellClass({ align: "right", mono: true }),
+                          isBestErs && "text-best",
+                        )}
+                      >
+                        {ers > 0 ? ers.toFixed(1) : "–"}
+                      </td>
+                    )}
+                    {showSpeed && highlights.hasErsHarv && (
                       <td
                         className={cn(
                           tableCellClass({ align: "right", mono: true }),
@@ -547,7 +622,7 @@ export function RaceResultsTable({
                         {ersHarv > 0 ? ersHarv.toFixed(1) : "–"}
                       </td>
                     )}
-                    {highlights.hasErsHarvestPct && (
+                    {showSpeed && highlights.hasErsHarvestPct && (
                       <td
                         className={tableCellClass({
                           align: "right",
@@ -562,7 +637,7 @@ export function RaceResultsTable({
                     <td
                       className={tableCellClass({
                         align: "right",
-                        className: "text-zinc-400",
+                        className: "text-tone-400",
                       })}
                     >
                       {stintStr}
@@ -608,7 +683,7 @@ export function RaceResultsTable({
                   sortDir={sortDir}
                   side="left"
                 />
-                Best Lap
+                Best lap
               </th>
               <th
                 className={thClass("right")}
@@ -659,7 +734,7 @@ export function RaceResultsTable({
                   className={cn(
                     tableRowClass,
                     d.index === focusedDriverIndex &&
-                      "bg-zinc-800/40 text-white font-medium",
+                      "bg-tone-800/40 text-tone-0 font-medium",
                   )}
                 >
                   <td className={tableCellClass()}>{fc.position}</td>
@@ -674,21 +749,23 @@ export function RaceResultsTable({
                     </span>
                   </td>
                   <td
-                    className={tableCellClass({ className: "text-zinc-400" })}
+                    className={tableCellClass({ className: "text-tone-400" })}
                   >
                     {getTeamName(d.team)}
                   </td>
                   <td
                     className={tableCellClass({ align: "right", mono: true })}
                   >
-                    {fc["best-lap-time-str"] || "–"}
+                    {fc["best-lap-time-ms"]
+                      ? msToLapTime(fc["best-lap-time-ms"])
+                      : "–"}
                   </td>
                   <td
                     className={cn(
                       tableCellClass({ align: "right", mono: true }),
                       stats?.sessionPeakRank === 1 && "text-best",
                       stats?.sessionPeakQuality === "limited" &&
-                        "text-zinc-500",
+                        "text-tone-500",
                     )}
                     title={
                       stats?.sessionPeakQuality === "limited"

@@ -236,7 +236,7 @@ const TracePane = memo(function TracePane({
         width={plotWidth}
         height={height}
         rx={6}
-        fill="rgba(255,255,255,0.015)"
+        fill="color-mix(in oklab, var(--color-tone-0) 1.5%, transparent)"
       />
       {bands.map((band) => (
         <rect
@@ -245,7 +245,7 @@ const TracePane = memo(function TracePane({
           y={0}
           width={band.width}
           height={height}
-          fill="rgba(255,255,255,0.025)"
+          fill="color-mix(in oklab, var(--color-tone-0) 2.5%, transparent)"
         />
       ))}
       {highlight && highlight.to > domain[0] && highlight.from < domain[1] && (
@@ -258,7 +258,7 @@ const TracePane = memo(function TracePane({
               Math.max(GUTTER_LEFT, x(highlight.from)),
           )}
           height={height}
-          fill="rgba(255,255,255,0.06)"
+          fill="color-mix(in oklab, var(--color-tone-0) 6%, transparent)"
         />
       )}
       {(id === "gap" || spec.symmetric) && (
@@ -291,13 +291,13 @@ const TracePane = memo(function TracePane({
         y={13}
         className="font-mono text-[10px] font-medium uppercase tracking-wider"
         // A halo in the card colour keeps the label legible over traces.
-        stroke="#18181b"
+        stroke="var(--color-tone-900)"
         strokeWidth={3}
         paintOrder="stroke"
       >
-        <tspan className="fill-zinc-400">{spec.label}</tspan>
+        <tspan className="fill-tone-400">{spec.label}</tspan>
         {spec.unit && (
-          <tspan className="fill-zinc-600" dx={5}>
+          <tspan className="fill-tone-600" dx={5}>
             {spec.unit}
           </tspan>
         )}
@@ -316,7 +316,7 @@ const TracePane = memo(function TracePane({
         x={GUTTER_LEFT - 6}
         y={y(hi) + 10}
         textAnchor="end"
-        className="fill-zinc-600 font-mono text-[10px] tabular-nums"
+        className="fill-tone-600 font-mono text-[10px] tabular-nums"
       >
         {spec.format(
           id === "gap" || spec.step ? hi - (spec.step ? 0.5 : 0) : hi,
@@ -326,7 +326,7 @@ const TracePane = memo(function TracePane({
         x={GUTTER_LEFT - 6}
         y={y(lo) - 3}
         textAnchor="end"
-        className="fill-zinc-600 font-mono text-[10px] tabular-nums"
+        className="fill-tone-600 font-mono text-[10px] tabular-nums"
       >
         {spec.format(spec.step ? lo + 0.5 : lo)}
       </text>
@@ -381,7 +381,7 @@ function SectorDeltas({
           y={13 + rowIndex * 13}
           textAnchor="middle"
           className="font-mono text-[10px] font-medium tabular-nums"
-          stroke="#18181b"
+          stroke="var(--color-tone-900)"
           strokeWidth={3}
           paintOrder="stroke"
         >
@@ -449,7 +449,7 @@ function DistanceAxis({
           x={x(d)}
           y={13}
           textAnchor="middle"
-          className="fill-zinc-600 font-mono text-[10px] tabular-nums"
+          className="fill-tone-600 font-mono text-[10px] tabular-nums"
         >
           {step >= 1000
             ? `${d / 1000} km`
@@ -467,7 +467,7 @@ function DistanceAxis({
             x={(x(start) + x(end)) / 2}
             y={29}
             textAnchor="middle"
-            className="fill-zinc-500 font-mono text-[10px] font-semibold"
+            className="fill-tone-500 font-mono text-[10px] font-semibold"
           >
             {label}
           </text>
@@ -538,8 +538,8 @@ function PaneResizeHandle({
     >
       <div
         className={cn(
-          "h-0.5 w-full rounded-full transition-colors group-hover:bg-zinc-500/70 group-focus-visible:bg-zinc-500/70",
-          dragging && "bg-zinc-400/80 group-hover:bg-zinc-400/80",
+          "h-0.5 w-full rounded-full transition-colors group-hover:bg-tone-500/70 group-focus-visible:bg-tone-500/70",
+          dragging && "bg-tone-400/80 group-hover:bg-tone-400/80",
         )}
       />
     </div>
@@ -562,7 +562,7 @@ function Crosshair({
     GUTTER_LEFT + ((hover - domain[0]) / (domain[1] - domain[0])) * plotWidth;
   return (
     <div
-      className="pointer-events-none absolute inset-y-0 w-px bg-zinc-300/60"
+      className="pointer-events-none absolute inset-y-0 w-px bg-tone-300/60"
       style={{ left }}
     />
   );
@@ -687,7 +687,7 @@ export function LapTraceCharts({
             <Crosshair store={hoverStore} width={width} domain={domain} />
             {drag && (
               <div
-                className="pointer-events-none absolute inset-y-0 bg-zinc-200/10 ring-1 ring-inset ring-zinc-300/30"
+                className="pointer-events-none absolute inset-y-0 bg-tone-200/10 ring-1 ring-inset ring-tone-300/30"
                 style={{
                   left: Math.min(x(drag.start), x(drag.current)),
                   width: Math.abs(x(drag.current) - x(drag.start)),

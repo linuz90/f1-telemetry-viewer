@@ -57,9 +57,49 @@ function synthesizedBasicEndLap(
   return Math.max(0, Math.min(numLaps, adjustedEndLap));
 }
 
+/**
+ * PnG can split one tyre set into two stints at a save or pit boundary (e.g.
+ * Medium L1–3 then Medium L4–4, both set `9.C2` with wear still climbing).
+ * The fake one-lap stint turned lap 3 into a "pit lap" and showed 24 %/lap
+ * wear; a real stop always fits a different set, so same-set neighbours merge.
+ */
+function mergeSplitStints(stints: TyreStint[]): TyreStint[] {
+  const merged: TyreStint[] = [];
+  for (const stint of stints) {
+    const previous = merged[merged.length - 1];
+    if (
+      previous &&
+      stint["tyre-set-key"] !== "" &&
+      stint["tyre-set-key"] === previous["tyre-set-key"] &&
+      stint["start-lap"] === previous["end-lap"] + 1
+    ) {
+      const wearByLap = new Map<number, TyreWearEntry>();
+      for (const entry of [
+        ...(stint["tyre-wear-history"] ?? []),
+        ...(previous["tyre-wear-history"] ?? []),
+      ]) {
+        wearByLap.set(entry["lap-number"], entry);
+      }
+      merged[merged.length - 1] = {
+        ...previous,
+        "end-lap": stint["end-lap"],
+        "stint-length": stint["end-lap"] - previous["start-lap"] + 1,
+        "tyre-wear-history": [...wearByLap.values()].sort(
+          (x, y) => x["lap-number"] - y["lap-number"],
+        ),
+      };
+      continue;
+    }
+    merged.push(stint);
+  }
+  return merged;
+}
+
 /** Get stints for a driver, falling back to basic stint data when detailed history is missing */
 export function getDriverStints(driver: DriverData): TyreStint[] {
-  if (driver["tyre-set-history"]?.length) return driver["tyre-set-history"];
+  if (driver["tyre-set-history"]?.length) {
+    return mergeSplitStints(driver["tyre-set-history"]);
+  }
   const basics = driver["session-history"]["tyre-stints-history-data"];
   if (!basics?.length) return [];
   return synthesizeStints(basics, driver["session-history"]["num-laps"]);
@@ -389,4 +429,24 @@ export function estimateMaxLife(wearRatePerLap: number): number {
   return wearRatePerLap > 0
     ? Math.round(PUNCTURE_THRESHOLD / wearRatePerLap)
     : 0;
+}
+
+/**
+ * One stint's green-flag wear rate and its laps to `PUNCTURE_THRESHOLD`, by
+ * the same curve projection as the track page's Tyre Life, so a stint reads
+ * the same on the session and track pages.
+ */
+export function stintGreenLife(
+  stint: TyreStint,
+  neutralisedLaps: ReadonlySet<number>,
+): { greenLaps: number; wearPerLap: number; lifeLaps: number } {
+  const green = getGreenFlagWear(stint, neutralisedLaps);
+  const wearPerLap = green.laps > 0 ? green.wear / green.laps : 0;
+  const projected = projectLapsToWear(green.curve, PUNCTURE_THRESHOLD);
+  return {
+    greenLaps: green.laps,
+    wearPerLap,
+    lifeLaps:
+      projected != null ? Math.round(projected) : estimateMaxLife(wearPerLap),
+  };
 }
