@@ -18,9 +18,22 @@ import {
   getRacePaceReferenceSampleCount,
   isRacePaceRankEligible,
 } from "./racePace";
-import { getCompletedStints, getDriverStints, stintWearRate } from "./tyres";
+import {
+  getCompletedStints,
+  getDriverStints,
+  getNeutralisedLaps,
+  stintWearRate,
+} from "./tyres";
 
 const MATCHED_PACE_TIE_TOLERANCE_MS = 50;
+
+/** Green-flag wear per lap of each completed stint that recorded any. */
+function completedStintWearRates(driver: DriverData): number[] {
+  const neutralisedLaps = getNeutralisedLaps(driver["per-lap-info"]);
+  return getCompletedStints(getDriverStints(driver))
+    .map((stint) => stintWearRate(stint, neutralisedLaps))
+    .filter((rate) => rate > 0);
+}
 const ERS_HARVEST_ENERGY_TOOLTIP =
   "Average ERS energy harvested per lap, MGU-K + MGU-H combined. Green-flag laps only; pre-race baseline and final reset snapshot excluded.";
 
@@ -59,12 +72,8 @@ export function generateInsights(
     }
 
     // 2. Tyre wear delta vs rival
-    const playerRates = getCompletedStints(getDriverStints(player))
-      .map((s) => stintWearRate(s))
-      .filter((r) => r > 0);
-    const rivalRates = getCompletedStints(getDriverStints(rival))
-      .map((s) => stintWearRate(s))
-      .filter((r) => r > 0);
+    const playerRates = completedStintWearRates(player);
+    const rivalRates = completedStintWearRates(rival);
     if (playerRates.length > 0 && rivalRates.length > 0) {
       const playerAvgRate =
         playerRates.reduce((a, b) => a + b, 0) / playerRates.length;
@@ -215,9 +224,7 @@ export function generateInsights(
     // 2. Tyre wear ranking
     const wearRanking: { driver: DriverData; avgRate: number }[] = [];
     for (const d of allDrivers) {
-      const stints = getCompletedStints(getDriverStints(d));
-      if (!stints.length) continue;
-      const rates = stints.map((s) => stintWearRate(s)).filter((r) => r > 0);
+      const rates = completedStintWearRates(d);
       if (rates.length === 0) continue;
       const avg = rates.reduce((a, b) => a + b, 0) / rates.length;
       wearRanking.push({ driver: d, avgRate: avg });

@@ -43,6 +43,7 @@ import {
   getCompletedStints,
   getDriverStints,
   getLapCompoundMap,
+  getNeutralisedLaps,
   stintWearRate,
 } from "../utils/stats/tyres";
 import { compoundDisplayRank } from "../constants/compounds";
@@ -703,10 +704,11 @@ export function buildStintComparisonRows({
   const stints = getDriverStints(player);
   const playerLaps = player["session-history"]["lap-history-data"];
   const others = allDrivers.filter((driver) => driver.index !== player.index);
+  const neutralisedLaps = getNeutralisedLaps(player["per-lap-info"]);
 
   return stints.map((stint, index) => {
     const compound = stint["tyre-set-data"]["visual-tyre-compound"];
-    const playerWearRate = stintWearRate(stint);
+    const playerWearRate = stintWearRate(stint, neutralisedLaps);
     const best = getBestDriverOnCompound(
       others,
       compound,

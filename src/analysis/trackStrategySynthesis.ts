@@ -2,9 +2,12 @@ import type {
   CompoundLifeSample,
   CompoundLifeStats,
 } from "../utils/stats/trackAggregates";
-import { PUNCTURE_THRESHOLD, projectWearFromCurve } from "../utils/stats/tyres";
 import {
-  DRY_COMPOUND_PRIORITY,
+  PUNCTURE_THRESHOLD,
+  projectCompoundWear,
+  projectWearFromCurve,
+} from "../utils/stats/tyres";
+import {
   isDryCompound,
   rankDryCompoundsByPace,
   rankWetCompounds,
@@ -40,9 +43,9 @@ function buildPitWindow(stintEndLap: number, totalLaps: number) {
 // wear data, using a wear-balanced pit lap with a slight undercut bias:
 //
 //   1. Rank dry compounds by softness (softer = faster on fresh rubber).
-//   2. Walk compound PAIRS from softest to hardest, SKIPPING Soft+Hard
-//      (across-the-allocation pairings are dominated by Soft+Medium or
-//      Medium+Hard — confirmed at 0/35 observations in user telemetry).
+//   2. Pair compounds on adjacent rungs of what the player has run: Soft+Medium
+//      and Medium+Hard, never Soft+Hard across a Medium (0/35 observations in
+//      user telemetry). Without a Medium, as in F2, Soft+Hard is adjacent.
 //   3. For each pair, the pit lap is set so BOTH stints hit roughly the same
 //      fraction of their aggregate wear life:
 //          balanced = round(totalLaps * wearRate(second)
@@ -50,17 +53,22 @@ function buildPitWindow(stintEndLap: number, totalLaps: number) {
 //      then nudged 1 lap earlier to bank a small undercut margin (fresh rubber
 //      gives ~1.5–2s on the out-lap; one lap = roughly that gain).
 //   4. Projected stint wear prefers matching real stint samples (same compound,
-//      same sequence slot, and long enough for the projected stint), using the
-//      observed worst-wheel wear curve at the planned lap before falling back
-//      to the aggregate compound average. Both projected stints must clear the
-//      PUNCTURE_THRESHOLD safety cap — the puncture-risk threshold beyond which
-//      grip falls off a cliff.
+//      same sequence slot, and enough green-flag laps to cover the projected
+//      stint), reading the sample's green-flag wear curve at the planned lap.
+//      Past every real stint it uses the compound projection Tyre Life uses
+//      (`projectCompoundWear`), so a plan never outlasts the card. Both
+//      projected stints must clear the PUNCTURE_THRESHOLD safety cap — the
+//      puncture-risk threshold beyond which grip falls off a cliff.
 //   5. Candidate strategies are scored by distance-matched compound pace, wear
 //      degradation, pit-loss cost, and managed-tyre risk. The fastest scored
 //      candidate becomes Recommended; Alternative prefers a different stop count
 //      only when it stays time-competitive, otherwise the next best distinct shape.
-//   6. Two-stop sandwich (fast-durable-fast) stays in the candidate set so the
-//      scorer can decide when an extra stop pays back on high-wear tracks.
+//   6. A two-stop sandwich (fast-durable-fast) per adjacent pair stays in the
+//      candidate set so the scorer can decide when an extra stop pays back on
+//      high-wear tracks. Races without a mandatory stop (F2 sprints) add a
+//      no-stop plan on each compound.
+//   7. Plans the model can't separate go to the one starting on the softer
+//      tyre, which is what most of the field does.
 //
 // Pit windows are centered on the projected pit lap with ±1 lap of slack.
 
@@ -86,6 +94,16 @@ const ONE_STOP_PIT_LAP_ADJUSTMENTS = [0, -1, 1] as const;
 // two-stop is technically different, but a near-even one-stop mirror is the more
 // useful alternative for race planning.
 const STOP_COUNT_ALTERNATIVE_MAX_DELTA_MS = 5_000;
+/** Score gap within which a softer-first plan beats a harder-first one.
+ *  Mirror one-stops land within 0.7 s on rounding alone, and the model doesn't
+ *  price the start or track position, where the softer tyre gains; 73–100% of
+ *  human finishers in the player's races start on it. */
+const FAST_START_TIE_MS = 2_000;
+/** Laps a planned stint may run past the compound's longest green-flag run
+ *  before its timing reads as a guess. Real stints' wear rate drifts under 10%
+ *  from first third to last, and the late-stint rate covers most of that, so
+ *  two laps past the evidence move the projection by a fraction of a lap. */
+const WEAR_EXTRAPOLATION_TOLERANCE_LAPS = 2;
 
 function pickLatestRelevantSample(
   samples: CompoundLifeSample[],
@@ -96,10 +114,10 @@ function pickLatestRelevantSample(
       if (a.sessionSortKey !== b.sessionSortKey) {
         return b.sessionSortKey - a.sessionSortKey;
       }
-      const aExtra = Math.abs(a.stintLength - plannedLaps);
-      const bExtra = Math.abs(b.stintLength - plannedLaps);
+      const aExtra = Math.abs(a.greenLaps - plannedLaps);
+      const bExtra = Math.abs(b.greenLaps - plannedLaps);
       if (aExtra !== bExtra) return aExtra - bExtra;
-      return b.stintLength - a.stintLength;
+      return b.greenLaps - a.greenLaps;
     })[0] ?? null
   );
 }
@@ -124,6 +142,37 @@ function projectedWearForSample(
   );
 }
 
+/** A stint well past every real green-flag run on its compound rests on a
+ *  wear extrapolation, often from one short stint in a partial race, so the
+ *  plan's timing drops to low confidence and says which tyre it guessed. */
+function withWearEvidenceCaveat(
+  estimate: TrackStrategyTimeEstimate | undefined,
+  shape: TrackStrategyShape,
+  compoundLifeStats: CompoundLifeStats[],
+): TrackStrategyTimeEstimate | undefined {
+  if (!estimate) return estimate;
+  for (const [index, name] of shape.compounds.entries()) {
+    const compound = compoundLifeStats.find((stats) => stats.compound === name);
+    if (!compound) continue;
+    const evidenceLaps = compound.longestGreenRun;
+    if (
+      shape.stintLaps[index]! <=
+      evidenceLaps + WEAR_EXTRAPOLATION_TOLERANCE_LAPS
+    ) {
+      continue;
+    }
+    return {
+      ...estimate,
+      confidence: "low",
+      details: {
+        ...estimate.details,
+        paceSource: `${estimate.details?.paceSource}; ${name} wear extrapolated past your longest ${evidenceLaps}-lap green-flag run`,
+      },
+    };
+  }
+  return estimate;
+}
+
 function wearForProjectedStint(
   compound: CompoundLifeStats,
   plannedLaps: number,
@@ -132,7 +181,7 @@ function wearForProjectedStint(
   preferredStopCount?: number,
 ): number {
   const longEnoughSamples = compound.samples.filter(
-    (sample) => sample.wearRatePerLap > 0 && sample.stintLength >= plannedLaps,
+    (sample) => sample.wearRatePerLap > 0 && sample.greenLaps >= plannedLaps,
   );
   const pickFromSamples = (samples: CompoundLifeSample[]) => {
     const exactSlotSample = pickLatestRelevantSample(
@@ -152,21 +201,28 @@ function wearForProjectedStint(
     return pickLatestRelevantSample(samples, plannedLaps);
   };
 
-  if (preferredStopCount != null) {
-    const strategyMatchedSample = pickFromSamples(
-      longEnoughSamples.filter(
-        (sample) => sample.strategyStopCount === preferredStopCount,
-      ),
-    );
-    if (strategyMatchedSample) {
-      return projectedWearForSample(strategyMatchedSample, plannedLaps);
-    }
+  const strategyMatchedSample =
+    preferredStopCount != null
+      ? pickFromSamples(
+          longEnoughSamples.filter(
+            (sample) => sample.strategyStopCount === preferredStopCount,
+          ),
+        )
+      : null;
+  const sample = strategyMatchedSample ?? pickFromSamples(longEnoughSamples);
+  const compoundWear = projectCompoundWear(
+    compound.samples.map((compoundSample) => compoundSample.wearCurve),
+    plannedLaps,
+  );
+  if (!sample) {
+    return compoundWear ?? compound.avgWearRatePerLap * plannedLaps;
   }
-
-  const sample = pickFromSamples(longEnoughSamples);
-  if (sample) return projectedWearForSample(sample, plannedLaps);
-
-  return compound.avgWearRatePerLap * plannedLaps;
+  // A matching real stint can read gentler than the compound as a whole; the
+  // compound projection stays the floor so a plan never outlasts Tyre Life.
+  return Math.max(
+    projectedWearForSample(sample, plannedLaps),
+    compoundWear ?? 0,
+  );
 }
 
 function projectedStintWear(
@@ -255,18 +311,35 @@ function buildOneStopShape(
   };
 }
 
+/** Two-stop sandwich splits in preference order: an even third each with
+ *  leftover laps on the middle (durable) stint, then a wear-balanced split
+ *  where every stint uses the same share of its tyre's life, the twin of the
+ *  one-stop's balanced pit lap, for when the faster tyre cannot last a third
+ *  of the race. */
+function twoStopSplits(
+  fastest: CompoundLifeStats,
+  durable: CompoundLifeStats,
+  totalLaps: number,
+): number[][] {
+  const base = Math.floor(totalLaps / 3);
+  const even = [base, totalLaps - base * 2, base];
+  // Solves outer * fastestWear = middle * durableWear with 2 * outer + middle
+  // = totalLaps.
+  const outer = Math.round(
+    (totalLaps * durable.avgWearRatePerLap) /
+      (2 * durable.avgWearRatePerLap + fastest.avgWearRatePerLap),
+  );
+  return [even, [outer, totalLaps - outer * 2, outer]];
+}
+
 /** Two-stop sandwich: fastest – durable – fastest. Kept in the candidate set
  *  even when a one-stop is viable so the timing model can decide whether lower
  *  wear plus a fresh final stint pays back the extra pit loss. */
 function buildTwoStopShape(
   fastest: CompoundLifeStats,
   durable: CompoundLifeStats,
-  totalLaps: number,
+  stintLaps: number[],
 ): TrackStrategyShape | null {
-  const base = Math.floor(totalLaps / 3);
-  const remainder = totalLaps - base * 3;
-  // Concentrate any leftover laps on the middle (durable) stint.
-  const stintLaps = [base, base + remainder, base];
   if (stintLaps.some((l) => l < 1)) return null;
   const stintWearPercentages = [
     projectedStintWear(fastest, stintLaps[0], 0, 3, 2),
@@ -354,23 +427,10 @@ function suggestionFromShape(
   };
 }
 
-/** Soft+Hard is a pairing that skips the Medium allocation rung. In observed
- *  user races (35 dry multi-stint races) it appeared 0 times — strategists
- *  default to Soft+Medium or Medium+Hard since they share an adjacent rung.
- *  We suppress it here so the recommendation never offers a shape that
- *  doesn't show up in practice. */
-function isSoftHardPair(a: CompoundLifeStats, b: CompoundLifeStats): boolean {
-  const aPri = DRY_COMPOUND_PRIORITY[a.compound] ?? Number.POSITIVE_INFINITY;
-  const bPri = DRY_COMPOUND_PRIORITY[b.compound] ?? Number.POSITIVE_INFINITY;
-  const softest = Math.min(aPri, bPri);
-  const hardest = Math.max(aPri, bPri);
-  return softest === 0 && hardest === 2;
-}
-
 interface StrategyCandidate {
   shape: TrackStrategyShape;
   fastStart?: boolean;
-  kind: "one-stop" | "managed-one-stop" | "two-stop";
+  kind: "no-stop" | "one-stop" | "managed-one-stop" | "two-stop";
   score?: StrategyScore;
 }
 
@@ -389,6 +449,9 @@ function isCompetitiveStopCountAlternative(
 }
 
 function candidateFallbackRank(candidate: StrategyCandidate): number {
+  // Without pit loss to weigh, a no-stop that keeps its tyres under the cap
+  // beats any stop.
+  if (candidate.kind === "no-stop" && !candidate.shape.risk) return -1;
   if (candidate.kind === "one-stop") return 0;
   if (candidate.kind === "two-stop") return 1;
   return 2;
@@ -401,12 +464,15 @@ export function synthesizeStrategies(
   fullDistanceRaceCount: number,
   entries: BucketRaceEntry[],
   pitLossEntries: BucketRaceEntry[],
+  { requiresPitStop = true }: { requiresPitStop?: boolean } = {},
 ): {
   recommended: TrackStrategySuggestion | null;
   alternative: TrackStrategySuggestion | null;
 } {
   const ranked = rankDryCompoundsByPace(compoundLifeStats);
-  if (ranked.length < 2) return { recommended: null, alternative: null };
+  if (ranked.length < (requiresPitStop ? 2 : 1)) {
+    return { recommended: null, alternative: null };
+  }
 
   const candidates = new Map<string, StrategyCandidate>();
   const addCandidate = (
@@ -427,44 +493,59 @@ export function synthesizeStrategies(
     addCandidate(shape, "managed-one-stop", fastStart);
   };
 
-  // Walk adjacent compound pairs in softness order, but collect every viable
-  // fast-first/slow-first shape plus a ±1 lap pit-window variant. Ranking happens
-  // after timing is scored, so softness order is only the generation order now.
-  // Soft+Hard is skipped because strategists don't skip allocation rungs in
-  // practice when Soft+Medium or Medium+Hard exists.
+  // Walk adjacent compound pairs in softness order, collecting every viable
+  // fast-first/slow-first shape plus a ±1 lap pit-window variant. Ranking
+  // happens after timing is scored, so softness order is only the generation
+  // order. Pairs skip no rung of the player's compounds: strategists don't run
+  // Soft+Hard when a Medium is there.
   for (let i = 0; i < ranked.length - 1; i++) {
-    for (let j = i + 1; j < ranked.length; j++) {
-      const softer = ranked[i];
-      const harder = ranked[j];
-      if (isSoftHardPair(softer, harder)) continue;
-      for (const pitLapAdjustment of ONE_STOP_PIT_LAP_ADJUSTMENTS) {
-        const fastFirst = buildOneStopShape(softer, harder, totalLaps, {
-          pitLapAdjustment,
-        });
-        const slowFirst = buildOneStopShape(harder, softer, totalLaps, {
-          pitLapAdjustment,
-        });
-        const managedFastFirst = buildOneStopShape(softer, harder, totalLaps, {
-          allowManaged: true,
-          pitLapAdjustment,
-        });
-        const managedSlowFirst = buildOneStopShape(harder, softer, totalLaps, {
-          allowManaged: true,
-          pitLapAdjustment,
-        });
-        addCandidate(fastFirst, "one-stop", true);
-        addCandidate(slowFirst, "one-stop", false);
-        addManagedOneStop(managedFastFirst, true);
-        addManagedOneStop(managedSlowFirst, false);
-      }
+    const softer = ranked[i];
+    const harder = ranked[i + 1];
+    for (const pitLapAdjustment of ONE_STOP_PIT_LAP_ADJUSTMENTS) {
+      const fastFirst = buildOneStopShape(softer, harder, totalLaps, {
+        pitLapAdjustment,
+      });
+      const slowFirst = buildOneStopShape(harder, softer, totalLaps, {
+        pitLapAdjustment,
+      });
+      const managedFastFirst = buildOneStopShape(softer, harder, totalLaps, {
+        allowManaged: true,
+        pitLapAdjustment,
+      });
+      const managedSlowFirst = buildOneStopShape(harder, softer, totalLaps, {
+        allowManaged: true,
+        pitLapAdjustment,
+      });
+      addCandidate(fastFirst, "one-stop", true);
+      addCandidate(slowFirst, "one-stop", false);
+      addManagedOneStop(managedFastFirst, true);
+      addManagedOneStop(managedSlowFirst, false);
     }
   }
 
-  // The two-stop sandwich stays in the candidate set even when a one-stop is
-  // feasible, because the timing model can now answer whether the extra stop is
-  // paid back by lower wear plus a fresh final stint.
-  const twoStop = buildTwoStopShape(ranked[0], ranked[1], totalLaps);
-  addCandidate(twoStop, "two-stop");
+  // Two-stop sandwiches stay in the candidate set even when a one-stop is
+  // feasible, because the timing model can answer whether the extra stop is
+  // paid back by lower wear plus a fresh final stint. One per adjacent pair:
+  // Medium-Hard-Medium is the field's most common two-stop at long, high-wear
+  // races even when a Soft is available.
+  for (let i = 0; i < ranked.length - 1; i++) {
+    for (const stintLaps of twoStopSplits(
+      ranked[i],
+      ranked[i + 1],
+      totalLaps,
+    )) {
+      const twoStop = buildTwoStopShape(ranked[i], ranked[i + 1], stintLaps);
+      if (!twoStop) continue;
+      addCandidate(twoStop, "two-stop");
+      break;
+    }
+  }
+
+  if (!requiresPitStop) {
+    for (const compound of ranked) {
+      addCandidate(buildSameCompoundShape(compound, totalLaps, 0), "no-stop");
+    }
+  }
 
   const candidateList = [...candidates.values()];
   if (candidateList.length === 0) {
@@ -477,6 +558,24 @@ export function synthesizeStrategies(
       candidate.score = scoreShape(candidate.shape, timingContext);
     }
     candidateList.sort((a, b) => a.score!.totalScoreMs - b.score!.totalScoreMs);
+    const best = candidateList[0];
+    if (best.fastStart === false) {
+      // Only the same tyres in the other order: which compounds to run is a
+      // pace question the model does answer.
+      const tyres = [...best.shape.compounds].sort().join();
+      const fastStart = candidateList.find(
+        (candidate) =>
+          candidate.fastStart === true &&
+          candidate.kind === best.kind &&
+          [...candidate.shape.compounds].sort().join() === tyres &&
+          candidate.score!.totalScoreMs - best.score!.totalScoreMs <=
+            FAST_START_TIE_MS,
+      );
+      if (fastStart) {
+        candidateList.splice(candidateList.indexOf(fastStart), 1);
+        candidateList.unshift(fastStart);
+      }
+    }
   } else {
     const hasStrictOneStop = candidateList.some(
       (candidate) => candidate.kind === "one-stop",
@@ -497,7 +596,11 @@ export function synthesizeStrategies(
     });
   }
 
-  const fastestScoreMs = candidateList[0].score?.totalScoreMs ?? 0;
+  // The softer-start promotion can put a slightly slower plan first; timing
+  // deltas still count from the fastest.
+  const fastestScoreMs = Math.min(
+    ...candidateList.map((candidate) => candidate.score?.totalScoreMs ?? 0),
+  );
   const anchor = timingContext
     ? findRaceTimeAnchor(entries, timingContext, isDryCompound)
     : null;
@@ -509,11 +612,15 @@ export function synthesizeStrategies(
       fullDistanceRaceCount,
       candidate.fastStart,
       timingContext
-        ? timeEstimateForCandidate(
-            candidate,
-            fastestScoreMs,
-            timingContext,
-            anchor,
+        ? withWearEvidenceCaveat(
+            timeEstimateForCandidate(
+              candidate,
+              fastestScoreMs,
+              timingContext,
+              anchor,
+            ),
+            candidate.shape,
+            compoundLifeStats,
           )
         : undefined,
     ),
@@ -541,6 +648,11 @@ export function synthesizeStrategies(
         isDifferentSuggestion(suggestion) &&
         hasRecommendedStopCount(suggestion),
     ) ??
+    // The sandwich is the only two-stop shape, so a winning two-stop has no
+    // same-count alternative: offer the next best plan instead.
+    (recommendedStopCount === 2
+      ? suggestions.find(isDifferentSuggestion)
+      : undefined) ??
     null;
 
   return { recommended, alternative };
@@ -606,11 +718,6 @@ export function synthesizeWetStrategies(
             anchor,
           )
         : undefined;
-    // Stints longer than any real one on this compound are linear wear
-    // extrapolations, often from a short opening stint on a drying track.
-    const isExtrapolated =
-      Math.max(...best.shape.stintLaps) > compound.longestStint;
-
     return [
       {
         ...suggestionFromShape(
@@ -619,16 +726,8 @@ export function synthesizeWetStrategies(
           raceCount,
           fullDistanceRaceCount,
           undefined,
-          estimate && isExtrapolated
-            ? {
-                ...estimate,
-                confidence: "low",
-                details: {
-                  ...estimate.details,
-                  paceSource: `${estimate.details?.paceSource}; wear extrapolated past your ${compound.longestStint}-lap longest ${compound.compound} stint`,
-                },
-              }
-            : estimate,
+          // Wet evidence is often a short opening stint on a drying track.
+          withWearEvidenceCaveat(estimate, best.shape, [compound]),
         ),
         closeStopCount:
           closeCandidate &&

@@ -10,6 +10,7 @@ import { medianPaceInRange } from "../utils/stats/pace";
 import {
   getCompletedStints,
   getDriverStints,
+  getNeutralisedLaps,
   stintWearRate,
 } from "../utils/stats/tyres";
 
@@ -292,8 +293,9 @@ function getBestStintPace(player: DriverData): BestStintPace | null {
 function wearSamplesByCompound(player: DriverData): Map<string, number[]> {
   const byCompound = new Map<string, number[]>();
 
+  const neutralisedLaps = getNeutralisedLaps(player["per-lap-info"]);
   for (const stint of getCompletedStints(getDriverStints(player))) {
-    const wearRate = stintWearRate(stint);
+    const wearRate = stintWearRate(stint, neutralisedLaps);
     if (wearRate <= 0) continue;
     const compound = stint["tyre-set-data"]["visual-tyre-compound"];
     const samples = byCompound.get(compound) ?? [];

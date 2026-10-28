@@ -1,6 +1,6 @@
 import { compoundDisplayRank } from "../../constants/compounds";
 import type { TelemetrySession } from "../../types/telemetry";
-import { median, quantile } from "./core";
+import { quantile } from "./core";
 import { findPlayer, isRaceSession } from "./drivers";
 import { collectGreenFlagBurnDeltas, fuelSafetyMarginLaps } from "./energy";
 import {
@@ -13,24 +13,27 @@ import type { StintWearCurvePoint } from "./tyres";
 import {
   PUNCTURE_THRESHOLD,
   estimateMaxLife,
-  getStintWearCurve,
-  projectLapsToWear,
-  stintWearRate,
+  getGreenFlagWear,
+  getNeutralisedLaps,
+  projectCompoundLapsToWear,
 } from "./tyres";
 
 /** One observed player stint kept for strategy-specific wear projections. */
 export interface CompoundLifeSample {
   compound: string;
+  /** Green-flag wear per lap (`getGreenFlagWear`). */
   wearRatePerLap: number;
-  stintLength: number;
+  /** Green-flag laps behind `wearCurve`: how far the evidence reaches before
+   *  a projection has to extrapolate. */
+  greenLaps: number;
   /** Zero-based position in the tyre sequence: 0 = opening stint. */
   stintIndex: number;
   /** Number of pit stops in the source strategy shape. */
   strategyStopCount: number;
   startLap: number;
   endLap: number;
-  /** Worst-wheel wear by completed stint lap. Strategy projections use this
-   *  when a real stint is longer than the candidate stint, so late-stint wear
+  /** Green-flag wear curve (`getGreenFlagWear`). Strategy projections read
+   *  it when a real stint covered the candidate stint, so late-stint wear
    *  acceleration is not flattened into a full-stint average. */
   wearCurve: StintWearCurvePoint[];
   /** True only when this stint reached the race finish, not just a DNF export. */
@@ -46,17 +49,21 @@ export interface CompoundLifeSample {
 export interface CompoundLifeStats {
   compound: string;
   avgWearRatePerLap: number;
-  /** Laps until worst-wheel wear reaches PUNCTURE_THRESHOLD: the median of
-   *  each stint's own curve projection (`projectLapsToWear`), so late-stint
-   *  acceleration counts and one odd stint cannot set the number. */
+  /** Green-flag laps until worst-wheel wear reaches PUNCTURE_THRESHOLD along
+   *  the median of the stints' own curve projections
+   *  (`projectCompoundLapsToWear`), so late-stint acceleration counts and one
+   *  odd stint cannot set the number. The strategy projects with the same
+   *  median, so its stints run out where this says. */
   estMaxLife: number;
   avgStintLength: number;
-  longestStint: number;
-  /** Worst-wheel wear the longest stint ended on: how far real driving went
-   *  before `estMaxLife` starts extrapolating. */
-  longestStintEndWear: number;
+  /** Most green-flag laps one stint ran on this compound and the worst-wheel
+   *  wear they added: how far real racing went before `estMaxLife` and the
+   *  strategy start extrapolating. */
+  longestGreenRun: number;
+  longestGreenRunWear: number;
   stintCount: number;
-  /** Best valid lap time in ms on this compound (0 if none) */
+  /** Best valid lap time in ms on this compound across every stint, wear
+   *  evidence or not (0 if none) */
   bestLapMs: number;
   /** Peak pace on this compound pooled across the races (`calculatePeakPace`);
    *  0 when fewer than three eligible laps exist. */
@@ -67,7 +74,7 @@ export interface CompoundLifeStats {
   samples: CompoundLifeSample[];
 }
 
-/** Minimum stint length to include in aggregate compound stats */
+/** Minimum green-flag laps for a stint to count as tyre-life evidence */
 const MIN_STINT_LAPS = 3;
 
 function parseSessionSortKey(
@@ -101,12 +108,11 @@ export function aggregateCompoundLife(
     {
       rates: number[];
       lengths: number[];
-      lifeProjections: number[];
-      longest: { length: number; endWear: number } | null;
-      bestLapMs: number;
+      longestGreenRun: { laps: number; wear: number } | null;
       samples: CompoundLifeSample[];
     }
   > = {};
+  const bestLapByCompound = new Map<string, number>();
   const paceSamplesByCompound = new Map<string, RacePaceLapSample[]>();
 
   for (const [sessionIndex, session] of sessions.entries()) {
@@ -123,6 +129,7 @@ export function aggregateCompoundLife(
 
     const laps = player["session-history"]["lap-history-data"];
     const stints = player["tyre-set-history"] ?? [];
+    const neutralisedLaps = getNeutralisedLaps(player["per-lap-info"]);
     const sessionSortKey = parseSessionSortKey(session, sessionIndex);
     const totalLaps = session["session-info"]["total-laps"];
     const lapsCompleted = player["session-history"]["num-laps"] ?? 0;
@@ -132,101 +139,87 @@ export function aggregateCompoundLife(
       lapsCompleted >= totalLaps - 1;
 
     for (const [stintIndex, stint] of stints.entries()) {
-      if (stint["stint-length"] < MIN_STINT_LAPS) continue;
-
       const compound = stint["tyre-set-data"]["visual-tyre-compound"];
-      const rate = stintWearRate(stint);
-      if (rate <= 0) continue;
-      const wearCurve = getStintWearCurve(stint);
 
-      if (!byCompound[compound])
-        byCompound[compound] = {
-          rates: [],
-          lengths: [],
-          lifeProjections: [],
-          longest: null,
-          bestLapMs: 0,
-          samples: [],
-        };
-      byCompound[compound].rates.push(rate);
-      byCompound[compound].lengths.push(stint["stint-length"]);
-      const projectedLife = projectLapsToWear(wearCurve, PUNCTURE_THRESHOLD);
-      if (projectedLife != null) {
-        byCompound[compound].lifeProjections.push(projectedLife);
-      }
-      const longest = byCompound[compound].longest;
-      if (!longest || stint["stint-length"] > longest.length) {
-        byCompound[compound].longest = {
-          length: stint["stint-length"],
-          endWear: wearCurve.at(-1)?.worstWear ?? 0,
-        };
-      }
-      byCompound[compound].samples.push({
-        compound,
-        wearRatePerLap: rate,
-        stintLength: stint["stint-length"],
-        stintIndex,
-        strategyStopCount: Math.max(0, stints.length - 1),
-        startLap: stint["start-lap"],
-        endLap: stint["end-lap"],
-        wearCurve,
-        isFinalStint:
-          stintIndex === stints.length - 1 &&
-          reachedRaceFinish &&
-          stint["end-lap"] >= totalLaps - 1,
-        sessionSortKey,
-      });
-
-      // Find best valid lap in this stint
+      // Best lap pools every stint: a lap time needs no wear evidence.
       let lapNum = 0;
       for (const l of laps) {
         if (l["lap-time-in-ms"] > 0) {
           lapNum++;
           if (lapNum >= stint["start-lap"] && lapNum <= stint["end-lap"]) {
             if (isCompleteValidLap(l)) {
-              const cur = byCompound[compound].bestLapMs;
+              const cur = bestLapByCompound.get(compound) ?? 0;
               if (cur === 0 || l["lap-time-in-ms"] < cur) {
-                byCompound[compound].bestLapMs = l["lap-time-in-ms"];
+                bestLapByCompound.set(compound, l["lap-time-in-ms"]);
               }
             }
           }
         }
       }
+
+      const green = getGreenFlagWear(stint, neutralisedLaps);
+      if (green.laps < MIN_STINT_LAPS || green.wear <= 0) continue;
+      const rate = green.wear / green.laps;
+
+      if (!byCompound[compound])
+        byCompound[compound] = {
+          rates: [],
+          lengths: [],
+          longestGreenRun: null,
+          samples: [],
+        };
+      byCompound[compound].rates.push(rate);
+      byCompound[compound].lengths.push(stint["stint-length"]);
+      const longest = byCompound[compound].longestGreenRun;
+      if (!longest || green.laps > longest.laps) {
+        byCompound[compound].longestGreenRun = {
+          laps: green.laps,
+          wear: green.wear,
+        };
+      }
+      byCompound[compound].samples.push({
+        compound,
+        wearRatePerLap: rate,
+        greenLaps: green.laps,
+        stintIndex,
+        strategyStopCount: Math.max(0, stints.length - 1),
+        startLap: stint["start-lap"],
+        endLap: stint["end-lap"],
+        wearCurve: green.curve,
+        isFinalStint:
+          stintIndex === stints.length - 1 &&
+          reachedRaceFinish &&
+          stint["end-lap"] >= totalLaps - 1,
+        sessionSortKey,
+      });
     }
   }
 
   return Object.entries(byCompound)
-    .map(
-      ([
+    .map(([compound, { rates, lengths, longestGreenRun, samples }]) => {
+      const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+      const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+      const projectedLife = projectCompoundLapsToWear(
+        samples.map((sample) => sample.wearCurve),
+        PUNCTURE_THRESHOLD,
+      );
+      const peak = calculatePeakPace(paceSamplesByCompound.get(compound) ?? []);
+      return {
         compound,
-        { rates, lengths, lifeProjections, longest, bestLapMs, samples },
-      ]) => {
-        const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
-        const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-        const projectedLife = median(lifeProjections);
-        const peak = calculatePeakPace(
-          paceSamplesByCompound.get(compound) ?? [],
-        );
-        return {
-          compound,
-          avgWearRatePerLap: avgRate,
-          // A stint without a wear curve cannot project, so fall back to the
-          // pooled linear rate rather than dropping the compound.
-          estMaxLife:
-            projectedLife != null
-              ? Math.round(projectedLife)
-              : estimateMaxLife(avgRate),
-          avgStintLength: Math.round(avgLength),
-          longestStint: Math.max(...lengths),
-          longestStintEndWear: longest?.endWear ?? 0,
-          stintCount: rates.length,
-          bestLapMs,
-          peakPaceMs: peak?.timeMs ?? 0,
-          peakPaceLapCount: peak?.sampleCount ?? 0,
-          samples,
-        };
-      },
-    )
+        avgWearRatePerLap: avgRate,
+        // A compound too gentle to reach the threshold within a projectable
+        // stint falls back to the pooled linear rate.
+        estMaxLife: projectedLife ?? estimateMaxLife(avgRate),
+        avgStintLength: Math.round(avgLength),
+        longestGreenRun: longestGreenRun?.laps ?? 0,
+        longestGreenRunWear: longestGreenRun?.wear ?? 0,
+        stintCount: rates.length,
+        bestLapMs: bestLapByCompound.get(compound) ?? 0,
+        peakPaceMs: peak?.timeMs ?? 0,
+        peakPaceLapCount: peak?.sampleCount ?? 0,
+        samples,
+      };
+    })
     .sort(
       (a, b) =>
         compoundDisplayRank(a.compound) - compoundDisplayRank(b.compound),

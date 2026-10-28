@@ -10,9 +10,9 @@ F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON ex
 - Local dev indexes telemetry summaries and streams raw telemetry JSON from disk.
 - Production/demo mode reads committed demo data or user-uploaded JSON/zip/`.pngt` files.
 - Focused Node test suites cover the session-summary index, complete-lap timing,
-  Race Pace estimation, fuel aggregation, session Key Insights curation, Track
-  Strategy synthesis, and lap recordings and their tips. No general UI test
-  runner or linter is configured.
+  Race Pace estimation, fuel aggregation, tyre wear rates, session Key Insights
+  curation, Track Strategy synthesis, and lap recordings and their tips. No
+  general UI test runner or linter is configured.
 
 ## Commands
 
@@ -37,6 +37,7 @@ pnpm test:speed               # Run canonical speed/aero inference regressions
 pnpm test:session-insights    # Run session Key Insights card merging and budget regressions
 pnpm test:share-text          # Run plain-text setup/strategy copy formats
 pnpm test:strategy            # Run Track Strategy synthesis regressions (dry + wet)
+pnpm test:tyre-wear           # Run green-flag tyre wear rate regressions
 pnpm test:lap-recording       # Run .pngt reader, completeness and API regressions
 pnpm test:lap-telemetry       # Run lap-comparison tips, defaults and track-map calibration
 pnpm check:lap-telemetry [folder] # Re-measure lap-tip clock accuracy and tip census on real recordings
@@ -178,10 +179,11 @@ Speed:
 Tyre wear:
 
 - User-facing tyre wear rates, stint life, and strategy projections use worst-wheel wear (max of FL/FR/RL/RR), not the exported average.
+- Wear rates are green-flag rates from `getGreenFlagWear()`: per-lap deltas measured from the snapshot PnG logs on the lap before the stint, over laps no SC/VSC touched (restart laps included), skipping flat or falling snapshots. End wear divided by `stint-length` is wrong three ways: SC laps barely wear, a refitted used set starts above zero, and an unfinished race's final stint counts the lap in progress.
 - Compact `session-history.tyre-stints-history-data[].end-lap` is one lap before the detailed outgoing stint boundary; use `getDriverStints()` instead of raw compact data so pit-in/out filtering stays aligned.
 - PnG may emit a fresh incoming-tyre `0%` snapshot on the previous pit-boundary lap. Normalize duplicate lap wear via shared tyre helpers so outgoing worn tyres are not overwritten by incoming fresh tyres.
 - Absolute strategy timing anchors require real tyre-wear history; synthesized/basic-only stints can describe compound sequence and pit laps but must not anchor race-duration estimates as zero-wear stints.
-- Track Progress Tyre Life is a stint length, not a race lap: `estMaxLife` is the median of each stint's own curve projection to `PUNCTURE_THRESHOLD` (`projectLapsToWear()`), and the card shows the longest observed stint and its end wear beside it because practice races are mostly partial and the number is usually an extrapolation.
+- Track Progress Tyre Life is a stint length in green-flag laps, not a race lap: `estMaxLife` is where the median of the stints' own green-flag curve projections reaches `PUNCTURE_THRESHOLD` (`projectCompoundLapsToWear()`), and the card shows the longest green-flag run and the wear it added beside it because practice races are mostly partial and the number is usually an extrapolation. Strategy stint wear never reads below that same median (`projectCompoundWear()`), even where one real stint covers the plan, so only a managed-tyres plan outlasts the card.
 
 Lap timing validity:
 
@@ -232,7 +234,12 @@ Strategy timing:
 - When same-distance strategy evidence exists, prefer same stop-count samples for strategy timing and wear projection, then fall back to the broader selected race-distance bucket.
 - Pit-loss fallbacks may cross distance because pit-lane time loss is distance-independent: infer same-track user pit loss first, reject obvious outlier stops, then use attributed Pits n' Giggles F1 defaults, then a low-confidence F1 median. Do not invent F2 pit-loss defaults.
 - Strategy alternatives should stay useful: prefer a different stop count only when it is time-competitive; otherwise show the next best distinct one-stop or pit-window shape.
+- Dry plans pair compounds on adjacent rungs of what the player has run (Soft+Medium, Medium+Hard; Soft+Hard only without a Medium, as in F2), with one fast-durable-fast sandwich per pair. F2 sprints (`session-type` "Race"; the feature race is "Race 2") need no stop, so they also get no-stop plans; any feature race in the bucket keeps the stop mandatory.
+- Plans within `FAST_START_TIE_MS` go to the one starting on the softer tyre: the model prices neither the start nor track position, and most of the field starts soft. Check recommendations against what finishers ran in races the player completed; when the player quits, the game simulates everyone else's result.
 - Absolute strategy durations are display estimates anchored to completed same-distance races; otherwise prefer relative deltas and confidence/source copy.
+- A dry or wet plan with a stint more than `WEAR_EXTRAPOLATION_TOLERANCE_LAPS` past its compound's longest green-flag run is a wear extrapolation: its timing drops to low confidence and names the tyre.
+- Compound pace offsets come from the player's clean laps corrected to an empty tank and fresh tyres (`FUEL_LAP_TIME_MS_PER_KG`, `WEAR_LAP_TIME_MS_PER_PERCENT`, both measured on the corpus), compared only within races that ran two compounds (median polish over per-race medians), never a lap-number trend: in-stint degradation cancels the fuel gain and makes the late, light stint's tyre look fastest. A compound needs 6 clean laps from 2 sessions (saves of one session count once); a thin or order-inverting compound sits `DEFAULT_COMPOUND_STEP_MS` per rung from the measured ones (interpolated between two) and its plans read low confidence. The game's tyre-set `lap-delta-time` is not race pace: per stint it is relative to the fitted set and includes wear, and new sets' deltas are a fresh-tyre ideal about three times the gap races show.
+- Wear costs lap time linearly up to the puncture cap; fuel load changes the wear rate by about 5% across a full tank, so wear projections carry no fuel term.
 - Wet plans are separate same-compound stop-count plans, one per wet compound (PnG exports `Inters` and `Wet`, not `Intermediate`). Keep wet stints out of dry pair ranking, anchor each plan only on races run entirely on its compounds, and leave slick crossovers unmodelled because they depend on when the track dries.
 
 Lap telemetry:
