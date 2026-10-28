@@ -242,7 +242,7 @@ export function TopBar({
           aria-label="Sessions home"
           className="flex items-center gap-2.5 font-semibold tracking-tight text-tone-50 transition-opacity hover:opacity-80"
         >
-          <AppLogo className="h-[18px]" />
+          <AppLogo className="size-[22px]" />
           <span className="hidden sm:inline">
             <AppBrand />
           </span>
