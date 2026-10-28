@@ -547,24 +547,33 @@ export function buildRaceHeadline(
   };
   const byPosition = (position: number) =>
     drivers.find((d) => d["final-classification"]?.position === position);
-  const own = totalTime(driver);
+  const ownLaps = driver["final-classification"]?.["num-laps"];
+  // A time gap only means something over the same distance: a lapped car's
+  // total is shorter, which read as "-66.1 s behind P11" at Spa.
+  const gapTo = (other: DriverData | undefined) => {
+    const own = totalTime(driver);
+    const theirs = other ? totalTime(other) : null;
+    return own != null &&
+      theirs != null &&
+      other!["final-classification"]?.["num-laps"] === ownLaps
+      ? Math.abs(own - theirs)
+      : null;
+  };
   if (story.classified === 1) {
-    const second = byPosition(2);
-    const gap = own != null && second ? totalTime(second) : null;
+    const gap = gapTo(byPosition(2));
     return {
       text:
-        gap != null && own != null
-          ? `Won from P${story.grid}, ${(gap - own).toFixed(1)} s clear.`
+        gap != null
+          ? `Won from P${story.grid}, ${gap.toFixed(1)} s clear.`
           : `Won from P${story.grid}.`,
       usesPace: false,
     };
   }
-  const ahead = byPosition(story.classified - 1);
-  const aheadTime = ahead ? totalTime(ahead) : null;
+  const behind = gapTo(byPosition(story.classified - 1));
   return {
     text:
-      own != null && aheadTime != null
-        ? `P${story.classified} from P${story.grid}, ${(own - aheadTime).toFixed(1)} s behind P${story.classified - 1}.`
+      behind != null
+        ? `P${story.classified} from P${story.grid}, ${behind.toFixed(1)} s behind P${story.classified - 1}.`
         : `P${story.classified} from P${story.grid}.`,
     usesPace: false,
   };

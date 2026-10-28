@@ -242,6 +242,18 @@ export function RaceView({
   }
 
   const { story, pace, headline, series, bands, events, start } = model;
+  const reaction = start && (
+    <span
+      title={`${start.label}: ${start.detail}`}
+      className={REACTION_TONE[start.rating] ?? "text-tone-500"}
+    >
+      {" "}
+      · {start.formatted} reaction
+      {start.rating === "bad" || start.rating === "terrible"
+        ? `, ${start.label.toLowerCase()}`
+        : ""}
+    </span>
+  );
   const totalLaps = Math.max(story?.lastLap ?? 0, series.lapsMs.length, 1);
   const maxPosition = Math.max(9, ...(story?.trace ?? [1]));
   const ownBestMs = driverBestLapTimeMs(focused) || undefined;
@@ -457,6 +469,14 @@ export function RaceView({
                 )}
               </span>
             </div>
+            {/* A race without position history still shows its reaction. */}
+            {!story && reaction && (
+              <div className="relative mt-4 flex flex-wrap gap-1.5">
+                <span className="rounded-full bg-tone-800/60 px-3 py-1 text-xs text-tone-400 ring-1 ring-tone-800">
+                  Start{reaction}
+                </span>
+              </div>
+            )}
             {story && (
               <div className="relative mt-4 flex flex-wrap gap-1.5">
                 {story.chips.map((chip) => (
@@ -481,20 +501,7 @@ export function RaceView({
                           ? `−${-chip.places}`
                           : "0"}
                     </b>
-                    {chip.key === "start" && start && (
-                      <span
-                        title={`${start.label}: ${start.detail}`}
-                        className={
-                          REACTION_TONE[start.rating] ?? "text-tone-500"
-                        }
-                      >
-                        {" "}
-                        · {start.formatted} reaction
-                        {start.rating === "bad" || start.rating === "terrible"
-                          ? `, ${start.label.toLowerCase()}`
-                          : ""}
-                      </span>
-                    )}
+                    {chip.key === "start" && reaction}
                   </span>
                 ))}
               </div>

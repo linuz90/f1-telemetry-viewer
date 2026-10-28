@@ -10,6 +10,7 @@ import {
   type SessionKind,
 } from "../../analysis/sessionKind";
 import { sessionBestLapMs, sessionDayKey } from "../../analysis/sessionLog";
+import { LAPS_QUERY_PARAM } from "../../analysis/lapTelemetrySelection";
 import { sessionSaveSlugs } from "../../utils/deduplicateSessions";
 import { SESSION_TAB_QUERY_PARAM } from "../../constants/routes";
 import { getTrackDisplayName, getTrackId } from "../../utils/tracks";
@@ -33,18 +34,28 @@ export interface SessionTab<K extends string = string> {
   label: string;
 }
 
-/** The open tab lives in `?tab=` so a tab can be linked and survives reloads. */
+/**
+ * The open tab lives in `?tab=` so a tab can be linked and survives reloads.
+ * A lap selection (`?laps=`) without a tab is a link into Lap telemetry, the
+ * only tab that reads it.
+ */
 export function useSessionTab<K extends string>(
   tabs: readonly SessionTab<K>[],
 ): [K, (tab: K) => void] {
   const [params, setParams] = useSearchParams();
-  const requested = params.get(SESSION_TAB_QUERY_PARAM) as K | null;
+  const hasLapRefs =
+    params.has(LAPS_QUERY_PARAM) && tabs.some((t) => t.key === "lap-telemetry");
+  const requested = (params.get(SESSION_TAB_QUERY_PARAM) ??
+    (hasLapRefs ? "lap-telemetry" : null)) as K | null;
   const active = tabs.some((t) => t.key === requested)
     ? requested!
     : tabs[0].key;
   const setTab = (tab: K) => {
     const next = new URLSearchParams(params);
-    if (tab === tabs[0].key) next.delete(SESSION_TAB_QUERY_PARAM);
+    // The first tab drops `?tab=` unless a lap selection would then reopen
+    // Lap telemetry.
+    if (tab === tabs[0].key && !hasLapRefs)
+      next.delete(SESSION_TAB_QUERY_PARAM);
     else next.set(SESSION_TAB_QUERY_PARAM, tab);
     setParams(next, { replace: true });
     window.scrollTo({ top: 0 });

@@ -1,5 +1,5 @@
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
-import { findPlayer } from "../utils/stats/drivers";
+import { findPlayer, findStintResult } from "../utils/stats/drivers";
 import {
   isRaceSessionType,
   isTimeTrialSessionType,
@@ -44,9 +44,13 @@ export function sessionKind(session: TelemetrySession): SessionKind {
     const player = findPlayer(session);
     // Spectator saves have no player to have run a long run.
     if (!player) return "race";
+    // Same status sources as the session summary, so a save the log lists
+    // as a retirement opens as a race.
     return isLongRunResult(
       Boolean(info["network-game"]),
-      player["final-classification"]?.["result-status"] || undefined,
+      player["final-classification"]?.["result-status"] ||
+        findStintResult(session, player)?.["result-status"] ||
+        undefined,
     )
       ? "long-run"
       : "race";

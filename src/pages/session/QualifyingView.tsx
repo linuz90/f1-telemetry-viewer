@@ -191,7 +191,9 @@ export function QualifyingView({
           label: "Ideal lap",
           value: summary.idealMs ? msToLapTime(summary.idealMs) : "—",
           note:
-            summary.idealMs && summary.bestMs - summary.idealMs < 5
+            summary.idealMs &&
+            summary.bestMs - summary.idealMs < 5 &&
+            summary.bestLapNumber > 0
               ? `Lap ${summary.bestLapNumber} had all your best sectors`
               : summary.idealMs
                 ? `${((summary.bestMs - summary.idealMs) / 1000).toFixed(3)} s left in your laps`
@@ -308,48 +310,52 @@ export function QualifyingView({
                 );
               })}
             </div>
-            <div className="relative mt-5 grid gap-3 sm:grid-cols-3">
-              {([1, 2, 3] as const).map((sector, i) => {
-                const own = summary.sectors[i];
-                const ref = poleLap ? sectorTimeMs(poleLap, sector) : 0;
-                const delta = ref ? own - ref : 0;
-                const best = own > 0 && own <= sessionBestSectors[i];
-                return (
-                  <div
-                    key={sector}
-                    className="rounded-xl bg-tone-800/40 p-3.5 ring-1 ring-tone-800"
-                  >
-                    <div className="text-xs text-tone-500">Sector {sector}</div>
+            {summary.sectors.every((ms) => ms > 0) && (
+              <div className="relative mt-5 grid gap-3 sm:grid-cols-3">
+                {([1, 2, 3] as const).map((sector, i) => {
+                  const own = summary.sectors[i];
+                  const ref = poleLap ? sectorTimeMs(poleLap, sector) : 0;
+                  const delta = ref ? own - ref : 0;
+                  const best = own > 0 && own <= sessionBestSectors[i];
+                  return (
                     <div
-                      className={cn(
-                        "mt-0.5 font-mono text-xl font-semibold",
-                        best ? "text-best" : "text-tone-50",
-                      )}
+                      key={sector}
+                      className="rounded-xl bg-tone-800/40 p-3.5 ring-1 ring-tone-800"
                     >
-                      {(own / 1000).toFixed(3)}
+                      <div className="text-xs text-tone-500">
+                        Sector {sector}
+                      </div>
+                      <div
+                        className={cn(
+                          "mt-0.5 font-mono text-xl font-semibold",
+                          best ? "text-best" : "text-tone-50",
+                        )}
+                      >
+                        {(own / 1000).toFixed(3)}
+                      </div>
+                      <div
+                        className={cn(
+                          "text-xs",
+                          best
+                            ? "text-best"
+                            : delta > 0
+                              ? "text-behind"
+                              : delta < 0
+                                ? "text-ahead"
+                                : "text-tone-500",
+                        )}
+                      >
+                        {best
+                          ? "Session best"
+                          : pole?.d.index === focused.index
+                            ? "your pole lap"
+                            : `${delta > 0 ? "+" : delta < 0 ? "−" : ""}${(Math.abs(delta) / 1000).toFixed(3)} to pole`}
+                      </div>
                     </div>
-                    <div
-                      className={cn(
-                        "text-xs",
-                        best
-                          ? "text-best"
-                          : delta > 0
-                            ? "text-behind"
-                            : delta < 0
-                              ? "text-ahead"
-                              : "text-tone-500",
-                      )}
-                    >
-                      {best
-                        ? "Session best"
-                        : pole?.d.index === focused.index
-                          ? "your pole lap"
-                          : `${delta > 0 ? "+" : delta < 0 ? "−" : ""}${(Math.abs(delta) / 1000).toFixed(3)} to pole`}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
           <StatDoors stats={stats} />
           <WorthList

@@ -7,7 +7,7 @@ import type {
   TelemetrySession,
   TyreStint,
 } from "../src/types/telemetry";
-import { summaryKind } from "../src/analysis/sessionKind";
+import { sessionKind, summaryKind } from "../src/analysis/sessionKind";
 import { buildSessionLog } from "../src/analysis/sessionLog";
 import {
   buildRaceStory,
@@ -15,6 +15,7 @@ import {
   significantMoments,
 } from "../src/analysis/raceStory";
 import { buildOnlineForm } from "../src/analysis/onlineForm";
+import { buildQualiSummary, qualiHeadline } from "../src/analysis/worthALook";
 import { getDriverStints } from "../src/utils/stats/tyres";
 
 function summary(overrides: Partial<SessionSummary>): SessionSummary {
@@ -321,6 +322,54 @@ test("an online save before the flag reads as a running position, not a result",
   );
 });
 
+test("a headline gives no time gap to a car on a different lap count", () => {
+  const ahead = raceDriver(1, "Ahead", [stint(1, 10, "b")], 1);
+  const you = raceDriver(0, "You", [stint(1, 10, "a")], 2);
+  you["final-classification"]!["num-laps"] = 9;
+  you["final-classification"]!["total-race-time"] = 850;
+  const session = raceSession(
+    [you, ahead],
+    [
+      [2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    ],
+  );
+  const story = buildRaceStory(session, you)!;
+  assert.equal(
+    buildRaceHeadline(session, you, story, null).text,
+    "P2 from P2.",
+  );
+});
+
+test("a race with only a stint-history result opens as a race, not a long run", () => {
+  const you = raceDriver(0, "You", [stint(1, 10, "a")], 6);
+  delete (you as { "final-classification"?: unknown })["final-classification"];
+  const session = raceSession([you], [[3, 3, 3, 4, 5, 5]]);
+  session["session-info"]["network-game"] = 0;
+  assert.equal(sessionKind(session), "long-run");
+  session["tyre-stint-history-v2"] = [
+    { index: 0, name: "You", "result-status": "DNF", position: 6 },
+  ] as unknown as TelemetrySession["tyre-stint-history-v2"];
+  assert.equal(sessionKind(session), "race");
+});
+
+test("a quali result comes from the classification when history lacks the lap", () => {
+  // History kept only 1:30 laps, not the 1:27.789 that set the result: the
+  // official time stands, and no ideal lap is built from slower laps.
+  const you = raceDriver(0, "You", [stint(1, 3, "a")], 4);
+  you["final-classification"]!["best-lap-time-ms"] = 87_789;
+  const pole = raceDriver(1, "Pole", [stint(1, 3, "b")], 1);
+  pole["final-classification"]!["best-lap-time-ms"] = 87_300;
+  const session = raceSession([you, pole], [[4], [1]]);
+  session["session-info"]["session-type"] = "Short Qualifying";
+  const summary = buildQualiSummary(session, you)!;
+  assert.equal(summary.bestMs, 87_789);
+  assert.equal(summary.position, 4);
+  assert.deepEqual(summary.sectors, [0, 0, 0]);
+  assert.equal(summary.idealMs, 0);
+  assert.equal(qualiHeadline(summary), "P4, 0.489 s off pole.");
+});
+
 test("a position history covering only the final lap tells no story", () => {
   const you = raceDriver(0, "You", [stint(1, 10, "a")], 6, 18);
   const session = raceSession([you], [[]]);
@@ -356,6 +405,7 @@ test("recent form averages the last five races' grid and finish, leaving DNFs ou
     grid: number,
     position: number,
     status = "FINISHED",
+    playerLaps = status === "FINISHED" ? 29 : 3,
   ) =>
     summary({
       slug: `r${day}`,
@@ -367,7 +417,7 @@ test("recent form averages the last five races' grid and finish, leaving DNFs ou
         position,
         gridPosition: grid,
         status,
-        playerLaps: status === "FINISHED" ? 29 : 3,
+        playerLaps,
         totalLaps: 29,
         fieldSize: 20,
       },
@@ -378,12 +428,19 @@ test("recent form averages the last five races' grid and finish, leaving DNFs ou
       race(2, 7, 5),
       race(3, 4, 10),
       race(4, 4, 9, "DID_NOT_FINISH"),
-      race(5, 3, 11),
+      // Classified three laps down: still a finish.
+      race(5, 3, 11, "FINISHED", 26),
       race(6, 2, 7),
+      // An older export's saves before the flag: no status, no result, even
+      // two laps short.
+      race(7, 5, 6, "", 12),
+      race(8, 5, 6, "", 27),
     ],
     "f1-26",
   )!;
   assert.equal(form.races.length, 6);
+  assert.equal(form.stats.starts, 6);
+  assert.equal(form.races[4].finish, 11);
   assert.equal(form.recent.count, 5);
   assert.equal(form.recent.averageGrid, 4);
   assert.equal(form.recent.averageFinish, (5 + 10 + 11 + 7) / 4);

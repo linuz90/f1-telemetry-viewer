@@ -4,10 +4,13 @@ import type {
   LapHistoryEntry,
   TelemetrySession,
 } from "../types/telemetry";
-import type { TrackPBs } from "../hooks/useTrackHistory";
+import type { TrackPBs } from "./trackPbs";
 import { msToLapTime, sectorTimeMs } from "../utils/format";
 import { ordinal } from "../utils/stats/core";
-import { driverBestLapTimeMs } from "../utils/stats/drivers";
+import {
+  driverBestLapTimeMs,
+  sessionDriverBestLapTimeMs,
+} from "../utils/stats/drivers";
 import {
   getRacePaceLapSamples,
   hasCompleteLapTiming,
@@ -364,7 +367,9 @@ export interface QualiSummary {
   /** Closest margin to the car ahead or behind, when under 0.1 s. */
   closest: { position: number; gapMs: number; ahead: boolean } | null;
   idealMs: number;
+  /** The best lap's sectors, or zeros when history lacks that lap. */
   sectors: [number, number, number];
+  /** 0 when history lacks the lap that set the classified time. */
   bestLapNumber: number;
 }
 
@@ -383,13 +388,24 @@ export function buildQualiSummary(
   session: TelemetrySession,
   driver: DriverData,
 ): QualiSummary | null {
-  const best = bestCompleteLap(driver);
-  if (!best) return null;
   const drivers = session["classification-data"] ?? [];
   // Time Trial classification holds the stored ghost, never a grid slot.
   const isTimeTrial = /time\s*trial/i.test(
     session["session-info"]["session-type"],
   );
+  // The classified best lap is the result (history can miss the lap that set
+  // it); Time Trial reads history only, since its classification is a ghost.
+  const ownMs = sessionDriverBestLapTimeMs(session, driver);
+  if (!ownMs) return null;
+  // The history lap that set that time carries its sectors and lap number,
+  // when the export kept it.
+  const best =
+    driver["session-history"]["lap-history-data"]
+      .map((lap, index) => ({ lap, lapNumber: index + 1 }))
+      .find(
+        ({ lap }) =>
+          hasCompleteLapTiming(lap) && lap["lap-time-in-ms"] === ownMs,
+      ) ?? null;
   const position = isTimeTrial
     ? null
     : driver["final-classification"]?.position || null;
@@ -400,8 +416,8 @@ export function buildQualiSummary(
     }))
     .filter((d) => d.ms > 0 && d.position > 0)
     .sort((a, b) => a.ms - b.ms);
-  const poleMs = field[0]?.ms ?? best.lap["lap-time-in-ms"];
-  const ownMs = best.lap["lap-time-in-ms"];
+  const poleMs = field[0]?.ms ?? ownMs;
+  const ideal = idealLapMs(driver);
   let closest: QualiSummary["closest"] = null;
   if (position) {
     for (const other of field) {
@@ -421,9 +437,11 @@ export function buildQualiSummary(
     bestMs: ownMs,
     poleMs,
     closest,
-    idealMs: idealLapMs(driver),
-    sectors: lapSectors(best.lap),
-    bestLapNumber: best.lapNumber,
+    // History can miss the lap that set the classified time, and an ideal
+    // slower than the real best is no ideal.
+    idealMs: ideal > 0 && ideal <= ownMs ? ideal : 0,
+    sectors: best ? lapSectors(best.lap) : [0, 0, 0],
+    bestLapNumber: best?.lapNumber ?? 0,
   };
 }
 
@@ -723,9 +741,10 @@ export function buildLongRunStints(driver: DriverData): LongRunStint[] {
     const clean = samples.filter(
       (s) => s.lapNumber >= start && s.lapNumber <= end,
     );
+    // A deleted lap is not a best lap, however fast it was.
     const stintLaps = laps
       .slice(start - 1, end)
-      .filter((lap) => hasCompleteLapTiming(lap))
+      .filter((lap) => isCompleteValidLap(lap))
       .map((lap) => lap["lap-time-in-ms"]);
     const life = stintGreenLife(stint, neutralised);
     return {

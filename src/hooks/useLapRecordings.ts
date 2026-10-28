@@ -1,6 +1,7 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { useLapImports } from "../context/LapImportsContext";
+import { SESSION_TAB_QUERY_PARAM } from "../constants/routes";
 import { useTelemetry } from "../context/TelemetryContext";
 import {
   LAP_TELEMETRY_ANCHOR,
@@ -147,7 +148,7 @@ export function useLapTraceLinks(
       const lapNumber = lapsByTime.get(Math.round(lapTimeMs));
       return lapNumber === undefined
         ? undefined
-        : `?${LAPS_QUERY_PARAM}=${lapRefKey({ recordingSlug: manifest.slug, driverIndex: driver.index, lapNumber })}#${LAP_TELEMETRY_ANCHOR}`;
+        : `?${SESSION_TAB_QUERY_PARAM}=lap-telemetry&${LAPS_QUERY_PARAM}=${lapRefKey({ recordingSlug: manifest.slug, driverIndex: driver.index, lapNumber })}#${LAP_TELEMETRY_ANCHOR}`;
     };
   }, [driverIndex, manifest]);
 }

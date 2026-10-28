@@ -82,9 +82,9 @@ Routes:
 
 - `/` -> newest available formula scope.
 - `/:formulaKey` -> Sessions home, e.g. `/f1-26`: latest race, online form, then the session log. Log filters live in the URL (`type`, `mode`, `track`).
-- `/:formulaKey/sessions/*` -> session page; `?tab=` picks the tab, `?driver=` opens a driver in Results.
+- `/:formulaKey/sessions/*` -> session page; `?tab=` picks the tab, `?driver=` opens a driver in Results, and a `?laps=` selection without a tab opens Lap telemetry.
 - `/:formulaKey/tracks` -> tracks index.
-- `/:formulaKey/tracks/:trackId` -> track page; `?tab=` is one of `TRACK_PAGE_TABS`.
+- `/:formulaKey/tracks/:trackId` -> track page; `?tab=` is one of `TRACK_PAGE_TABS`, and `?tab=<kind>&laps=` (lap imports, older links) opens Lap telemetry on that kind's laps.
 - `/:formulaKey/form` -> online form, every online race.
 - `/ui-debug` -> dev-only UI fixture page.
 

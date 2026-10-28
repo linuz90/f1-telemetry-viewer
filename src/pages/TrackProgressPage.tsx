@@ -118,8 +118,18 @@ export function TrackProgressPage() {
   const [data, setData] = useState<TrackSessionData[]>([]);
   const [loading, setLoading] = useState(true);
   const requestedTab = searchParams.get(TRACK_TAB_QUERY_PARAM);
+  // A lap selection on a kind's tab (an imported lap file, links from before
+  // Lap telemetry had its own tab) opens Lap telemetry on that kind's laps.
+  const linkedLapKind =
+    searchParams.has(LAPS_QUERY_PARAM) && isTrackSessionTab(requestedTab)
+      ? requestedTab
+      : null;
   const [pageTab, setPageTab] = useState<TrackPageTab>(() =>
-    isTrackPageTab(requestedTab) ? requestedTab : "overview",
+    linkedLapKind
+      ? "lap-telemetry"
+      : isTrackPageTab(requestedTab)
+        ? requestedTab
+        : "overview",
   );
   // The kind whose laps the Lap telemetry tab shows; spectator and
   // recorded-laps-only states reuse it for their single list.
@@ -155,10 +165,15 @@ export function TrackProgressPage() {
     );
   }, [activeFormulaKey, canonicalTrackId, navigate, search, trackId]);
 
+  // The tab follows the URL, including a lap link arriving while the page is
+  // open (an import from here), which wins over the kind tab it names.
   useEffect(() => {
-    if (isTrackPageTab(requestedTab)) setPageTab(requestedTab);
+    if (linkedLapKind) {
+      setPageTab("lap-telemetry");
+      setLapKindChoice(linkedLapKind);
+    } else if (isTrackPageTab(requestedTab)) setPageTab(requestedTab);
     else if (!requestedTab) setPageTab("overview");
-  }, [requestedTab]);
+  }, [linkedLapKind, requestedTab]);
 
   // Route slugs are canonical circuit ids (`yas-marina`), while telemetry may
   // use country, city, or circuit names. Match through the shared resolver so
@@ -954,8 +969,11 @@ export function TrackProgressPage() {
                 value={lapKind}
                 onChange={(value) => {
                   setLapKindChoice(value);
+                  // Name the tab: a lap link's kind tab would otherwise take
+                  // over once its lap selection is cleared.
                   const nextParams = new URLSearchParams(searchParams);
                   nextParams.delete(LAPS_QUERY_PARAM);
+                  nextParams.set(TRACK_TAB_QUERY_PARAM, "lap-telemetry");
                   setSearchParams(nextParams, { replace: true });
                 }}
               />

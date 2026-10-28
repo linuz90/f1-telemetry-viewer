@@ -1,7 +1,6 @@
 import type { SessionSummary } from "../types/telemetry";
 import {
   getDashboardResultStats,
-  isCleanRaceFinish,
   isDnfResultStatus,
   type DashboardResultStats,
 } from "./dashboardResultStats";
@@ -50,31 +49,54 @@ export function buildOnlineForm(
   sessions: SessionSummary[],
   formulaKey: string | undefined,
 ): OnlineForm | null {
-  const stats = getDashboardResultStats(sessions, formulaKey);
-  if (stats.resultSessions.length === 0) return null;
+  const pool = getDashboardResultStats(sessions, formulaKey);
+  if (pool.resultSessions.length === 0) return null;
 
-  const races = [...stats.resultSessions]
+  const races = [...pool.resultSessions]
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map((session): FormRace => {
+    .flatMap((session): FormRace[] => {
       const result = session.playerRaceResult!;
       const grid =
         result.gridPosition && result.gridPosition > 0
           ? result.gridPosition
           : null;
-      const dnf =
-        isDnfResultStatus(result.status) || !isCleanRaceFinish(session);
+      // The status decides: a classified finish counts however many laps
+      // down, a retirement is a DNF. Older exports carry no status, so there
+      // only a save at the full, known distance is a finish; anything shorter
+      // may be a save before the flag, which is no result at all.
+      const status = (result.status ?? "")
+        .toUpperCase()
+        .replace(/[\s-]+/g, "_");
+      const dnf = isDnfResultStatus(result.status);
+      const totalLaps = result.totalLaps ?? 0;
+      const finished =
+        status === "FINISHED" ||
+        (!status && totalLaps > 0 && result.playerLaps >= totalLaps);
+      if (!dnf && !finished) return [];
       const finish = dnf ? null : result.position;
-      return {
-        session,
-        grid,
-        finish,
-        gain: grid != null && finish != null ? grid - finish : null,
-        short:
-          (result.totalLaps ?? 0) > 0 &&
-          (result.totalLaps ?? 0) <= SHORT_RACE_LAPS,
-      };
+      return [
+        {
+          session,
+          grid,
+          finish,
+          gain: grid != null && finish != null ? grid - finish : null,
+          short:
+            (result.totalLaps ?? 0) > 0 &&
+            (result.totalLaps ?? 0) <= SHORT_RACE_LAPS,
+        },
+      ];
     });
 
+  if (races.length === 0) return null;
+  // The season numbers count the same races the list shows: a save before
+  // the flag is in neither.
+  const stats =
+    races.length === pool.resultSessions.length
+      ? pool
+      : getDashboardResultStats(
+          races.map((race) => race.session),
+          formulaKey,
+        );
   const last = races.slice(-FORM_RECENT_RACES);
   return {
     races,
