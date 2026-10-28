@@ -5,10 +5,12 @@ const PROJECTION_STRIPES =
   "repeating-linear-gradient(135deg, rgba(255,255,255,0.28) 0 2px, transparent 2px 6px)";
 
 /**
- * Solid = the longest stint actually driven on a compound and the worst-wheel
- * wear it reached; stripes = the projection from there to the threshold.
- * Practice races are usually partial, so most tyre-life numbers extrapolate
- * past the evidence; this makes the share that is guesswork visible.
+ * Solid = the longest green-flag run actually driven on a compound and the
+ * worst-wheel wear it added; stripes = the projection from there to the
+ * threshold. Practice races are usually partial, so most tyre-life numbers
+ * extrapolate past the evidence; this makes the share that is guesswork
+ * visible. Tyre life counts green-flag laps, so the evidence does too: laps
+ * behind the Safety Car would draw solid bar the projection never used.
  */
 export function TyreLifeEvidenceBar({
   compound,
@@ -43,7 +45,7 @@ export function TyreLifeEvidenceBar({
         )}
       </div>
       <div className="mt-1 whitespace-nowrap font-mono text-2xs tabular-nums text-zinc-500">
-        seen {seenLaps} laps · {Math.round(seenWear)}%
+        seen {seenLaps} green laps · {Math.round(seenWear)}%
       </div>
     </div>
   );

@@ -1,4 +1,8 @@
-import type { TyreStint, LapHistoryEntry } from "../types/telemetry";
+import type {
+  LapHistoryEntry,
+  PerLapInfo,
+  TyreStint,
+} from "../types/telemetry";
 import {
   buildStintDetails,
   buildStintTimelineSegments,
@@ -8,7 +12,7 @@ import {
 import { getCompoundColor } from "../utils/colors";
 import { cn } from "../utils/cn";
 import { stintChipStyle, stintChipTextStyle } from "./ui/StintChip";
-import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
+import { PUNCTURE_THRESHOLD, getNeutralisedLaps } from "../utils/stats/tyres";
 import { msToLapTime } from "../utils/format";
 import { CompoundStatCard, type CompoundStatCardRow } from "./CompoundStatCard";
 import { ScrollArea } from "./ui/ScrollArea";
@@ -210,23 +214,37 @@ export function StintTimeline({ stints, totalLaps }: StintTimelineProps) {
 export function StintDetailCards({
   stints,
   laps,
+  perLapInfo,
   rivalStints,
   rivalLaps,
+  rivalPerLapInfo,
   rivalName,
   driverName,
 }: {
   stints: TyreStint[];
   laps: LapHistoryEntry[];
+  perLapInfo?: PerLapInfo[];
   rivalStints?: TyreStint[];
   rivalLaps?: LapHistoryEntry[];
+  rivalPerLapInfo?: PerLapInfo[];
   rivalName?: string;
   driverName?: string;
 }) {
   if (stints.length === 0) return null;
 
-  const details = buildStintDetails(stints, laps);
+  const details = buildStintDetails(
+    stints,
+    laps,
+    getNeutralisedLaps(perLapInfo),
+  );
   const rivalDetails =
-    rivalStints && rivalLaps ? buildStintDetails(rivalStints, rivalLaps) : [];
+    rivalStints && rivalLaps
+      ? buildStintDetails(
+          rivalStints,
+          rivalLaps,
+          getNeutralisedLaps(rivalPerLapInfo),
+        )
+      : [];
   const pairedDetails = pairStintDetailsByCompound({
     details,
     comparisonDetails: rivalDetails,

@@ -184,13 +184,15 @@ function StrategyRow({
       : "Alternative";
   const tagline = isWet
     ? wetTagline(strategy, isManaged)
-    : isManaged
-      ? "One-stop, tyre management required"
-      : strategy.fastStart === true
-        ? "Fast start, durable finish"
-        : strategy.fastStart === false
-          ? "Durable start, fast finisher"
-          : "Two-stop sandwich";
+    : strategy.pitWindows.length === 0
+      ? `No-stop${isManaged ? ", tyre management required" : ""}`
+      : isManaged
+        ? "One-stop, tyre management required"
+        : strategy.fastStart === true
+          ? "Fast start, durable finish"
+          : strategy.fastStart === false
+            ? "Durable start, fast finisher"
+            : "Two-stop sandwich";
   const timingLabel = formatStrategyTiming(kind, strategy.timeEstimate);
 
   return (
@@ -282,18 +284,19 @@ function formatStrategyTiming(
   // read as a comparison against the dry plans or the other wet compound.
   if (kind === "wet") return duration ?? "best stop count";
 
+  // A recommendation can trail the fastest plan when it is the softer-start
+  // mirror of a near tie, so only a zero delta reads as fastest.
+  const isFastest = estimate.deltaToFastestMs === 0;
   const deltaLabel =
     estimate.deltaToFastestMs <= 250
-      ? kind === "recommended"
+      ? kind === "recommended" && isFastest
         ? "fastest"
         : "even"
       : formatSignedSeconds(estimate.deltaToFastestMs, 1);
 
   if (duration) return `${duration} · ${deltaLabel}`;
 
-  return kind === "recommended" && estimate.deltaToFastestMs <= 250
-    ? "fastest by model"
-    : deltaLabel;
+  return kind === "recommended" && isFastest ? "fastest by model" : deltaLabel;
 }
 
 function formatRaceDuration(ms: number): string {

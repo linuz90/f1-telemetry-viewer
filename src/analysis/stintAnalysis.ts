@@ -1,9 +1,11 @@
 import type { LapHistoryEntry, TyreStint } from "../types/telemetry";
 import { isCompleteValidLap } from "../utils/stats/laps";
 import {
+  PUNCTURE_THRESHOLD,
   estimateMaxLife,
+  getGreenFlagWear,
   getWorstStintEndWear,
-  stintWearRate,
+  projectLapsToWear,
 } from "../utils/stats/tyres";
 
 /**
@@ -84,13 +86,17 @@ function buildValidLapTimesByNumber(laps: readonly LapHistoryEntry[]) {
 export function buildStintDetails(
   stints: readonly TyreStint[],
   laps: readonly LapHistoryEntry[],
+  neutralisedLaps: ReadonlySet<number>,
 ): StintDetail[] {
   const validLapTimes = buildValidLapTimesByNumber(laps);
 
   return stints.map((stint, index) => {
     const compound = stint["tyre-set-data"]["visual-tyre-compound"];
     const peakWear = getWorstStintEndWear(stint);
-    const wearRate = stintWearRate(stint);
+    // Green-flag wear and the same curve projection as the Track page's Tyre
+    // Life card, so one stint reads the same on both pages.
+    const greenWear = getGreenFlagWear(stint, neutralisedLaps);
+    const wearRate = greenWear.laps > 0 ? greenWear.wear / greenWear.laps : 0;
     const stintTimes: number[] = [];
     const stintTimesWithOutlap: number[] = [];
 
@@ -115,7 +121,9 @@ export function buildStintDetails(
       compound,
       peakWear,
       wearRate,
-      estimatedLife: estimateMaxLife(wearRate),
+      estimatedLife:
+        projectLapsToWear(greenWear.curve, PUNCTURE_THRESHOLD) ??
+        estimateMaxLife(wearRate),
       bestTimeMs: effectiveTimes.length > 0 ? Math.min(...effectiveTimes) : 0,
       averageTimeMs,
       averageDeviationMs:

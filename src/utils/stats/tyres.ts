@@ -1,9 +1,12 @@
 import type {
   DriverData,
+  PerLapInfo,
   TyreStint,
   TyreStintBasic,
   TyreWearEntry,
 } from "../../types/telemetry";
+import { median } from "./core";
+import { isGreenFlagLap } from "./energy";
 
 export function synthesizeStints(
   basics: TyreStintBasic[],
@@ -82,21 +85,20 @@ export function getCompletedStints(stints: TyreStint[]): TyreStint[] {
   return stints;
 }
 
+/** Green-flag wear per lap across the driver's completed stints. */
 export function avgWearRate(player: DriverData): number {
   const stints = getCompletedStints(getDriverStints(player));
-  if (!stints.length) return 0;
+  const neutralisedLaps = getNeutralisedLaps(player["per-lap-info"]);
 
   let totalWear = 0;
   let totalLaps = 0;
-
   for (const stint of stints) {
-    const endWear = getWorstStintEndWear(stint);
-    if (endWear <= 0) continue;
-    totalWear += endWear;
-    totalLaps += stint["stint-length"];
+    const green = getGreenFlagWear(stint, neutralisedLaps);
+    totalWear += green.wear;
+    totalLaps += green.laps;
   }
 
-  return totalLaps > 0 ? totalWear / totalLaps : 0;
+  return totalLaps > 0 && totalWear > 0 ? totalWear / totalLaps : 0;
 }
 
 /** Get the worst (max) wheel wear from a single TyreWearEntry */
@@ -158,6 +160,88 @@ export function buildWorstWearByLap(
   return wearByLap;
 }
 
+/** Laps a Safety Car or VSC touched. `max-safety-car-status` is the worst
+ *  state over the lap, so the deployment and restart laps count too. */
+export function getNeutralisedLaps(
+  perLapInfo: readonly PerLapInfo[] | undefined,
+): Set<number> {
+  const laps = new Set<number>();
+  for (const lap of perLapInfo ?? []) {
+    if (!isGreenFlagLap(lap)) laps.add(lap["lap-number"]);
+  }
+  return laps;
+}
+
+export interface GreenFlagWear {
+  /** Worst-wheel wear accumulated by green laps only. `stintLap` counts green
+   *  laps, so a projection along it reads "after N laps of racing". */
+  curve: StintWearCurvePoint[];
+  laps: number;
+  wear: number;
+}
+
+/** Wear a stint's green-flag laps added. A tyre behind the Safety Car or VSC
+ *  barely wears, so counting those laps as racing laps flattens the rate: the
+ *  Sakhir 26 Oct Soft, fitted under the SC, read 4.6%/lap over its seven laps
+ *  but wore 6.3%/lap once racing. */
+export function getGreenFlagWear(
+  stint: TyreStint,
+  neutralisedLaps: ReadonlySet<number>,
+): GreenFlagWear {
+  const curve: StintWearCurvePoint[] = [];
+  let laps = 0;
+  let wear = 0;
+  const observed = getStintWearCurve(stint);
+  let previousLap = stint["start-lap"] - 1;
+  let previousWear = getFittedWear(stint, observed[0]);
+
+  for (const point of observed) {
+    // A snapshot can span skipped laps; it still measures green wear as long
+    // as none of them was neutralised.
+    let isGreen = true;
+    for (let lap = previousLap + 1; lap <= point.lapNumber; lap++) {
+      if (neutralisedLaps.has(lap)) isGreen = false;
+    }
+    if (isGreen) {
+      const delta = point.worstWear - previousWear;
+      // A racing lap always wears the tyres, so a dip or a flat lap is a bad
+      // snapshot (F2 Losail logs pit-in laps at zero): measure the next one
+      // from the last good one.
+      if (delta <= 0) continue;
+      laps += point.lapNumber - previousLap;
+      wear += delta;
+      curve.push({
+        lapNumber: point.lapNumber,
+        stintLap: laps,
+        worstWear: wear,
+      });
+    }
+    previousLap = point.lapNumber;
+    // Wear never heals, so a dip behind the Safety Car cannot lower the
+    // baseline the next green lap is measured from.
+    previousWear = Math.max(previousWear, point.worstWear);
+  }
+
+  return { curve, laps, wear };
+}
+
+/** Worst-wheel wear when the set went on: PnG's snapshot on the lap before
+ *  the stint (the formation lap for the opening stint, the incoming set on a
+ *  pit lap), else a new set. Measuring from it keeps the formation lap and a
+ *  used set's earlier wear out of the first green lap. */
+function getFittedWear(
+  stint: TyreStint,
+  firstPoint: StintWearCurvePoint | undefined,
+): number {
+  const snapshots = (stint["tyre-wear-history"] ?? [])
+    .filter((entry) => entry["lap-number"] === stint["start-lap"] - 1)
+    .map(getWorstWheelWear);
+  if (snapshots.length === 0 || !firstPoint) return 0;
+  const fitted = Math.min(...snapshots);
+  // Above the first lap's wear it is the outgoing set, not this one.
+  return fitted <= firstPoint.worstWear ? fitted : 0;
+}
+
 export function projectWearFromCurve(
   curve: readonly StintWearCurvePoint[],
   plannedLaps: number,
@@ -201,24 +285,73 @@ export function projectWearFromCurve(
   return before.worstWear + (plannedLaps - before.stintLap) * projectedRate;
 }
 
-/** Stint laps until worst-wheel wear reaches `threshold`: read off the curve
- *  when the stint got there, otherwise projected past its end at the rate
- *  `projectWearFromCurve` uses (late-stint rate, never gentler than the
- *  average). Null without a curve or without any recorded wear. */
+/** Stint laps until worst-wheel wear reaches `threshold` along one curve:
+ *  read off the curve when the stint got there, otherwise projected past its
+ *  end the way `projectWearFromCurve` does (late-stint rate, never gentler
+ *  than the average). Null without any recorded wear. */
 export function projectLapsToWear(
   curve: readonly StintWearCurvePoint[],
   threshold: number,
 ): number | null {
   const last = curve.at(-1);
   if (!last || last.worstWear <= 0 || last.stintLap <= 0) return null;
+  return lapsToReachWear(
+    (laps) => projectWearFromCurve(curve, laps),
+    threshold,
+  );
+}
 
-  const crossed = curve.find((point) => point.worstWear >= threshold);
-  if (crossed) return crossed.stintLap;
+/** Worst-wheel wear after `laps` green laps on a compound: the median of each
+ *  stint's own curve projection. Tyre Life and the strategy's projected
+ *  stints both read this, so a planned stint reaches the threshold on the lap
+ *  the Tyre Life card names. */
+export function projectCompoundWear(
+  curves: readonly (readonly StintWearCurvePoint[])[],
+  laps: number,
+): number | null {
+  return (
+    median(
+      curves
+        .map((curve) => projectWearFromCurve(curve, laps))
+        .filter((wear): wear is number => wear != null),
+    ) ?? null
+  );
+}
 
-  const nextLapWear = projectWearFromCurve(curve, last.stintLap + 1);
-  const rate = nextLapWear == null ? 0 : nextLapWear - last.worstWear;
-  if (rate <= 0) return null;
-  return Math.round(last.stintLap + (threshold - last.worstWear) / rate);
+export function projectCompoundLapsToWear(
+  curves: readonly (readonly StintWearCurvePoint[])[],
+  threshold: number,
+): number | null {
+  return lapsToReachWear(
+    (laps) => projectCompoundWear(curves, laps),
+    threshold,
+  );
+}
+
+/** Longest stint worth projecting to. A compound that would outlast it has
+ *  too little wear to project from; callers fall back to a linear rate. */
+const MAX_PROJECTED_STINT_LAPS = 200;
+
+/** First lap a non-decreasing wear projection reaches `threshold`, with the
+ *  crossing interpolated inside that lap and rounded. */
+function lapsToReachWear(
+  project: (laps: number) => number | null,
+  threshold: number,
+): number | null {
+  let previousWear = 0;
+  for (let laps = 1; laps <= MAX_PROJECTED_STINT_LAPS; laps++) {
+    const wear = project(laps);
+    if (wear == null) return null;
+    if (wear >= threshold) {
+      const lapFraction =
+        wear > previousWear
+          ? (threshold - previousWear) / (wear - previousWear)
+          : 1;
+      return Math.round(laps - 1 + lapFraction);
+    }
+    previousWear = wear;
+  }
+  return null;
 }
 
 /** Get the compound sequence for a driver's stints */
@@ -239,10 +372,13 @@ export function findSameStrategyDrivers(
   });
 }
 
-/** Calculate avg wear rate (%/lap) for a single stint using worst-wheel metric */
-export function stintWearRate(stint: TyreStint): number {
-  const lastWear = getWorstStintEndWear(stint);
-  return stint["stint-length"] > 0 ? lastWear / stint["stint-length"] : 0;
+/** Worst-wheel wear per green-flag lap for one stint (`getGreenFlagWear`). */
+export function stintWearRate(
+  stint: TyreStint,
+  neutralisedLaps: ReadonlySet<number>,
+): number {
+  const green = getGreenFlagWear(stint, neutralisedLaps);
+  return green.laps > 0 ? green.wear / green.laps : 0;
 }
 
 /** Worst-wheel wear % at which puncture risk starts */

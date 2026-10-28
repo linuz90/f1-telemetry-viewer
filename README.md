@@ -90,6 +90,7 @@ pnpm test:energy-stats           # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                   # Run the focused fuel-aggregation suite
 pnpm test:speed                  # Run canonical speed/aero inference regressions
 pnpm test:strategy               # Run Track Strategy synthesis regressions (dry + wet)
+pnpm test:tyre-wear              # Run green-flag tyre wear rate regressions
 pnpm test:lap-recording          # Run .pngt reader, completeness and API regressions
 pnpm test:lap-telemetry          # Run lap-comparison tips, defaults and track-map calibration
 pnpm check:lap-telemetry [folder] # Measure lap-tip accuracy on real recordings (aggregates only)
@@ -108,8 +109,9 @@ from a local representative corpus instead of the committed demo fixtures; the
 source remains read-only and only aggregate measurements are printed.
 
 The session-summary index, complete-lap timing, Race Pace estimation, fuel
-aggregation, speed/aero inference, Track Strategy synthesis, and lap recordings
-and their tips have focused suites built on Node's test runner. No general UI
+aggregation, tyre wear rates, speed/aero inference, Track Strategy synthesis,
+and lap recordings and their tips have focused suites built on Node's test
+runner. No general UI
 test runner or linter is configured; `pnpm build` remains the main whole-app
 validation command.
 

@@ -810,8 +810,8 @@ export function TrackProgressPage() {
                         belowHero={
                           <TyreLifeEvidenceBar
                             compound={cs.compound}
-                            seenLaps={cs.longestStint}
-                            seenWear={cs.longestStintEndWear}
+                            seenLaps={cs.longestGreenRun}
+                            seenWear={cs.longestGreenRunWear}
                             estLife={cs.estMaxLife}
                           />
                         }
@@ -851,8 +851,8 @@ export function TrackProgressPage() {
                     ))}
                   </div>
                   <p className="text-xs text-zinc-600 mt-1.5">
-                    Solid = longest stint on that compound and the worst-wheel
-                    wear it reached; stripes = projection to the{" "}
+                    Solid = longest green-flag run on that compound and the
+                    worst-wheel wear it added; stripes = projection to the{" "}
                     {PUNCTURE_THRESHOLD}% puncture risk threshold along your
                     stints&apos; wear curves. {PEAK_PACE_LABEL} is the mean of
                     your fastest {PEAK_PACE_WINDOW} clean laps.

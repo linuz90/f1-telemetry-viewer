@@ -4,7 +4,7 @@ import type {
   TyreStint,
 } from "../../types/telemetry";
 import { filterOutlierLaps, medianLapTimeMs } from "./laps";
-import { getDriverStints, stintWearRate } from "./tyres";
+import { getDriverStints, getNeutralisedLaps, stintWearRate } from "./tyres";
 
 /** Find the fastest same-compound driver within an overlapping lap range. */
 export function getBestDriverOnCompound(
@@ -35,6 +35,7 @@ export function getBestDriverOnCompound(
 
   for (const driver of drivers) {
     const laps = driver["session-history"]["lap-history-data"];
+    const neutralisedLaps = getNeutralisedLaps(driver["per-lap-info"]);
     for (const stint of getDriverStints(driver)) {
       if (stint["tyre-set-data"]["visual-tyre-compound"] !== compound) continue;
       if (stint["end-lap"] < lapStart || stint["start-lap"] > lapEnd) continue;
@@ -43,7 +44,7 @@ export function getBestDriverOnCompound(
       if (overlapEnd - overlapStart + 1 < 3) continue;
       const paceMs = medianPaceInRange(laps, overlapStart, overlapEnd);
       if (paceMs <= 0) continue;
-      const rate = stintWearRate(stint);
+      const rate = stintWearRate(stint, neutralisedLaps);
       if (!best || paceMs < best.paceMs) {
         best = {
           driver,

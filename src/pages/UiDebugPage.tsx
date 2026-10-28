@@ -888,7 +888,7 @@ export function UiDebugPage() {
       </DebugSection>
 
       <DebugSection file="src/components/StintTimeline.tsx / StintDetailCards">
-        <StintDetailCards stints={stints} laps={laps} />
+        <StintDetailCards stints={stints} laps={laps} perLapInfo={perLapInfo} />
       </DebugSection>
 
       <DebugSection file="src/components/LapTimeChart.tsx">

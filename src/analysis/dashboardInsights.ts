@@ -589,6 +589,7 @@ const TYRE_COMPOUNDS = new Set([
   "Soft",
   "Medium",
   "Hard",
+  "Inters",
   "Intermediate",
   "Wet",
 ]);
@@ -608,8 +609,12 @@ function buildTyreWhispererInsight(
   >();
   for (const session of resultSessions) {
     for (const stint of session.stints ?? []) {
-      // Drop very short stints — typically formation, SC restart, in-laps — they distort the wear/lap rate.
-      if (stint.laps < 3) continue;
+      // Green-flag wear only: SC/VSC laps barely wear the tyres. Hand-built
+      // demo summaries carry just the whole-stint numbers.
+      const laps = stint.greenLaps ?? stint.laps;
+      const wear = stint.greenWear ?? stint.endWearAvg;
+      // Too few laps to give a wear/lap rate worth ranking.
+      if (laps < 3) continue;
       if (!TYRE_COMPOUNDS.has(stint.compound)) continue;
       const entry = byCompound.get(stint.compound) ?? {
         totalLaps: 0,
@@ -617,8 +622,8 @@ function buildTyreWhispererInsight(
         stints: 0,
         sessions: [],
       };
-      entry.totalLaps += stint.laps;
-      entry.totalWear += stint.endWearAvg;
+      entry.totalLaps += laps;
+      entry.totalWear += wear;
       entry.stints += 1;
       entry.sessions.push(session);
       byCompound.set(stint.compound, entry);
@@ -641,7 +646,7 @@ function buildTyreWhispererInsight(
     formulaKey: getSessionFormulaScopeKey(mostRecent),
     scope,
     headline: `${winner.wearPerLap.toFixed(2)}%/lap`,
-    detail: `${winner.compound}s · ${winner.stints} stints`,
+    detail: `${winner.compound.endsWith("s") ? winner.compound : `${winner.compound}s`} · ${winner.stints} stints`,
     sampleSize: winner.stints,
   };
 }

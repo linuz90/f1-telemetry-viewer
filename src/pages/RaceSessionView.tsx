@@ -404,8 +404,10 @@ export function RaceSessionView({
             <StintDetailCards
               stints={stints}
               laps={laps}
+              perLapInfo={perLapInfo}
               rivalStints={rival ? rivalStints : undefined}
               rivalLaps={rival ? rivalLaps : undefined}
+              rivalPerLapInfo={rival?.["per-lap-info"]}
               rivalName={rival?.["driver-name"]}
               driverName={focusedDriver?.["driver-name"]}
             />

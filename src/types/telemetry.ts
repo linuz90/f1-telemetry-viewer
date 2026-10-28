@@ -86,6 +86,11 @@ export interface PlayerStintSummary {
   laps: number;
   /** Worst-wheel tyre wear percentage at stint end. Field name is historical. */
   endWearAvg: number;
+  /** Green-flag laps and the worst-wheel wear they added (`getGreenFlagWear`):
+   *  the honest per-lap rate, since SC/VSC laps barely wear the tyres. Absent
+   *  from hand-built demo summaries. */
+  greenLaps?: number;
+  greenWear?: number;
 }
 
 /**

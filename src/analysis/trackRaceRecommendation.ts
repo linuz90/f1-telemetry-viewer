@@ -39,6 +39,14 @@ function isNearFullDistanceRace(
   return lapsCompleted >= totalLaps - 1;
 }
 
+/** F2 sprints ("Race"; the feature race is "Race 2") need no pit stop, and
+ *  their finishers almost all run to the flag on one set. Every other dry
+ *  race here must use two compounds. */
+function hasMandatoryPitStop(entry: BucketRaceEntry): boolean {
+  const info = entry.session["session-info"];
+  return !(info.formula === "F2" && info["session-type"] === "Race");
+}
+
 function buildBucketEntries(sessions: TelemetrySession[]): BucketRaceEntry[] {
   const entries: BucketRaceEntry[] = [];
   for (const session of sessions) {
@@ -197,6 +205,7 @@ export function buildTrackRaceRecommendation(
     fullDistanceEntries.length,
     entries,
     pitLossEntries,
+    { requiresPitStop: entries.some(hasMandatoryPitStop) },
   );
   const wetStrategies = synthesizeWetStrategies(
     strategyCompoundLifeStats,

@@ -26,7 +26,11 @@ import {
   isCompleteValidLap,
 } from "./stats/laps";
 import { compareCompoundMatchedRacePace } from "./stats/matchedPace";
-import { getWorstStintEndWear } from "./stats/tyres";
+import {
+  getGreenFlagWear,
+  getNeutralisedLaps,
+  getWorstStintEndWear,
+} from "./stats/tyres";
 import { buildSessionSpeedAnalysis } from "../analysis/speedAnalysis";
 
 export interface BuiltSessionSummary {
@@ -39,7 +43,7 @@ export interface BuiltSessionSummary {
  * Bump this for `SessionSummary`, filename normalization, or any transitive
  * summary-producing policy change; final sorting and dedupe are recomputed.
  */
-export const SESSION_SUMMARY_CACHE_VERSION = 6;
+export const SESSION_SUMMARY_CACHE_VERSION = 7;
 
 function getDrivers(session: TelemetrySession | undefined): DriverData[] {
   return session?.["classification-data"] ?? [];
@@ -402,6 +406,7 @@ function buildRaceTelemetryExtras(
   }
 
   const stints = player["tyre-set-history"] ?? [];
+  const neutralisedLaps = getNeutralisedLaps(player["per-lap-info"]);
   const stintSummaries: PlayerStintSummary[] = [];
   for (const stint of stints) {
     const laps = stint["stint-length"];
@@ -410,7 +415,14 @@ function buildRaceTelemetryExtras(
     if (endWear <= 0) continue;
     const compound = stint["tyre-set-data"]?.["visual-tyre-compound"];
     if (!compound) continue;
-    stintSummaries.push({ compound, laps, endWearAvg: endWear });
+    const green = getGreenFlagWear(stint, neutralisedLaps);
+    stintSummaries.push({
+      compound,
+      laps,
+      endWearAvg: endWear,
+      greenLaps: green.laps,
+      greenWear: green.wear,
+    });
   }
   if (stintSummaries.length > 0) extras.stints = stintSummaries;
 

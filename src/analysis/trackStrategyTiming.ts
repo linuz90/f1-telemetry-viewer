@@ -8,7 +8,9 @@ import { median } from "../utils/stats/core";
 import type { CompoundLifeStats } from "../utils/stats/trackAggregates";
 import { getRacePaceLapSamples } from "../utils/stats/laps";
 import {
+  buildWorstWearByLap,
   getDriverStints,
+  getNeutralisedLaps,
   getWorstStintEndWear,
   PUNCTURE_THRESHOLD,
 } from "../utils/stats/tyres";
@@ -25,12 +27,13 @@ import type {
 
 type StrategyEstimateConfidence = TrackStrategyTimeEstimate["confidence"];
 
-// The games do not expose a direct "lap time lost per wear %" curve. This
-// deliberately simple curve keeps normal wear cheap, then makes long stints pay
-// once they drift into the mid-50s where grip drop-off starts to matter.
-const WEAR_LINEAR_PENALTY_MS_PER_PERCENT = 18;
-const HIGH_WEAR_PENALTY_START_PERCENT = 55;
-const HIGH_WEAR_PENALTY_MS_PER_PERCENT_SQUARED = 4;
+// Lap time lost per % of worst-wheel wear, with driver-race fixed effects:
+// the player 22–37 ms/% (Hard to Medium), the whole field 34–54 ms/% by
+// compound. The loss stays linear right up to the puncture cap (43, 38 and
+// 41 ms/% below 30%, 30–55% and above 55%), so there is no high-wear surcharge.
+// Fresh-tyre pace offsets are corrected at the same rate, so wear is charged
+// once.
+const WEAR_LAP_TIME_MS_PER_PERCENT = 30;
 const MANAGED_RISK_PENALTY_MS_PER_PERCENT = 3000;
 const PIT_LOSS_MIN_MS = 10_000;
 const PIT_LOSS_MAX_MS = 45_000;
@@ -41,6 +44,21 @@ const PIT_LOSS_REFERENCE_OUTLIER_RATIO = 0.3;
 const PIT_LOSS_SAMPLE_OUTLIER_MS = 5_000;
 const PIT_LOSS_SAMPLE_OUTLIER_RATIO = 0.18;
 const PIT_LOSS_HIGH_CONFIDENCE_SPREAD_MS = 3_000;
+// Lap-time cost of fuel: 0.028 ± 0.004 s/kg with driver-race fixed effects
+// over 352 human driver-races in F1 25, F1 26 and F2 (the player alone,
+// 0.021 ± 0.011 over 69 races). Per-track values ranged 0.017–0.053.
+const FUEL_LAP_TIME_MS_PER_KG = 30;
+// A compound's clean laps only count as pace evidence from more than one race
+// and more than a handful of laps. One short stint carries that race's fuel
+// load and conditions: Sakhir's only Soft laps came after a late Safety Car on
+// ~5 kg of fuel and read 1.4 s/lap faster than Medium and Hard.
+const MIN_PACE_EVIDENCE_LAPS = 6;
+const MIN_PACE_EVIDENCE_RACES = 2;
+// Clean laps one race needs on a compound before its median counts.
+const MIN_PACE_CELL_LAPS = 2;
+// A softer compound may measure up to this much slower than a harder one
+// before the pair counts as inverted rather than noise.
+const COMPOUND_ORDER_TOLERANCE_MS = 100;
 
 interface PitLossEstimate {
   ms: number;
@@ -56,6 +74,8 @@ interface CompoundPaceModel {
   offsetsMs: Map<string, number>;
   confidence: StrategyEstimateConfidence;
   source: string;
+  /** Compounds placed by compound order, not by their own laps. */
+  assumedCompounds?: Set<string>;
 }
 
 export interface StrategyTimingContext {
@@ -283,98 +303,224 @@ function normalizeOffsets(
   return normalized;
 }
 
-function buildCleanLapPaceModel(
-  entries: BucketRaceEntry[],
-): CompoundPaceModel | null {
-  const samples = entries.flatMap((entry) =>
-    getRacePaceLapSamples(entry.player).filter(
-      (sample) => sample.compound && isDryCompound(sample.compound),
-    ),
-  );
-  if (samples.length < 6) return null;
-
-  const meanLap =
-    samples.reduce((sum, sample) => sum + sample.lapNumber, 0) / samples.length;
-  const meanTime =
-    samples.reduce((sum, sample) => sum + sample.timeMs, 0) / samples.length;
-  const lapVariance = samples.reduce(
-    (sum, sample) => sum + (sample.lapNumber - meanLap) ** 2,
-    0,
-  );
-  if (lapVariance <= 0) return null;
-
-  const covariance = samples.reduce(
-    (sum, sample) =>
-      sum + (sample.lapNumber - meanLap) * (sample.timeMs - meanTime),
-    0,
-  );
-  const slope = covariance / lapVariance;
-  const intercept = meanTime - slope * meanLap;
-
-  const residuals = new Map<string, number[]>();
-  for (const sample of samples) {
-    const compound = sample.compound;
-    if (!compound) continue;
-
-    const compoundResiduals = residuals.get(compound) ?? [];
-    compoundResiduals.push(
-      sample.timeMs - (intercept + slope * sample.lapNumber),
-    );
-    residuals.set(compound, compoundResiduals);
-  }
-
-  const rawOffsets = new Map<string, number>();
-  let eligibleCompoundCount = 0;
-  for (const [compound, values] of residuals) {
-    if (values.length < 3) continue;
-    const compoundMedian = median(values);
-    if (compoundMedian == null) continue;
-    rawOffsets.set(compound, compoundMedian);
-    eligibleCompoundCount += 1;
-  }
-
-  if (eligibleCompoundCount < 2) return null;
-
-  return {
-    offsetsMs: normalizeOffsets(rawOffsets),
-    confidence: samples.length >= 18 ? "medium" : "low",
-    source: "distance-matched clean-lap pace",
-  };
+interface CorrectedPaceSample {
+  compound: string;
+  /** Lap time with the fuel and tyre wear on board taken off. */
+  freshEmptyMs: number;
 }
 
-function buildTyreSetDeltaPaceModel(
-  entries: BucketRaceEntry[],
-): CompoundPaceModel | null {
-  const byCompound = new Map<string, number[]>();
+/** Clean laps put on one footing: an empty tank and fresh tyres. A lap-number
+ *  trend can't do this: in-stint degradation cancels the fuel gain, so the
+ *  late, light stint's tyre reads fastest. */
+function correctedPaceSamples(entry: BucketRaceEntry): CorrectedPaceSample[] {
+  const player = entry.player;
+  const fuelByLap = new Map<number, number>();
+  for (const lap of player["per-lap-info"] ?? []) {
+    const fuelKg = lap["car-status-data"]?.["fuel-in-tank"];
+    if (Number.isFinite(fuelKg) && fuelKg >= 0) {
+      fuelByLap.set(lap["lap-number"], fuelKg);
+    }
+  }
+  const wearByLap = buildWorstWearByLap(getDriverStints(player));
+  const neutralisedLaps = getNeutralisedLaps(player["per-lap-info"]);
 
-  for (const entry of entries) {
-    for (const stint of getDriverStints(entry.player)) {
-      const compound = stint["tyre-set-data"]["visual-tyre-compound"];
-      const deltaMs = stint["tyre-set-data"]["lap-delta-time"];
-      if (!isDryCompound(compound) || !Number.isFinite(deltaMs)) continue;
-      if (Math.abs(deltaMs) > 10_000) continue;
+  return getRacePaceLapSamples(player).flatMap((sample) => {
+    const { compound, lapNumber } = sample;
+    if (!compound || !isDryCompound(compound)) return [];
+    // Tyres and brakes cool behind the Safety Car, so the first green lap
+    // after it is not a representative racing lap.
+    if (neutralisedLaps.has(lapNumber - 1)) return [];
+    // Per-lap snapshots are taken as each lap ends, so the lap ran on the
+    // average of its own and the previous snapshot.
+    const fuelStart = fuelByLap.get(lapNumber - 1);
+    const fuelEnd = fuelByLap.get(lapNumber);
+    const wearStart = wearByLap.get(lapNumber - 1);
+    const wearEnd = wearByLap.get(lapNumber);
+    if (
+      fuelStart == null ||
+      fuelEnd == null ||
+      wearStart == null ||
+      wearEnd == null
+    ) {
+      return [];
+    }
+    return [
+      {
+        compound,
+        freshEmptyMs:
+          sample.timeMs -
+          ((fuelStart + fuelEnd) / 2) * FUEL_LAP_TIME_MS_PER_KG -
+          ((wearStart + wearEnd) / 2) * WEAR_LAP_TIME_MS_PER_PERCENT,
+      },
+    ];
+  });
+}
 
-      const values = byCompound.get(compound) ?? [];
-      values.push(deltaMs);
-      byCompound.set(compound, values);
+/** One race's median corrected lap on one compound. */
+interface PaceCell {
+  race: string;
+  compound: string;
+  medianMs: number;
+  lapCount: number;
+}
+
+/** One cell per race and dry compound, each race counted once. Track
+ *  Progress keeps several saves of one session, which would otherwise pass
+ *  the two-race evidence floor on their own. Races that put on a wet tyre
+ *  are left out: slick laps on a drying track are not dry pace. */
+function buildPaceCells(entries: BucketRaceEntry[]): PaceCell[] {
+  const samplesByRace = new Map<string, CorrectedPaceSample[]>();
+  for (const [index, entry] of entries.entries()) {
+    const hasWetStint = getDriverStints(entry.player).some(
+      (stint) => !isDryCompound(stint["tyre-set-data"]["visual-tyre-compound"]),
+    );
+    if (hasWetStint) continue;
+    const race = String(
+      entry.session.debug?.["session-uid"] ?? `entry-${index}`,
+    );
+    const samples = correctedPaceSamples(entry);
+    // Later saves of a session hold every lap the earlier ones did.
+    if (samples.length > (samplesByRace.get(race)?.length ?? -1)) {
+      samplesByRace.set(race, samples);
     }
   }
 
-  const rawOffsets = new Map<string, number>();
-  for (const [compound, values] of byCompound) {
-    const compoundMedian = median(values);
-    if (compoundMedian == null) continue;
-    rawOffsets.set(compound, compoundMedian);
+  const cells: PaceCell[] = [];
+  for (const [race, samples] of samplesByRace) {
+    const byCompound = new Map<string, number[]>();
+    for (const sample of samples) {
+      const lapTimes = byCompound.get(sample.compound) ?? [];
+      lapTimes.push(sample.freshEmptyMs);
+      byCompound.set(sample.compound, lapTimes);
+    }
+    for (const [compound, lapTimes] of byCompound) {
+      if (lapTimes.length < MIN_PACE_CELL_LAPS) continue;
+      cells.push({
+        race,
+        compound,
+        medianMs: median(lapTimes)!,
+        lapCount: lapTimes.length,
+      });
+    }
   }
+  return cells;
+}
 
-  const distinctValues = new Set([...rawOffsets.values()].map(Math.round));
-  if (rawOffsets.size < 2 || distinctValues.size < 2) return null;
+/** Compound effects with each race compared only with itself: alternate race
+ *  and compound medians until they settle (median polish). A race's driver
+ *  form, setup and track state cancel out of its own compound differences. */
+function fitCompoundEffects(cells: PaceCell[]): Map<string, number> {
+  const compoundEffects = new Map(cells.map((cell) => [cell.compound, 0]));
+  const raceEffects = new Map<string, number>();
+  for (let pass = 0; pass < 20; pass++) {
+    for (const race of new Set(cells.map((cell) => cell.race))) {
+      raceEffects.set(
+        race,
+        median(
+          cells
+            .filter((cell) => cell.race === race)
+            .map((cell) => cell.medianMs - compoundEffects.get(cell.compound)!),
+        )!,
+      );
+    }
+    for (const compound of compoundEffects.keys()) {
+      compoundEffects.set(
+        compound,
+        median(
+          cells
+            .filter((cell) => cell.compound === compound)
+            .map((cell) => cell.medianMs - raceEffects.get(cell.race)!),
+        )!,
+      );
+    }
+  }
+  return compoundEffects;
+}
 
-  return {
-    offsetsMs: normalizeOffsets(rawOffsets),
-    confidence: "medium",
-    source: "distance-matched tyre-set deltas",
-  };
+/** The first softer/harder pair whose measured pace inverts the compound
+ *  order by more than noise. */
+function findOrderInversion(
+  offsets: Map<string, number>,
+): [softer: string, harder: string] | null {
+  for (const [softer, softerOffset] of offsets) {
+    for (const [harder, harderOffset] of offsets) {
+      const softerPriority = DRY_COMPOUND_PRIORITY[softer];
+      const harderPriority = DRY_COMPOUND_PRIORITY[harder];
+      if (
+        softerPriority == null ||
+        harderPriority == null ||
+        softerPriority >= harderPriority
+      ) {
+        continue;
+      }
+      if (softerOffset > harderOffset + COMPOUND_ORDER_TOLERANCE_MS) {
+        return [softer, harder];
+      }
+    }
+  }
+  return null;
+}
+
+function buildCleanLapPaceModel(
+  entries: BucketRaceEntry[],
+): CompoundPaceModel | null {
+  const allCells = buildPaceCells(entries);
+  const active = new Set(allCells.map((cell) => cell.compound));
+
+  // Drop compounds until the rest are measured and in order: thin ones first,
+  // then, while the order inverts, whichever of the pair has fewer laps.
+  // Dropped compounds are placed by compound order downstream.
+  while (active.size >= 2) {
+    const usable = allCells.filter((cell) => active.has(cell.compound));
+    const compoundsPerRace = new Map<string, number>();
+    for (const cell of usable) {
+      compoundsPerRace.set(
+        cell.race,
+        (compoundsPerRace.get(cell.race) ?? 0) + 1,
+      );
+    }
+    // Only a race that ran two compounds can compare them.
+    const cells = usable.filter(
+      (cell) => (compoundsPerRace.get(cell.race) ?? 0) >= 2,
+    );
+    const lapCounts = new Map<string, number>();
+    const raceCounts = new Map<string, number>();
+    for (const cell of cells) {
+      lapCounts.set(
+        cell.compound,
+        (lapCounts.get(cell.compound) ?? 0) + cell.lapCount,
+      );
+      raceCounts.set(cell.compound, (raceCounts.get(cell.compound) ?? 0) + 1);
+    }
+    const thin = [...active].filter(
+      (compound) =>
+        (lapCounts.get(compound) ?? 0) < MIN_PACE_EVIDENCE_LAPS ||
+        (raceCounts.get(compound) ?? 0) < MIN_PACE_EVIDENCE_RACES,
+    );
+    if (thin.length > 0) {
+      for (const compound of thin) active.delete(compound);
+      continue;
+    }
+
+    const offsetsMs = normalizeOffsets(fitCompoundEffects(cells));
+    const inversion = findOrderInversion(offsetsMs);
+    if (inversion) {
+      const [softer, harder] = inversion;
+      active.delete(
+        lapCounts.get(softer)! <= lapCounts.get(harder)! ? softer : harder,
+      );
+      continue;
+    }
+
+    const sampleCount = [...lapCounts.values()].reduce((a, b) => a + b, 0);
+    return {
+      offsetsMs,
+      confidence: sampleCount >= 18 ? "medium" : "low",
+      source:
+        "distance-matched clean-lap pace within races, fuel and wear corrected",
+    };
+  }
+  return null;
 }
 
 function buildDefaultPaceModel(
@@ -403,52 +549,19 @@ function buildDefaultPaceModel(
 function resolveEvidenceCompoundPaceModel(
   entries: BucketRaceEntry[],
 ): CompoundPaceModel | null {
-  const cleanLapModel = buildCleanLapPaceModel(entries);
-  if (cleanLapModel && paceModelMatchesCompoundOrder(cleanLapModel)) {
-    return cleanLapModel;
-  }
-
-  const tyreSetModel = buildTyreSetDeltaPaceModel(entries);
-  if (tyreSetModel) {
-    return cleanLapModel
-      ? {
-          ...tyreSetModel,
-          source:
-            "distance-matched tyre-set deltas; clean laps looked fuel-confounded",
-        }
-      : tyreSetModel;
-  }
-
-  return null;
-}
-
-function paceModelMatchesCompoundOrder(model: CompoundPaceModel): boolean {
-  const entries = [...model.offsetsMs.entries()];
-  for (let i = 0; i < entries.length; i++) {
-    for (let j = i + 1; j < entries.length; j++) {
-      const [aCompound, aOffset] = entries[i];
-      const [bCompound, bOffset] = entries[j];
-      const aPriority = DRY_COMPOUND_PRIORITY[aCompound];
-      const bPriority = DRY_COMPOUND_PRIORITY[bCompound];
-      if (aPriority == null || bPriority == null || aPriority === bPriority) {
-        continue;
-      }
-
-      const softerOffset = aPriority < bPriority ? aOffset : bOffset;
-      const harderOffset = aPriority < bPriority ? bOffset : aOffset;
-      if (softerOffset > harderOffset + 100) return false;
-    }
-  }
-  return true;
+  // The game's tyre-set `lap-delta-time` is no fallback: each stint's value is
+  // measured against whichever set was fitted when PnG saved and includes the
+  // set's own wear, and even new sets' deltas (~0.5 s a compound step) are a
+  // fresh-tyre ideal, about three times the gap races actually show.
+  return buildCleanLapPaceModel(entries);
 }
 
 function resolveCompoundPaceModel(
   entries: BucketRaceEntry[],
   rankedCompounds: CompoundLifeStats[],
 ): CompoundPaceModel {
-  // Clean race laps are distance-matched, but with thin one-stop evidence they can
-  // still say the late low-fuel hard stint is "faster" than the early medium stint.
-  // In that case, prefer the game's compound ordering over a misleading residual.
+  // Without two measured compounds, the game's compound order is the only
+  // honest ranking.
   return (
     resolveEvidenceCompoundPaceModel(entries) ??
     buildDefaultPaceModel(rankedCompounds)
@@ -523,16 +636,65 @@ function fallbackCompoundOffsetMs(compound: string): number {
   return (DRY_COMPOUND_PRIORITY[compound] ?? 2) * DEFAULT_COMPOUND_STEP_MS;
 }
 
-function projectedWearDegradationMs(endWearPercent: number, stintLaps: number) {
-  let total = 0;
-  for (let lap = 1; lap <= stintLaps; lap++) {
-    const wearAtLap = (endWearPercent * lap) / stintLaps;
-    const highWear = Math.max(0, wearAtLap - HIGH_WEAR_PENALTY_START_PERCENT);
-    total +=
-      wearAtLap * WEAR_LINEAR_PENALTY_MS_PER_PERCENT +
-      highWear ** 2 * HIGH_WEAR_PENALTY_MS_PER_PERCENT_SQUARED;
+/** Places compounds the model has no evidence for: between two measured
+ *  neighbours by interpolation, otherwise one default compound step per rung
+ *  past the nearest measured compound, so a thinly run Soft sits just ahead
+ *  of a measured Medium instead of at the scale's zero. */
+function withAssumedCompounds(
+  model: CompoundPaceModel,
+  rankedCompounds: CompoundLifeStats[],
+): CompoundPaceModel {
+  const measured = [...model.offsetsMs.entries()].filter(
+    ([compound]) => DRY_COMPOUND_PRIORITY[compound] != null,
+  );
+  if (measured.length === 0) return model;
+
+  const offsetsMs = new Map(model.offsetsMs);
+  const assumedCompounds = new Set<string>();
+  for (const { compound } of rankedCompounds) {
+    const priority = DRY_COMPOUND_PRIORITY[compound];
+    if (offsetsMs.has(compound) || priority == null) continue;
+    const nearestOn = (side: -1 | 1) =>
+      measured
+        .filter(
+          ([measuredCompound]) =>
+            Math.sign(DRY_COMPOUND_PRIORITY[measuredCompound]! - priority) ===
+            side,
+        )
+        .sort(
+          (a, b) =>
+            Math.abs(DRY_COMPOUND_PRIORITY[a[0]]! - priority) -
+            Math.abs(DRY_COMPOUND_PRIORITY[b[0]]! - priority),
+        )[0];
+    const softer = nearestOn(-1);
+    const harder = nearestOn(1);
+    let offsetMs: number;
+    if (softer && harder) {
+      const softerPriority = DRY_COMPOUND_PRIORITY[softer[0]]!;
+      const progress =
+        (priority - softerPriority) /
+        (DRY_COMPOUND_PRIORITY[harder[0]]! - softerPriority);
+      offsetMs = softer[1] + (harder[1] - softer[1]) * progress;
+    } else {
+      const [anchorCompound, anchorOffset] = (softer ?? harder)!;
+      offsetMs =
+        anchorOffset +
+        (priority - DRY_COMPOUND_PRIORITY[anchorCompound]!) *
+          DEFAULT_COMPOUND_STEP_MS;
+    }
+    offsetsMs.set(compound, offsetMs);
+    assumedCompounds.add(compound);
   }
-  return total;
+  if (assumedCompounds.size === 0) return model;
+
+  return { ...model, offsetsMs: normalizeOffsets(offsetsMs), assumedCompounds };
+}
+
+/** Lap time a stint loses to its own wear, with wear rising evenly to
+ *  `endWearPercent`. Each lap pays for its mid-lap wear, as the pace model
+ *  measures it, which sums to half the end wear on every lap. */
+function projectedWearDegradationMs(endWearPercent: number, stintLaps: number) {
+  return (WEAR_LAP_TIME_MS_PER_PERCENT * endWearPercent * stintLaps) / 2;
 }
 
 export function scoreShape(
@@ -545,13 +707,24 @@ export function scoreShape(
   const paceModel =
     context.strategyPaceModels.get(stopCount) ?? context.paceModel;
 
+  const assumedCompounds = new Set<string>();
+  let paceConfidence = paceModel.confidence;
   for (let i = 0; i < shape.compounds.length; i++) {
     const compound = shape.compounds[i];
     const stintLaps = shape.stintLaps[i];
     const endWear = shape.stintWearPercentages[i];
-    tyrePaceMs +=
-      (paceModel.offsetsMs.get(compound) ??
-        fallbackCompoundOffsetMs(compound)) * stintLaps;
+    // A stop-count model only covers compounds its own races ran; the shared
+    // model fills the rest on the same scale.
+    const sourceModel = paceModel.offsetsMs.has(compound)
+      ? paceModel
+      : context.paceModel;
+    const offsetMs =
+      sourceModel.offsetsMs.get(compound) ?? fallbackCompoundOffsetMs(compound);
+    if (sourceModel.assumedCompounds?.has(compound)) {
+      assumedCompounds.add(compound);
+    }
+    paceConfidence = lowerConfidence(paceConfidence, sourceModel.confidence);
+    tyrePaceMs += offsetMs * stintLaps;
     wearDegradationMs += projectedWearDegradationMs(endWear, stintLaps);
   }
 
@@ -571,8 +744,13 @@ export function scoreShape(
     wearDegradationMs,
     pitLossMs,
     managedRiskPenaltyMs,
-    paceConfidence: paceModel.confidence,
-    paceSource: paceModel.source,
+    // A plan resting on a compound with no pace evidence of its own is a
+    // guess about that tyre, whatever the model's other compounds say.
+    paceConfidence: assumedCompounds.size > 0 ? "low" : paceConfidence,
+    paceSource:
+      assumedCompounds.size > 0
+        ? `${paceModel.source}; ${[...assumedCompounds].join(", ")} pace assumed from compound order`
+        : paceModel.source,
   };
 }
 
@@ -649,7 +827,10 @@ export function buildTimingContext(
 
   const pitLoss = resolvePitLoss(pitLossEntries, representative);
   if (!pitLoss) return null;
-  const paceModel = resolveCompoundPaceModel(entries, rankedCompounds);
+  const paceModel = withAssumedCompounds(
+    resolveCompoundPaceModel(entries, rankedCompounds),
+    rankedCompounds,
+  );
 
   return {
     pitLoss,
