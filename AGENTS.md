@@ -231,6 +231,7 @@ Strategy timing:
 - Track Strategy timing must stay race-distance scoped. Tyre wear and degradation differ between 25%, 50%, and full-distance races, so do not reuse same-track tyre pace/wear evidence across `total-laps` buckets unless a future model explicitly normalizes race-distance percentage.
 - When same-distance strategy evidence exists, prefer same stop-count samples for strategy timing and wear projection, then fall back to the broader selected race-distance bucket.
 - Pit-loss fallbacks may cross distance because pit-lane time loss is distance-independent: infer same-track user pit loss first, reject obvious outlier stops, then use attributed Pits n' Giggles F1 defaults, then a low-confidence F1 median. Do not invent F2 pit-loss defaults.
+- The dry recommendation is synthesized from the player's compound pace and wear (model in the header comment of `src/analysis/trackStrategySynthesis.ts`), never ranked from observed compound sequences: with one or two races at a track, the most frequent sequence is whatever happened once, DNFs included. `PUNCTURE_THRESHOLD` (`src/utils/stats/tyres.ts`) is its only wear cap; import it rather than adding a strategy-specific ceiling.
 - Strategy alternatives should stay useful: prefer a different stop count only when it is time-competitive; otherwise show the next best distinct one-stop or pit-window shape.
 - Absolute strategy durations are display estimates anchored to completed same-distance races; otherwise prefer relative deltas and confidence/source copy.
 - Wet plans are separate same-compound stop-count plans, one per wet compound (PnG exports `Inters` and `Wet`, not `Intermediate`). Keep wet stints out of dry pair ranking, anchor each plan only on races run entirely on its compounds, and leave slick crossovers unmodelled because they depend on when the track dries.
@@ -270,6 +271,8 @@ Styling:
 - Dark Tailwind UI.
 - Reuse shared primitives before adding one-off styles.
 - Keep chart/card constants in `src/constants/` or shared UI modules.
+- Color carries meaning (semantic tokens in `src/index.css`): purple (`best`, the `purple` accent) means fastest or session best, as in F1 broadcasts; green and red (`ahead`, `behind`) mean gaining or losing against a rival or a previous result.
+- In a tile that mixes prose with a number, tint only the number (`Slower by <span className="text-behind">+0.583</span>`); verbs, labels and units stay neutral so the eye lands on the data. A tile showing one bare value keeps its full color.
 
 ## Reading Raw Session Telemetry
 
