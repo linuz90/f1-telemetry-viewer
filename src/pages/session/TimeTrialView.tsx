@@ -1,4 +1,11 @@
 import { useMemo, useState, type ReactNode } from "react";
+import {
+  CircleCheck,
+  History,
+  Play,
+  Sparkles,
+  TrendingDown,
+} from "lucide-react";
 import type { TelemetrySession } from "../../types/telemetry";
 import { useScopedSessions } from "../../hooks/useSessionLog";
 import { useTrackHistory } from "../../hooks/useTrackHistory";
@@ -114,12 +121,14 @@ export function TimeTrialView({
   const stats: StatDoor[] = [
     {
       label: "Ideal lap",
+      icon: Sparkles,
       value: summary.idealMs ? msToLapTime(summary.idealMs) : "—",
       note: "your best valid sectors",
       onOpen: () => setTab("laps"),
     },
     {
       label: "Valid laps",
+      icon: CircleCheck,
       value: (
         <>
           {valid.length}{" "}
@@ -136,12 +145,14 @@ export function TimeTrialView({
     },
     {
       label: "First lap",
+      icon: Play,
       value: firstValid ? msToLapTime(firstValid["lap-time-in-ms"]) : "—",
       note: `to ${msToLapTime(summary.bestMs)} on lap ${summary.bestLapNumber}`,
     },
     previousPb
       ? {
           label: "Previous PB",
+          icon: History,
           value: msToLapTime(previousPb),
           tone: isNewPb ? undefined : "best",
           note: isNewPb
@@ -150,6 +161,7 @@ export function TimeTrialView({
         }
       : {
           label: "Gained in the session",
+          icon: TrendingDown,
           value: firstValid
             ? `${((firstValid["lap-time-in-ms"] - summary.bestMs) / 1000).toFixed(3)} s`
             : "—",

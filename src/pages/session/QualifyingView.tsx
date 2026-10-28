@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Flag, Repeat, Sparkles, Trophy } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import type { TelemetrySession } from "../../types/telemetry";
 import { useTelemetry } from "../../context/TelemetryContext";
@@ -189,6 +190,7 @@ export function QualifyingView({
     ? [
         {
           label: "Ideal lap",
+          icon: Sparkles,
           value: summary.idealMs ? msToLapTime(summary.idealMs) : "—",
           note:
             summary.idealMs &&
@@ -202,6 +204,7 @@ export function QualifyingView({
         },
         {
           label: "Runs",
+          icon: Repeat,
           value: `${validLaps.length} lap${validLaps.length === 1 ? "" : "s"}`,
           note: validLaps
             .map((lap) => msToLapTime(lap["lap-time-in-ms"]))
@@ -210,6 +213,7 @@ export function QualifyingView({
         },
         {
           label: "Pole",
+          icon: Flag,
           value: pole ? msToLapTime(pole.ms) : "—",
           note: pole
             ? pole.d.index === focused.index
@@ -220,6 +224,7 @@ export function QualifyingView({
         },
         {
           label: `PB at ${getTrackDisplayName(trackName)}`,
+          icon: Trophy,
           value: pbs?.bestQualiLapMs
             ? msToLapTime(Math.min(pbs.bestQualiLapMs, summary.bestMs))
             : msToLapTime(summary.bestMs),

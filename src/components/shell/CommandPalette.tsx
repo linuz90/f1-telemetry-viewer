@@ -22,8 +22,13 @@ import {
 import { useTelemetry } from "../../context/TelemetryContext";
 import { useScopedSessions, useTrackIndex } from "../../hooks/useSessionLog";
 import { sessionRowLabel, summaryKind } from "../../analysis/sessionKind";
-import { getTrackDisplayName, getTrackId } from "../../utils/tracks";
-import { getTeamColor } from "../../utils/colors";
+import {
+  getTrackDisplayName,
+  getTrackId,
+  getTrackSearchNames,
+} from "../../utils/tracks";
+import { scoreWords, searchWords } from "./paletteSearch";
+import { getTeamColor, getTeamName } from "../../utils/colors";
 import { msToLapTime } from "../../utils/format";
 import {
   formPath,
@@ -98,18 +103,19 @@ const TRACK_JUMPS = [
   },
 ] as const;
 
-function wordsOf(...texts: string[]): string[] {
-  return texts
-    .join(" ")
-    .toLowerCase()
-    .split(/[^a-z0-9:.']+/)
-    .filter(Boolean);
-}
+const wordsOf = searchWords;
 
-function matches(item: PaletteItem, tokens: string[]): boolean {
-  return tokens.every((token) =>
-    item.words.some((word) => word.startsWith(token)),
-  );
+/** Result words a driver might type: "p1", "win", "pole", "podium", "dnf". */
+function resultWords(session: SessionSummary): string[] {
+  const result = sessionResult(session);
+  if (!result) return [];
+  const words = [result.main];
+  const position = Number(result.main.replace(/^P/, ""));
+  const kind = summaryKind(session);
+  if (kind === "race" && position === 1) words.push("win", "winner");
+  if (kind === "race" && position > 0 && position <= 3) words.push("podium");
+  if (kind === "qualifying" && position === 1) words.push("pole");
+  return words;
 }
 
 function VisualBox({
@@ -292,7 +298,7 @@ export function CommandPalette({
             />
           </span>
         ),
-        words: wordsOf(name, entry.trackId, entry.track),
+        words: wordsOf(...getTrackSearchNames(entry.track), entry.trackId),
         run: go(trackPath(activeFormulaKey, entry.trackId)),
       });
       for (const jump of TRACK_JUMPS) {
@@ -302,7 +308,10 @@ export function CommandPalette({
           label: `${name} ${jump.label.toLowerCase()}`,
           sub: `Track page › ${jump.label}`,
           visual: <IconVisual icon={jump.icon} />,
-          words: [...wordsOf(name, entry.trackId), ...jump.words],
+          words: [
+            ...wordsOf(...getTrackSearchNames(entry.track)),
+            ...jump.words,
+          ],
           run: go(trackPath(activeFormulaKey, entry.trackId, jump.tab)),
         });
       }
@@ -333,12 +342,18 @@ export function CommandPalette({
           />
         ),
         words: wordsOf(
-          trackName,
-          session.track,
+          ...getTrackSearchNames(session.track),
           sessionRowLabel(session),
-          kind === "qualifying" ? "quali q" : kind,
+          kind === "qualifying"
+            ? "quali q qualifying"
+            : kind === "long-run"
+              ? "long run practice"
+              : kind === "time-trial"
+                ? "time trial tt hot laps"
+                : "race",
           day,
-          session.isOnline ? "online" : "offline practice",
+          session.isOnline ? "online" : "offline practice ai",
+          ...resultWords(session),
         ),
         run: go(sessionSummaryPath(session)),
       });
@@ -372,7 +387,10 @@ export function CommandPalette({
             {driver.count} race{driver.count === 1 ? "" : "s"} together
           </span>
         ),
-        words: wordsOf(driver.name),
+        words: wordsOf(
+          driver.name,
+          driver.team ? getTeamName(driver.team) : "",
+        ),
         run: go(
           `${sessionSummaryPath(session)}?tab=results&driver=${encodeURIComponent(key)}`,
         ),
@@ -435,14 +453,29 @@ export function CommandPalette({
         },
       ].filter((section) => section.items.length > 0);
     }
+    // Best match first within a group (ties keep newest first), and the group
+    // with the strongest match leads: "nibal" opens on Drivers, "bahrain" on
+    // Tracks.
     return (["Tracks", "Sessions", "Drivers", "Jump to"] as const)
-      .map((group) => ({
-        heading: group,
-        items: index
-          .filter((item) => item.group === group && matches(item, tokens))
-          .slice(0, GROUP_LIMIT[group]),
-      }))
-      .filter((section) => section.items.length > 0);
+      .map((group) => {
+        const scored = index
+          .filter((item) => item.group === group)
+          .map((item, order) => ({
+            item,
+            order,
+            score: scoreWords(item.words, tokens),
+          }))
+          .filter((entry) => entry.score > 0)
+          .sort((a, b) => b.score - a.score || a.order - b.order)
+          .slice(0, GROUP_LIMIT[group]);
+        return {
+          heading: group,
+          top: scored[0]?.score ?? 0,
+          items: scored.map((entry) => entry.item),
+        };
+      })
+      .filter((section) => section.items.length > 0)
+      .sort((a, b) => b.top - a.top);
   }, [index, query, trackIndex]);
   const results = useMemo(
     () => sections.flatMap((section) => section.items),

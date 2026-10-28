@@ -32,6 +32,7 @@ pnpm test:energy-stats        # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                # Run fuel aggregation and recommendation tests
 pnpm test:speed               # Run canonical speed/aero inference regressions
 pnpm test:session-story       # Run session kind, session log, race story and online form regressions
+pnpm test:search              # Run ⌘K palette matching (aliases, typos, accents)
 pnpm test:share-text          # Run plain-text setup/strategy copy formats
 pnpm test:strategy            # Run Track Strategy synthesis regressions (dry + wet)
 pnpm test:tyre-wear           # Run green-flag tyre wear rate regressions
@@ -259,7 +260,7 @@ Pages:
 - Each session page leads with a hero headline. A new insight goes into the ranked Worth a look list (`src/analysis/worthALook.ts`), never a new tile or card.
 - Worth a look takes every item that clears its threshold in the Tuning section; `WorthList` shows five and folds the rest behind "Show N more". `rankWorthItems()` ranks places before seconds. The list carries no padding or placeholder items and never repeats the headline, and imperative advice comes only from lap-telemetry tips.
 - Position changes come from `buildRaceStory()`: a pit cycle nets out once nearby cars have made their matching stop, and a swap that comes back within two laps reads as steady, so chips and headlines never credit a pit cycle or a back-and-forth as places gained.
-- Anything per lap is drawn by `LapChart`: a line on a normal time axis (quicker laps lower, pit and SC laps in an "off scale" gutter above), the compound strip beneath, SC/VSC as grey washes, pit hairlines, and the driver's own events lane. A faded dot is a lap Race Pace leaves out (`buildDriverLapSeries()`), a flat line a stint average. Dates are progress lines (`TrendChart`), drivers are sorted bars, places on track use the circuit map; no donuts. You are `--color-chart-you` (cyan), the comparison driver `--color-chart-compare` (orange), purple the fastest.
+- Anything per lap is drawn by `LapChart`: a line on a normal time axis (quicker laps lower, pit and SC laps in an "off scale" gutter above), the compound strip beneath, SC/VSC as grey washes, pit hairlines, and the driver's own events lane. A faded dot is a lap Race Pace leaves out (`buildDriverLapSeries()`), a flat line a stint average. Stacked panels (position over lap time) are labelled and spaced apart. Dates are progress lines (`TrendChart`), drivers are sorted bars, places on track use the circuit map; no donuts. A single driver's line is neutral ink; with a comparison driver on the chart, you are `--color-chart-you` (cyan) and they are `--color-chart-compare` (orange). Purple is the fastest.
 - Race pages show no whole-race sector split: it is not actionable. Qualifying keeps its one-lap sector cards.
 - Circuit maps are `TrackOutline`, drawn from `trackGeometry.ts` in the brand red. `detail` adds the chequered timing line, sector splits (lap fractions from `session-info` `sector-2/3-lap-distance-start`, which older exports leave at 0) and turn numbers, each label placed on the side of the track with the most room.
 - The track Setups tab shows the quali setup (fastest or latest), the race setup and every setup run there; `setupIdentity()` ignores brake bias and fuel, which drivers change mid-session.

@@ -1,6 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, Check, ChevronRight, Copy } from "lucide-react";
+import {
+  ArrowUpRight,
+  Check,
+  ChevronRight,
+  Copy,
+  type LucideIcon,
+} from "lucide-react";
 import type { CarSetup } from "../../types/telemetry";
 import type { WorthItem, WorthTarget } from "../../analysis/worthALook";
 import { formatSetupText } from "../../analysis/shareText";
@@ -42,6 +48,8 @@ export function Panel({
 
 export interface StatDoor {
   label: string;
+  /** A small glyph before the label, so a row of numbers scans by kind. */
+  icon?: LucideIcon;
   value: ReactNode;
   note?: ReactNode;
   tone?: "best";
@@ -57,7 +65,10 @@ export function StatDoors({ stats }: { stats: StatDoor[] }) {
       {stats.map((stat) => {
         const body = (
           <>
-            <div className="flex items-center gap-1 text-xs text-tone-500">
+            <div className="flex items-center gap-1.5 text-xs text-tone-500">
+              {stat.icon && (
+                <stat.icon aria-hidden className="size-3.5 text-tone-400" />
+              )}
               {stat.label}
               {(stat.onOpen || stat.to) && (
                 <ChevronRight aria-hidden className="size-3 text-tone-600" />

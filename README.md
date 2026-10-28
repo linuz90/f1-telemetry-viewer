@@ -90,6 +90,7 @@ pnpm test:energy-stats           # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                   # Run the focused fuel-aggregation suite
 pnpm test:speed                  # Run canonical speed/aero inference regressions
 pnpm test:session-story          # Run session kind, session log, race story and online form regressions
+pnpm test:search                 # Run ⌘K palette matching (aliases, typos, accents)
 pnpm test:strategy               # Run Track Strategy synthesis regressions (dry + wet)
 pnpm test:tyre-wear              # Run green-flag tyre wear rate regressions
 pnpm test:lap-recording          # Run .pngt reader, completeness and API regressions

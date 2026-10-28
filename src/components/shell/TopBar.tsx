@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FolderUp, Search } from "lucide-react";
+import { FolderUp, Gift, Search } from "lucide-react";
 import { useTelemetry } from "../../context/TelemetryContext";
 import { useScopedSessions, useTrackIndex } from "../../hooks/useSessionLog";
 import {
@@ -15,7 +15,7 @@ import {
   SESSIONS_ROUTE_SEGMENT,
   TRACKS_ROUTE_SEGMENT,
 } from "../../constants/routes";
-import { AppBrand } from "../AppBrand";
+import { APP_NAME } from "../../config/branding";
 import { AppLogo } from "../AppLogo";
 import { FormulaScopeSelect } from "../FormulaScopeSelect";
 import { TrackFlag } from "../TrackFlag";
@@ -237,15 +237,15 @@ export function TopBar({
   return (
     <header className="sticky top-0 z-40 border-b border-tone-800/70 bg-canvas/85 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:gap-4 sm:px-6">
+        {/* The mark alone: the name is in the tab title and the tooltip, and
+            the scope picker beside it says which game this is. */}
         <Link
           to={home}
-          aria-label="Sessions home"
-          className="flex items-center gap-2.5 font-semibold tracking-tight text-tone-50 transition-opacity hover:opacity-80"
+          aria-label={`${APP_NAME}, sessions home`}
+          title={APP_NAME}
+          className="grid size-9 place-items-center rounded-lg text-tone-50 transition-colors hover:bg-tone-900"
         >
           <AppLogo className="size-[22px]" />
-          <span className="hidden sm:inline">
-            <AppBrand />
-          </span>
         </Link>
         {formulaOptions.length > 1 && activeFormulaKey && (
           <FormulaScopeSelect
@@ -283,10 +283,15 @@ export function TopBar({
           <button
             type="button"
             onClick={onOpenChangelog}
-            className="hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium text-tone-200 ring-1 ring-tone-700 transition-colors hover:bg-tone-900 hover:text-tone-50 sm:inline-flex"
+            title="What's new"
+            aria-label="What's new"
+            className="relative hidden rounded-lg p-1.5 text-tone-400 transition-colors hover:bg-tone-900 hover:text-tone-100 sm:block"
           >
-            <span aria-hidden className="size-1.5 rounded-full bg-brand" />
-            What's new
+            <Gift className="size-4" />
+            <span
+              aria-hidden
+              className="absolute top-1 right-1 size-1.5 rounded-full bg-brand ring-2 ring-canvas"
+            />
           </button>
         )}
         <button

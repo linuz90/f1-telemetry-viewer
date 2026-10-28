@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Gauge, ListOrdered, Repeat, Timer, Trophy } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { DriverData, TelemetrySession } from "../../types/telemetry";
 import { useTelemetry } from "../../context/TelemetryContext";
@@ -325,6 +326,7 @@ export function RaceView({
   const stats: StatDoor[] = [
     {
       label: "Race pace",
+      icon: Gauge,
       value: pace ? (
         <>
           {ordinal(pace.rank)}{" "}
@@ -345,6 +347,7 @@ export function RaceView({
     story?.topN
       ? {
           label: `In the top ${story.topN.position}`,
+          icon: Trophy,
           value: (
             <>
               {story.topN.laps}{" "}
@@ -356,9 +359,10 @@ export function RaceView({
           note: `P${story.topN.best} on ${story.topN.atBest} of them`,
           onOpen: () => setTab("laps"),
         }
-      : { label: "Laps", value: String(story?.lastLap ?? 0) },
+      : { label: "Laps", icon: Repeat, value: String(story?.lastLap ?? 0) },
     {
       label: "Best lap",
+      icon: Timer,
       value: ownBestMs ? msToLapTime(ownBestMs) : "—",
       tone: ownBestMs && ownBestMs === fastestOverall ? "best" : undefined,
       note:
@@ -372,6 +376,7 @@ export function RaceView({
     quali?.qualifyingPosition
       ? {
           label: "Quali",
+          icon: ListOrdered,
           value: `P${quali.qualifyingPosition}`,
           note: quali.bestLapTimeMs
             ? msToLapTime(quali.bestLapTimeMs)
@@ -380,6 +385,7 @@ export function RaceView({
         }
       : {
           label: "Grid",
+          icon: ListOrdered,
           value: result?.["grid-position"]
             ? `P${result["grid-position"]}`
             : "—",

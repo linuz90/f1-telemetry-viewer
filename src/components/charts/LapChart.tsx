@@ -21,6 +21,8 @@ export type ChartSeriesTone = "you" | "compare";
 export interface PositionPanel {
   kind: "position";
   height: number;
+  /** Shown in the left gutter when the chart stacks panels. */
+  label?: string;
   /** Index 0 is the grid, index n the end of lap n. */
   trace: number[];
   /** Worst position shown (the axis runs P1 to this). */
@@ -43,12 +45,16 @@ export interface TimeSeries {
 export interface TimePanel {
   kind: "time";
   height: number;
+  /** Shown in the left gutter when the chart stacks panels. */
+  label?: string;
   series: TimeSeries[];
 }
 
 export interface WearPanel {
   kind: "wear";
   height: number;
+  /** Shown in the left gutter when the chart stacks panels. */
+  label?: string;
   /** Worst-wheel wear %, index lap - 1. */
   wear: (number | null)[];
 }
@@ -75,6 +81,13 @@ const TONE_VAR: Record<ChartSeriesTone, string> = {
 
 const GUTTER_H = 22;
 const PANEL_GAP = 20;
+/** Stacked panels get more air and a label each, so they read as two charts. */
+const STACKED_PANEL_GAP = 44;
+const PANEL_LABEL: Record<LapChartPanel["kind"], string> = {
+  position: "Position",
+  time: "Lap time",
+  wear: "Tyre wear",
+};
 const EVENT_LANE = 18;
 const AXIS_H = 18;
 
@@ -146,10 +159,32 @@ export function LapChart({
   const xCenter = (lap: number) => L + (lap - 0.5) * slot;
   const xEdge = (lap: number) => L + lap * slot;
 
+  // A single driver's line is neutral ink; blue marks you only when there is
+  // another driver on the chart to tell you apart from.
+  const compared = panels.some(
+    (panel) =>
+      panel.kind === "time" && panel.series.some((s) => s.tone === "compare"),
+  );
+  const tone: Record<ChartSeriesTone, string> = {
+    you: compared ? TONE_VAR.you : "var(--color-tone-200)",
+    compare: TONE_VAR.compare,
+  };
+  const stacked = panels.length > 1 && !compact;
+
   const layout = useMemo(() => {
     let y = events.length && !compact ? EVENT_LANE : 0;
     return panels.map((panel, index) => {
-      const top = y + (index === 0 ? (compact ? 4 : 14) : PANEL_GAP);
+      const top =
+        y +
+        (index === 0
+          ? compact
+            ? 4
+            : stacked
+              ? 22
+              : 14
+          : stacked
+            ? STACKED_PANEL_GAP
+            : PANEL_GAP);
       const domain = panel.kind === "time" ? timeDomain(panel) : null;
       const hasOffScale =
         panel.kind === "time" &&
@@ -167,7 +202,7 @@ export function LapChart({
         domain,
       };
     });
-  }, [panels, events.length, compact]);
+  }, [panels, events.length, compact, stacked]);
   const plotBottom = layout.at(-1)?.bottom ?? 0;
   const contentBottom = layout.at(-1)?.bottom ?? 0;
   const height = contentBottom + (compact ? 4 : AXIS_H + 4);
@@ -184,6 +219,32 @@ export function LapChart({
 
   layout.forEach(({ panel, top, plotTop, bottom, gutter, domain }, pi) => {
     const key = `p${pi}`;
+    if (stacked) {
+      elements.push(
+        <text
+          key={`${key}-label`}
+          x={0}
+          y={top - 9}
+          className="fill-tone-400 text-[10.5px] font-semibold tracking-wide uppercase"
+        >
+          {panel.label ?? PANEL_LABEL[panel.kind]}
+        </text>,
+      );
+      if (pi > 0) {
+        const previous = layout[pi - 1];
+        const y = (previous.bottom + top) / 2 - 6;
+        elements.push(
+          <line
+            key={`${key}-divider`}
+            x1={0}
+            x2={L + plotW}
+            y1={y}
+            y2={y}
+            className="stroke-tone-800"
+          />,
+        );
+      }
+    }
     for (const band of bands) {
       elements.push(
         <rect
@@ -264,7 +325,7 @@ export function LapChart({
           key={`${key}-line`}
           points={points.join(" ")}
           fill="none"
-          stroke={TONE_VAR.you}
+          stroke={tone.you}
           strokeWidth={2}
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -280,7 +341,7 @@ export function LapChart({
             cx={x(0)}
             cy={y(first)}
             r={compact ? 3 : 4}
-            stroke={TONE_VAR.you}
+            stroke={tone.you}
             strokeWidth={2}
             className="fill-tone-900"
           />,
@@ -293,7 +354,7 @@ export function LapChart({
             cx={x(lastIndex)}
             cy={y(Math.min(last, panel.maxPosition))}
             r={compact ? 3.5 : 4.5}
-            fill={TONE_VAR.you}
+            fill={tone.you}
             className="stroke-tone-900"
             strokeWidth={2}
           />,
@@ -389,7 +450,7 @@ export function LapChart({
       const stintOf = (lap: number) =>
         stints.findIndex((s) => lap >= s.from && lap <= s.to);
       for (const series of panel.series) {
-        const color = TONE_VAR[series.tone];
+        const color = tone[series.tone];
         // Lines join clean laps only, broken at stint changes.
         let segment: string[] = [];
         let segmentStint = -1;
@@ -552,7 +613,7 @@ export function LapChart({
               .map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`)
               .join(" ")}
             fill="none"
-            stroke={TONE_VAR.you}
+            stroke={tone.you}
             strokeWidth={2}
             strokeLinejoin="round"
           />,
@@ -565,7 +626,7 @@ export function LapChart({
             cx={ex}
             cy={ey}
             r={4}
-            fill={TONE_VAR.you}
+            fill={tone.you}
             className="stroke-tone-900"
             strokeWidth={2}
           />,
@@ -690,13 +751,13 @@ export function LapChart({
       </svg>
       {stints.length > 0 && (
         <div
-          className="relative mt-1 h-5"
+          className="relative mt-2 h-6"
           style={{ marginLeft: L, marginRight: R }}
         >
           {stints.map((stint) => (
             <div
               key={stint.from}
-              className="absolute top-0 flex h-5 items-center justify-center overflow-hidden rounded-md border-2 border-tone-900 text-[11px] font-semibold whitespace-nowrap"
+              className="absolute top-0 flex h-6 items-center justify-center overflow-hidden rounded-md border-2 border-tone-900 text-xs font-semibold whitespace-nowrap"
               style={{
                 left: `${((stint.from - 1) / laps) * 100}%`,
                 width: `${((stint.to - stint.from + 1) / laps) * 100}%`,
@@ -745,7 +806,7 @@ export function LapChart({
                 style={{
                   background:
                     row.tone && row.tone !== "event"
-                      ? TONE_VAR[row.tone]
+                      ? tone[row.tone]
                       : "transparent",
                 }}
               />
