@@ -75,6 +75,7 @@ Data flow:
 - Dev and self-hosting share `src/plugin/session-summary-index.ts`, which incrementally caches pre-dedup summaries for `/api/sessions` and resolves slugs for raw detail streaming.
 - Dev: `src/plugin/telemetry-server.ts` adapts the shared index to Vite middleware.
 - Self-hosting: `server.ts` adapts the same index to the production HTTP server.
+- Embedded in Pits n' Giggles (git submodule at `apps/external/f1-save-viewer`, served under `/save-viewer/`): its Python server builds the session list (`apps/web/session_discovery.py`, a port of an older `buildSessionSummary()`), so new summary fields reach PnG users only when PnG ports them. It omits `isOnline`, `isAutoSave` and most race/quali extras; read summary fields as optional and degrade gracefully. It rewrites our built `index.html` by exact string (favicon and touch-icon hrefs, `<body class="`, `<div id="root">`, `</head>`) to inject its sidebar, icons and `window.__PNG_*` config, and answers unknown `/save-viewer/*` paths, API ones included, with that page. Its build env vars are in the README's Embedding section.
 - Production/demo: `public/demo/sessions.json`.
 - Upload mode: JSON/zip/`.pngt` files parsed in-browser.
 - Lap recordings (`.pngt`, Pits n' Giggles 5.0 beta): `src/plugin/lap-recording-index.ts` indexes them on their own and serves `/api/lap-recordings/...` for both servers; upload mode and browser imports (`LapImportsProvider`) open them through the same reader in `src/utils/lapRecording/`.

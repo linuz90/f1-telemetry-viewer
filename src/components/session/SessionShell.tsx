@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+} from "lucide-react";
 import type { SessionSummary, TelemetrySession } from "../../types/telemetry";
 import { useTelemetry } from "../../context/TelemetryContext";
 import { useScopedSessions, useSessionLog } from "../../hooks/useSessionLog";
@@ -33,6 +38,15 @@ export interface SessionTab<K extends string = string> {
   key: K;
   label: string;
 }
+
+// A host's own view of the same save, e.g. Pits n' Giggles' Legacy View
+// (`/legacy/{slug}`), linked from every session page when both are set.
+const EXTERNAL_LINK_TEMPLATE = import.meta.env.VITE_EXTERNAL_LINK_TEMPLATE as
+  | string
+  | undefined;
+const EXTERNAL_LINK_LABEL = import.meta.env.VITE_EXTERNAL_LINK_LABEL as
+  | string
+  | undefined;
 
 /**
  * The open tab lives in `?tab=` so a tab can be linked and survives reloads.
@@ -317,6 +331,18 @@ export function SessionShell<K extends string>({
           <p className="mt-1 text-sm text-tone-500">{meta.join(" · ")}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 pt-5">
+          {summary && EXTERNAL_LINK_TEMPLATE && EXTERNAL_LINK_LABEL && (
+            <a
+              href={EXTERNAL_LINK_TEMPLATE.replace("{slug}", summary.slug)}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={EXTERNAL_LINK_LABEL}
+              className="mr-1.5 flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs text-tone-400 ring-1 ring-tone-800 transition-colors hover:bg-tone-900 hover:text-tone-100 max-sm:w-8 max-sm:justify-center max-sm:px-0"
+            >
+              <ExternalLink className="size-3.5 shrink-0" />
+              <span className="max-sm:sr-only">{EXTERNAL_LINK_LABEL}</span>
+            </a>
+          )}
           {navButton(newer, "newer")}
           {navButton(older, "older")}
         </div>

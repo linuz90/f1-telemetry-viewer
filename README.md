@@ -177,6 +177,21 @@ The cache can contain summary metadata such as driver and rival names, so its di
 
 Works on macOS, Linux, and Windows.
 
+### Embedding
+
+Pits n' Giggles bundles the viewer under `/save-viewer/` and serves its own session API. A host sets these at build time:
+
+| Variable                      | Pits n' Giggles   | Effect                                                                        |
+| ----------------------------- | ----------------- | ----------------------------------------------------------------------------- |
+| `VITE_BASE_PATH`              | `/save-viewer/`   | Base path for assets, API calls and routes                                    |
+| `VITE_APP_NAME`               | `Pits n' Giggles` | Product name in labels and the upload screen                                  |
+| `VITE_THEME`                  | `dark`            | Forces `dark` or `light` instead of the system setting (`?theme=` still wins) |
+| `VITE_EXTERNAL_LINK_TEMPLATE` | `/legacy/{slug}`  | Link from every session page to the host's view of the same save              |
+| `VITE_EXTERNAL_LINK_LABEL`    | `Legacy View`     | Label for that link                                                           |
+| `VITE_DISABLE_ANALYTICS`      | `true`            | Turns off Vercel Analytics                                                    |
+
+At serve time it can set `window.__PNG_VERSION__` (page title) and `window.__PNG_SAVE_VIEWER_CONFIG__ = { sessionPollIntervalMs }` (session-list refresh, `null` to disable). Its `index.html` rewrites rely on the favicon and touch-icon links staying as they are. A session list without `isAutoSave` is deduplicated in the browser.
+
 ## Stack
 
 React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts 3, React Router 7, JSZip, Motion, and lucide-react.

@@ -4,11 +4,13 @@
     <meta charset="UTF-8" />
     <script>
       // Theme before first paint so there is no flash: ?theme=light|dark
-      // (Pits n' Giggles or a test can force one), else the system setting,
-      // followed live. index.css styles :root[data-theme="light"].
+      // (a test can force one), else the build's VITE_THEME (Pits n' Giggles
+      // is dark-only), else the system setting, followed live. index.css
+      // styles :root[data-theme="light"].
       (function () {
         var media = window.matchMedia("(prefers-color-scheme: light)");
-        var forced = new URLSearchParams(location.search).get("theme");
+        var forced =
+          new URLSearchParams(location.search).get("theme") || "%VITE_THEME%";
         function apply() {
           document.documentElement.dataset.theme =
             forced === "light" || forced === "dark"
@@ -22,8 +24,9 @@
       })();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Pits n' Giggles swaps these two hrefs for its own icons; another icon
+         link would win over its favicon. -->
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>F1 Telemetry Viewer</title>
     <meta

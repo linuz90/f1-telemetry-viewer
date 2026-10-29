@@ -3,8 +3,8 @@ import { cn } from "../utils/cn";
 /**
  * The viewer's mark: a stopwatch with a red slice of elapsed time. The case
  * and crown take the text colour, the slice the brand red. `public/favicon.svg`
- * and the touch icon draw the same geometry on a dark tile; regenerate them
- * if this changes.
+ * (the source of `favicon.ico`, not linked itself) and the touch icon draw
+ * the same geometry on a dark tile; regenerate them if this changes.
  */
 export function AppLogo({ className }: { className?: string }) {
   return (
