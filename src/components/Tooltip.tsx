@@ -58,13 +58,13 @@ export function Tooltip({ text, children, className = "" }: TooltipProps) {
             sideOffset={6}
             collisionPadding={8}
             className={cn(
-              "z-50 max-w-64 rounded-md border border-zinc-700 bg-zinc-800 px-2.5 py-1.5 text-left text-xs font-normal leading-snug text-zinc-300 shadow-lg",
+              "z-50 max-w-64 rounded-md border border-tone-700 bg-tone-800 px-2.5 py-1.5 text-left text-xs font-normal leading-snug text-tone-300 shadow-lg",
               "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
               "data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1",
             )}
           >
             {text}
-            <TooltipPrimitive.Arrow className="fill-zinc-800" />
+            <TooltipPrimitive.Arrow className="fill-tone-800" />
           </TooltipPrimitive.Content>
         </TooltipPrimitive.Portal>
       </TooltipPrimitive.Root>

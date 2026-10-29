@@ -4,7 +4,6 @@ import { msToLapTime } from "../utils/format";
 import { cn } from "../utils/cn";
 import { CompoundSwatchLabel } from "./ui/CompoundSwatchLabel";
 import { ScrollArea } from "./ui/ScrollArea";
-import { SectionHeader } from "./ui/SectionHeader";
 import {
   tableCellClass,
   tableClass,
@@ -19,8 +18,8 @@ interface StintComparisonTableProps {
 }
 
 /**
- * Per-stint comparison table: player vs best-on-compound driver.
- * Always visible regardless of rival picker selection.
+ * Per-stint comparison: each of your stints against the best stint on the
+ * same compound. The page's panel supplies the title.
  */
 export function StintComparisonTable({
   player,
@@ -31,11 +30,6 @@ export function StintComparisonTable({
 
   return (
     <div>
-      <SectionHeader
-        size="sm"
-        title="Stint Comparison"
-        hint="vs best on compound"
-      />
       <ScrollArea axis="x">
         <table className={cn(tableClass, "min-w-[520px]")}>
           <thead className={tableHeadClass}>
@@ -44,15 +38,15 @@ export function StintComparisonTable({
               <th className={tableHeadCellClass()}>Compound</th>
               <th className={tableHeadCellClass({ align: "right" })}>Laps</th>
               <th className={tableHeadCellClass({ align: "right" })}>
-                Median Pace
+                Median pace
               </th>
               <th className={tableHeadCellClass({ align: "right" })}>
-                Wear/Lap
+                Wear a lap
               </th>
               <th className={tableHeadCellClass({ align: "right" })}>
-                Pace Drop
+                Pace drop
               </th>
-              <th className={tableHeadCellClass()}>vs Best</th>
+              <th className={tableHeadCellClass()}>Best on compound</th>
             </tr>
           </thead>
           <tbody>
@@ -61,7 +55,7 @@ export function StintComparisonTable({
                 <tr key={row.stintNumber} className={tableRowClass}>
                   <td
                     className={tableCellClass({
-                      className: "font-medium text-zinc-300",
+                      className: "font-medium text-tone-300",
                     })}
                   >
                     {row.stintNumber}
@@ -73,7 +67,7 @@ export function StintComparisonTable({
                     className={tableCellClass({
                       align: "right",
                       mono: true,
-                      className: "text-zinc-300",
+                      className: "text-tone-300",
                     })}
                   >
                     {row.stint["stint-length"]}
@@ -81,7 +75,7 @@ export function StintComparisonTable({
                   <td
                     className={tableCellClass({ align: "right", mono: true })}
                   >
-                    <span className="text-zinc-300">
+                    <span className="text-tone-300">
                       {row.playerPace > 0 ? msToLapTime(row.playerPace) : "–"}
                     </span>
                     {row.paceDelta !== 0 && (
@@ -91,7 +85,7 @@ export function StintComparisonTable({
                   <td
                     className={tableCellClass({ align: "right", mono: true })}
                   >
-                    <span className="text-zinc-300">
+                    <span className="text-tone-300">
                       {row.playerWearRate > 0
                         ? `${row.playerWearRate.toFixed(1)}%`
                         : "–"}
@@ -103,7 +97,7 @@ export function StintComparisonTable({
                   <td
                     className={tableCellClass({ align: "right", mono: true })}
                   >
-                    <span className="text-zinc-300">
+                    <span className="text-tone-300">
                       {row.playerDrop !== 0
                         ? `${row.playerDrop > 0 ? "+" : ""}${(row.playerDrop / 1000).toFixed(3)}s`
                         : "–"}
@@ -114,7 +108,7 @@ export function StintComparisonTable({
                   </td>
                   <td
                     className={tableCellClass({
-                      className: "text-2xs text-zinc-500",
+                      className: "text-2xs text-tone-500",
                     })}
                   >
                     {row.bestDriverName

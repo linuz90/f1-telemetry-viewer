@@ -1,11 +1,11 @@
 # F1 Telemetry Viewer
 
-A local-first dashboard for telemetry exported by [Pits n' Giggles](https://github.com/ashwin-nat/pits-n-giggles). It turns the JSON files saved after each F1 game session into a fast, private web app for race results, rival comparisons, qualifying pace, tyre strategy, and track progress.
+A local-first viewer for telemetry exported by [Pits n' Giggles](https://github.com/ashwin-nat/pits-n-giggles). It turns the JSON files saved after each F1 game session into a fast, private web app for race debriefs, qualifying pace, lap comparisons, tyre strategy, and track progress.
 
 Supports recent F1 (and F2) telemetry, including the newly released **2026 Season Pack**.
 
 <p align="center">
-  <img src="assets/demo.gif" alt="F1 Telemetry Viewer dashboard showing race results, recent sessions, insights, rivals, and track progress" width="900">
+  <img src="assets/demo.gif" alt="F1 Telemetry Viewer" width="900">
 </p>
 
 > [!NOTE]
@@ -13,15 +13,15 @@ Supports recent F1 (and F2) telemetry, including the newly released **2026 Seaso
 
 ## What It Does
 
-- 🏁 **Results dashboard** - See your real race form at a glance: average finish, podiums, wins, front-row starts, top-five rate, DNFs, grid gain, recent results, best and toughest tracks, comeback drives, lap-one gains, fastest-lap highlights, and tyre-management patterns.
+- 🏠 **Sessions home** - Your latest race and online form on top, then every session grouped by day, track and online event, with filters kept in the URL and ⌘K search across tracks, sessions and drivers.
 - 🧭 **Formula scopes** - Keep F1 26, F1 25, F2 25, and older data separate with one app-wide selector and clean scoped URLs such as `/f1-26`, `/f1-26/tracks/sakhir`, and `/f1-26/sessions/session-slug`.
-- 🤝 **Rivals & teammates** - Aggregate online race rosters into teammate pace, frequent rivals, head-to-heads, fastest-lap threats, pole sitters, overtakers, and other repeat patterns.
-- 📊 **Session detail** - Open any race or qualifying session for lap-by-lap charts, sector tables, stint timelines, tyre wear, damage, ERS, fuel, position history, canonical peak/trap speeds, and a cautious rival aero tendency backed by comparable-lap evidence.
+- 📊 **Session pages** - Each race, long run, qualifying session or time trial opens on a one-line headline of what happened and a ranked "Worth a look" list, then tabs for lap-by-lap charts, tyres, lap telemetry, results and the car setup. Rival history shows in the Results driver panel.
+- 📉 **Online form** - Grid against finish, race by race, with podiums, front-row starts and DNFs.
 - 📈 **Lap telemetry** - With Pits n' Giggles 5.0 lap recordings, compare two complete laps (yours, a rival's, a friend's `.pngt` dropped onto the page, or the fastest recorded at the track) on speed, throttle, brake, gear and battery traces, with a track map, lap playback, and tips on where the time went.
-- 🗺️ **Track progress** - Drill into a circuit within the active game scope to review best laps, qualifying progression, race pace, setup history, tyre life, fuel usage, and every saved session for that track.
+- 🗺️ **Track pages** - A circuit map with the timing line, sectors and turn numbers, then your PBs, qualifying progress, a race plan with tyre life and fuel, your setups, and every saved session at that track.
 - 🔒 **Private data loading** - Use the local API during development, self-host against your telemetry folder, or drag in `.json` files (with their `.pngt` lap recordings) / a `.zip` in the browser. Hosted uploads stay in memory and imported lap files in browser storage; neither leaves your device.
 
-The dashboard prefers representative online races when there is enough human-grid data. If that is not available for a formula scope, it gracefully falls back to whatever race results or session history exists, so you only see an empty state when there is truly no data to show.
+Online form prefers representative online races when there is enough human-grid data. If that is not available for a formula scope, it gracefully falls back to whatever race results or session history exists, so you only see an empty state when there is truly no data to show.
 
 ## Loading Your Data
 
@@ -89,6 +89,8 @@ pnpm test:race-pace              # Run Race Pace estimator/matching regressions
 pnpm test:energy-stats           # Run ERS/fuel energy-stat regressions
 pnpm test:fuel                   # Run the focused fuel-aggregation suite
 pnpm test:speed                  # Run canonical speed/aero inference regressions
+pnpm test:session-story          # Run session kind, session log, race story and online form regressions
+pnpm test:search                 # Run ⌘K palette matching (aliases, typos, accents)
 pnpm test:strategy               # Run Track Strategy synthesis regressions (dry + wet)
 pnpm test:tyre-wear              # Run green-flag tyre wear rate regressions
 pnpm test:lap-recording          # Run .pngt reader, completeness and API regressions
@@ -175,6 +177,21 @@ The cache can contain summary metadata such as driver and rival names, so its di
 
 Works on macOS, Linux, and Windows.
 
+### Embedding
+
+Pits n' Giggles bundles the viewer under `/save-viewer/` and serves its own session API. A host sets these at build time:
+
+| Variable                      | Pits n' Giggles   | Effect                                                                        |
+| ----------------------------- | ----------------- | ----------------------------------------------------------------------------- |
+| `VITE_BASE_PATH`              | `/save-viewer/`   | Base path for assets, API calls and routes                                    |
+| `VITE_APP_NAME`               | `Pits n' Giggles` | Product name in labels and the upload screen                                  |
+| `VITE_THEME`                  | `dark`            | Forces `dark` or `light` instead of the system setting (`?theme=` still wins) |
+| `VITE_EXTERNAL_LINK_TEMPLATE` | `/legacy/{slug}`  | Link from every session page to the host's view of the same save              |
+| `VITE_EXTERNAL_LINK_LABEL`    | `Legacy View`     | Label for that link                                                           |
+| `VITE_DISABLE_ANALYTICS`      | `true`            | Turns off Vercel Analytics                                                    |
+
+At serve time it can set `window.__PNG_VERSION__` (page title) and `window.__PNG_SAVE_VIEWER_CONFIG__ = { sessionPollIntervalMs }` (session-list refresh, `null` to disable). Its `index.html` rewrites rely on the favicon and touch-icon links staying as they are. A session list without `isAutoSave` is deduplicated in the browser.
+
 ## Stack
 
 React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts 3, React Router 7, JSZip, Motion, and lucide-react.
@@ -192,11 +209,11 @@ React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts 3, React Router 7, JSZip,
 
 ```txt
 src/
-  components/    Layout, charts, tables, upload UI, dashboard sections
-  analysis/      UI-ready telemetry models, insight curation, track/session/rival/setup analysis
+  components/    Shell, shared lap chart, session and track parts, tables, upload UI
+  analysis/      UI-ready telemetry models: race story, Worth a look, session log, track/setup analysis
   context/       TelemetryProvider and browser zip/json loader
   hooks/         Session list, session detail, and track history hooks
-  pages/         Dashboard, session detail, and track progress routes
+  pages/         Sessions home, session pages, tracks, track page, and form routes
   plugin/        Shared session and lap-recording indexes, Vite local telemetry API
   utils/         Formatting, formula scopes, storage, summaries, routes, low-level stats
   types/         TypeScript telemetry model
@@ -215,8 +232,8 @@ The `TelemetryProvider` uses one data-access path for every screen:
 2. Fall back to bundled demo data (`public/demo/`).
 3. Fall back to browser upload mode.
 
-That keeps dashboard cards, track pages, and session pages working the same way whether the app is reading your local folder, serving demo data, or parsing files dropped into the browser.
+That keeps the home page, track pages, and session pages working the same way whether the app is reading your local folder, serving demo data, or parsing files dropped into the browser.
 
-Formula/game scope is part of the route, not a query parameter. The root path redirects to the latest scope with data; all analysis screens live under `/:formulaKey` so dashboard cards, sidebar sessions, track history, PBs, tyre life, and setup comparisons always describe the same game generation.
+Formula/game scope is part of the route, not a query parameter. The root path redirects to the latest scope with data; all analysis screens live under `/:formulaKey` so the session log, track history, PBs, tyre life, and setups always describe the same game generation.
 
-Telemetry calculations are split into two layers. `src/utils/stats/` contains small reusable primitives such as lap filtering, ERS energy, tyre wear, and pace helpers. `src/analysis/` contains product-facing models and policies such as session insight cards, dashboard result aggregates, rival cards, track progress buckets, setup comparison, and chart-ready lap/sector/stint/damage/tyre models. UI components should render those models rather than reimplementing telemetry rules inline.
+Telemetry calculations are split into two layers. `src/utils/stats/` contains small reusable primitives such as lap filtering, ERS energy, tyre wear, and pace helpers. `src/analysis/` contains product-facing models and policies such as the race story and Worth a look ranking, online form, track progress buckets, track setups, and chart-ready lap/sector/stint/damage/tyre models. UI components should render those models rather than reimplementing telemetry rules inline.

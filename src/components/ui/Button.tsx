@@ -3,17 +3,17 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../utils/cn";
 
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tone-600 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         primary: "rounded-lg bg-red-600 text-white hover:bg-red-500",
         secondary:
-          "rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 hover:text-zinc-100",
+          "rounded-lg bg-tone-800 text-tone-200 hover:bg-tone-700 hover:text-tone-100",
         subtle:
-          "rounded-lg bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
+          "rounded-lg bg-tone-900 text-tone-400 hover:bg-tone-800 hover:text-tone-200",
         ghost:
-          "rounded-md text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-200",
+          "rounded-md text-tone-500 hover:bg-tone-900/60 hover:text-tone-200",
         danger: "rounded-lg bg-red-700/95 text-white hover:bg-red-600",
       },
       size: {

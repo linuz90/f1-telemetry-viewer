@@ -73,48 +73,48 @@ export function CompoundStatCard({
           className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
           style={{ backgroundColor: color }}
         />
-        <span className="text-xs font-medium text-zinc-300 truncate">
+        <span className="text-xs font-medium text-tone-300 truncate">
           {compound}
         </span>
         {subtitle && (
-          <span className="ml-auto font-mono text-2xs tabular-nums text-zinc-500">
+          <span className="ml-auto font-mono text-2xs tabular-nums text-tone-500">
             {subtitle}
           </span>
         )}
       </HStack>
       {hero && !hasComparison && (
         <div className="text-center py-2 mb-1.5">
-          <div className="font-mono text-2xl font-medium text-zinc-100">
+          <div className="font-mono text-2xl font-medium text-tone-100">
             {hero.value}
           </div>
-          <div className="mt-0.5 font-mono text-xs tabular-nums text-zinc-500">
+          <div className="mt-0.5 font-mono text-xs tabular-nums text-tone-500">
             {hero.label}
           </div>
         </div>
       )}
       {hero && hasComparison && (
         <div className="py-2 mb-1.5">
-          <div className="mb-1 text-center font-mono text-xs tabular-nums text-zinc-500">
+          <div className="mb-1 text-center font-mono text-xs tabular-nums text-tone-500">
             {hero.label}
           </div>
           <div className="grid grid-cols-2 gap-3 text-center">
             <div className="min-w-0">
-              <div className="truncate font-mono text-xl font-medium text-zinc-100">
+              <div className="truncate font-mono text-xl font-medium text-tone-100">
                 {hero.value}
               </div>
               <div
-                className="mt-0.5 truncate text-2xs text-zinc-500"
+                className="mt-0.5 truncate text-2xs text-tone-500"
                 title={valueLabel}
               >
                 {valueLabel}
               </div>
             </div>
             <div className="min-w-0">
-              <div className="truncate font-mono text-xl font-medium text-zinc-400">
+              <div className="truncate font-mono text-xl font-medium text-tone-400">
                 {hero.comparisonValue ?? "–"}
               </div>
               <div
-                className="mt-0.5 truncate text-2xs text-zinc-500"
+                className="mt-0.5 truncate text-2xs text-tone-500"
                 title={comparisonLabel}
               >
                 {comparisonLabel}
@@ -124,9 +124,9 @@ export function CompoundStatCard({
         </div>
       )}
       {belowHero && <div className="mb-2">{belowHero}</div>}
-      <div className="text-xs text-zinc-400 space-y-1.5">
+      <div className="text-xs text-tone-400 space-y-1.5">
         {hasComparison && (
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.75rem,5.75rem)_minmax(4.75rem,5.75rem)] items-baseline gap-2 text-2xs text-zinc-600">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(4.75rem,5.75rem)_minmax(4.75rem,5.75rem)] items-baseline gap-2 text-2xs text-tone-600">
             <span />
             <span className="truncate text-right" title={valueLabel}>
               {valueLabel}
@@ -144,20 +144,20 @@ export function CompoundStatCard({
                 <span className="min-w-0 truncate">
                   {row.label}
                   {row.note && (
-                    <span className="text-zinc-600"> · {row.note}</span>
+                    <span className="text-tone-600"> · {row.note}</span>
                   )}
                 </span>
                 <span
                   className={cn(
                     "truncate text-right tabular-nums",
-                    row.className ?? "font-mono text-zinc-300",
+                    row.className ?? "font-mono text-tone-300",
                   )}
                 >
                   {row.value}
                 </span>
                 <span
                   className={cn(
-                    "truncate text-right font-mono tabular-nums text-zinc-500",
+                    "truncate text-right font-mono tabular-nums text-tone-500",
                     row.comparisonClassName,
                   )}
                 >
@@ -173,7 +173,7 @@ export function CompoundStatCard({
                       {row.note && (
                         <>
                           {" "}
-                          <span className="whitespace-nowrap text-zinc-600">
+                          <span className="whitespace-nowrap text-tone-600">
                             · {row.note}
                           </span>
                         </>
@@ -186,7 +186,7 @@ export function CompoundStatCard({
                     {row.note && (
                       <>
                         {" "}
-                        <span className="whitespace-nowrap text-zinc-600">
+                        <span className="whitespace-nowrap text-tone-600">
                           · {row.note}
                         </span>
                       </>
@@ -196,7 +196,7 @@ export function CompoundStatCard({
                 <span
                   className={cn(
                     "whitespace-nowrap",
-                    row.className ?? "text-zinc-300 font-mono",
+                    row.className ?? "text-tone-300 font-mono",
                   )}
                 >
                   {row.value}

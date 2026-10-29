@@ -2,14 +2,15 @@
 export const COMPOUND_COLORS: Record<string, string> = {
   Soft: "#ef4444",
   Medium: "#eab308",
-  Hard: "#e5e7eb",
+  // Hard reads near-white on dark cards and grey on light ones (index.css).
+  Hard: "var(--color-compound-hard)",
   Intermediate: "#22c55e",
   Inters: "#22c55e",
   Wet: "#3b82f6",
   Wets: "#3b82f6",
   // Fallback for actual compound names.
-  C1: "#e5e7eb",
-  C2: "#e5e7eb",
+  C1: "var(--color-compound-hard)",
+  C2: "var(--color-compound-hard)",
   C3: "#eab308",
   C4: "#ef4444",
   C5: "#ef4444",
@@ -64,16 +65,6 @@ export const WHEEL_COLORS = {
   RR: "#ef4444",
 } as const;
 
-/** Safety car / VSC reference-area shading. Amber for full SC, yellow for VSC. */
-export const SC_COLORS: Record<string, string> = {
-  SAFETY_CAR: "#f59e0b",
-  FULL_SAFETY_CAR: "#f59e0b",
-  VIRTUAL_SAFETY_CAR: "#eab308",
-};
-
-/** Fallback when a SC status doesn't resolve, keeping shading on screen. */
-export const SC_FALLBACK = "#f59e0b";
-
 /** Sector ranking colors. Purple is the app-wide "session best" accent. */
 export const PERF_COLORS = {
   best: "#7c3aed",
@@ -83,13 +74,6 @@ export const PERF_COLORS = {
 } as const;
 
 export type PerformanceTone = keyof typeof PERF_COLORS;
-
-/** Per-sector colors used in sector-improvement charts and best-sector cards. */
-export const SECTOR_COLORS = {
-  S1: "#3b82f6",
-  S2: "#8b5cf6",
-  S3: "#ec4899",
-} as const;
 
 /** Per-component damage colors used in the damage timeline chart. */
 export const DAMAGE_COLORS = {
@@ -102,48 +86,27 @@ export const DAMAGE_COLORS = {
   gearbox: "#10b981",
 } as const;
 
-/** Shared chart theme colors (zinc palette + semantic series tokens). */
+/** Shared chart theme colors. Neutrals and the you/compare series are CSS
+ *  variables (index.css) so charts follow the light/dark theme; Recharts and
+ *  SVG attributes accept `var()` directly. */
 export const CHART_THEME = {
-  grid: "#27272a",
-  axis: "#71717a",
-  tooltipBg: "#18181b",
-  tooltipBorder: "#27272a",
-  tooltipLabel: "#a1a1aa",
-  muted: "#52525b",
+  grid: "var(--color-tone-800)",
+  axis: "var(--color-tone-500)",
+  tooltipBg: "var(--color-tone-900)",
+  tooltipBorder: "var(--color-tone-800)",
+  tooltipLabel: "var(--color-tone-400)",
+  muted: "var(--color-tone-600)",
   best: "#a855f7",
-  player: "#22d3ee",
+  player: "var(--color-chart-you)",
   ahead: "#22c55e",
   behind: "#ef4444",
-  rival: "#f97316",
+  rival: "var(--color-chart-compare)",
   harvest: "#38bdf8",
   valid: "#10b981",
 } as const;
 
-/**
- * Categorical palette for location-breakdown pie charts (overtake / collision
- * locations). Eight fixed hues assigned in order (never cycled by rank across
- * repaints), ordered so adjacent slices stay distinct. Drawn from the same
- * Tailwind-500 family the rest of the app's charts use (see SECTOR_COLORS,
- * DAMAGE_COLORS, CHART_THEME) so it reads as one system; slices carry a direct
- * label via the legend rather than relying on color alone. "Other" / "Unknown"
- * buckets use `LOCATION_OTHER_COLOR` so an aggregate slice never reads as a hue.
- */
-export const LOCATION_BREAKDOWN_COLORS = [
-  "#3b82f6", // blue-500
-  "#f97316", // orange-500
-  "#22c55e", // green-500
-  "#a855f7", // purple-500
-  "#22d3ee", // cyan-400
-  "#ec4899", // pink-500
-  "#eab308", // yellow-500
-  "#ef4444", // red-500
-] as const;
-
 /** Lap Telemetry slots A and B reuse the app's player/rival tokens. */
 export const LAP_SLOT_COLORS = [CHART_THEME.player, CHART_THEME.rival] as const;
-
-/** Muted grey for the aggregate "Other" / "Unknown" slices. */
-export const LOCATION_OTHER_COLOR = CHART_THEME.muted;
 
 /** Reusable Recharts tooltip content style. */
 export const TOOLTIP_STYLE = {

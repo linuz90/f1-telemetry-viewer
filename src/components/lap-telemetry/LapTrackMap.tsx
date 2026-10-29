@@ -118,7 +118,7 @@ function Cursor({
       cy={point.y}
       r={9}
       fill={color}
-      stroke="#09090b"
+      stroke="var(--color-tone-950)"
       strokeWidth={3}
     />
   );
@@ -194,7 +194,7 @@ export function LapTrackMap({
         <polygon
           points={polylinePoints(outline)}
           fill="none"
-          stroke="#3f3f46"
+          stroke="var(--color-tone-700)"
           strokeWidth={11}
           strokeLinejoin="round"
         />
@@ -203,7 +203,7 @@ export function LapTrackMap({
           y1={start.y - normal.y}
           x2={start.x + normal.x}
           y2={start.y + normal.y}
-          stroke="#e4e4e7"
+          stroke="var(--color-tone-200)"
           strokeWidth={6}
           strokeLinecap="round"
         />
@@ -274,7 +274,7 @@ export function LapTrackMap({
                 cx={mid.x}
                 cy={mid.y}
                 r={radius}
-                fill={active ? color : "#09090b"}
+                fill={active ? color : "var(--color-tone-950)"}
                 stroke={color}
                 strokeWidth={3}
               />
@@ -284,7 +284,7 @@ export function LapTrackMap({
                 textAnchor="middle"
                 className="font-mono font-bold"
                 fontSize={radius * 1.05}
-                fill={active ? "#09090b" : color}
+                fill={active ? "var(--color-tone-950)" : color}
               >
                 {index + 1}
               </text>
@@ -299,7 +299,7 @@ export function LapTrackMap({
         />
       </svg>
       {!surveyed && (
-        <figcaption className="mt-1 text-center text-2xs text-zinc-600">
+        <figcaption className="mt-1 text-center text-2xs text-tone-600">
           Positions follow the circuit drawing, not GPS
         </figcaption>
       )}

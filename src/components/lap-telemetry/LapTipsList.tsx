@@ -46,7 +46,7 @@ function signed(value: number, unit = ""): string {
 }
 
 function timeClass(value: number): string {
-  return value > 0 ? "text-behind" : value < 0 ? "text-ahead" : "text-zinc-400";
+  return value > 0 ? "text-behind" : value < 0 ? "text-ahead" : "text-tone-400";
 }
 
 /** Whether a tip lost or gained time; the map colours stretches by it. */
@@ -156,7 +156,7 @@ export function LapTipsList({
         >
           {signed(totalS, " s")}
         </span>
-        <span className="text-sm text-zinc-400">
+        <span className="text-sm text-tone-400">
           {totalS > 0 ? "behind" : totalS < 0 ? "ahead of" : "level with"}{" "}
           {comparisonName} at the line
         </span>
@@ -165,7 +165,7 @@ export function LapTipsList({
         // Only the mismatches compete for attention; what matches stays in
         // the tooltip unless nothing differs.
         <p
-          className="mt-1 flex items-start gap-1.5 text-xs text-zinc-500"
+          className="mt-1 flex items-start gap-1.5 text-xs text-tone-500"
           title={
             differs.length > 0 && same.length > 0
               ? same.map((item) => item.label).join(" · ")
@@ -175,7 +175,7 @@ export function LapTipsList({
           {differs.length > 0 ? (
             <CircleAlert className="mt-0.5 size-3 shrink-0 text-amber-300" />
           ) : (
-            <CircleCheck className="mt-0.5 size-3 shrink-0 text-zinc-600" />
+            <CircleCheck className="mt-0.5 size-3 shrink-0 text-tone-600" />
           )}
           {(differs.length > 0 ? differs : same)
             .map((item) => item.label)
@@ -184,7 +184,7 @@ export function LapTipsList({
       )}
 
       {tips.length === 0 ? (
-        <p className="mt-4 text-sm text-zinc-400">
+        <p className="mt-4 text-sm text-tone-400">
           No stretch differs by {"≥"}
           {TIP_FLOOR_S} s, the smallest gap the recording measures reliably.
         </p>
@@ -194,7 +194,7 @@ export function LapTipsList({
             open={expanded}
             onOpenChange={onExpandedChange}
             controls={listId}
-            className="bg-zinc-800/60 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+            className="bg-tone-800/60 px-2.5 py-1 text-xs font-medium text-tone-300 hover:bg-tone-800 hover:text-tone-100"
           >
             {expanded ? "Hide tips" : `Show ${pluralize(tips.length, "tip")}`}
           </DisclosureToggle>
@@ -202,7 +202,7 @@ export function LapTipsList({
             <span className="flex flex-wrap gap-x-3 font-mono text-xs tabular-nums">
               {sectorDeltasS.map((delta, index) => (
                 <span key={index}>
-                  <span className="text-zinc-600">S{index + 1}</span>{" "}
+                  <span className="text-tone-600">S{index + 1}</span>{" "}
                   <span className={timeClass(delta)}>{signed(delta)}</span>
                 </span>
               ))}
@@ -232,7 +232,7 @@ export function LapTipsList({
       )}
 
       {tips.length > 0 && expanded && remainderCount > 0 && (
-        <p className="mt-2 flex justify-between border-t border-zinc-800/80 px-2.5 pt-2 font-mono text-xs tabular-nums text-zinc-600">
+        <p className="mt-2 flex justify-between border-t border-tone-800/80 px-2.5 pt-2 font-mono text-xs tabular-nums text-tone-600">
           <span>
             {remainderCount} smaller stretch{remainderCount === 1 ? "" : "es"}
           </span>
@@ -293,7 +293,7 @@ function TipGroups({
                 groupIndex > 0 && "pt-3",
               )}
             >
-              <Eyebrow className="text-zinc-600">Sector {group.sector}</Eyebrow>
+              <Eyebrow className="text-tone-600">Sector {group.sector}</Eyebrow>
               <span
                 className={cn(
                   "font-mono text-2xs tabular-nums",
@@ -365,41 +365,41 @@ function TipRow({
         className={cn(
           "grid w-full grid-cols-[1.25rem_minmax(0,1fr)_4.5rem] items-start gap-x-3 rounded-xl px-2.5 py-2 text-left transition-colors",
           selected
-            ? "bg-zinc-800/70 ring-1 ring-inset ring-white/[0.06]"
+            ? "bg-tone-800/70 ring-1 ring-inset ring-tone-0/[0.06]"
             : hovered
-              ? "bg-zinc-800/40"
-              : "hover:bg-zinc-800/40",
+              ? "bg-tone-800/40"
+              : "hover:bg-tone-800/40",
         )}
       >
-        <span className="flex size-5 items-center justify-center rounded-full font-mono text-2xs font-semibold text-zinc-400 ring-1 ring-inset ring-zinc-700">
+        <span className="flex size-5 items-center justify-center rounded-full font-mono text-2xs font-semibold text-tone-400 ring-1 ring-inset ring-tone-700">
           {number}
         </span>
         <span className="min-w-0">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="inline-flex items-center gap-1.5">
               <Icon
-                className="size-3.5 shrink-0 text-zinc-500"
+                className="size-3.5 shrink-0 text-tone-500"
                 aria-label={tip.category}
               >
                 <title>{tip.category}</title>
               </Icon>
-              <span className="text-sm font-medium text-zinc-100">
+              <span className="text-sm font-medium text-tone-100">
                 {tip.title}
               </span>
             </span>
             {notDriving && (
-              <span className="rounded-md px-1.5 text-2xs text-zinc-500 ring-1 ring-inset ring-zinc-800">
+              <span className="rounded-md px-1.5 text-2xs text-tone-500 ring-1 ring-inset ring-tone-800">
                 not driving
               </span>
             )}
           </span>
-          <span className="mt-0.5 block text-xs text-zinc-500">
+          <span className="mt-0.5 block text-xs text-tone-500">
             {tip.summary}
           </span>
           {selected && (
-            <span className="mt-2 block text-sm/relaxed text-zinc-300">
+            <span className="mt-2 block text-sm/relaxed text-tone-300">
               {tip.advice && (
-                <span className="font-medium text-zinc-100">
+                <span className="font-medium text-tone-100">
                   {tip.advice}.{" "}
                 </span>
               )}
@@ -417,7 +417,7 @@ function TipRow({
             {signed(tip.timeS)}
           </span>
           <span
-            className="flex h-1 w-full justify-end rounded-full bg-zinc-800/80"
+            className="flex h-1 w-full justify-end rounded-full bg-tone-800/80"
             aria-hidden
           >
             <span

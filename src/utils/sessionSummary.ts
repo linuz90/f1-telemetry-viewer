@@ -19,7 +19,13 @@ import {
   resolveSessionMeta,
   toSlug,
 } from "./parseFilename";
-import { classificationBestLapTimeMs } from "./stats/drivers";
+import {
+  classificationBestLapTimeMs,
+  driverBestLapTimeMs,
+  driverNameKey,
+  findStintResult,
+} from "./stats/drivers";
+import { msToLapTime } from "./format";
 import {
   getValidLaps,
   hasCompleteLapTiming,
@@ -43,7 +49,13 @@ export interface BuiltSessionSummary {
  * Bump this for `SessionSummary`, filename normalization, or any transitive
  * summary-producing policy change; final sorting and dedupe are recomputed.
  */
-export const SESSION_SUMMARY_CACHE_VERSION = 7;
+// 7: stints carry green-flag wear (SC/VSC laps left out).
+// 9: lap-time labels come from milliseconds ("1:27.320"), not the exporter's
+// zero-padded strings; race results fall back to the history best lap, which
+// long runs saved before the flag need; split stints on one tyre set merge
+// (`getDriverStints()`); rival keys use `driverNameKey()`, so names with
+// non-breaking spaces match. (8 was this work before it met 7.)
+export const SESSION_SUMMARY_CACHE_VERSION = 9;
 
 function getDrivers(session: TelemetrySession | undefined): DriverData[] {
   return session?.["classification-data"] ?? [];
@@ -171,10 +183,6 @@ interface RaceTelemetryExtras {
   rivals?: RivalEntry[];
 }
 
-function normalizeDriverKey(name: string | undefined): string {
-  return (name ?? "").trim().toLowerCase();
-}
-
 function computeLapStats(driver: DriverData): {
   bestLapMs?: number;
   validLapCount: number;
@@ -271,11 +279,11 @@ function buildRivalsRoster(
   const positionByName = new Map<string, Map<number, number>>();
   for (const entry of positionHistory) {
     positionByName.set(
-      normalizeDriverKey(entry.name),
+      driverNameKey(entry.name),
       buildPositionMap(entry["driver-position-history"]),
     );
   }
-  const playerPositionMap = positionByName.get(normalizeDriverKey(playerName));
+  const playerPositionMap = positionByName.get(driverNameKey(playerName));
 
   const overtakes = session.overtakes?.records ?? [];
   const overtakesByDriver = new Map<string, number>();
@@ -285,14 +293,14 @@ function buildRivalsRoster(
     const overtaker = record["overtaking-driver-name"];
     const overtaken = record["overtaken-driver-name"];
     if (overtaker) {
-      const k = normalizeDriverKey(overtaker);
+      const k = driverNameKey(overtaker);
       overtakesByDriver.set(k, (overtakesByDriver.get(k) ?? 0) + 1);
       if (overtaken === playerName) {
         overtakesOnPlayer.set(k, (overtakesOnPlayer.get(k) ?? 0) + 1);
       }
     }
     if (overtaker === playerName && overtaken) {
-      const k = normalizeDriverKey(overtaken);
+      const k = driverNameKey(overtaken);
       overtakesByPlayer.set(k, (overtakesByPlayer.get(k) ?? 0) + 1);
     }
   }
@@ -310,14 +318,14 @@ function buildRivalsRoster(
       ? drivers.find((d) => d.index === fastestDriverIndex)?.["driver-name"]
       : fastestRecord?.["driver-name"];
   const fastestKey = fastestDriverName
-    ? normalizeDriverKey(fastestDriverName)
+    ? driverNameKey(fastestDriverName)
     : undefined;
 
   const roster: RivalEntry[] = [];
   for (const driver of others) {
     const name = driver["driver-name"];
     if (!name) continue;
-    const key = normalizeDriverKey(name);
+    const key = driverNameKey(name);
     const lapStats = computeLapStats(driver);
     // A slot is an AI fill (game-roster surname like VERSTAPPEN/ANTONELLI)
     // when it carries none of the online-identity markers. We deliberately
@@ -487,8 +495,8 @@ function buildQualifyingExtras(
     typeof fastestRecord?.time === "number" && fastestRecord.time > 0
       ? fastestRecord.time
       : undefined;
-  if (recordedMs && fastestRecord?.["time-str"]) {
-    extras.poleLapTime = fastestRecord["time-str"];
+  if (recordedMs) {
+    extras.poleLapTime = msToLapTime(recordedMs);
     extras.poleLapTimeMs = recordedMs;
   } else {
     // Fallback when records.fastest.lap is missing — pick the leader's best lap.
@@ -498,9 +506,8 @@ function buildQualifyingExtras(
     const poleMs = classificationBestLapTimeMs(
       poleDriver?.["final-classification"],
     );
-    const poleStr = poleDriver?.["final-classification"]?.["best-lap-time-str"];
-    if (poleMs && poleStr) {
-      extras.poleLapTime = poleStr;
+    if (poleMs) {
+      extras.poleLapTime = msToLapTime(poleMs);
       extras.poleLapTimeMs = poleMs;
     }
   }
@@ -521,10 +528,7 @@ function buildPlayerRaceResult(
   }
 
   const classification = player["final-classification"];
-  const stintResult = session["tyre-stint-history-v2"]?.find(
-    (entry) =>
-      entry.index === player.index || entry.name === player["driver-name"],
-  );
+  const stintResult = findStintResult(session, player);
   const position = classification?.position ?? stintResult?.position;
   if (!position) return undefined;
 
@@ -535,6 +539,9 @@ function buildPlayerRaceResult(
     getTimedLapCount(player);
   const lapRatio =
     totalLaps && totalLaps > 0 ? playerLaps / totalLaps : undefined;
+  // Saves made before the flag (offline long runs) have no classified best
+  // lap; the player's complete history still has the run's real best.
+  const bestLapMs = driverBestLapTimeMs(player);
 
   return {
     position,
@@ -551,8 +558,8 @@ function buildPlayerRaceResult(
     totalLaps,
     lapRatio,
     fieldSize,
-    bestLapTime: classification?.["best-lap-time-str"],
-    bestLapTimeMs: classificationBestLapTimeMs(classification) || undefined,
+    bestLapTime: bestLapMs ? msToLapTime(bestLapMs) : undefined,
+    bestLapTimeMs: bestLapMs || undefined,
   };
 }
 
@@ -644,8 +651,8 @@ export function buildSessionSummary(
 
       if (bestLapNum > 0) {
         const bestLap = laps[bestLapNum - 1];
-        if (bestLap?.["lap-time-str"]) {
-          bestLapTime = bestLap["lap-time-str"];
+        if (bestLap?.["lap-time-in-ms"]) {
+          bestLapTime = msToLapTime(bestLap["lap-time-in-ms"]);
           bestLapTimeMs = bestLap["lap-time-in-ms"];
         }
       }
@@ -657,7 +664,7 @@ export function buildSessionSummary(
         const classifiedBestMs = classificationBestLapTimeMs(classification);
         if (classifiedBestMs > 0) {
           bestLapTimeMs = classifiedBestMs;
-          bestLapTime = classification?.["best-lap-time-str"] || undefined;
+          bestLapTime = msToLapTime(classifiedBestMs);
         }
       }
     }

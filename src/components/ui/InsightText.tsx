@@ -20,7 +20,7 @@ const DETAIL_SIZE: Record<InsightDetailSize, string> = {
 export function InsightValue({
   children,
   size = "lg",
-  tone = "text-zinc-100",
+  tone = "text-tone-100",
   className,
 }: {
   children: ReactNode;
@@ -31,7 +31,7 @@ export function InsightValue({
   return (
     <div
       className={cn(
-        "break-words font-mono tabular-nums",
+        "break-words tracking-tight",
         VALUE_SIZE[size],
         tone,
         className,
@@ -45,7 +45,7 @@ export function InsightValue({
 export function InsightDetail({
   children,
   size = "md",
-  tone = "text-zinc-400",
+  tone = "text-tone-400",
   className,
 }: {
   children: ReactNode;
@@ -54,14 +54,7 @@ export function InsightDetail({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "break-words font-mono tabular-nums",
-        DETAIL_SIZE[size],
-        tone,
-        className,
-      )}
-    >
+    <div className={cn("break-words", DETAIL_SIZE[size], tone, className)}>
       {children}
     </div>
   );

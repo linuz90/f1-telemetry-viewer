@@ -74,7 +74,7 @@ export function PillSelect({
       className={cn(
         FORM_CONTROL_CONTAINER_STYLES,
         "items-center",
-        "text-zinc-200",
+        "text-tone-200",
         FORM_CONTROL_WIDTH_STYLES[width],
         className,
       )}
@@ -83,14 +83,14 @@ export function PillSelect({
         <LeadingIcon
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute size-3 text-zinc-500",
+            "pointer-events-none absolute size-3 text-tone-500",
             styles.indicator,
           )}
         />
       ) : (
         <span
           className={cn(
-            "pointer-events-none absolute rounded-full bg-zinc-500/60",
+            "pointer-events-none absolute rounded-full bg-tone-500/60",
             styles.indicator,
             styles.dot,
           )}
@@ -119,7 +119,7 @@ export function PillSelect({
       </select>
       <ChevronDown
         className={cn(
-          "pointer-events-none absolute text-zinc-500",
+          "pointer-events-none absolute text-tone-500",
           styles.icon,
         )}
       />

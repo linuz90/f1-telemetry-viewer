@@ -3,8 +3,6 @@ import type {
   SessionSummary,
   TelemetrySession,
 } from "../types/telemetry";
-import type { RaceSetupCandidate, RaceSetupRunInput } from "./setupComparison";
-import { buildRaceSetupComparison } from "./setupComparison";
 import type { TrackSessionTab } from "../constants/routes";
 import {
   findPlayer,
@@ -83,7 +81,6 @@ export interface RaceAnalysisBucket {
   raceData: TrackSessionData[];
   sessions: TelemetrySession[];
   compoundLifeStats: CompoundLifeStats[];
-  setupCandidates: RaceSetupCandidate[];
   tyreEvidenceCount: number;
   setupSampleCount: number;
   fuelStats: TrackFuelStats | null;
@@ -296,21 +293,6 @@ function getRaceTotalLaps(session: TelemetrySession): number | null {
   return Math.round(totalLaps);
 }
 
-function toRaceSetupRuns(
-  races: readonly TrackSessionData[],
-): RaceSetupRunInput[] {
-  return races.map((race) => ({
-    summary: race.summary,
-    session: race.session,
-  }));
-}
-
-export function buildRaceSetupCandidates(
-  races: readonly TrackSessionData[],
-): RaceSetupCandidate[] {
-  return buildRaceSetupComparison(toRaceSetupRuns(races));
-}
-
 export function buildRaceAnalysisBuckets(
   races: readonly TrackSessionData[],
 ): RaceAnalysisBucket[] {
@@ -334,16 +316,16 @@ export function buildRaceAnalysisBuckets(
     .map(([totalLaps, raceData]) => {
       const sessions = raceData.map((race) => race.session);
       const compoundLifeStats = aggregateCompoundLife(sessions);
-      const setupCandidates = buildRaceSetupCandidates(raceData);
       const fuelStats = aggregateFuelData(sessions);
       const tyreEvidenceCount = compoundLifeStats.reduce(
         (sum, compound) => sum + compound.stintCount,
         0,
       );
-      const setupSampleCount = setupCandidates.reduce(
-        (sum, setup) => sum + setup.sampleCount,
-        0,
-      );
+      // Races that carry your setup still make a length worth offering when
+      // its tyre and fuel evidence is thin.
+      const setupSampleCount = raceData.filter(
+        (race) => findPlayer(race.session)?.["car-setup"]?.["is-valid"],
+      ).length;
 
       return {
         totalLaps,
@@ -352,7 +334,6 @@ export function buildRaceAnalysisBuckets(
         raceData,
         sessions,
         compoundLifeStats,
-        setupCandidates,
         tyreEvidenceCount,
         setupSampleCount,
         fuelStats,

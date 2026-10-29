@@ -9,7 +9,9 @@ import {
 } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { Layout } from "./components/Layout";
-import { DashboardPage } from "./pages/DashboardPage";
+import { SessionsPage } from "./pages/SessionsPage";
+import { FormPage } from "./pages/FormPage";
+import { TracksPage } from "./pages/TracksPage";
 import { SessionPage } from "./pages/SessionPage";
 import { TrackProgressPage } from "./pages/TrackProgressPage";
 import { TelemetryProvider, useTelemetry } from "./context/TelemetryContext";
@@ -36,8 +38,8 @@ function AppRoutes() {
 
   if (!isUiDebugRoute && (mode === "detecting" || sessionsLoading)) {
     return (
-      <div className="flex h-screen items-center justify-center bg-black">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-zinc-600 border-t-red-500" />
+      <div className="flex h-screen items-center justify-center bg-tone-1000">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-tone-600 border-t-red-500" />
       </div>
     );
   }
@@ -64,7 +66,23 @@ function AppRoutes() {
             path=":formulaKey"
             element={
               <ScopedFormulaRoute>
-                <DashboardPage />
+                <SessionsPage />
+              </ScopedFormulaRoute>
+            }
+          />
+          <Route
+            path=":formulaKey/form"
+            element={
+              <ScopedFormulaRoute>
+                <FormPage />
+              </ScopedFormulaRoute>
+            }
+          />
+          <Route
+            path=":formulaKey/tracks"
+            element={
+              <ScopedFormulaRoute>
+                <TracksPage />
               </ScopedFormulaRoute>
             }
           />
@@ -100,8 +118,8 @@ function UiDebugLoading() {
   return (
     <div className="flex min-h-screen items-center justify-center px-6 text-center">
       <div>
-        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-cyan-400" />
-        <p className="mt-3 font-mono text-xs uppercase tracking-[0.18em] text-zinc-500">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-tone-700 border-t-cyan-400" />
+        <p className="mt-3 font-mono text-xs uppercase tracking-[0.18em] text-tone-500">
           loading ui debug
         </p>
       </div>
@@ -174,15 +192,15 @@ function EmptyRouteState({
   return (
     <div className="flex h-full items-center justify-center px-6 text-center">
       <div className="max-w-sm">
-        <h2 className="text-base font-semibold text-zinc-200">{title}</h2>
-        <p className="mt-2 text-sm text-zinc-500">{description}</p>
+        <h2 className="text-base font-semibold text-tone-200">{title}</h2>
+        <p className="mt-2 text-sm text-tone-500">{description}</p>
         {formulaOptions.length > 0 && (
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             {formulaOptions.map((option) => (
               <Link
                 key={option.key}
                 to={dashboardPath(option.key)}
-                className="inline-flex rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
+                className="inline-flex rounded-lg bg-tone-800 px-4 py-2 text-sm font-medium text-tone-200 transition-colors hover:bg-tone-700"
               >
                 {option.label}
               </Link>

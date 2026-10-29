@@ -32,14 +32,6 @@ export function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-/** Helper: format ms to lap time string */
-export function msToLapTimeLocal(ms: number): string {
-  if (ms <= 0) return "-";
-  const minutes = Math.floor(ms / 60000);
-  const seconds = ((ms % 60000) / 1000).toFixed(3);
-  return minutes > 0 ? minutes + ":" + seconds.padStart(6, "0") : seconds;
-}
-
 /** Format a lap delta as "+X.X" or "-X.X" */
 export function formatLapDelta(delta: number): string {
   return delta >= 0 ? "+" + delta.toFixed(1) : delta.toFixed(1);

@@ -14,7 +14,7 @@ export function FocusToggle({
   label?: string;
 }) {
   return (
-    <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs text-zinc-400 cursor-pointer select-none">
+    <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs text-tone-400 cursor-pointer select-none">
       {label}
       <button
         type="button"
@@ -23,7 +23,7 @@ export function FocusToggle({
         onClick={onChange}
         className={cn(
           "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
-          value ? "bg-cyan-600" : "bg-zinc-800",
+          value ? "bg-cyan-600" : "bg-tone-800",
         )}
       >
         <span

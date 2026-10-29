@@ -1,14 +1,4 @@
-import {
-  ArrowUpDown,
-  Circle,
-  Cloud,
-  Flag,
-  Fuel,
-  Gauge,
-  Search,
-  Timer,
-  Zap,
-} from "lucide-react";
+import { Flag, Gauge, Search, Timer } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Card } from "../components/Card";
 import { CompoundStatCard } from "../components/CompoundStatCard";
@@ -16,25 +6,16 @@ import { TyreLifeEvidenceBar } from "../components/track/TyreLifeEvidenceBar";
 import { LapComparisonView } from "../components/lap-telemetry/LapComparisonView";
 import type { SlotLap } from "../components/lap-telemetry/types";
 import { DamageTimeline } from "../components/DamageTimeline";
-import { LapTimeChart } from "../components/LapTimeChart";
-import { PerformanceDeltaChart } from "../components/PerformanceDeltaChart";
-import { PositionChart } from "../components/PositionChart";
+import { LapChart, LapChartLegend } from "../components/charts/LapChart";
+import { WorthList } from "../components/session/SessionParts";
 import { SectorComparison } from "../components/SectorComparison";
-import { SessionInsightsGrid } from "../components/SessionInsightsGrid";
-import { SpeedAeroComparison } from "../components/SpeedAeroComparison";
-import { StartReactionCard } from "../components/StartReactionCard";
-import { StintDetailCards, StintTimeline } from "../components/StintTimeline";
-import { TrackKeyInsights } from "../components/track/TrackKeyInsights";
 import { TrackStrategySection } from "../components/track/TrackStrategySection";
 import { TrackFlag } from "../components/TrackFlag";
-import { TyreWearChart } from "../components/TyreWearChart";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
-import { CompoundBadge } from "../components/ui/CompoundBadge";
 import { CompoundSwatchLabel } from "../components/ui/CompoundSwatchLabel";
 import { Input } from "../components/ui/Input";
 import { InsightDetail, InsightValue } from "../components/ui/InsightText";
-import { InsightTile } from "../components/ui/InsightTile";
 import { PillSelect } from "../components/ui/PillSelect";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
@@ -44,9 +25,7 @@ import type {
   CarDamage,
   CarStatus,
   LapHistoryEntry,
-  OvertakeRecord,
   PerLapInfo,
-  PositionHistoryEntry,
   TyreSetData,
   TyreStint,
   TyreStintBasic,
@@ -56,19 +35,9 @@ import { cn } from "../utils/cn";
 import { msToLapTime, msToSectorTime } from "../utils/format";
 import { PEAK_PACE_LABEL, PEAK_PACE_TOOLTIP } from "../utils/stats/peakPace";
 import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
-import type { TrackRivalBenchmark } from "../analysis/rivalStats";
-import type { SessionInsight } from "../analysis/sessionInsightSummary";
-import type { DriverSpeedComparison } from "../analysis/speedAnalysis";
-import {
-  buildStartReactionModelFromSeconds,
-  type StartReactionModel,
-} from "../analysis/startReactionAnalysis";
-import type {
-  TrackRaceRecommendation,
-  TrackStrategySuggestion,
-} from "../analysis/trackStrategyTypes";
-import type { CumulativeDelta } from "../utils/stats/laps";
+import type { TrackStrategySuggestion } from "../analysis/trackStrategyTypes";
 import { prepareLap } from "../analysis/lapTelemetryAnalysis";
+import type { WorthItem } from "../analysis/worthALook";
 import type { LapCandidate } from "../analysis/lapTelemetrySelection";
 import { LAP_SLOT_COLORS } from "../constants/colors";
 import {
@@ -77,152 +46,6 @@ import {
 } from "../utils/lapRecording/syntheticLap";
 
 const COMPOUNDS = ["Soft", "Medium", "Hard", "Inters", "Wet", "C1", "C3", "C5"];
-
-const sampleInsights: SessionInsight[] = [
-  {
-    type: "result",
-    label: "Result",
-    value: "P1",
-    detail: "Finished - 27/27 laps - 25 pts",
-    extraDetails: ["P19 to P1 · 39 overtakes, 20 lost"],
-    accent: "amber",
-    tone: "best",
-    rank: 0,
-    rankTotal: 22,
-  },
-  {
-    type: "lap",
-    label: "Best Lap",
-    value: "1:21.736",
-    detail: "session fastest lap",
-    extraDetails: ["New PB · -0.142s improvement"],
-    accent: "purple",
-    tone: "best",
-    compound: "Medium",
-  },
-  {
-    type: "pace",
-    label: "Race Pace",
-    value: "2nd",
-    detail: "of 22 — +0.084s vs P1 · 18 laps",
-    extraDetails: ["New best · -0.061s/lap improvement"],
-    accent: "emerald",
-    rank: 1,
-    rankTotal: 22,
-    tooltip:
-      "Average of all complete green-flag laps after excluding lap 1, pit laps, SC, and per-stint outliers. Rankings also require enough session-relative evidence.",
-  },
-  {
-    type: "tyre",
-    label: "Tyres & Fuel",
-    value: "20th",
-    detail: "of 22 — +3.3%/lap vs best",
-    extraDetails: ["Fuel +0.3 laps · game estimate at finish"],
-    tooltip:
-      "Fuel margin is the game's own estimate at the last recorded lap, not a viewer recommendation. 0.1 kg in tank · 33.1 kg at start. Median green burn 1.52 kg/lap · 20 green pairs.",
-    accent: "lime",
-    rank: 19,
-    rankTotal: 22,
-  },
-  {
-    type: "speed",
-    label: "Speed & ERS",
-    value: "350 km/h",
-    detail: "session peak · P15/22",
-    extraDetails: [
-      "Speed trap 342.5 km/h · P10/22",
-      "ERS deploy 6.8 MJ/lap · P4/22",
-    ],
-    accent: "sky",
-    rank: 14,
-    rankTotal: 22,
-    tooltip:
-      "Session peak is the highest credible speed observed in the session. It is normally backed by a completed lap; a Limited session-only fallback stays unranked. Speed trap is the fixed circuit measurement point. Average ERS energy deployed per lap. ERS harvest 96.2% of the MGU-K limit · 3rd highest of 22 drivers.",
-  },
-  {
-    type: "incident",
-    label: "Your Session Events",
-    groupLabel: "Your Session Events",
-    value: "3 issues",
-    detail: "+12s - Race Incidents: 4 collisions - 2 laps Neutralized Laps",
-    extraDetails: ["+12s", "4 collisions", "Virtual Safety Car"],
-    accent: "rose",
-    tone: "negative",
-  },
-];
-
-const speedComparisonFixture: DriverSpeedComparison = {
-  focused: {
-    driverIndex: 0,
-    lapPeaks: [],
-    sessionPeak: {
-      kmh: 343,
-      lap: 8,
-      source: "combined",
-      quality: "good",
-      rank: 2,
-      fieldSize: 15,
-    },
-    representativeHighSpeed: {
-      kmh: 335,
-      percentile: 80,
-      eligibleLapCount: 21,
-      quality: "good",
-    },
-    speedTrap: {
-      kmh: 322.6,
-      lap: 22,
-      rank: 9,
-      fieldSize: 15,
-      quality: "good",
-    },
-  },
-  rival: {
-    driverIndex: 1,
-    lapPeaks: [],
-    sessionPeak: {
-      kmh: 340,
-      lap: 17,
-      source: "combined",
-      quality: "good",
-      rank: 4,
-      fieldSize: 15,
-    },
-    representativeHighSpeed: {
-      kmh: 330,
-      percentile: 80,
-      eligibleLapCount: 14,
-      quality: "good",
-    },
-    speedTrap: {
-      kmh: 337.8,
-      lap: 17,
-      rank: 1,
-      fieldSize: 15,
-      quality: "good",
-    },
-  },
-  sessionPeakDeltaKmh: 3,
-  pairedRepresentative: {
-    focusedKmh: 331,
-    rivalKmh: 330,
-    percentile: 80,
-  },
-  pairedMedianDeltaKmh: 5,
-  pairedDirectionAgreement: 0.55,
-  speedTrapDeltaKmh: -15.2,
-  comparableLapCount: 11,
-  pairedErsDeltaMj: 0.8,
-  pairedErsLapCount: 11,
-  matchedPaceDeltaMs: -1_039,
-  matchedSectorDeltasMs: [-425, -124, -404],
-  interpretation: {
-    mode: "aero-tendency",
-    verdict: "inconclusive",
-    confidence: null,
-    reasons: ["signals-conflict", "low-direction-agreement"],
-  },
-};
 
 const trackStrategy: TrackStrategySuggestion = {
   compounds: ["Medium", "Hard", "Medium"],
@@ -321,70 +144,12 @@ const trackFullWetStrategy: TrackStrategySuggestion = {
   },
 };
 
-const trackRecommendation: TrackRaceRecommendation = {
-  raceCount: 2,
-  fullDistanceRaceCount: 1,
-  hasEvidence: true,
-  bestRaceLap: {
-    bestLapMs: 81736,
-    compound: "Hard",
-    theoreticalBestMs: 81055,
-    gapToTheoreticalMs: 681,
-  },
-  raceVsQualiDeltaMs: 1575,
-  avgErsDeployMj: 7.4,
-  totalLaps: 27,
-  recommended: trackStrategy,
-  alternative: trackAlternative,
-  wetStrategies: [trackWetStrategy],
-  fuelTarget: {
-    recommendedDeltaLaps: -2.7,
-    recommendedFuelKg: 32.9,
-    burnRateKgPerLap: 1.2,
-    excessAtFinishLaps: 2.2,
-    eligibleAttemptCount: 2,
-    consecutiveGreenPairCount: 36,
-    completedRaceCount: 1,
-    confidence: "medium",
-  },
-  sinceLastRace: {
-    bestLapDeltaMs: -2643,
-    wearRateDelta: 1.66,
-  },
-};
-
-const trackRivalBenchmark: TrackRivalBenchmark = {
-  driverName: "LECLERC",
-  team: "Ferrari",
-  paceDeltaMs: 184,
-  basis: "same-compound pace",
-  raceCount: 2,
-  lapSamples: 18,
-};
-
 const laps = buildLaps();
-const rivalLaps = buildLaps(350);
-const startReactionSamples = [
-  makeStartReactionModel(0.142),
-  makeStartReactionModel(0.205),
-  makeStartReactionModel(0.283),
-  makeStartReactionModel(0.392),
-  makeStartReactionModel(0.62),
-];
 const stints = [
   makeStint("Medium", 1, 6, 0, 8.2),
   makeStint("Hard", 7, 12, 0, 5.8),
 ];
-const rivalStints = [
-  makeStint("Medium", 1, 5, 0, 9.1),
-  makeStint("Hard", 6, 12, 0, 6.5),
-];
 const perLapInfo = buildPerLapInfo();
-const lapPeaks = perLapInfo.map((lap) => ({
-  lap: lap["lap-number"],
-  kmh: lap["top-speed-kmph"] ?? 0,
-  accepted: lap["top-speed-kmph"] !== 486,
-}));
 const basicStints: TyreStintBasic[] = [
   {
     "tyre-actual-compound": "C3",
@@ -398,64 +163,34 @@ const basicStints: TyreStintBasic[] = [
   },
 ];
 
-const positionHistory: PositionHistoryEntry[] = [
-  makePositionHistory(
-    "ALONSO",
-    "Aston Martin",
-    [19, 17, 15, 12, 9, 8, 6, 5, 3, 2, 2, 1, 1],
-  ),
-  makePositionHistory(
-    "LECLERC",
-    "Ferrari",
-    [1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
-  ),
-  makePositionHistory(
-    "NORRIS",
-    "McLaren",
-    [2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4],
-  ),
-  makePositionHistory(
-    "RUSSELL",
-    "Mercedes",
-    [5, 5, 4, 4, 4, 4, 3, 3, 5, 5, 5, 5, 5],
-  ),
-];
-
-const overtakes: OvertakeRecord[] = [
+const worthItems: WorthItem[] = [
   {
-    "overtake-id": 1,
-    "overtaking-driver-name": "ALONSO",
-    "overtaken-driver-name": "RUSSELL",
-    "overtaking-driver-lap": 8,
+    id: "start",
+    tone: "loss",
+    claim: "Lost 4 places at the start, from P2 to P6.",
+    evidence: "Reaction 0.284 s; the cars around you averaged 0.21 s.",
+    target: "laps",
+    targetLabel: "Laps",
+    weight: 4,
   },
   {
-    "overtake-id": 2,
-    "overtaking-driver-name": "LECLERC",
-    "overtaken-driver-name": "ALONSO",
-    "overtaking-driver-lap": 9,
+    id: "pace",
+    tone: "gain",
+    claim: "Race pace 3rd of 20, better than the P9 result.",
+    evidence: "1:32.418 over 22 laps, 0.212 s off the best.",
+    target: "results",
+    targetLabel: "Results",
+    weight: 3,
   },
   {
-    "overtake-id": 3,
-    "overtaking-driver-name": "ALONSO",
-    "overtaken-driver-name": "LECLERC",
-    "overtaking-driver-lap": 11,
+    id: "sector",
+    tone: "note",
+    claim: "Sector 3 is where the fastest lap got away: 0.231 s.",
+    target: "lap-telemetry",
+    targetLabel: "Lap telemetry",
+    weight: 0.2,
   },
 ];
-
-const deltas: CumulativeDelta[] = Array.from({ length: 12 }, (_, index) => {
-  const lap = index + 1;
-  const lapDelta = lap < 4 ? 0.18 : lap < 8 ? -0.12 : -0.32;
-  return {
-    lap,
-    delta: 1.2 - lap * 0.18 + (lap > 8 ? -0.24 : 0),
-    lapDelta,
-    s1Delta: lapDelta * 0.35,
-    s2Delta: lapDelta * 0.4,
-    s3Delta: lapDelta * 0.25,
-    playerPit: lap === 7,
-    rivalPit: lap === 6,
-  };
-});
 
 export function UiDebugPage() {
   const [compactSegment, setCompactSegment] = useState("race");
@@ -469,107 +204,19 @@ export function UiDebugPage() {
         <p className="font-mono text-xs uppercase tracking-[0.22em] text-cyan-300">
           dev-only route
         </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-100">
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-tone-100">
           UI Debug
         </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-zinc-500">
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-tone-500">
           Static fixture page for iterating on core telemetry UI pieces without
           hunting for the perfect session file.
         </p>
       </header>
 
-      <DebugSection file="src/components/SessionInsightsGrid.tsx">
-        <SessionInsightsGrid
-          insights={sampleInsights}
-          hint="Race-style deck - podium, lap, fuel, sector, ERS, and warning states"
-        />
-      </DebugSection>
-
-      <DebugSection file="src/components/SpeedAeroComparison.tsx">
-        <SpeedAeroComparison
-          comparison={speedComparisonFixture}
-          focusedName="Fabrizio Rinaldi"
-          rivalName="Maupainz"
-        />
-      </DebugSection>
-
-      <DebugSection file="src/components/track/TrackKeyInsights.tsx">
-        <TrackKeyInsights
-          recommendation={trackRecommendation}
-          raceLengthLabel="27-lap"
-          rivalBenchmark={trackRivalBenchmark}
-        />
-      </DebugSection>
-
-      <DebugSection file="src/components/StartReactionCard.tsx">
-        <div className="space-y-4">
-          {startReactionSamples.map((model) => (
-            <StartReactionCard key={model.seconds} model={model} />
-          ))}
-        </div>
-      </DebugSection>
-
-      <DebugSection file="src/components/ui/InsightTile.tsx">
-        <SectionHeader
-          title="Insight Tile Accents"
-          hint="Compact fixture deck for tone checks"
-        />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <InsightTile title="Amber Fuel" icon={Fuel} accent="amber">
-            <DebugHero
-              value="-2.7 laps"
-              detail="32.9 kg total - 1.20 kg/lap burn"
-            />
-          </InsightTile>
-          <InsightTile title="Purple Best" icon={Timer} accent="purple">
-            <DebugHero
-              value="1:21.736"
-              detail="session fastest"
-              tone="text-best"
-            />
-          </InsightTile>
-          <InsightTile title="Emerald Gain" icon={ArrowUpDown} accent="emerald">
-            <DebugHero
-              value="+18 pos"
-              detail="started P19, finished P1"
-              tone="text-ahead"
-            />
-          </InsightTile>
-          <InsightTile title="Rose Risk" icon={Circle} accent="rose">
-            <DebugHero
-              value="20th"
-              detail="of 22 - +3.3%/lap vs best"
-              tone="text-behind"
-            />
-          </InsightTile>
-          <InsightTile title="Cyan Sector" icon={Zap} accent="cyan">
-            <DebugHero
-              value="+0.266s"
-              detail="S2 weakest - 8th of 22"
-              tone="text-cyan-300"
-            />
-          </InsightTile>
-          <InsightTile title="Sky Speed" icon={Gauge} accent="sky">
-            <DebugHero
-              value="350 km/h"
-              detail="session peak - P15/22"
-              tone="text-sky-300"
-            />
-          </InsightTile>
-          <InsightTile title="Zinc Neutral" icon={Flag} accent="zinc">
-            <DebugHero value="P2" detail="Finished - 33/33 laps" />
-          </InsightTile>
-          <InsightTile title="Context" icon={Cloud}>
-            <DebugHero value="Clear" detail="Track 35C - Air 24C" />
-          </InsightTile>
-        </div>
-      </DebugSection>
-
       <DebugSection
         files={[
           "Badge.tsx",
           "Button.tsx",
-          "CompoundBadge.tsx",
           "CompoundSwatchLabel.tsx",
           "InsightText.tsx",
           "SegmentedControl.tsx",
@@ -629,14 +276,6 @@ export function UiDebugPage() {
             </HStack>
           </div>
           <div>
-            <DebugComponentLabel>CompoundBadge.tsx</DebugComponentLabel>
-            <HStack align="stretch" wrap className="gap-2">
-              {COMPOUNDS.map((compound) => (
-                <CompoundBadge key={compound} compound={compound} />
-              ))}
-            </HStack>
-          </div>
-          <div>
             <DebugComponentLabel>CompoundSwatchLabel.tsx</DebugComponentLabel>
             <HStack wrap className="gap-x-4 gap-y-2">
               {COMPOUNDS.slice(0, 5).map((compound) => (
@@ -645,7 +284,7 @@ export function UiDebugPage() {
               <CompoundSwatchLabel
                 compound="Hard"
                 size="xs"
-                labelClassName="text-zinc-500"
+                labelClassName="text-tone-500"
               />
             </HStack>
           </div>
@@ -666,7 +305,7 @@ export function UiDebugPage() {
                 <InsightValue size="md" tone="text-ahead">
                   Faster by 0.410s
                 </InsightValue>
-                <InsightDetail size="sm" tone="text-zinc-500" className="mt-1">
+                <InsightDetail size="sm" tone="text-tone-500" className="mt-1">
                   same tyres · race-pace laps
                 </InsightDetail>
               </div>
@@ -677,7 +316,7 @@ export function UiDebugPage() {
                 <InsightValue size="sm" tone="text-warning">
                   Mario_Cavallaro_
                 </InsightValue>
-                <InsightDetail size="xs" tone="text-zinc-500" className="mt-1">
+                <InsightDetail size="xs" tone="text-tone-500" className="mt-1">
                   compact fallback
                 </InsightDetail>
               </div>
@@ -839,10 +478,6 @@ export function UiDebugPage() {
         />
       </DebugSection>
 
-      <DebugSection file="src/components/StintTimeline.tsx">
-        <StintTimeline stints={stints} totalLaps={12} />
-      </DebugSection>
-
       <DebugSection file="src/components/CompoundStatCard.tsx">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {["Soft", "Medium", "Hard"].map((compound, index) => (
@@ -887,50 +522,77 @@ export function UiDebugPage() {
         </div>
       </DebugSection>
 
-      <DebugSection file="src/components/StintTimeline.tsx / StintDetailCards">
-        <StintDetailCards stints={stints} laps={laps} perLapInfo={perLapInfo} />
-      </DebugSection>
-
-      <DebugSection file="src/components/LapTimeChart.tsx">
-        <LapTimeChart
-          laps={laps}
-          rivalLaps={rivalLaps}
-          rivalName="LECLERC"
-          pitLaps={[7]}
-          perLapInfo={perLapInfo}
-          lapPeaks={lapPeaks}
-          damageLaps={[8]}
-          stints={stints}
-        />
+      <DebugSection file="src/components/charts/LapChart.tsx">
+        <Card as="section" className="space-y-4">
+          <LapChartLegend
+            items={[
+              { tone: "you", label: "ALONSO" },
+              { tone: "compare", label: "LECLERC" },
+            ]}
+          />
+          <LapChart
+            laps={12}
+            bands={[{ from: 5, to: 6, label: "VSC" }]}
+            pits={[6]}
+            stints={stints.map((stint) => ({
+              from: stint["start-lap"],
+              to: stint["end-lap"],
+              compound: stint["tyre-set-data"]["visual-tyre-compound"],
+            }))}
+            events={[{ lap: 8, kind: "contact" }]}
+            panels={[
+              {
+                kind: "position",
+                height: 120,
+                trace: [12, 10, 9, 8, 8, 6, 9, 7, 5, 4, 3, 3, 2],
+                maxPosition: 20,
+                endLabel: "P2",
+              },
+              {
+                kind: "time",
+                height: 160,
+                series: [
+                  {
+                    key: "you",
+                    tone: "you",
+                    lapsMs: laps.map((lap) => lap["lap-time-in-ms"]),
+                    excluded: new Map([
+                      [1, "start"],
+                      [5, "VSC"],
+                      [6, "VSC"],
+                      [7, "invalid"],
+                    ]),
+                    averages: [
+                      { from: 2, to: 4, ms: 82_600 },
+                      { from: 8, to: 12, ms: 82_360 },
+                    ],
+                  },
+                  {
+                    key: "compare",
+                    tone: "compare",
+                    lapsMs: laps.map((lap) => lap["lap-time-in-ms"] + 350),
+                  },
+                ],
+              },
+              {
+                kind: "wear",
+                height: 80,
+                wear: laps.map((_, index) =>
+                  index < 6 ? (index + 1) * 8.2 : (index - 5) * 5.8,
+                ),
+              },
+            ]}
+          />
+        </Card>
       </DebugSection>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <DebugSection file="src/components/PositionChart.tsx">
-          <PositionChart
-            positionHistory={positionHistory}
-            playerName="ALONSO"
-            rivalName="LECLERC"
-            overtakes={overtakes}
-          />
+        <DebugSection file="src/components/session/SessionParts.tsx (WorthList)">
+          <WorthList items={worthItems} onOpen={() => {}} />
         </DebugSection>
 
-        <DebugSection file="src/components/TyreWearChart.tsx">
-          <TyreWearChart
-            stints={stints}
-            rivalStints={rivalStints}
-            rivalName="LECLERC"
-            perLapInfo={perLapInfo}
-          />
-        </DebugSection>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <DebugSection file="src/components/DamageTimeline.tsx">
           <DamageTimeline perLapInfo={perLapInfo} />
-        </DebugSection>
-
-        <DebugSection file="src/components/PerformanceDeltaChart.tsx">
-          <PerformanceDeltaChart deltas={deltas} rivalName="LECLERC" />
         </DebugSection>
       </div>
 
@@ -1086,7 +748,7 @@ function DebugComponentLabel({ children }: { children: ReactNode }) {
 
 function DebugCodeChip({ children }: { children: ReactNode }) {
   return (
-    <code className="inline-flex rounded-md bg-zinc-950/55 px-1.5 py-0.5 font-mono text-2xs leading-none text-zinc-500 ring-1 ring-white/[0.04]">
+    <code className="inline-flex rounded-md bg-tone-950/55 px-1.5 py-0.5 font-mono text-2xs leading-none text-tone-500 ring-1 ring-tone-0/[0.04]">
       {children}
     </code>
   );
@@ -1102,36 +764,13 @@ function DebugVariantLabel({
   return (
     <span
       className={cn(
-        "w-14 font-mono text-2xs leading-none text-zinc-600",
+        "w-14 font-mono text-2xs leading-none text-tone-600",
         className,
       )}
     >
       {children}
     </span>
   );
-}
-
-function DebugHero({
-  value,
-  detail,
-  tone = "text-zinc-100",
-}: {
-  value: string;
-  detail: string;
-  tone?: string;
-}) {
-  return (
-    <>
-      <InsightValue tone={tone}>{value}</InsightValue>
-      <InsightDetail className="mt-1.5">{detail}</InsightDetail>
-    </>
-  );
-}
-
-function makeStartReactionModel(seconds: number): StartReactionModel {
-  const model = buildStartReactionModelFromSeconds(seconds);
-  if (!model) throw new Error(`Invalid start reaction fixture: ${seconds}`);
-  return model;
 }
 
 function buildLaps(offsetMs = 0): LapHistoryEntry[] {
@@ -1268,21 +907,5 @@ function makeStatus(lap: number): CarStatus {
     "ers-harvested-limit-per-lap": 8_000_000,
     "ers-deployed-this-lap": 5_800_000,
     "ers-max-capacity": 4_000_000,
-  };
-}
-
-function makePositionHistory(
-  name: string,
-  team: string,
-  positions: number[],
-): PositionHistoryEntry {
-  return {
-    name,
-    team,
-    "driver-number": 14,
-    "driver-position-history": positions.map((position, lap) => ({
-      "lap-number": lap,
-      position,
-    })),
   };
 }

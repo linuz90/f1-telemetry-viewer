@@ -74,8 +74,8 @@ interface EventStyle {
 const DEFAULT_STYLE: EventStyle = {
   label: "Event",
   icon: Circle,
-  iconClass: "bg-zinc-800 text-zinc-400",
-  badgeClass: "bg-zinc-800/80 text-zinc-400",
+  iconClass: "bg-tone-800 text-tone-400",
+  badgeClass: "bg-tone-800/80 text-tone-400",
 };
 
 const EVENT_STYLES: Record<string, EventStyle> = {
@@ -118,8 +118,8 @@ const EVENT_STYLES: Record<string, EventStyle> = {
   TYRE_CHANGE: {
     label: "Tyres",
     icon: Circle,
-    iconClass: "bg-zinc-700 text-zinc-300",
-    badgeClass: "bg-zinc-800/80 text-zinc-300",
+    iconClass: "bg-tone-700 text-tone-300",
+    badgeClass: "bg-tone-800/80 text-tone-300",
   },
   FASTEST_LAP: {
     label: "Fastest lap",
@@ -136,8 +136,8 @@ const EVENT_STYLES: Record<string, EventStyle> = {
   CHEQUERED_FLAG: {
     label: "Flag",
     icon: Flag,
-    iconClass: "bg-zinc-700 text-zinc-300",
-    badgeClass: "bg-zinc-800/80 text-zinc-300",
+    iconClass: "bg-tone-700 text-tone-300",
+    badgeClass: "bg-tone-800/80 text-tone-300",
   },
   OVERTAKE: {
     label: "Overtake",
@@ -172,14 +172,14 @@ const EVENT_STYLES: Record<string, EventStyle> = {
   SESSION_START: {
     label: "Session",
     icon: Play,
-    iconClass: "bg-zinc-800 text-zinc-400",
-    badgeClass: "bg-zinc-800/80 text-zinc-400",
+    iconClass: "bg-tone-800 text-tone-400",
+    badgeClass: "bg-tone-800/80 text-tone-400",
   },
   SESSION_END: {
     label: "Session",
     icon: Square,
-    iconClass: "bg-zinc-800 text-zinc-400",
-    badgeClass: "bg-zinc-800/80 text-zinc-400",
+    iconClass: "bg-tone-800 text-tone-400",
+    badgeClass: "bg-tone-800/80 text-tone-400",
   },
   RED_FLAG: {
     label: "Red flag",
@@ -214,8 +214,8 @@ const EVENT_STYLES: Record<string, EventStyle> = {
   DRS_DISABLED: {
     label: "DRS",
     icon: Wind,
-    iconClass: "bg-zinc-800 text-zinc-400",
-    badgeClass: "bg-zinc-800/80 text-zinc-400",
+    iconClass: "bg-tone-800 text-tone-400",
+    badgeClass: "bg-tone-800/80 text-tone-400",
   },
   PARTIAL_AERO_MODE_ENABLED: {
     label: "Aero",
@@ -226,8 +226,8 @@ const EVENT_STYLES: Record<string, EventStyle> = {
   PARTIAL_AERO_MODE_DISABLED: {
     label: "Aero",
     icon: ShieldAlert,
-    iconClass: "bg-zinc-800 text-zinc-400",
-    badgeClass: "bg-zinc-800/80 text-zinc-400",
+    iconClass: "bg-tone-800 text-tone-400",
+    badgeClass: "bg-tone-800/80 text-tone-400",
   },
   OVERTAKE_MODE_ENABLED: {
     label: "Overtake mode",
@@ -238,14 +238,14 @@ const EVENT_STYLES: Record<string, EventStyle> = {
   OVERTAKE_MODE_DISABLED: {
     label: "Overtake mode",
     icon: Rocket,
-    iconClass: "bg-zinc-800 text-zinc-400",
-    badgeClass: "bg-zinc-800/80 text-zinc-400",
+    iconClass: "bg-tone-800 text-tone-400",
+    badgeClass: "bg-tone-800/80 text-tone-400",
   },
   DRIVER_AI_STATUS_CHANGE: {
     label: "AI",
     icon: Bot,
-    iconClass: "bg-zinc-800 text-zinc-400",
-    badgeClass: "bg-zinc-800/80 text-zinc-400",
+    iconClass: "bg-tone-800 text-tone-400",
+    badgeClass: "bg-tone-800/80 text-tone-400",
   },
 };
 
@@ -445,7 +445,7 @@ export function RaceControlTimeline({
     <div>
       <SectionHeader
         size="sm"
-        title="Race Control"
+        title="Race control"
         hint={`${keyEventCount} key event${keyEventCount === 1 ? "" : "s"} · ${events.length} total`}
         className="mb-4"
         action={
@@ -461,7 +461,7 @@ export function RaceControlTimeline({
               <>
                 <span
                   aria-hidden="true"
-                  className="hidden h-4 w-px bg-zinc-800 sm:block"
+                  className="hidden h-4 w-px bg-tone-800 sm:block"
                 />
                 <FocusToggle
                   label="Focus driver"
@@ -474,9 +474,9 @@ export function RaceControlTimeline({
         }
       />
 
-      <div className="mb-5 grid gap-3 rounded-xl bg-zinc-950/30 p-2.5 ring-1 ring-inset ring-white/[0.035] lg:grid-cols-2 2xl:grid-cols-[minmax(16rem,1fr)_minmax(11rem,15rem)_minmax(16rem,19rem)]">
+      <div className="mb-5 grid gap-3 rounded-xl bg-tone-950/30 p-2.5 ring-1 ring-inset ring-tone-0/[0.035] lg:grid-cols-2 2xl:grid-cols-[minmax(16rem,1fr)_minmax(11rem,15rem)_minmax(16rem,19rem)]">
         <div className="min-w-0 lg:col-span-2 2xl:col-span-1">
-          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-zinc-600">
+          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-tone-600">
             Search
           </span>
           <Input
@@ -490,7 +490,7 @@ export function RaceControlTimeline({
           />
         </div>
         <div className="min-w-0">
-          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-zinc-600">
+          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-tone-600">
             Event type
           </span>
           <MultiPillSelect
@@ -503,7 +503,7 @@ export function RaceControlTimeline({
           />
         </div>
         <div className="min-w-0">
-          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-zinc-600">
+          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-tone-600">
             Lap navigation
           </span>
           <RaceControlLapNavigator
@@ -517,7 +517,7 @@ export function RaceControlTimeline({
       {visibleEvents.length === 0 ? (
         <div className={cn(EVENT_VIEWPORT_HEIGHT, "pt-3")}>
           <EmptyState
-            title="Race Control"
+            title="Race control"
             message="No race-control events match this view."
           />
         </div>
@@ -538,8 +538,8 @@ export function RaceControlTimeline({
             {groups.map((group) => (
               <section key={group.key} className="space-y-2">
                 <HStack className="sticky top-0 z-10 -mx-1 gap-2 bg-card-surface px-1 py-1.5">
-                  <Eyebrow className="text-zinc-500">{group.label}</Eyebrow>
-                  <span className="h-px flex-1 bg-zinc-800/70" />
+                  <Eyebrow className="text-tone-500">{group.label}</Eyebrow>
+                  <span className="h-px flex-1 bg-tone-800/70" />
                 </HStack>
                 <div className="space-y-1.5">
                   {group.events.map((event) => (
@@ -558,7 +558,7 @@ export function RaceControlTimeline({
       <HStack
         wrap
         justify="between"
-        className="mt-3 gap-2 text-xs text-zinc-500"
+        className="mt-3 gap-2 text-xs text-tone-500"
       >
         <span>
           Showing {pagedEvents.length} of {visibleEvents.length} matching event
@@ -630,7 +630,7 @@ function RaceControlEventRow({
   const primaryDriver = driverInfos[0];
 
   return (
-    <div className="rounded-md border border-zinc-800/80 bg-zinc-950/60 px-3 py-2.5 shadow-sm shadow-black/10">
+    <div className="rounded-md border border-tone-800/80 bg-tone-950/60 px-3 py-2.5 shadow-sm shadow-black/10">
       <HStack align="start" className="gap-3">
         <HStack
           as="span"
@@ -641,7 +641,7 @@ function RaceControlEventRow({
         </HStack>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <span className="min-w-0 text-sm leading-snug text-zinc-200">
+            <span className="min-w-0 text-sm leading-snug text-tone-200">
               {formatRaceControlEvent(event)}
             </span>
             <HStack
@@ -671,7 +671,7 @@ function RaceControlEventRow({
               )}
             >
               {primaryDriver && (
-                <HStack as="p" className="gap-1.5 text-xs text-zinc-500">
+                <HStack as="p" className="gap-1.5 text-xs text-tone-500">
                   <span
                     className="inline-block size-1.5 rounded-full"
                     style={{
@@ -684,7 +684,7 @@ function RaceControlEventRow({
                 </HStack>
               )}
               {clock && (
-                <span className="ml-auto font-mono text-2xs text-zinc-500">
+                <span className="ml-auto font-mono text-2xs text-tone-500">
                   {clock}
                 </span>
               )}

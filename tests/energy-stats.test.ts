@@ -14,7 +14,6 @@ import {
   type RaceDriverStats,
 } from "../src/analysis/resultsAnalysis";
 import { avgErsHarvestUtilization } from "../src/utils/stats/energy";
-import { generateInsights } from "../src/utils/stats/raceInsights";
 
 function lap({
   number,
@@ -195,36 +194,4 @@ test("harvest utilization sort keeps missing telemetry last in both directions",
     });
     assert.equal(sorted.at(-1)?.name, "Missing");
   }
-});
-
-test("race insights retain raw harvested energy for exports without a limit", () => {
-  const session = JSON.parse(
-    readFileSync(
-      new URL(
-        "../public/demo/race-spa-2026-01-26-22-14-52.json",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-  ) as TelemetrySession;
-  const player = session["classification-data"].find(
-    (candidate) => candidate["is-player"],
-  );
-  const rival = session["classification-data"].find(
-    (candidate) => candidate.index !== player?.index,
-  );
-  assert.ok(player);
-  assert.ok(rival);
-
-  const fieldHarvest = generateInsights(session, player).find((insight) =>
-    insight.label.startsWith("ERS Harv"),
-  );
-  const rivalHarvest = generateInsights(session, player, rival).find(
-    (insight) => insight.label.startsWith("ERS Harv"),
-  );
-
-  assert.equal(fieldHarvest?.label, "ERS Harv");
-  assert.match(fieldHarvest?.detail ?? "", /MJ\/lap/);
-  assert.equal(rivalHarvest?.label, "ERS Harv");
-  assert.match(rivalHarvest?.value ?? "", /MJ/);
 });

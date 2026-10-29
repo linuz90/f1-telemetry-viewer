@@ -18,7 +18,7 @@ export function LapImportsRow({ slugs }: { slugs: ReadonlySet<string> }) {
 
   if (here.length === 0) {
     return (
-      <p className="flex items-center gap-1.5 text-xs text-zinc-600">
+      <p className="flex items-center gap-1.5 text-xs text-tone-600">
         <FileUp className="size-3.5 shrink-0" />
         Got a lap file from a friend? Drop their .pngt anywhere to compare.
       </p>
@@ -26,27 +26,27 @@ export function LapImportsRow({ slugs }: { slugs: ReadonlySet<string> }) {
   }
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs">
-      <span className="text-zinc-600">Imported</span>
+      <span className="text-tone-600">Imported</span>
       {here.map((entry) => (
         <span
           key={entry.slug}
-          className="inline-flex items-center rounded-md bg-zinc-800/60"
+          className="inline-flex items-center rounded-md bg-tone-800/60"
         >
           <button
             type="button"
             onClick={() => askOwner(entry.slug)}
             title={`${entry.fileName}: change whose laps these are`}
-            className="rounded-l-md py-1 pl-2 pr-1.5 text-left transition-colors hover:bg-zinc-700/50"
+            className="rounded-l-md py-1 pl-2 pr-1.5 text-left transition-colors hover:bg-tone-700/50"
           >
-            <span className="text-zinc-200">{ownerLabel(entry)}</span>{" "}
-            <span className="text-zinc-500">{recordingLabel(entry.raw)}</span>
+            <span className="text-tone-200">{ownerLabel(entry)}</span>{" "}
+            <span className="text-tone-500">{recordingLabel(entry.raw)}</span>
           </button>
           <button
             type="button"
             onClick={() => remove(entry.slug)}
             aria-label={`Remove ${entry.fileName}`}
             title="Remove from this browser"
-            className="rounded-r-md px-1.5 py-1 text-zinc-500 transition-colors hover:bg-zinc-700/50 hover:text-zinc-200"
+            className="rounded-r-md px-1.5 py-1 text-tone-500 transition-colors hover:bg-tone-700/50 hover:text-tone-200"
           >
             <X className="size-3" />
           </button>
