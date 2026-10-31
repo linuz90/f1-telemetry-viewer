@@ -48,6 +48,10 @@ function trace(
     startLap,
     lapMs,
     counted: lapMs.map((ms, i) => ms != null && !uncounted.includes(i + 1)),
+    bestMs: lapMs.reduce<number | null>(
+      (best, ms) => (ms != null && (best == null || ms < best) ? ms : best),
+      null,
+    ),
     wear: wear ?? lapMs.map((_, i) => (i + 1) * wearPerLap),
     fuelKg: fuelKg ?? lapMs.map(() => null),
     wearPerLap,
@@ -298,13 +302,16 @@ function tyreStint(
 }
 
 test("traces follow the stints, Race Pace's counted laps, wear and fuel", () => {
-  const times = [96_000, 90_000, 90_100, 99_000, 101_000, 89_500, 89_600];
+  // Lap 1 is quick but the start; lap 7 is quicker still but deleted.
+  const times = [89_000, 90_000, 90_100, 99_000, 101_000, 89_500, 88_000];
+  const laps = times.map(lap);
+  laps[6]["lap-valid-bit-flags"] = 0;
   const driver = {
     index: 0,
     "is-player": true,
     "session-history": {
       "num-laps": times.length,
-      "lap-history-data": times.map(lap),
+      "lap-history-data": laps,
       "tyre-stints-history-data": [],
     },
     "tyre-set-history": [
@@ -329,9 +336,14 @@ test("traces follow the stints, Race Pace's counted laps, wear and fuel", () => 
       ["Hard", 5, 3],
     ],
   );
-  // The start, the in-lap (4) and the out-lap (5) don't count.
+  // The start, the in-lap (4), the out-lap (5) and the deleted lap don't
+  // count; the best is the quickest valid lap all the same.
   assert.deepEqual(traces[0].counted, [false, true, true, false]);
-  assert.deepEqual(traces[1].counted, [false, true, true]);
+  assert.deepEqual(traces[1].counted, [false, true, false]);
+  assert.deepEqual(
+    traces.map((t) => t.bestMs),
+    [89_000, 89_500],
+  );
   assert.deepEqual(traces[0].wear, [5, 10, 15, 20]);
   assert.deepEqual(traces[1].fuelKg, [24, 22.5, 21]);
 });

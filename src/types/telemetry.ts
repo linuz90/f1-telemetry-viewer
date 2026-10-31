@@ -121,6 +121,8 @@ export interface StintTrace {
   lapMs: (number | null)[];
   /** Laps Race Pace counts (`getRacePaceLapSamples()`). */
   counted: boolean[];
+  /** Fastest complete valid lap, counted or not; a deleted lap never is. */
+  bestMs: number | null;
   /** Worst-wheel wear % at the end of the lap; null without a snapshot. */
   wear: (number | null)[];
   /** Fuel in the tank at the end of the lap, kg; null when not exported. */

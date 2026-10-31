@@ -10,6 +10,7 @@ import type { SessionKind } from "./sessionKind";
 import {
   getRacePaceLapSamples,
   hasCompleteLapTiming,
+  isCompleteValidLap,
 } from "../utils/stats/laps";
 import {
   getCompletedStints,
@@ -96,6 +97,7 @@ export function buildStintTraces(driver: DriverData): StintTrace[] {
       startLap: start,
       lapMs: [],
       counted: [],
+      bestMs: null,
       wear: [],
       fuelKg: [],
       wearPerLap: Math.round(life.wearPerLap * 100) / 100,
@@ -107,6 +109,12 @@ export function buildStintTraces(driver: DriverData): StintTrace[] {
         entry && hasCompleteLapTiming(entry) ? entry["lap-time-in-ms"] : null,
       );
       trace.counted.push(counted.has(lap));
+      if (
+        entry &&
+        isCompleteValidLap(entry) &&
+        (trace.bestMs == null || entry["lap-time-in-ms"] < trace.bestMs)
+      )
+        trace.bestMs = entry["lap-time-in-ms"];
       trace.wear.push(round1(wearByLap.get(lap)));
       trace.fuelKg.push(round1(fuelByLap.get(lap)));
     }
@@ -207,7 +215,7 @@ export function comparableStints(source: {
           ? clean.reduce((s, c) => s + c.ms, 0) / clean.length
           : null,
       cleanLaps: clean.length,
-      bestMs: clean.length ? Math.min(...clean.map((c) => c.ms)) : null,
+      bestMs: trace.bestMs,
       wearPerLap: trace.wearPerLap,
       lifeLaps: trace.lifeLaps,
       fadeSPerLap:

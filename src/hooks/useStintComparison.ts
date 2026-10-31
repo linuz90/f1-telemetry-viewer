@@ -109,16 +109,21 @@ export function useStintComparison(
       return true;
     });
   }, [meta, ownUid, raceLaps, scoped, slug]);
+  const vsParam = params.get(VS_PARAM);
+  const vsSlug = vsParam?.split("~")[0];
   // Earlier runs first, newest first, so the fallback serves the progression
-  // and the default comparison before any later run.
+  // and the default comparison before any later run; a linked `?vs=` run
+  // loads wherever it falls.
   const missing = useMemo(() => {
     const without = candidates.filter((s) => !s.stintLaps);
     const date = meta?.date ?? "";
-    return [
+    const picked = [
       ...without.filter((s) => s.date < date),
       ...without.filter((s) => s.date >= date),
     ].slice(0, DETAIL_FALLBACK_LIMIT);
-  }, [candidates, meta?.date]);
+    const linked = without.find((s) => s.slug === vsSlug);
+    return linked && !picked.includes(linked) ? [...picked, linked] : picked;
+  }, [candidates, meta?.date, vsSlug]);
   const details = useQueries({
     queries: missing.map((s) => ({
       ...getSessionQueryOptions(s.slug),
@@ -132,10 +137,22 @@ export function useStintComparison(
     const fromSummaries = candidates.flatMap((s) =>
       s.stintLaps ? fromSummary(s, s.stintLaps) : [],
     );
+    // Summaries built elsewhere may lack the UID the JSON carries, so saves
+    // of one run (this one's included) collapse here too, newest first.
+    const seenUids = new Set(
+      [
+        ownUid,
+        ...candidates.filter((s) => s.stintLaps).map((s) => s.sessionUid),
+      ].filter(Boolean),
+    );
     const fromDetails = missing.flatMap((s, i) => {
       const detail = details[i];
-      // Summaries built elsewhere may lack the UID the JSON carries.
-      if (!detail || (ownUid && sessionUidOf(detail) === ownUid)) return [];
+      if (!detail) return [];
+      const uid = sessionUidOf(detail);
+      if (uid) {
+        if (seenUids.has(uid)) return [];
+        seenUids.add(uid);
+      }
       const player = findPlayer(detail);
       const stintLaps = player && buildPlayerStintLaps(detail, player);
       return stintLaps
@@ -172,7 +189,6 @@ export function useStintComparison(
     opening?.a ??
     stints[0] ??
     null;
-  const vsParam = params.get(VS_PARAM);
   const activeDefault = defaults.find((d) => d.a === active)?.b ?? null;
   const compare =
     vsParam === NO_COMPARE

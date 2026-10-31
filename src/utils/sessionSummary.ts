@@ -57,9 +57,10 @@ export interface BuiltSessionSummary {
 // long runs saved before the flag need; split stints on one tyre set merge
 // (`getDriverStints()`); rival keys use `driverNameKey()`, so names with
 // non-breaking spaces match. (8 was this work before it met 7.)
-// 11: race summaries carry the player's stints lap by lap (`stintLaps`) and
-// setup, for stint comparison. (10 was this work with a keyed setup.)
-export const SESSION_SUMMARY_CACHE_VERSION = 11;
+// 12: race summaries carry the player's stints lap by lap (`stintLaps`), with
+// each stint's best valid lap, and setup, for stint comparison. (10 and 11
+// were this work in progress.)
+export const SESSION_SUMMARY_CACHE_VERSION = 12;
 
 function getDrivers(session: TelemetrySession | undefined): DriverData[] {
   return session?.["classification-data"] ?? [];

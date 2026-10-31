@@ -28,9 +28,10 @@ export const signedSeconds = (ms: number, digits = 3) =>
 export const signedPercent = (value: number) =>
   `${value > 0 ? "+" : value < 0 ? "−" : "±"}${Math.abs(value).toFixed(1)}`;
 
-/** A fade in s/lap without a "−0.00" for a flat stint. */
+/** A fade in s/lap without a "−0.00" for a flat stint; a stint that got
+ *  quicker reads with a true minus, like the other deltas. */
 const fadeText = (fade: number) =>
-  (Math.abs(fade) < 0.005 ? 0 : fade).toFixed(2);
+  (Math.abs(fade) < 0.005 ? 0 : fade).toFixed(2).replace("-", "−");
 
 /** Gaining (green), losing (red), or level (neutral) for a time delta. */
 export function paceTone(ms: number | null | undefined, level = 0): string {
