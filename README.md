@@ -15,7 +15,7 @@ Supports recent F1 (and F2) telemetry, including the newly released **2026 Seaso
 
 - 🏠 **Sessions home** - Your latest race and online form on top, then every session grouped by day, track and online event, with filters kept in the URL and ⌘K search across tracks, sessions and drivers.
 - 🧭 **Formula scopes** - Keep F1 26, F1 25, F2 25, and older data separate with one app-wide selector and clean scoped URLs such as `/f1-26`, `/f1-26/tracks/sakhir`, and `/f1-26/sessions/session-slug`.
-- 📊 **Session pages** - Each race, long run, qualifying session or time trial opens on a one-line headline of what happened and a ranked "Worth a look" list, then tabs for lap-by-lap charts, tyres, lap telemetry, results and the car setup. Rival history shows in the Results driver panel.
+- 📊 **Session pages** - Each race, long run, qualifying session or time trial opens on a one-line headline of what happened and a ranked "Worth a look" list, then tabs for lap-by-lap charts, tyres, lap telemetry, results and the car setup. A long run, and each race stint in the Tyres tab, sits beside your earlier runs on the same tyre at that track: laps paired by tyre age on equal fuel, with wear, fade and setup changes. Rival history shows in the Results driver panel.
 - 📉 **Online form** - Grid against finish, race by race, with podiums, front-row starts and DNFs.
 - 📈 **Lap telemetry** - With Pits n' Giggles 5.0 lap recordings, compare two complete laps (yours, a rival's, a friend's `.pngt` dropped onto the page, or the fastest recorded at the track) on speed, throttle, brake, gear and battery traces, with a track map, lap playback, and tips on where the time went.
 - 🗺️ **Track pages** - A circuit map with the timing line, sectors and turn numbers, then your PBs, qualifying progress, a race plan with tyre life and fuel, your setups, and every saved session at that track.
@@ -194,7 +194,7 @@ At serve time it can set `window.__PNG_VERSION__` (page title) and `window.__PNG
 
 ## Stack
 
-React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts 3, React Router 7, JSZip, Motion, and lucide-react.
+React 19, TypeScript, Vite 8, Tailwind CSS 4, Base UI, Recharts 3, React Router 7, JSZip, Motion, and lucide-react.
 
 ## Supported Data
 
