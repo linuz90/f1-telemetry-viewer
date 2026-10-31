@@ -3,6 +3,9 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Route,
+  SlidersHorizontal,
+  Timer,
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -13,8 +16,19 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { ActionEmptyState } from "../components/ActionEmptyState";
-import { cardClass } from "../components/Card";
+import { cardClass, heroCardClass } from "../components/ui/surfaces";
+import { pageClass } from "../components/ui/page";
+import { Breadcrumb, PageHeader } from "../components/ui/PageHeader";
+import {
+  tableCellClass,
+  tableClass,
+  tableHeadCellClass,
+  tableHeadClass,
+  tableRowClass,
+} from "../components/ui/table";
 import { CompoundStatCard } from "../components/CompoundStatCard";
+import { EmptyState } from "../components/EmptyState";
+import { SessionKindIcon } from "../components/SessionKindIcon";
 import { PaceEvolutionChart } from "../components/track/PaceEvolutionChart";
 import { TyreLifeEvidenceBar } from "../components/track/TyreLifeEvidenceBar";
 import { TrackPaceTrends } from "../components/track/TrackPaceTrends";
@@ -22,10 +36,11 @@ import { TrackStrategySection } from "../components/track/TrackStrategySection";
 import { TrackOutline } from "../components/TrackOutline";
 import { TrendChart, type TrendPoint } from "../components/charts/TrendChart";
 import {
-  Panel,
+  SetupPanel,
   SetupSheet,
   WorthList,
 } from "../components/session/SessionParts";
+import { Panel, panelGridClass } from "../components/ui/Panel";
 import { SessionLog } from "../components/sessions/SessionLog";
 import { LapTelemetrySection } from "../components/lap-telemetry/LapTelemetrySection";
 import {
@@ -36,7 +51,19 @@ import { TrackFlag } from "../components/TrackFlag";
 import { Badge } from "../components/ui/Badge";
 import { Button, buttonVariants } from "../components/ui/Button";
 import { SectionHeader } from "../components/ui/SectionHeader";
-import { SegmentedControl } from "../components/ui/SegmentedControl";
+import {
+  SegmentedControl,
+  type SegmentedOption,
+} from "../components/ui/SegmentedControl";
+import {
+  PAGE_TAB_BAR_ID,
+  PAGE_TAB_PANEL_ID,
+  pageTabBarClass,
+  pageTabListClass,
+  pageTabPanelClass,
+  revealPageTabBar,
+} from "../components/ui/pageTabs";
+import { PageTab } from "../components/ui/PageTab";
 import { HStack } from "../components/ui/Stack";
 import { useTelemetry } from "../context/TelemetryContext";
 import { useLapRecordingList } from "../hooks/useLapRecordings";
@@ -55,7 +82,11 @@ import {
   buildTrackBriefing,
   type TrackBriefingItem,
 } from "../analysis/trackBriefing";
-import { buildTrackSetups, type TrackSetups } from "../analysis/trackSetups";
+import {
+  buildTrackSetups,
+  type TrackSetupUse,
+  type TrackSetups,
+} from "../analysis/trackSetups";
 import { buildSessionLog, sessionBestLapMs } from "../analysis/sessionLog";
 import { sessionKindLabel, summaryKind } from "../analysis/sessionKind";
 import type { TrackIndexEntry } from "../analysis/trackIndex";
@@ -65,6 +96,14 @@ import type {
 } from "../analysis/trackStrategyTypes";
 import { formatSetupText } from "../analysis/shareText";
 import { useTrackIndex } from "../hooks/useSessionLog";
+import {
+  Menu,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuLinkItem,
+  MenuPopup,
+  MenuTrigger,
+} from "../components/ui/Menu";
 import type { SessionSummary } from "../types/telemetry";
 import type { CompoundLifeStats } from "../utils/stats/trackAggregates";
 import { getCompoundColor } from "../utils/colors";
@@ -87,6 +126,7 @@ import {
   tracksPath,
 } from "../utils/routes";
 import {
+  SESSION_TAB_QUERY_PARAM,
   TRACK_PAGE_TABS,
   TRACK_TAB_QUERY_PARAM,
   type TrackPageTab,
@@ -356,19 +396,23 @@ export function TrackProgressPage() {
           : "";
 
       return (
-        <div className="p-6 max-w-5xl mx-auto space-y-6">
-          <div>
-            <h2 className="text-xl font-bold mb-1">
-              <TrackFlag track={trackSourceName} className="mr-2" />
-              {displayTrackName}
-            </h2>
-            <p className="text-sm text-tone-500">
-              {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
-              {spectatorTrackSessions.length} spectator session
-              {spectatorTrackSessions.length !== 1 ? "s" : ""}
-              {spectatorDateRange ? ` · ${spectatorDateRange}` : ""}
-            </p>
-          </div>
+        <div className={cn(pageClass, "space-y-6")}>
+          <PageHeader
+            title={
+              <>
+                <TrackFlag track={trackSourceName} className="mr-2" />
+                {displayTrackName}
+              </>
+            }
+            subtitle={
+              <>
+                {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
+                {spectatorTrackSessions.length} spectator session
+                {spectatorTrackSessions.length !== 1 ? "s" : ""}
+                {spectatorDateRange ? ` · ${spectatorDateRange}` : ""}
+              </>
+            }
+          />
 
           <section className={cardClass}>
             <Badge tone="zinc">Spectator</Badge>
@@ -396,17 +440,16 @@ export function TrackProgressPage() {
         ? activeTab
         : recordedLapTabs[0];
       return (
-        <div className="p-6 max-w-5xl mx-auto space-y-6">
-          <div>
-            <h2 className="text-xl font-bold mb-1">
-              <TrackFlag track={trackSourceName} className="mr-2" />
-              {displayTrackName}
-            </h2>
-            <p className="text-sm text-tone-500">
-              {activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}
-              No sessions of yours here yet, only recorded laps
-            </p>
-          </div>
+        <div className={cn(pageClass, "space-y-6")}>
+          <PageHeader
+            title={
+              <>
+                <TrackFlag track={trackSourceName} className="mr-2" />
+                {displayTrackName}
+              </>
+            }
+            subtitle={`${activeFormula?.showLabel ? `${activeFormula.label} · ` : ""}No sessions of yours here yet, only recorded laps`}
+          />
           <LapTelemetrySection
             key={lapTab}
             scope={{
@@ -525,6 +568,7 @@ export function TrackProgressPage() {
     if (tab === "overview") nextParams.delete(TRACK_TAB_QUERY_PARAM);
     else nextParams.set(TRACK_TAB_QUERY_PARAM, tab);
     nextParams.delete(LAPS_QUERY_PARAM);
+    revealPageTabBar();
     setSearchParams(nextParams, { replace: true });
   };
   const handleRaceLengthChange = (raceLaps: string) => {
@@ -558,6 +602,7 @@ export function TrackProgressPage() {
     .sort((a, b) => a.bestLapMs - b.bestLapMs)[0];
   const bestTimeTrialSession = trackAnalysis.timeTrial.bestSession;
   const pbItems: {
+    kind: TrackSessionKind;
     label: string;
     ms: number;
     note: string;
@@ -566,6 +611,7 @@ export function TrackProgressPage() {
   }[] = [];
   if (actualBestQualiMs > 0 && trackAnalysis.qualifying.bestSession) {
     pbItems.push({
+      kind: "qualifying",
       label: "Quali PB",
       ms: actualBestQualiMs,
       note: formatShortDate(trackAnalysis.qualifying.bestSession.summary.date),
@@ -575,6 +621,7 @@ export function TrackProgressPage() {
   }
   if (onlineQualiBest && onlineQualiBest.bestLapMs !== actualBestQualiMs) {
     pbItems.push({
+      kind: "qualifying",
       label: "Online quali",
       ms: onlineQualiBest.bestLapMs,
       note: `${formatShortDate(onlineQualiBest.summary.date)}${onlineQualiBest.summary.qualifyingPosition ? ` · P${onlineQualiBest.summary.qualifyingPosition}` : ""}`,
@@ -583,6 +630,7 @@ export function TrackProgressPage() {
   }
   if (bestRaceLap) {
     pbItems.push({
+      kind: "race",
       label: "Race best lap",
       ms: bestRaceLap.bestLapMs,
       note: formatShortDate(bestRaceLap.summary.date),
@@ -591,6 +639,7 @@ export function TrackProgressPage() {
   }
   if (bestTimeTrialSession && bestTimeTrialMs > 0) {
     pbItems.push({
+      kind: "time-trial",
       label: "Time trial",
       ms: bestTimeTrialMs,
       note: formatShortDate(bestTimeTrialSession.summary.date),
@@ -668,35 +717,34 @@ export function TrackProgressPage() {
   })();
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-5 pb-16 sm:px-6">
-      <section className="relative overflow-hidden rounded-2xl bg-tone-900 p-5 ring-1 ring-tone-800 sm:p-7">
+    <div className={pageClass}>
+      <section className={heroCardClass}>
+        {/* Only the backdrop clips, so the track switcher can overhang the card. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_140%_at_85%_30%,color-mix(in_oklab,var(--color-brand)_8%,transparent)_0%,transparent_55%)]"
-        />
-        <div className="pointer-events-none absolute inset-y-6 right-7 hidden w-[44%] md:block">
-          <TrackOutline
-            track={trackSourceName}
-            glow
-            detail={{ level: "full", sectorStarts }}
-            className="h-full w-full"
-          />
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(120%_140%_at_85%_30%,color-mix(in_oklab,var(--color-brand)_8%,transparent)_0%,transparent_55%)]" />
+          <div className="absolute inset-y-6 right-7 hidden w-[44%] md:block">
+            <TrackOutline
+              track={trackSourceName}
+              glow
+              detail={{ level: "full", sectorStarts }}
+              className="h-full w-full"
+            />
+          </div>
         </div>
         <div className="relative max-w-xl">
-          <div className="text-xs text-tone-500">
-            <Link
-              to={activeFormulaKey ? tracksPath(activeFormulaKey) : "/"}
-              className="hover:text-tone-200"
-            >
-              Tracks
-            </Link>{" "}
-            ›{" "}
+          <Breadcrumb
+            to={activeFormulaKey ? tracksPath(activeFormulaKey) : "/"}
+            label="Tracks"
+          >
             <TrackFlag
               track={trackSourceName}
               className="mx-0.5 -translate-y-px"
             />{" "}
             {getTrackCountryName(trackSourceName) ?? displayTrackName}
-          </div>
+          </Breadcrumb>
           <div className="mt-1 flex items-center gap-2">
             <h1 className="text-5xl font-bold tracking-tighter text-tone-50 sm:text-6xl">
               {displayTrackName}
@@ -738,7 +786,10 @@ export function TrackProgressPage() {
             <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-4 sm:flex sm:flex-wrap">
               {pbItems.map((item) => (
                 <Link key={item.label} to={item.to ?? "#"} className="group">
-                  <div className="text-xs text-tone-500">{item.label}</div>
+                  <div className="text-xs text-tone-500">
+                    <SessionKindIcon kind={item.kind} className="mr-1" />
+                    {item.label}
+                  </div>
                   <div
                     className={cn(
                       "mt-0.5 font-mono text-xl font-semibold tracking-tight",
@@ -758,22 +809,20 @@ export function TrackProgressPage() {
       </section>
 
       <div
+        id={PAGE_TAB_BAR_ID}
         role="tablist"
-        className="mt-5 flex gap-5 overflow-x-auto border-b border-tone-800 text-sm"
+        className={cn(
+          "mt-2 border-b border-tone-800",
+          pageTabListClass,
+          pageTabBarClass,
+        )}
       >
         {tabs.map((tab) => (
-          <button
+          <PageTab
             key={tab}
-            type="button"
-            role="tab"
-            aria-selected={tab === selectedTab}
-            onClick={() => setTab(tab)}
-            className={cn(
-              "-mb-px border-b-2 pb-2.5 whitespace-nowrap transition-colors",
-              tab === selectedTab
-                ? "border-tone-50 font-medium text-tone-50"
-                : "border-transparent text-tone-400 hover:text-tone-100",
-            )}
+            tab={tab}
+            selected={tab === selectedTab}
+            onSelect={() => setTab(tab)}
           >
             {TRACK_PAGE_TAB_LABELS[tab]}
             {tab === "sessions" && (
@@ -781,17 +830,28 @@ export function TrackProgressPage() {
                 {playerTrackSessions.length}
               </span>
             )}
-          </button>
+          </PageTab>
         ))}
       </div>
 
-      <div className="mt-5 space-y-5">
+      <div
+        id={PAGE_TAB_PANEL_ID}
+        className={cn("mt-5 space-y-5", pageTabPanelClass)}
+      >
         {selectedTab === "overview" && (
           <>
-            <div className="grid gap-5 lg:grid-cols-2">
+            <div className={panelGridClass}>
               {qualiTrend.length > 1 ? (
                 <Panel
-                  title="Qualifying progress"
+                  title={
+                    <>
+                      <SessionKindIcon
+                        kind="qualifying"
+                        className="mr-1.5 text-tone-500"
+                      />
+                      Qualifying progress
+                    </>
+                  }
                   hint="Best lap per day"
                   action={
                     trendGain > 0 ? (
@@ -805,20 +865,47 @@ export function TrackProgressPage() {
                   <TrendChart points={qualiTrend} height={240} />
                 </Panel>
               ) : (
-                <Panel title="Qualifying progress">
-                  <p className="text-sm text-tone-500">
-                    One qualifying day here so far.
-                  </p>
+                <Panel
+                  title={
+                    <>
+                      <SessionKindIcon
+                        kind="qualifying"
+                        className="mr-1.5 text-tone-500"
+                      />
+                      Qualifying progress
+                    </>
+                  }
+                  hint="Best lap per day"
+                  className="flex flex-col"
+                >
+                  <EmptyState
+                    icon={Timer}
+                    title={
+                      qualiTrend.length === 1
+                        ? "One qualifying day so far"
+                        : "No qualifying here yet"
+                    }
+                    message="Qualify here on two different days to see your trend."
+                  />
                 </Panel>
               )}
               <Panel
-                title="Race plan"
+                title={
+                  <>
+                    <SessionKindIcon
+                      kind="race"
+                      className="mr-1.5 text-tone-500"
+                    />
+                    Race plan
+                  </>
+                }
                 hint={
                   recommendation
                     ? `From your ${recommendation.totalLaps}-lap races here`
                     : "Race here to build a plan"
                 }
                 action={raceLengthSelector}
+                className="flex flex-col"
               >
                 {plan ? (
                   <RacePlanSummary
@@ -832,10 +919,11 @@ export function TrackProgressPage() {
                     onOpenSetups={() => setTab("setups")}
                   />
                 ) : (
-                  <p className="text-sm text-tone-500">
-                    No race with tyre data at this length yet. A long run is
-                    enough to start one.
-                  </p>
+                  <EmptyState
+                    icon={Route}
+                    title="No plan for this length yet"
+                    message="A race or long run here with tyre data builds one."
+                  />
                 )}
               </Panel>
             </div>
@@ -872,6 +960,7 @@ export function TrackProgressPage() {
             {selectedCompoundLifeStats.length > 0 && (
               <div>
                 <SectionHeader
+                  size="lg"
                   title="Tyre life"
                   hint={`${selectedRaceAnalysisBucket ? `${selectedRaceAnalysisBucket.totalLaps}-lap races · ` : ""}${selectedTyreLifeStintCount} stint${selectedTyreLifeStintCount !== 1 ? "s" : ""} across ${selectedTyreLifeRaceCount} race${selectedTyreLifeRaceCount !== 1 ? "s" : ""}`}
                 />
@@ -1034,35 +1123,30 @@ function TrackSwitcher({
   entries: TrackIndexEntry[];
   linkFor: (trackId: string) => string;
 }) {
-  const [open, setOpen] = useState(false);
   if (entries.length < 2) return null;
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
+    <Menu>
+      <MenuTrigger
         aria-label="Switch track"
-        className="grid size-8 place-items-center rounded-lg text-tone-500 hover:bg-tone-800 hover:text-tone-100"
+        className="grid size-8 place-items-center rounded-lg text-tone-500 outline-none hover:bg-tone-800 hover:text-tone-100 focus-visible:ring-1 focus-visible:ring-tone-600"
       >
-        <ChevronDown className="size-5" />
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 z-40 mt-1.5 max-h-96 w-80 overflow-y-auto rounded-xl bg-tone-900 p-1.5 shadow-2xl shadow-tone-1000/40 ring-1 ring-tone-800">
-          <div className="px-2.5 pt-1.5 pb-1 text-xs text-tone-500">
+        <ChevronDown aria-hidden className="size-5" />
+      </MenuTrigger>
+      <MenuPopup
+        className="max-h-[min(24rem,var(--available-height))] w-80"
+        aria-label="Switch track"
+      >
+        <MenuGroup>
+          <MenuGroupLabel>
             Calendar order · switching keeps your tab
-          </div>
+          </MenuGroupLabel>
           {entries.map((entry) => (
-            <Link
+            <MenuLinkItem
               key={entry.trackId}
-              to={linkFor(entry.trackId)}
-              onClick={() => setOpen(false)}
-              className={cn(
-                "flex items-center justify-between gap-4 rounded-lg px-2.5 py-1.5 text-sm",
-                entry.trackId === current
-                  ? "bg-active/10 text-tone-50"
-                  : "text-tone-200 hover:bg-tone-800",
-              )}
+              render={<Link to={linkFor(entry.trackId)} />}
+              aria-current={entry.trackId === current ? "page" : undefined}
+              label={getTrackDisplayName(entry.track)}
+              className="justify-between gap-4 text-sm text-tone-200"
             >
               <span className="flex items-center gap-2">
                 <TrackFlag track={entry.track} />
@@ -1072,11 +1156,11 @@ function TrackSwitcher({
                 {entry.qualiPbMs ? msToLapTime(entry.qualiPbMs) : "—"} ·{" "}
                 {entry.sessionCount}
               </span>
-            </Link>
+            </MenuLinkItem>
           ))}
-        </div>
-      )}
-    </div>
+        </MenuGroup>
+      </MenuPopup>
+    </Menu>
   );
 }
 
@@ -1225,51 +1309,59 @@ function formatRaceTime(ms: number): string {
   return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
 }
 
+type QualiSetupChoice = "fastest" | "latest";
+
+const QUALI_SETUP_OPTIONS: readonly SegmentedOption<QualiSetupChoice>[] = [
+  { value: "fastest", label: "Fastest" },
+  { value: "latest", label: "Latest" },
+];
+
 function TrackSetupsTab({ setups }: { setups: TrackSetups }) {
-  const [qualiChoice, setQualiChoice] = useState<"fastest" | "latest">(
-    "fastest",
-  );
+  const [qualiChoice, setQualiChoice] = useState<QualiSetupChoice>("fastest");
   const quali =
     qualiChoice === "fastest" ? setups.qualiFastest : setups.qualiLatest;
-  const sessionLabel = (use: NonNullable<TrackSetups["race"]>) =>
-    `${use.data.summary.isOnline ? "Online" : "Practice"} ${sessionKindLabel(use.kind).toLowerCase()} · ${formatShortDate(use.data.summary.date)}`;
+  // Opens the session's own Setup tab, the way that tab links back here.
+  const sessionLink = (use: TrackSetupUse) => (
+    <Link
+      to={`${sessionSummaryPath(use.data.summary)}?${SESSION_TAB_QUERY_PARAM}=setup`}
+      className="hover:text-tone-100"
+    >
+      {use.data.summary.isOnline ? "Online" : "Practice"}{" "}
+      {sessionKindLabel(use.kind).toLowerCase()} ·{" "}
+      {formatShortDate(use.data.summary.date)} →
+    </Link>
+  );
   if (!setups.qualiFastest && !setups.race) {
     return (
-      <p className="text-sm text-tone-500">
-        No setups recorded here yet: the game exports your own setup with each
-        save.
-      </p>
+      <Panel>
+        <EmptyState
+          icon={SlidersHorizontal}
+          title="No setups here yet"
+          message="The game exports your own setup with each save."
+        />
+      </Panel>
     );
   }
   return (
     <>
-      <div className="grid gap-5 lg:grid-cols-2">
-        {quali && (
-          <Panel>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <span className="text-xs text-tone-500">Qualifying setup</span>
-              {setups.qualiLatest &&
-                setups.qualiFastest &&
-                setups.qualiLatest !== setups.qualiFastest && (
-                  <div className="flex rounded-lg bg-tone-800/60 p-0.5 text-xs">
-                    {(["fastest", "latest"] as const).map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setQualiChoice(value)}
-                        className={cn(
-                          "rounded-md px-2.5 py-1",
-                          qualiChoice === value
-                            ? "bg-tone-900 text-tone-50 ring-1 ring-tone-700"
-                            : "text-tone-400",
-                        )}
-                      >
-                        {value === "fastest" ? "Fastest" : "Latest"}
-                      </button>
-                    ))}
-                  </div>
-                )}
-            </div>
+      <div className={panelGridClass}>
+        <SetupPanel
+          kind="qualifying"
+          aside={
+            setups.qualiLatest &&
+            setups.qualiFastest &&
+            setups.qualiLatest !== setups.qualiFastest && (
+              <SegmentedControl<QualiSetupChoice>
+                size="sm"
+                ariaLabel="Qualifying setup"
+                options={QUALI_SETUP_OPTIONS}
+                value={qualiChoice}
+                onChange={setQualiChoice}
+              />
+            )
+          }
+        >
+          {quali ? (
             <SetupSheet
               setup={quali.setup}
               title={
@@ -1285,20 +1377,29 @@ function TrackSetupsTab({ setups }: { setups: TrackSetups }) {
                   </span>
                 </>
               }
-              meta={sessionLabel(quali)}
+              meta={sessionLink(quali)}
             />
-          </Panel>
-        )}
-        {setups.race && (
-          <Panel>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <span className="text-xs text-tone-500">Race setup</span>
+          ) : (
+            <EmptyState
+              icon={SlidersHorizontal}
+              title="No qualifying setup yet"
+              message="Your fastest one shows here once you qualify."
+            />
+          )}
+        </SetupPanel>
+        <SetupPanel
+          kind="race"
+          aside={
+            setups.race && (
               <span className="text-xs text-tone-500">
                 {setups.raceIsFastest
                   ? "latest, and your fastest race lap here"
                   : "latest"}
               </span>
-            </div>
+            )
+          }
+        >
+          {setups.race ? (
             <SetupSheet
               setup={setups.race.setup}
               title={
@@ -1309,26 +1410,54 @@ function TrackSetupsTab({ setups }: { setups: TrackSetups }) {
                   </span>
                 </>
               }
-              meta={sessionLabel(setups.race)}
+              meta={sessionLink(setups.race)}
             />
-          </Panel>
-        )}
+          ) : (
+            <EmptyState
+              icon={SlidersHorizontal}
+              title="No race setup yet"
+              message="Your latest one shows here once you race."
+            />
+          )}
+        </SetupPanel>
       </div>
       <Panel
         title="Every setup you've run here"
         hint="Newest first. Brake bias changed from the wheel doesn't count as a new setup."
       >
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-tone-500">
-                <th className="py-2 pr-4 font-normal">Last used</th>
-                <th className="py-2 pr-4 font-normal">Used for</th>
-                <th className="py-2 pr-4 font-normal">Aero</th>
-                <th className="py-2 pr-4 font-normal">Diff</th>
-                <th className="py-2 pr-4 font-normal">ARB</th>
-                <th className="py-2 pr-4 text-right font-normal">Sessions</th>
-                <th className="py-2 text-right font-normal">Best lap</th>
+          <table className={tableClass}>
+            <thead className={tableHeadClass}>
+              <tr>
+                <th className={tableHeadCellClass({ layout: "flush" })}>
+                  Last used
+                </th>
+                <th className={tableHeadCellClass({ layout: "flush" })}>
+                  Used for
+                </th>
+                <th className={tableHeadCellClass({ layout: "flush" })}>
+                  Aero
+                </th>
+                <th className={tableHeadCellClass({ layout: "flush" })}>
+                  Diff
+                </th>
+                <th className={tableHeadCellClass({ layout: "flush" })}>ARB</th>
+                <th
+                  className={tableHeadCellClass({
+                    align: "right",
+                    layout: "flush",
+                  })}
+                >
+                  Sessions
+                </th>
+                <th
+                  className={tableHeadCellClass({
+                    align: "right",
+                    layout: "flush",
+                  })}
+                >
+                  Best lap
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1342,35 +1471,83 @@ function TrackSetupsTab({ setups }: { setups: TrackSetups }) {
                   setups.qualiFastest &&
                   group.bestLapMs === setups.qualiFastest.data.bestLapMs;
                 return (
-                  <tr key={group.key} className="border-t border-tone-800/70">
-                    <td className="py-2 pr-4 text-tone-300">
+                  <tr key={group.key} className={tableRowClass}>
+                    <td
+                      className={tableCellClass({
+                        layout: "flush",
+                        className: "text-tone-300",
+                      })}
+                    >
                       {formatShortDate(group.lastDate)}
                     </td>
-                    <td className="py-2 pr-4 text-tone-300">
-                      {group.kinds.map((k) => sessionKindLabel(k)).join(", ")}
+                    <td
+                      className={tableCellClass({
+                        layout: "flush",
+                        className: "text-tone-300",
+                      })}
+                    >
+                      <span className="flex flex-wrap gap-x-3">
+                        {group.kinds.map((k) => (
+                          <span key={k} className="whitespace-nowrap">
+                            <SessionKindIcon
+                              kind={k}
+                              className="mr-1 text-tone-500"
+                            />
+                            {sessionKindLabel(k)}
+                          </span>
+                        ))}
+                      </span>
                     </td>
-                    <td className="py-2 pr-4 font-mono text-tone-100">
+                    <td
+                      className={tableCellClass({
+                        layout: "flush",
+                        mono: true,
+                        className: "text-tone-100",
+                      })}
+                    >
                       {lines.Aerodynamics}
                     </td>
-                    <td className="py-2 pr-4 font-mono text-tone-100">
+                    <td
+                      className={tableCellClass({
+                        layout: "flush",
+                        mono: true,
+                        className: "text-tone-100",
+                      })}
+                    >
                       {lines.Transmission}
                     </td>
-                    <td className="py-2 pr-4 font-mono text-tone-100">
+                    <td
+                      className={tableCellClass({
+                        layout: "flush",
+                        mono: true,
+                        className: "text-tone-100",
+                      })}
+                    >
                       {lines.Suspension?.split(" ")[1]}
                     </td>
-                    <td className="py-2 pr-4 text-right text-tone-400">
+                    <td
+                      className={tableCellClass({
+                        align: "right",
+                        layout: "flush",
+                        className: "text-tone-400",
+                      })}
+                    >
                       {group.sessionCount}
                     </td>
                     <td
-                      className={cn(
-                        "py-2 text-right font-mono",
-                        isPb ? "text-best" : "text-tone-100",
-                      )}
+                      className={tableCellClass({
+                        align: "right",
+                        layout: "flush",
+                        mono: true,
+                        className: isPb ? "text-best" : "text-tone-100",
+                      })}
                     >
                       {msToLapTime(group.bestLapMs)}
-                      <span className="ml-1.5 font-sans text-xs text-tone-500">
-                        {sessionKindLabel(group.bestKind).toLowerCase()}
-                      </span>
+                      <SessionKindIcon
+                        kind={group.bestKind}
+                        label={`Set in ${sessionKindLabel(group.bestKind).toLowerCase()}`}
+                        className="ml-1.5 text-xs text-tone-500"
+                      />
                     </td>
                   </tr>
                 );

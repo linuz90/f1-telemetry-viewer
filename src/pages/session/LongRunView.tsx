@@ -1,50 +1,66 @@
 import { useMemo, useState, type ReactNode } from "react";
 import type { TelemetrySession } from "../../types/telemetry";
 import { useScopedSessions } from "../../hooks/useSessionLog";
-import { useSession } from "../../hooks/useSession";
-import { summaryKind } from "../../analysis/sessionKind";
+import { useStintComparison } from "../../hooks/useStintComparison";
 import {
-  buildLongRunStints,
+  lapTelemetryHref,
+  useRecordedLapFinder,
+} from "../../hooks/useLapRecordings";
+import {
   buildLongRunWorthALook,
-  compareLongRuns,
   type WorthTarget,
 } from "../../analysis/worthALook";
+import {
+  placeComparisonOnLaps,
+  progressionHeadline,
+  stintCompareDetail,
+  stintDeltaClaim,
+  stintHistory,
+} from "../../analysis/stintCompare";
 import {
   buildDriverLapSeries,
   buildSafetyCarBands,
 } from "../../analysis/lapChartModel";
-import { findFocusedDriver, findPlayer } from "../../utils/stats/drivers";
-import { getTrackId } from "../../utils/tracks";
+import {
+  driverBestLapTimeMs,
+  findFocusedDriver,
+} from "../../utils/stats/drivers";
+import { getTrackDisplayName } from "../../utils/tracks";
 import { msToLapTime } from "../../utils/format";
-import { getCompoundColor } from "../../utils/colors";
-import { PUNCTURE_THRESHOLD } from "../../utils/stats/tyres";
-import { LapChart } from "../../components/charts/LapChart";
+import { sessionSaveSlugs } from "../../utils/deduplicateSessions";
+import { LapChart, type LapChartPanel } from "../../components/charts/LapChart";
+import {
+  PROGRESSION_TILES,
+  StintCompareLine,
+  StintComparePicker,
+  StintProgression,
+  stintCompareTooltipRows,
+} from "../../components/session/StintCompare";
 import {
   SessionShell,
   useSessionTab,
 } from "../../components/session/SessionShell";
-import {
-  Panel,
-  SetupSheet,
-  WorthList,
-} from "../../components/session/SessionParts";
+import { WorthList } from "../../components/session/SessionParts";
+import { Panel } from "../../components/ui/Panel";
+import { heroCardClass } from "../../components/ui/surfaces";
 import { LapTelemetrySection } from "../../components/lap-telemetry/LapTelemetrySection";
 import { DuplicateNotice } from "../../components/DuplicateNotice";
-import { formatDayLabel } from "../../components/sessions/sessionFormat";
 import { LapTable } from "./LapTable";
+import { SessionSetup } from "./SessionSetup";
 
 const TABS = [
   { key: "overview", label: "Overview" },
   { key: "laps", label: "Laps" },
   { key: "tyres", label: "Tyres" },
   { key: "lap-telemetry", label: "Lap telemetry" },
-  { key: "car", label: "Car" },
+  { key: "setup", label: "Setup" },
 ] as const;
 
 /**
  * A long run: an offline race saved before the flag. It has no result to
- * show, so it answers practice questions: pace and wear on each tyre, and how
- * it compares with the last run here at the same race length.
+ * show, so it answers practice questions: pace and wear on each tyre, and
+ * whether it beat the earlier runs here at the same race length
+ * (`src/analysis/stintCompare.ts`).
  */
 export function LongRunView({
   session,
@@ -58,55 +74,61 @@ export function LongRunView({
   const meta = scoped.find((s) => s.slug === slug);
   const driver = findFocusedDriver(session);
   const [expanded, setExpanded] = useState(false);
-  const raceLaps = session["session-info"]["total-laps"];
 
-  // The previous long run at this track and race length, for the comparison.
-  const previousMeta = meta
-    ? scoped.find(
-        (s) =>
-          s.slug !== meta.slug &&
-          s.date < meta.date &&
-          // Two saves of one session (a manual save, then another) are the
-          // same run, not a previous one.
-          (!meta.sessionUid || s.sessionUid !== meta.sessionUid) &&
-          summaryKind(s) === "long-run" &&
-          getTrackId(s.track) === getTrackId(meta.track) &&
-          (s.playerRaceResult?.totalLaps ?? raceLaps) === raceLaps &&
-          (s.stints?.length ?? 0) > 0,
-      )
-    : undefined;
-  const { session: previous } = useSession(previousMeta?.slug);
-  const previousDriver = previous ? findPlayer(previous) : undefined;
-
-  const stints = useMemo(
-    () => (driver ? buildLongRunStints(driver) : []),
-    [driver],
-  );
+  const model = useStintComparison(session, slug, driver);
+  const { stints, comparison, compare, label } = model;
   const series = useMemo(
     () => (driver ? buildDriverLapSeries(driver, session) : null),
     [driver, session],
   );
-  const comparisons = useMemo(
-    () =>
-      driver && previousDriver && previousMeta
-        ? compareLongRuns(
-            { driver },
-            { driver: previousDriver, date: previousMeta.date },
-          )
-        : [],
-    [driver, previousDriver, previousMeta],
+  const laps = series?.lapsMs.length ?? 0;
+  const placed = useMemo(
+    () => (comparison ? placeComparisonOnLaps(comparison, laps) : null),
+    [comparison, laps],
   );
-  const headlineComparison = [...comparisons].sort(
-    (a, b) => Math.abs(b.deltaMs) - Math.abs(a.deltaMs),
-  )[0];
+  const compareLabel = compare ? label(compare) : "";
+
+  // Each stint against the latest earlier run on its tyre; the biggest
+  // change is the headline, the rest are Worth a look.
+  const labelled = useMemo(
+    () => model.defaults.map((c) => ({ comparison: c, label: label(c.b) })),
+    [model.defaults, label],
+  );
+  const headlineComparison =
+    [...model.defaults]
+      .filter((c) => c.deltaMs != null)
+      .sort((x, y) => Math.abs(y.deltaMs!) - Math.abs(x.deltaMs!))[0] ?? null;
   const worth = useMemo(
     () =>
       buildLongRunWorthALook({
         stints,
-        comparisons,
-        headlineCompound: headlineComparison?.compound ?? null,
+        comparisons: labelled,
+        headline: headlineComparison,
       }),
-    [stints, comparisons, headlineComparison],
+    [stints, labelled, headlineComparison],
+  );
+
+  // Lap telemetry for a paired lap: this run's lap beside the other's.
+  const ownSaves = useMemo(
+    () => (meta ? sessionSaveSlugs(meta) : [slug]),
+    [meta, slug],
+  );
+  const compareMeta = compare
+    ? scoped.find((s) => s.slug === compare.slug)
+    : undefined;
+  const compareSaves = useMemo(
+    () =>
+      compareMeta
+        ? sessionSaveSlugs(compareMeta)
+        : compare
+          ? [compare.slug]
+          : [],
+    [compareMeta, compare],
+  );
+  const findOwnLap = useRecordedLapFinder(ownSaves, driver?.index);
+  const findCompareLap = useRecordedLapFinder(
+    compareSaves,
+    compare?.slug === slug ? driver?.index : "player",
   );
 
   const shell = (children: ReactNode) => (
@@ -130,25 +152,32 @@ export function LongRunView({
       <p className="text-sm text-tone-500">No laps in this save.</p>,
     );
 
-  const laps = series.lapsMs.length;
   const bands = buildSafetyCarBands(driver);
   const thin = stints.filter((s) => s.cleanLaps > 0 && s.cleanLaps < 3);
-  const previousLabel =
-    previousMeta &&
-    meta &&
-    previousMeta.date.split("T")[0] === meta.date.split("T")[0]
-      ? `${previousMeta.date.split("T")[1]?.slice(0, 5)} run`
-      : previousMeta
-        ? `${formatDayLabel(previousMeta.date.split("T")[0])} run`
-        : "last run";
-  const headline = headlineComparison
-    ? Math.abs(headlineComparison.deltaMs) < 50
-      ? `${headlineComparison.compound}s matched your ${previousLabel}, within ${(Math.abs(headlineComparison.deltaMs) / 1000).toFixed(3)} s a lap.`
-      : `${headlineComparison.compound}s ran ${(Math.abs(headlineComparison.deltaMs) / 1000).toFixed(3)} s a lap ${headlineComparison.deltaMs > 0 ? "slower" : "faster"} than your ${previousLabel}.`
-    : stints
-        .filter((s) => s.averageMs != null)
-        .map((s) => `${s.compound} ${msToLapTime(s.averageMs!)}`)
-        .join(" · ") || "Not enough clean laps for a pace number.";
+  const headlineHistory = headlineComparison
+    ? stintHistory(headlineComparison.a, model.pool)
+    : [];
+  const headline =
+    (headlineComparison &&
+      (progressionHeadline(
+        headlineComparison.a,
+        headlineHistory
+          .slice(-PROGRESSION_TILES)
+          .map((stint) => ({ stint, label: label(stint) })),
+        headlineHistory.length,
+      ) ??
+        stintDeltaClaim(headlineComparison, label(headlineComparison.b)))) ||
+    stints
+      .filter((s) => s.averageMs != null)
+      .map((s) => `${s.compound} ${msToLapTime(s.averageMs!)}`)
+      .join(" · ") ||
+    "Not enough clean laps for a pace number.";
+  const headlineDetail = headlineComparison
+    ? stintCompareDetail(headlineComparison)
+    : "";
+  const trackName = getTrackDisplayName(
+    meta?.track ?? String(session["session-info"]["track-id"]),
+  );
   const openTarget = (target: WorthTarget) => {
     if (TABS.some((t) => t.key === target))
       setTab(target as (typeof TABS)[number]["key"]);
@@ -163,92 +192,120 @@ export function LongRunView({
     const reason = series.excluded.get(lap);
     return {
       title: `Lap ${lap}`,
-      rows: ms
-        ? [
-            {
-              tone: "you" as const,
-              value: msToLapTime(ms),
-              label: `${series.compoundByLap.get(lap) ?? ""}${reason ? ` · not counted: ${reason}` : ""}`,
-            },
-          ]
-        : [],
+      rows: [
+        ...(ms
+          ? [
+              {
+                tone: "you" as const,
+                value: msToLapTime(ms),
+                label: `${series.compoundByLap.get(lap) ?? ""}${reason ? ` · not counted: ${reason}` : ""}`,
+              },
+            ]
+          : []),
+        ...(placed ? stintCompareTooltipRows(placed, lap, compareLabel) : []),
+      ],
     };
   };
-  const timePanel = (height: number) => ({
-    kind: "time" as const,
-    height,
-    series: [
-      {
-        key: "you",
-        tone: "you" as const,
-        lapsMs: series.lapsMs,
-        excluded: series.excluded,
-        averages: series.stints
-          .filter((s) => s.averageMs != null)
-          .map((s) => ({ from: s.from, to: s.to, ms: s.averageMs! })),
-      },
-    ],
-  });
+  // Your laps, with the compared stint on the same tyre age and the running
+  // gap to it underneath.
+  const lapPanels = (height: number): LapChartPanel[] => [
+    {
+      kind: "time",
+      height,
+      series: [
+        ...(placed && comparison
+          ? [
+              {
+                key: "compare",
+                tone: "compare" as const,
+                lapsMs: placed.lapsMs,
+                excluded: placed.excluded,
+                averages:
+                  comparison.b.averageMs != null
+                    ? [
+                        {
+                          from: comparison.a.startLap,
+                          to: Math.min(
+                            laps,
+                            comparison.a.startLap +
+                              (comparison.b.endLap - comparison.b.startLap),
+                          ),
+                          ms: comparison.b.averageMs,
+                        },
+                      ]
+                    : [],
+              },
+            ]
+          : []),
+        {
+          key: "you",
+          tone: "you" as const,
+          lapsMs: series.lapsMs,
+          excluded: series.excluded,
+          averages: series.stints
+            .filter((s) => s.averageMs != null)
+            .map((s) => ({ from: s.from, to: s.to, ms: s.averageMs! })),
+        },
+      ],
+    },
+    ...(placed && comparison && comparison.pairs.length > 0
+      ? [
+          {
+            kind: "gap" as const,
+            height: Math.round(height * 0.45),
+            label: `Gap to ${compareLabel}`,
+            gapMs: placed.gapMs,
+          },
+        ]
+      : []),
+  ];
+  const telemetryHref =
+    placed && findOwnLap && findCompareLap
+      ? (lap: number) => {
+          const own = series.lapsMs[lap - 1];
+          const other = placed.lapsMs[lap - 1];
+          const refA = own != null ? findOwnLap(own) : undefined;
+          const refB = other != null ? findCompareLap(other) : undefined;
+          return refA && refB ? lapTelemetryHref([refA, refB]) : undefined;
+        }
+      : undefined;
+  const compareControls = (model.pool.length > 0 || stints.length > 1) && (
+    <StintComparePicker model={model} />
+  );
 
   return shell(
     <>
       {tab === "overview" && (
         <>
-          <section className="rounded-2xl bg-tone-900 p-5 ring-1 ring-tone-800 sm:p-6">
+          <section className={heroCardClass}>
             <p className="max-w-3xl text-lg leading-snug font-medium text-tone-50">
               {headline}
             </p>
-            {headlineComparison?.setupNote && (
-              <p className="mt-1 text-sm text-tone-400">
-                {headlineComparison.setupNote}
+            {headlineDetail && (
+              <p className="mt-1 max-w-3xl text-sm text-tone-400">
+                {headlineDetail}
               </p>
             )}
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {stints.map((stint) => (
-                <div
-                  key={stint.startLap}
-                  className="rounded-xl bg-tone-800/40 p-4 ring-1 ring-tone-800"
-                >
-                  <div className="flex items-center gap-2 text-sm">
-                    <span
-                      className="size-3 rounded-full"
-                      style={{
-                        backgroundColor: getCompoundColor(stint.compound),
-                      }}
-                    />
-                    <b className="font-semibold text-tone-50">
-                      {stint.compound}
-                    </b>
-                    <span className="ml-auto text-xs text-tone-500">
-                      laps {stint.startLap}–{stint.endLap}
-                    </span>
-                  </div>
-                  <div className="mt-2 font-mono text-3xl font-semibold tracking-tight text-tone-50">
-                    {stint.averageMs ? msToLapTime(stint.averageMs) : "—"}
-                  </div>
-                  <div className="text-xs text-tone-500">
-                    {stint.averageMs
-                      ? `average, ${stint.cleanLaps} clean laps`
-                      : "too few clean laps"}{" "}
-                    · best {stint.bestMs ? msToLapTime(stint.bestMs) : "—"}
-                  </div>
-                  <div className="mt-3 border-t border-tone-800 pt-2.5 text-sm text-tone-400">
-                    <b className="font-semibold text-tone-50">
-                      {stint.wearPerLap.toFixed(1)}%
-                    </b>{" "}
-                    wear a lap ·{" "}
-                    <b className="font-semibold text-tone-50">
-                      ~{stint.lifeLaps} laps
-                    </b>{" "}
-                    to {PUNCTURE_THRESHOLD}%
-                  </div>
-                </div>
+                <StintProgression
+                  key={stint.id}
+                  model={model}
+                  stint={stint}
+                  trackName={trackName}
+                />
               ))}
             </div>
+            {compareControls && (
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <StintCompareLine model={model} />
+                {compareControls}
+              </div>
+            )}
             <LapChart
-              className="mt-5"
+              className="mt-4"
               laps={laps}
-              panels={[timePanel(170)]}
+              panels={lapPanels(170)}
               bands={bands}
               pits={series.pitInLaps}
               stints={chartStints}
@@ -257,6 +314,8 @@ export function LongRunView({
             <p className="mt-2 text-xs text-tone-500">
               Faded dots are left out of the averages: the start, in-laps and
               pit laps.
+              {placed &&
+                " The gap adds up lap-for-lap differences on the same tyre age; below the line is time gained."}
               {thin.length > 0 &&
                 ` ${thin.map((s) => `${s.compound}s rest on ${s.cleanLaps} clean lap${s.cleanLaps === 1 ? "" : "s"}`).join(", ")}, so treat that number as rough.`}
             </p>
@@ -274,10 +333,12 @@ export function LongRunView({
           <Panel
             title="Lap times"
             hint="Hover any lap. Faded dots are left out of the averages."
+            action={compareControls}
           >
+            <StintCompareLine model={model} className="mb-3" />
             <LapChart
               laps={laps}
-              panels={[timePanel(200)]}
+              panels={lapPanels(200)}
               bands={bands}
               pits={series.pitInLaps}
               stints={chartStints}
@@ -285,30 +346,64 @@ export function LongRunView({
             />
           </Panel>
           <Panel title="Every lap">
-            <LapTable driver={driver} series={series} />
+            <LapTable
+              driver={driver}
+              series={series}
+              compare={
+                placed
+                  ? { label: compareLabel, laps: placed, telemetryHref }
+                  : undefined
+              }
+            />
           </Panel>
         </>
       )}
       {tab === "tyres" && (
-        <Panel title="Tyre wear" hint="Worst wheel, lap by lap">
+        <Panel
+          title="Tyre wear"
+          hint="Worst wheel, lap by lap"
+          action={compareControls}
+        >
+          <StintCompareLine model={model} className="mb-3" />
           <LapChart
             laps={laps}
-            panels={[{ kind: "wear", height: 170, wear: series.wear }]}
+            panels={[
+              {
+                kind: "wear",
+                height: 170,
+                wear: series.wear,
+                compare: placed?.wear,
+              },
+            ]}
             pits={series.pitInLaps}
             stints={chartStints}
-            tooltip={(lap) => ({
-              title: `Lap ${lap}`,
-              rows:
-                series.wear[lap - 1] != null
-                  ? [
-                      {
-                        tone: "you",
-                        value: `${Math.round(series.wear[lap - 1]!)}%`,
-                        label: `worst wheel · ${series.compoundByLap.get(lap) ?? ""}`,
-                      },
-                    ]
-                  : [],
-            })}
+            tooltip={(lap) => {
+              const own = series.wear[lap - 1];
+              const other = placed?.wear[lap - 1];
+              return {
+                title: `Lap ${lap}`,
+                rows: [
+                  ...(own != null
+                    ? [
+                        {
+                          tone: "you" as const,
+                          value: `${Math.round(own)}%`,
+                          label: `worst wheel · ${series.compoundByLap.get(lap) ?? ""}`,
+                        },
+                      ]
+                    : []),
+                  ...(other != null
+                    ? [
+                        {
+                          tone: "compare" as const,
+                          value: `${Math.round(other)}%`,
+                          label: `${compareLabel}, lap ${placed!.lapB[lap - 1]}`,
+                        },
+                      ]
+                    : []),
+                ],
+              };
+            }}
           />
         </Panel>
       )}
@@ -322,16 +417,13 @@ export function LongRunView({
           }}
         />
       )}
-      {tab === "car" && driver["car-setup"]?.["is-valid"] && (
-        <div className="grid items-start gap-5 lg:grid-cols-2">
-          <Panel>
-            <SetupSheet
-              setup={driver["car-setup"]}
-              title="Setup used"
-              meta="This long run"
-            />
-          </Panel>
-        </div>
+      {tab === "setup" && (
+        <SessionSetup
+          kind="long-run"
+          driver={driver}
+          bestLapMs={driverBestLapTimeMs(driver)}
+          trackName={meta?.track ?? String(session["session-info"]["track-id"])}
+        />
       )}
     </>,
   );

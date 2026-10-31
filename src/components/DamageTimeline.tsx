@@ -14,9 +14,10 @@ import {
 } from "../analysis/damageAnalysis";
 import type { PerLapInfo } from "../types/telemetry";
 import { Badge } from "./ui/Badge";
-import { CHART_THEME, DAMAGE_COLORS, TOOLTIP_STYLE } from "../constants/colors";
-import { EmptyState } from "./EmptyState";
-import { SectionHeader } from "./ui/SectionHeader";
+import { CHART_THEME, DAMAGE_COLORS } from "../constants/colors";
+import { chartTooltipClass } from "./charts/chartStyles";
+import { cn } from "../utils/cn";
+import { Panel } from "./ui/Panel";
 import { HStack } from "./ui/Stack";
 
 interface DamageTimelineProps {
@@ -33,37 +34,30 @@ const DAMAGE_FIELD_COLORS: Record<string, string> = {
   gearbox: DAMAGE_COLORS.gearbox,
 };
 
+/**
+ * The driver's damage and faults, lap by lap, beside the lap times they
+ * explain. A clean race, or one too short to chart, shows nothing.
+ */
 export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
-  // Need at least 2 data points to draw a meaningful timeline
-  if (perLapInfo.length < 2) {
-    return (
-      <EmptyState
-        title="Damage"
-        message="Not enough lap data was recorded to show the damage timeline."
-      />
-    );
-  }
+  if (perLapInfo.length < 2) return null;
 
   const analysis = buildDamageAnalysis(perLapInfo);
   const activeFields = DAMAGE_SERIES_FIELDS.filter((field) =>
     analysis.activeFieldKeys.includes(field.key),
   );
 
-  // Check if any damage occurred at all
   if (activeFields.length === 0) {
     if (analysis.faults.length === 0) return null;
     // Only faults, no damage chart needed — just show badges
     return (
-      <div>
-        <SectionHeader size="sm" title="Damage" />
+      <Panel title="Damage">
         <FaultBadges faults={analysis.faults} />
-      </div>
+      </Panel>
     );
   }
 
   return (
-    <div>
-      <SectionHeader size="sm" title="Damage" />
+    <Panel title="Damage" hint="Hover any lap">
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart
           data={analysis.data}
@@ -89,12 +83,31 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
             width={35}
           />
           <Tooltip
-            {...TOOLTIP_STYLE}
-            labelFormatter={(lap) => `Lap ${lap}`}
-            formatter={(
-              value: number | undefined,
-              name: string | undefined,
-            ) => [value != null ? `${value.toFixed(0)}%` : "–", name ?? ""]}
+            content={({ active, label, payload }) =>
+              active && payload?.length ? (
+                <div className={cn(chartTooltipClass, "px-3 py-2")}>
+                  <div className="mb-0.5 text-tone-400">Lap {label}</div>
+                  {payload.map((entry) => (
+                    <div
+                      key={String(entry.dataKey)}
+                      className="flex items-center gap-1.5 text-tone-200"
+                    >
+                      <span
+                        aria-hidden
+                        className="size-2 rounded-full"
+                        style={{ backgroundColor: entry.color }}
+                      />
+                      {entry.name}
+                      <span className="ml-auto pl-3 font-mono tabular-nums">
+                        {typeof entry.value === "number"
+                          ? `${entry.value.toFixed(0)}%`
+                          : "–"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : null
+            }
           />
           {activeFields.map((field) => (
             // Damage arrives in jumps, so the line steps rather than curves.
@@ -127,7 +140,7 @@ export function DamageTimeline({ perLapInfo }: DamageTimelineProps) {
         ))}
       </div>
       {analysis.faults.length > 0 && <FaultBadges faults={analysis.faults} />}
-    </div>
+    </Panel>
   );
 }
 

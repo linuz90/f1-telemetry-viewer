@@ -1,4 +1,4 @@
-import { cn } from "../../utils/cn";
+import { Switch } from "@base-ui/react/switch";
 
 /**
  * "Focus driver only" toggle used above the qualifying and race results tables.
@@ -16,23 +16,16 @@ export function FocusToggle({
   return (
     <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs text-tone-400 cursor-pointer select-none">
       {label}
-      <button
-        type="button"
-        role="switch"
-        aria-checked={value}
-        onClick={onChange}
-        className={cn(
-          "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
-          value ? "bg-cyan-600" : "bg-tone-800",
-        )}
+      <Switch.Root
+        checked={value}
+        onCheckedChange={onChange}
+        className="relative inline-flex h-4 w-7 items-center rounded-full bg-tone-800 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-tone-600 data-checked:bg-active"
       >
-        <span
-          className={cn(
-            "inline-block h-3 w-3 rounded-full bg-white transition-transform",
-            value ? "translate-x-3.5" : "translate-x-0.5",
-          )}
-        />
-      </button>
+        {/* The thumb is white in both themes on purpose: a tone token would
+            turn it near-black in light mode, which reads as a hole in the
+            track rather than a knob. */}
+        <Switch.Thumb className="inline-block size-3 translate-x-0.5 rounded-full bg-white shadow-sm transition-transform data-checked:translate-x-3.5" />
+      </Switch.Root>
     </label>
   );
 }

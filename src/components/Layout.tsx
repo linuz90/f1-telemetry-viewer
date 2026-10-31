@@ -1,3 +1,4 @@
+import { pageGutterClass } from "./ui/page";
 import { ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { Outlet, useLocation, useNavigationType } from "react-router-dom";
@@ -7,7 +8,7 @@ import { useTelemetry } from "../context/TelemetryContext";
 import { cn } from "../utils/cn";
 import { readStoredString, writeStoredString } from "../utils/storage";
 import { AppBrand } from "./AppBrand";
-import { cardHighlight } from "./Card";
+import { cardHighlight } from "./ui/surfaces";
 import { ChangelogModal } from "./ChangelogModal";
 import { CommandPalette } from "./shell/CommandPalette";
 import { setCommandPaletteOpen } from "./shell/commandPaletteStore";
@@ -79,10 +80,13 @@ export function Layout() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <TopBar hasUnseenChangelog={hasUnseen} onOpenChangelog={openChangelog} />
+      <TopBar
+        hasUnseenChangelog={hasUnseen}
+        onOpenChangelog={latestHash ? openChangelog : undefined}
+      />
       <main className="min-w-0">
         {mode === "demo" && (
-          <div className="mx-auto max-w-6xl px-6 pt-6 pb-2">
+          <div className={cn(pageGutterClass, "pt-6 pb-2")}>
             {/*
               Two-layer background: base zinc gradient stays consistent with
               the dashboard cards, then a radial red glow biased to the bottom-

@@ -12,7 +12,7 @@ import type { TrackSessionData } from "./trackAnalysis";
  * game exports for quali saves that never ran (wings 25-25, diff 60-50).
  */
 
-const IDENTITY_KEYS: (keyof CarSetup)[] = [
+export const SETUP_IDENTITY_KEYS: (keyof CarSetup)[] = [
   "front-wing",
   "rear-wing",
   "on-throttle",
@@ -35,7 +35,9 @@ const IDENTITY_KEYS: (keyof CarSetup)[] = [
 ];
 
 export function setupIdentity(setup: CarSetup): string {
-  return IDENTITY_KEYS.map((key) => Number(setup[key]).toFixed(2)).join("|");
+  return SETUP_IDENTITY_KEYS.map((key) => Number(setup[key]).toFixed(2)).join(
+    "|",
+  );
 }
 
 export interface TrackSetupUse {

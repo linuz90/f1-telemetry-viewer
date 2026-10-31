@@ -1,3 +1,5 @@
+import { listItemClass } from "../ui/surfaces";
+import { lapColorBarClass } from "./lapColorBar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   bestLapCandidates,
@@ -73,10 +75,11 @@ function RowButton({
     <button
       type="button"
       data-slot={slot}
+      aria-pressed={!!slot}
       onClick={() => onPick(row.candidate)}
       className={cn(
-        "grid w-full grid-cols-[1.5rem_5rem_1fr_auto] items-center gap-x-3 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-tone-800/60",
-        slot && "bg-tone-800/50",
+        listItemClass,
+        "grid grid-cols-[1.5rem_5rem_1fr_auto] gap-x-3",
       )}
     >
       <span className="font-mono text-2xs font-semibold text-tone-400">
@@ -97,7 +100,7 @@ function RowButton({
       <span className="flex min-w-0 items-center gap-2">
         {showTeam && (
           <span
-            className="h-3.5 w-1 shrink-0 rounded-full"
+            className={lapColorBarClass}
             style={{ backgroundColor: recordingTeamColor(row.team) }}
           />
         )}
@@ -300,16 +303,13 @@ export function LapPicker({
   }, [slotName]);
 
   return (
-    <Modal onClose={onClose} className="max-h-[85vh] max-w-2xl overflow-hidden">
-      <div ref={bodyRef} className="flex min-h-0 flex-col gap-3 p-5">
-        <div className="pr-8">
-          <h3 className="text-lg font-semibold text-tone-100">
-            Choose lap {slotName}
-          </h3>
-          <p className="text-xs text-tone-500">
-            Only laps recorded start to finish are listed.
-          </p>
-        </div>
+    <Modal
+      onClose={onClose}
+      title={`Choose lap ${slotName}`}
+      description="Only laps recorded start to finish are listed."
+      className="max-h-[85vh] max-w-2xl overflow-hidden"
+    >
+      <div ref={bodyRef} className="flex min-h-0 flex-col gap-3 px-5 pb-5">
         {/* A row of nothing but reasons says nothing the list does not. */}
         {presets.some((preset) => preset.candidate) && (
           <div className={cn("grid gap-2", PRESET_COLUMNS[presets.length])}>
@@ -326,8 +326,8 @@ export function LapPicker({
                   className={cn(
                     "flex min-w-0 flex-col gap-1 rounded-xl px-3 py-2 text-left ring-1 ring-inset transition-colors disabled:cursor-default",
                     slot === slotName
-                      ? "bg-tone-800 ring-tone-0/[0.1]"
-                      : "bg-tone-800/40 ring-tone-0/[0.04] enabled:hover:bg-tone-800/80",
+                      ? "bg-tone-800 ring-tone-700"
+                      : "ring-tone-800 enabled:hover:bg-tone-800/60",
                   )}
                 >
                   <span className="flex items-center justify-between gap-2">
@@ -341,7 +341,7 @@ export function LapPicker({
                   {lap ? (
                     <span className="flex min-w-0 items-center gap-2">
                       <span
-                        className="h-3.5 w-1 shrink-0 rounded-full"
+                        className={lapColorBarClass}
                         style={{
                           backgroundColor: recordingTeamColor(lap.team),
                         }}
@@ -426,16 +426,12 @@ export function LapPicker({
                 >
                   <button
                     type="button"
+                    aria-pressed={driver.index === sessionDriver}
                     onClick={() => setSessionDriver(driver.index)}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
-                      driver.index === sessionDriver
-                        ? "bg-tone-800 text-tone-100"
-                        : "text-tone-400 hover:bg-tone-800/50",
-                    )}
+                    className={cn(listItemClass, "text-sm text-tone-400")}
                   >
                     <span
-                      className="h-3.5 w-1 shrink-0 rounded-full"
+                      className={lapColorBarClass}
                       style={{
                         backgroundColor: recordingTeamColor(driver.team),
                       }}

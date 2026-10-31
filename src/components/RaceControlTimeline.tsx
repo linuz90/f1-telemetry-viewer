@@ -1,3 +1,4 @@
+import { wellClass } from "./ui/surfaces";
 import {
   AlertTriangle,
   Bot,
@@ -51,6 +52,9 @@ interface RaceControlTimelineProps {
 }
 
 type ViewMode = "key" | "all";
+
+const FILTER_CAPTION_CLASS =
+  "mb-1.5 block text-2xs font-medium uppercase tracking-wider text-tone-600";
 
 const VIEW_MODE_OPTIONS = [
   { value: "key", label: "Key events" },
@@ -474,11 +478,14 @@ export function RaceControlTimeline({
         }
       />
 
-      <div className="mb-5 grid gap-3 rounded-xl bg-tone-950/30 p-2.5 ring-1 ring-inset ring-tone-0/[0.035] lg:grid-cols-2 2xl:grid-cols-[minmax(16rem,1fr)_minmax(11rem,15rem)_minmax(16rem,19rem)]">
+      <div
+        className={cn(
+          wellClass,
+          "mb-5 grid gap-3 p-2.5 lg:grid-cols-2 2xl:grid-cols-[minmax(16rem,1fr)_minmax(11rem,15rem)_minmax(16rem,19rem)]",
+        )}
+      >
         <div className="min-w-0 lg:col-span-2 2xl:col-span-1">
-          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-tone-600">
-            Search
-          </span>
+          <span className={FILTER_CAPTION_CLASS}>Search</span>
           <Input
             type="search"
             size="md"
@@ -490,9 +497,7 @@ export function RaceControlTimeline({
           />
         </div>
         <div className="min-w-0">
-          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-tone-600">
-            Event type
-          </span>
+          <span className={FILTER_CAPTION_CLASS}>Event type</span>
           <MultiPillSelect
             value={messageTypeFilter}
             onChange={setMessageTypeFilter}
@@ -503,9 +508,7 @@ export function RaceControlTimeline({
           />
         </div>
         <div className="min-w-0">
-          <span className="mb-1.5 block text-2xs font-medium uppercase tracking-wider text-tone-600">
-            Lap navigation
-          </span>
+          <span className={FILTER_CAPTION_CLASS}>Lap navigation</span>
           <RaceControlLapNavigator
             value={activeLapFilter}
             options={lapOptions}
@@ -515,10 +518,11 @@ export function RaceControlTimeline({
       </div>
 
       {visibleEvents.length === 0 ? (
-        <div className={cn(EVENT_VIEWPORT_HEIGHT, "pt-3")}>
+        <div className={cn(EVENT_VIEWPORT_HEIGHT, "flex flex-col pt-3")}>
           <EmptyState
-            title="Race control"
-            message="No race-control events match this view."
+            icon={Flag}
+            title="No race-control events"
+            message="Nothing matches this view."
           />
         </div>
       ) : (
@@ -630,7 +634,7 @@ function RaceControlEventRow({
   const primaryDriver = driverInfos[0];
 
   return (
-    <div className="rounded-md border border-tone-800/80 bg-tone-950/60 px-3 py-2.5 shadow-sm shadow-black/10">
+    <div className={cn(wellClass, "rounded-md px-3 py-2.5")}>
       <HStack align="start" className="gap-3">
         <HStack
           as="span"

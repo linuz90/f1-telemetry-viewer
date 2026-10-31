@@ -1,10 +1,13 @@
+import { floatingSurface } from "../../components/ui/surfaces";
 import { X } from "lucide-react";
 import type { DriverData } from "../../types/telemetry";
 import type { RaceDriverStats } from "../../analysis/resultsAnalysis";
 import { useScopedSessions } from "../../hooks/useSessionLog";
 import { getTeamName } from "../../utils/colors";
+import { cn } from "../../utils/cn";
 import { msToLapTime } from "../../utils/format";
 import { driverNameKey } from "../../utils/stats/drivers";
+import { stickyBelowPageTabsClass } from "../../components/ui/pageTabs";
 
 function signed(ms: number) {
   const s = (ms / 1000).toFixed(3);
@@ -67,7 +70,13 @@ export function DriverPanel({
   );
 
   return (
-    <aside className="rounded-2xl bg-tone-900 p-5 shadow-2xl shadow-tone-1000/40 ring-1 ring-tone-700 lg:sticky lg:top-20">
+    <aside
+      className={cn(
+        floatingSurface,
+        "rounded-2xl p-5",
+        stickyBelowPageTabsClass,
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-lg font-semibold tracking-tight text-tone-50">

@@ -10,10 +10,11 @@ import { ScrollArea } from "./ui/ScrollArea";
 import { SectionHeader } from "./ui/SectionHeader";
 import {
   tableCellClass,
-  tableClassLoose,
+  tableClass,
   tableHeadCellClass,
   tableHeadClass,
   tableRowClass,
+  tableRowFocusedClass,
 } from "./ui/table";
 
 interface QualifyingTableProps {
@@ -45,7 +46,7 @@ export function QualifyingTable({
         }
       />
       <ScrollArea axis="x">
-        <table className={tableClassLoose}>
+        <table className={tableClass}>
           <thead className={tableHeadClass}>
             <tr>
               <th className={tableHeadCellClass()}>Pos</th>
@@ -78,7 +79,7 @@ export function QualifyingTable({
                   key={row.driver.index}
                   className={cn(
                     tableRowClass,
-                    isFocused && "bg-tone-800/40 text-tone-0 font-medium",
+                    isFocused && tableRowFocusedClass,
                   )}
                 >
                   <td className={tableCellClass()}>{row.position}</td>

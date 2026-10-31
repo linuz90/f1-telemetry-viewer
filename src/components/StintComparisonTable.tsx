@@ -6,7 +6,7 @@ import { CompoundSwatchLabel } from "./ui/CompoundSwatchLabel";
 import { ScrollArea } from "./ui/ScrollArea";
 import {
   tableCellClass,
-  tableClass,
+  tableClassDense,
   tableHeadCellClass,
   tableHeadClass,
   tableRowClass,
@@ -31,22 +31,48 @@ export function StintComparisonTable({
   return (
     <div>
       <ScrollArea axis="x">
-        <table className={cn(tableClass, "min-w-[520px]")}>
+        <table className={cn(tableClassDense, "min-w-[520px]")}>
           <thead className={tableHeadClass}>
             <tr>
-              <th className={tableHeadCellClass()}>Stint</th>
-              <th className={tableHeadCellClass()}>Compound</th>
-              <th className={tableHeadCellClass({ align: "right" })}>Laps</th>
-              <th className={tableHeadCellClass({ align: "right" })}>
+              <th className={tableHeadCellClass({ layout: "flush" })}>Stint</th>
+              <th className={tableHeadCellClass({ layout: "flush" })}>
+                Compound
+              </th>
+              <th
+                className={tableHeadCellClass({
+                  layout: "flush",
+                  align: "right",
+                })}
+              >
+                Laps
+              </th>
+              <th
+                className={tableHeadCellClass({
+                  layout: "flush",
+                  align: "right",
+                })}
+              >
                 Median pace
               </th>
-              <th className={tableHeadCellClass({ align: "right" })}>
+              <th
+                className={tableHeadCellClass({
+                  layout: "flush",
+                  align: "right",
+                })}
+              >
                 Wear a lap
               </th>
-              <th className={tableHeadCellClass({ align: "right" })}>
+              <th
+                className={tableHeadCellClass({
+                  layout: "flush",
+                  align: "right",
+                })}
+              >
                 Pace drop
               </th>
-              <th className={tableHeadCellClass()}>Best on compound</th>
+              <th className={tableHeadCellClass({ layout: "flush" })}>
+                Best on compound
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -55,16 +81,18 @@ export function StintComparisonTable({
                 <tr key={row.stintNumber} className={tableRowClass}>
                   <td
                     className={tableCellClass({
+                      layout: "flush",
                       className: "font-medium text-tone-300",
                     })}
                   >
                     {row.stintNumber}
                   </td>
-                  <td className={tableCellClass()}>
+                  <td className={tableCellClass({ layout: "flush" })}>
                     <CompoundSwatchLabel compound={row.compound} />
                   </td>
                   <td
                     className={tableCellClass({
+                      layout: "flush",
                       align: "right",
                       mono: true,
                       className: "text-tone-300",
@@ -73,7 +101,11 @@ export function StintComparisonTable({
                     {row.stint["stint-length"]}
                   </td>
                   <td
-                    className={tableCellClass({ align: "right", mono: true })}
+                    className={tableCellClass({
+                      layout: "flush",
+                      align: "right",
+                      mono: true,
+                    })}
                   >
                     <span className="text-tone-300">
                       {row.playerPace > 0 ? msToLapTime(row.playerPace) : "–"}
@@ -83,7 +115,11 @@ export function StintComparisonTable({
                     )}
                   </td>
                   <td
-                    className={tableCellClass({ align: "right", mono: true })}
+                    className={tableCellClass({
+                      layout: "flush",
+                      align: "right",
+                      mono: true,
+                    })}
                   >
                     <span className="text-tone-300">
                       {row.playerWearRate > 0
@@ -95,7 +131,11 @@ export function StintComparisonTable({
                     )}
                   </td>
                   <td
-                    className={tableCellClass({ align: "right", mono: true })}
+                    className={tableCellClass({
+                      layout: "flush",
+                      align: "right",
+                      mono: true,
+                    })}
                   >
                     <span className="text-tone-300">
                       {row.playerDrop !== 0
@@ -108,6 +148,7 @@ export function StintComparisonTable({
                   </td>
                   <td
                     className={tableCellClass({
+                      layout: "flush",
                       className: "text-2xs text-tone-500",
                     })}
                   >

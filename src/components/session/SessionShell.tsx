@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronDown,
@@ -27,14 +27,35 @@ import {
   trackTabForSessionType,
 } from "../../utils/routes";
 import { cn } from "../../utils/cn";
+import { pageClass } from "../ui/page";
+import { Breadcrumb } from "../ui/PageHeader";
+import {
+  Menu,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuLinkItem,
+  MenuPopup,
+  MenuTrigger,
+} from "../ui/Menu";
 import { TrackFlag } from "../TrackFlag";
+import {
+  PAGE_TAB_BAR_ID,
+  PAGE_TAB_PANEL_ID,
+  pageTabBarClass,
+  pageTabListClass,
+  pageTabPanelClass,
+  revealPageTabBar,
+  type PageTabKey,
+} from "../ui/pageTabs";
+import { PageTab } from "../ui/PageTab";
+import { SessionKindIcon } from "../SessionKindIcon";
 import {
   formatDayLabel,
   sessionClock,
   sessionResult,
 } from "../sessions/sessionFormat";
 
-export interface SessionTab<K extends string = string> {
+export interface SessionTab<K extends PageTabKey = PageTabKey> {
   key: K;
   label: string;
 }
@@ -53,7 +74,7 @@ const EXTERNAL_LINK_LABEL = import.meta.env.VITE_EXTERNAL_LINK_LABEL as
  * A lap selection (`?laps=`) without a tab is a link into Lap telemetry, the
  * only tab that reads it.
  */
-export function useSessionTab<K extends string>(
+export function useSessionTab<K extends PageTabKey>(
   tabs: readonly SessionTab<K>[],
 ): [K, (tab: K) => void] {
   const [params, setParams] = useSearchParams();
@@ -71,8 +92,8 @@ export function useSessionTab<K extends string>(
     if (tab === tabs[0].key && !hasLapRefs)
       next.delete(SESSION_TAB_QUERY_PARAM);
     else next.set(SESSION_TAB_QUERY_PARAM, tab);
+    revealPageTabBar();
     setParams(next, { replace: true });
-    window.scrollTo({ top: 0 });
   };
   return [active, setTab];
 }
@@ -95,16 +116,6 @@ function DaySwitcher({
   current: string;
   sessions: SessionSummary[];
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (event: MouseEvent) => {
-      if (!ref.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
   if (sessions.length < 2) return null;
   const online = sessions.filter((s) => s.isOnline);
   const offline = sessions.filter((s) => !s.isOnline);
@@ -112,18 +123,19 @@ function DaySwitcher({
     const result = sessionResult(session);
     const best = sessionBestLapMs(session);
     return (
-      <Link
+      <MenuLinkItem
         key={session.slug}
-        to={sessionSummaryPath(session)}
-        onClick={() => setOpen(false)}
-        className={cn(
-          "flex items-baseline justify-between gap-6 rounded-lg px-2.5 py-1.5 text-sm",
-          session.slug === current
-            ? "bg-active/10 text-tone-50"
-            : "text-tone-200 hover:bg-tone-800",
-        )}
+        render={<Link to={sessionSummaryPath(session)} />}
+        aria-current={session.slug === current ? "page" : undefined}
+        className="items-baseline justify-between gap-6 text-sm text-tone-200"
       >
-        <span>{sessionRowLabel(session)}</span>
+        <span>
+          <SessionKindIcon
+            kind={summaryKind(session)}
+            className="mr-1.5 text-tone-500"
+          />
+          {sessionRowLabel(session)}
+        </span>
         <span className="text-xs text-tone-400 tabular-nums">
           {result ? (
             <b className="font-semibold text-tone-100">{result.main}</b>
@@ -132,37 +144,32 @@ function DaySwitcher({
           ) : null}{" "}
           · {sessionClock(session)}
         </span>
-      </Link>
+      </MenuLinkItem>
     );
   };
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
+    <Menu>
+      <MenuTrigger
         aria-label="Other sessions that day"
-        className="grid size-7 place-items-center rounded-lg text-tone-500 hover:bg-tone-900 hover:text-tone-100"
+        className="grid size-7 place-items-center rounded-lg text-tone-500 outline-none hover:bg-tone-900 hover:text-tone-100 focus-visible:ring-1 focus-visible:ring-tone-600"
       >
-        <ChevronDown className="size-4" />
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 z-40 mt-1.5 w-80 rounded-xl bg-tone-900 p-1.5 shadow-2xl shadow-tone-1000/40 ring-1 ring-tone-800">
-          {online.length > 0 && (
-            <div className="px-2.5 pt-1.5 pb-1 text-xs text-tone-500">
-              Online
-            </div>
-          )}
-          {online.map(row)}
-          {offline.length > 0 && (
-            <div className="px-2.5 pt-2 pb-1 text-xs text-tone-500">
-              Practice
-            </div>
-          )}
-          {offline.map(row)}
-        </div>
-      )}
-    </div>
+        <ChevronDown aria-hidden className="size-4" />
+      </MenuTrigger>
+      <MenuPopup className="w-80" aria-label="Other sessions that day">
+        {online.length > 0 && (
+          <MenuGroup>
+            <MenuGroupLabel>Online</MenuGroupLabel>
+            {online.map(row)}
+          </MenuGroup>
+        )}
+        {offline.length > 0 && (
+          <MenuGroup>
+            <MenuGroupLabel className="pt-2">Practice</MenuGroupLabel>
+            {offline.map(row)}
+          </MenuGroup>
+        )}
+      </MenuPopup>
+    </Menu>
   );
 }
 
@@ -172,7 +179,7 @@ function DaySwitcher({
  * scope when this session is filtered out); the title's ▾ lists that day's
  * sessions at the track; the event strip links an online quali and race.
  */
-export function SessionShell<K extends string>({
+export function SessionShell<K extends PageTabKey>({
   session,
   slug,
   kind,
@@ -212,7 +219,9 @@ export function SessionShell<K extends string>({
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       if (
-        target.closest("input, textarea, select, [contenteditable]") ||
+        target.closest(
+          "input, textarea, select, [contenteditable], [role=combobox], [role=dialog]",
+        ) ||
         event.metaKey ||
         event.ctrlKey ||
         event.altKey
@@ -306,18 +315,12 @@ export function SessionShell<K extends string>({
   const hasStrip = event.length > 1 || actions != null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-5 pb-16 sm:px-6">
+    <div className={pageClass}>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div className="text-xs text-tone-500">
-            <Link
-              to={dashboardPath(activeFormulaKey)}
-              className="hover:text-tone-200"
-            >
-              Sessions
-            </Link>
-            {dayKey && <> › {formatDayLabel(dayKey)}</>}
-          </div>
+          <Breadcrumb to={dashboardPath(activeFormulaKey)} label="Sessions">
+            {dayKey && formatDayLabel(dayKey)}
+          </Breadcrumb>
           <div className="mt-1 flex items-center gap-1.5">
             <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight text-tone-50 sm:text-[1.75rem]">
               <TrackFlag track={trackName} size="medium" />
@@ -365,6 +368,7 @@ export function SessionShell<K extends string>({
                       : "text-tone-400 ring-tone-800 hover:text-tone-100",
                   )}
                 >
+                  <SessionKindIcon kind={summaryKind(s)} className="mr-1" />
                   {summaryKind(s) === "race" ? "Race" : "Quali"}{" "}
                   {result && (
                     <b className="font-semibold text-tone-50">{result.main}</b>
@@ -385,32 +389,33 @@ export function SessionShell<K extends string>({
         <div className="mt-3 flex sm:hidden">{trackLink()}</div>
       )}
 
-      <div className="mt-4 flex items-start gap-4 border-b border-tone-800">
-        <div
-          role="tablist"
-          className="flex min-w-0 flex-1 gap-5 overflow-x-auto text-sm"
-        >
+      <div
+        id={PAGE_TAB_BAR_ID}
+        className={cn(
+          "mt-1 flex items-start gap-4 border-b border-tone-800",
+          pageTabBarClass,
+        )}
+      >
+        <div role="tablist" className={cn("min-w-0 flex-1", pageTabListClass)}>
           {tabs.map((tab) => (
-            <button
+            <PageTab
               key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={tab.key === activeTab}
-              onClick={() => onTabChange(tab.key)}
-              className={cn(
-                "-mb-px border-b-2 pb-2.5 whitespace-nowrap transition-colors",
-                tab.key === activeTab
-                  ? "border-tone-50 font-medium text-tone-50"
-                  : "border-transparent text-tone-400 hover:text-tone-100",
-              )}
+              tab={tab.key}
+              selected={tab.key === activeTab}
+              onSelect={() => onTabChange(tab.key)}
             >
               {tab.label}
-            </button>
+            </PageTab>
           ))}
         </div>
         {!hasStrip && trackLink("max-sm:hidden")}
       </div>
-      <div className="mt-5 space-y-5">{children}</div>
+      <div
+        id={PAGE_TAB_PANEL_ID}
+        className={cn("mt-5 space-y-5", pageTabPanelClass)}
+      >
+        {children}
+      </div>
     </div>
   );
 }

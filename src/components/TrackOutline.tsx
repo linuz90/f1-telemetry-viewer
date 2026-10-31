@@ -15,7 +15,7 @@ const MARK_POINTS = 600;
 /**
  * The circuit as the viewer's visual signature: a real reference lap from
  * `trackGeometry.ts` drawn as a line, glowing in the brand red on heroes and
- * the current track, a quiet grey elsewhere. `detail` adds the start/finish
+ * the selected ⌘K row, a quiet grey elsewhere. `detail` adds the start/finish
  * line, the sector splits (lap fractions from a session's sector starts) and
  * the official turn numbers. Layouts without published geometry fall back to
  * the outline drawings, which have no start line to place marks from.
@@ -87,7 +87,7 @@ export function TrackOutline({
       <TrackLayout
         track={track}
         className={cn(
-          glow ? "text-brand" : "text-tone-600",
+          glow ? "text-brand" : "text-tone-500",
           "[&_svg]:h-full [&_svg]:w-full",
           className,
         )}
@@ -103,14 +103,28 @@ export function TrackOutline({
       preserveAspectRatio="xMidYMid meet"
       className={cn("overflow-visible", className)}
     >
-      <path
-        d={shape.d}
-        fill="none"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        className={glow ? "stroke-brand/20" : "stroke-tone-600/40"}
-        strokeWidth={glow ? 11 : 8}
-      />
+      {glow ? (
+        <path
+          d={shape.d}
+          fill="none"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          className="stroke-brand/20"
+          strokeWidth={11}
+        />
+      ) : (
+        // A fixed screen width: a stroke in drawing units thins to under a
+        // pixel at menu and palette sizes, where these quiet outlines live.
+        <path
+          d={shape.d}
+          fill="none"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+          className="stroke-tone-500"
+          strokeWidth={1.5}
+        />
+      )}
       {glow && (
         <path
           d={shape.d}

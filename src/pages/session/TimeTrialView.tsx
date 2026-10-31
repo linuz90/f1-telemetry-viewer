@@ -23,26 +23,27 @@ import {
   hasCompleteLapTiming,
 } from "../../utils/stats/laps";
 import { msToLapTime } from "../../utils/format";
+import { heroCardClass } from "../../components/ui/surfaces";
 import { LapChart } from "../../components/charts/LapChart";
 import {
   SessionShell,
   useSessionTab,
 } from "../../components/session/SessionShell";
 import {
-  Panel,
-  SetupSheet,
   StatDoors,
   WorthList,
   type StatDoor,
 } from "../../components/session/SessionParts";
+import { Panel } from "../../components/ui/Panel";
 import { SectorComparison } from "../../components/SectorComparison";
 import { LapTelemetrySection } from "../../components/lap-telemetry/LapTelemetrySection";
+import { SessionSetup } from "./SessionSetup";
 
 const TABS = [
   { key: "overview", label: "Overview" },
   { key: "laps", label: "Laps" },
   { key: "lap-telemetry", label: "Lap telemetry" },
-  { key: "car", label: "Car" },
+  { key: "setup", label: "Setup" },
 ] as const;
 
 /**
@@ -173,7 +174,7 @@ export function TimeTrialView({
     <>
       {tab === "overview" && (
         <>
-          <section className="rounded-2xl bg-tone-900 p-5 ring-1 ring-tone-800 sm:p-6">
+          <section className={heroCardClass}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-5">
               <span className="font-mono text-6xl leading-none font-bold tracking-tight text-tone-50">
                 {msToLapTime(summary.bestMs)}
@@ -272,16 +273,13 @@ export function TimeTrialView({
           }}
         />
       )}
-      {tab === "car" && driver["car-setup"]?.["is-valid"] && (
-        <div className="grid items-start gap-5 lg:grid-cols-2">
-          <Panel>
-            <SetupSheet
-              setup={driver["car-setup"]}
-              title="Setup used"
-              meta="This time trial"
-            />
-          </Panel>
-        </div>
+      {tab === "setup" && (
+        <SessionSetup
+          kind="time-trial"
+          driver={driver}
+          bestLapMs={summary.bestMs}
+          trackName={trackName}
+        />
       )}
     </>,
   );

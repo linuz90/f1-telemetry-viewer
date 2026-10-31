@@ -1,3 +1,4 @@
+import { chartTooltipClass } from "../charts/chartStyles";
 import {
   CartesianGrid,
   ComposedChart,
@@ -17,16 +18,17 @@ import type {
   SectorCardModel,
   TrackPaceAnalysis,
 } from "../../analysis/trackAnalysis";
-import { CHART_THEME, TOOLTIP_STYLE } from "../../constants/colors";
+import { CHART_THEME } from "../../constants/colors";
 import {
   joinMetaParts,
   msToLapTime,
   msToSectorTime,
   pluralize,
 } from "../../utils/format";
-import { cardClass } from "../Card";
+import { cn } from "../../utils/cn";
+import { cardSurface } from "../ui/surfaces";
 import { formatLapTick, lapTimeAxis } from "../charts/lapTimeAxis";
-import { SectionHeader } from "../ui/SectionHeader";
+import { Panel } from "../ui/Panel";
 
 /**
  * Qualifying and Time Trial progress at one track: every lap by session with
@@ -89,11 +91,10 @@ function LapTimesChart({
   );
 
   return (
-    <section className={cardClass}>
-      <SectionHeader
-        title="Lap times by session"
-        hint={`Every timed lap, each session's best joined · ${pluralize(sessions.length, "session")}`}
-      />
+    <Panel
+      title="Lap times by session"
+      hint={`Every timed lap, each session's best joined · ${pluralize(sessions.length, "session")}`}
+    >
       <ResponsiveContainer width="100%" height={280}>
         <ComposedChart
           data={sessions}
@@ -136,11 +137,10 @@ function LapTimesChart({
               if (!session) return null;
               return (
                 <div
-                  style={{
-                    ...TOOLTIP_STYLE.contentStyle,
-                    padding: "8px 12px",
-                  }}
-                  className="space-y-0.5 text-tone-300"
+                  className={cn(
+                    chartTooltipClass,
+                    "space-y-0.5 px-3 py-2 text-tone-300",
+                  )}
                 >
                   <div className="mb-1 text-2xs text-tone-400">
                     {session.label}
@@ -213,7 +213,7 @@ function LapTimesChart({
           </span>
         )}
       </div>
-    </section>
+    </Panel>
   );
 }
 
@@ -249,7 +249,7 @@ function SectorBestTile({
   const deltaMs = latestMs > 0 && bestMs > 0 ? latestMs - bestMs : 0;
 
   return (
-    <div className="rounded-2xl bg-tone-900 p-4 ring-1 ring-tone-800">
+    <div className={cn(cardSurface, "p-4")}>
       <div className="text-xs text-tone-500">{title}</div>
       <div className="mt-1 font-mono text-xl font-semibold tracking-tight text-best">
         {bestMs > 0 ? msToSectorTime(bestMs) : "–"}

@@ -9,7 +9,9 @@ import {
 } from "../../analysis/lapTelemetryAnalysis";
 import { LAP_TIPS_OPEN_STORAGE_KEY } from "../../constants/storage";
 import { useTrackDisclosure } from "../../hooks/useTrackDisclosure";
+import { cn } from "../../utils/cn";
 import { getTrackCorners } from "../../utils/tracks";
+import { stickyBelowPageTabsClass } from "../ui/pageTabs";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { createHoverStore } from "./hoverStore";
 import { LapReadout } from "./LapReadout";
@@ -186,8 +188,12 @@ export function LapComparisonView({
             onHoverTip={(tip) => setHoveredTipId(tip?.id ?? null)}
           />
           {track && (
-            // top-20 clears the race page's sticky session bar.
-            <div className="mx-auto w-full max-w-68 lg:sticky lg:top-20 lg:max-w-none lg:self-start">
+            <div
+              className={cn(
+                "mx-auto w-full max-w-68 lg:max-w-none lg:self-start",
+                stickyBelowPageTabsClass,
+              )}
+            >
               <LapTrackMap
                 track={track}
                 tips={comparison.tips}

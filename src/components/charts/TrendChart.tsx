@@ -1,3 +1,5 @@
+import { cn } from "../../utils/cn";
+import { chartTickClass, chartTooltipClass } from "./chartStyles";
 import { useState } from "react";
 import { msToLapTime } from "../../utils/format";
 import { useElementWidth } from "./useElementWidth";
@@ -59,7 +61,7 @@ export function TrendChart({
               x={L - 8}
               y={y(t) + 3.5}
               textAnchor="end"
-              className="fill-tone-500 text-[10.5px] tabular-nums"
+              className={chartTickClass}
             >
               {msToLapTime(t).replace(/0+$/, "").replace(/\.$/, "")}
             </text>
@@ -101,7 +103,7 @@ export function TrendChart({
                 x={x(i)}
                 y={height - 6}
                 textAnchor="middle"
-                className="fill-tone-500 text-[10.5px]"
+                className={chartTickClass}
               >
                 {p.label}
               </text>
@@ -121,7 +123,7 @@ export function TrendChart({
       </svg>
       {hover != null && (
         <div
-          className="pointer-events-none absolute rounded-lg bg-tone-900 px-2.5 py-1.5 text-xs whitespace-nowrap shadow-xl ring-1 ring-tone-700"
+          className={cn(chartTooltipClass, "absolute whitespace-nowrap")}
           style={{
             left: Math.min(width - 150, Math.max(0, x(hover) - 60)),
             top: 0,

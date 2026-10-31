@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { getCompoundColor } from "../../utils/colors";
 import { msToLapTime } from "../../utils/format";
 import { cn } from "../../utils/cn";
+import { chartTickClass, chartTooltipClass } from "./chartStyles";
 import { useElementWidth } from "./useElementWidth";
 
 /**
@@ -57,9 +58,21 @@ export interface WearPanel {
   label?: string;
   /** Worst-wheel wear %, index lap - 1. */
   wear: (number | null)[];
+  /** The compared stint's wear on the same laps, drawn in the compare tone. */
+  compare?: (number | null)[];
 }
 
-export type LapChartPanel = PositionPanel | TimePanel | WearPanel;
+/** A running gap to a compared stint, index lap - 1 (ms; negative = ahead).
+ *  Time gained plots below zero, like a quicker lap on the time panel. */
+export interface GapPanel {
+  kind: "gap";
+  height: number;
+  /** Shown in the left gutter when the chart stacks panels. */
+  label?: string;
+  gapMs: (number | null)[];
+}
+
+export type LapChartPanel = PositionPanel | TimePanel | WearPanel | GapPanel;
 
 export interface LapChartStint {
   from: number;
@@ -87,6 +100,7 @@ const PANEL_LABEL: Record<LapChartPanel["kind"], string> = {
   position: "Position",
   time: "Lap time",
   wear: "Tyre wear",
+  gap: "Gap",
 };
 const EVENT_LANE = 18;
 const AXIS_H = 18;
@@ -106,11 +120,20 @@ function tickLabel(ms: number, stepS: number): string {
   return `${minutes}:${seconds.toFixed(digits).padStart(digits ? 4 : 2, "0")}`;
 }
 
-/** Fit the scale to the clean laps of every series. */
-function timeDomain(panel: TimePanel): [number, number] {
+/** Fit the scale to the clean laps of every series on the axis. */
+function timeDomain(
+  panel: TimePanel,
+  firstLap: number,
+  lastLap: number,
+): [number, number] {
   const clean = panel.series.flatMap((s) =>
     s.lapsMs.filter(
-      (ms, i): ms is number => ms != null && ms > 0 && !s.excluded?.has(i + 1),
+      (ms, i): ms is number =>
+        ms != null &&
+        ms > 0 &&
+        i + 1 >= firstLap &&
+        i + 1 <= lastLap &&
+        !s.excluded?.has(i + 1),
     ),
   );
   if (clean.length === 0) return [0, 1];
@@ -122,6 +145,7 @@ function timeDomain(panel: TimePanel): [number, number] {
 
 export function LapChart({
   laps,
+  firstLap = 1,
   panels,
   bands = [],
   pits = [],
@@ -131,7 +155,10 @@ export function LapChart({
   compact = false,
   className,
 }: {
+  /** The last lap on the axis. */
   laps: number;
+  /** The first lap on the axis, for a chart of one stint. */
+  firstLap?: number;
   panels: LapChartPanel[];
   bands?: { from: number; to: number; label: string }[];
   /** In-laps; a hairline is drawn at the end of each. */
@@ -150,20 +177,29 @@ export function LapChart({
   // A stint can run into a lap the chart does not draw (an untimed final
   // lap), so clip the strip to the laps on the axis.
   const stints = allStints
-    .filter((stint) => stint.from <= laps)
-    .map((stint) => ({ ...stint, to: Math.min(stint.to, laps) }));
+    .filter((stint) => stint.from <= laps && stint.to >= firstLap)
+    .map((stint) => ({
+      ...stint,
+      from: Math.max(stint.from, firstLap),
+      to: Math.min(stint.to, laps),
+    }));
+  const onAxis = (lap: number) => lap >= firstLap && lap <= laps;
+  const span = Math.max(1, laps - firstLap + 1);
   const L = compact ? 4 : 52;
   const R = compact ? 4 : 16;
   const plotW = Math.max(40, width - L - R);
-  const slot = plotW / Math.max(1, laps);
-  const xCenter = (lap: number) => L + (lap - 0.5) * slot;
-  const xEdge = (lap: number) => L + lap * slot;
+  const slot = plotW / span;
+  const xCenter = (lap: number) => L + (lap - firstLap + 0.5) * slot;
+  const xEdge = (lap: number) => L + (lap - firstLap + 1) * slot;
 
   // A single driver's line is neutral ink; blue marks you only when there is
   // another driver on the chart to tell you apart from.
   const compared = panels.some(
     (panel) =>
-      panel.kind === "time" && panel.series.some((s) => s.tone === "compare"),
+      (panel.kind === "time" &&
+        panel.series.some((s) => s.tone === "compare")) ||
+      (panel.kind === "wear" && !!panel.compare) ||
+      panel.kind === "gap",
   );
   const tone: Record<ChartSeriesTone, string> = {
     you: compared ? TONE_VAR.you : "var(--color-tone-200)",
@@ -185,11 +221,14 @@ export function LapChart({
           : stacked
             ? STACKED_PANEL_GAP
             : PANEL_GAP);
-      const domain = panel.kind === "time" ? timeDomain(panel) : null;
+      const domain =
+        panel.kind === "time" ? timeDomain(panel, firstLap, laps) : null;
       const hasOffScale =
         panel.kind === "time" &&
         panel.series.some((s) =>
-          s.lapsMs.some((ms) => ms != null && domain && ms > domain[1]),
+          s.lapsMs.some(
+            (ms, i) => ms != null && domain && ms > domain[1] && onAxis(i + 1),
+          ),
         );
       const gutter = hasOffScale && !compact ? GUTTER_H : 0;
       y = top + gutter + panel.height;
@@ -245,7 +284,14 @@ export function LapChart({
         );
       }
     }
-    for (const band of bands) {
+    for (const fullBand of bands) {
+      if (fullBand.to < firstLap || fullBand.from > laps) continue;
+      // A one-stint chart crops a Safety Car period that started before it.
+      const band = {
+        ...fullBand,
+        from: Math.max(fullBand.from, firstLap),
+        to: Math.min(fullBand.to, laps),
+      };
       elements.push(
         <rect
           key={`${key}-band-${band.from}`}
@@ -272,6 +318,7 @@ export function LapChart({
     }
     if (!compact) {
       for (const pit of pits) {
+        if (!onAxis(pit)) continue;
         elements.push(
           <line
             key={`${key}-pit-${pit}`}
@@ -305,7 +352,7 @@ export function LapChart({
                 x={L - 8}
                 y={y(p) + 3.5}
                 textAnchor="end"
-                className="fill-tone-500 text-[10.5px] tabular-nums"
+                className={chartTickClass}
               >
                 P{p}
               </text>
@@ -417,7 +464,7 @@ export function LapChart({
                 x={L - 8}
                 y={y(t) + 3.5}
                 textAnchor="end"
-                className="fill-tone-500 text-[10.5px] tabular-nums"
+                className={chartTickClass}
               >
                 {tickLabel(t, step / 1000)}
               </text>
@@ -451,6 +498,9 @@ export function LapChart({
         stints.findIndex((s) => lap >= s.from && lap <= s.to);
       for (const series of panel.series) {
         const color = tone[series.tone];
+        // The compared line is a reference beside yours: lighter and thinner,
+        // so your own laps stay the line the eye follows.
+        const reference = series.tone === "compare";
         // Lines join clean laps only, broken at stint changes.
         let segment: string[] = [];
         let segmentStint = -1;
@@ -462,10 +512,10 @@ export function LapChart({
                 points={segment.join(" ")}
                 fill="none"
                 stroke={color}
-                strokeWidth={2}
+                strokeWidth={reference ? 1.5 : 2}
                 strokeLinejoin="round"
                 strokeLinecap="round"
-                opacity={series.tone === "compare" ? 0.85 : 1}
+                opacity={reference ? 0.55 : 1}
               />,
             );
           }
@@ -473,7 +523,7 @@ export function LapChart({
         };
         series.lapsMs.forEach((ms, i) => {
           const lap = i + 1;
-          if (ms == null || ms <= 0) return;
+          if (ms == null || ms <= 0 || !onAxis(lap)) return;
           const excluded = series.excluded?.has(lap) || ms > hi;
           if (excluded) return;
           const s = stintOf(lap);
@@ -484,7 +534,7 @@ export function LapChart({
         flush();
         series.lapsMs.forEach((ms, i) => {
           const lap = i + 1;
-          if (ms == null || ms <= 0) return;
+          if (ms == null || ms <= 0 || !onAxis(lap)) return;
           const offScale = ms > hi;
           const excluded = series.excluded?.has(lap) || offScale;
           if (series.tone === "compare" && excluded) return;
@@ -494,15 +544,21 @@ export function LapChart({
               key={`${key}-${series.key}-d${lap}`}
               cx={xCenter(lap)}
               cy={offScale ? offScaleY : y(ms)}
-              r={series.tone === "you" ? (compact ? 2.5 : 3.6) : 2.8}
+              r={reference ? 2.4 : compact ? 2.5 : 3.6}
               fill={color}
-              opacity={excluded ? 0.35 : 1}
+              opacity={excluded ? 0.35 : reference ? 0.6 : 1}
               className={excluded ? "" : "stroke-tone-900"}
               strokeWidth={excluded ? 0 : 1.5}
             />,
           );
         });
-        for (const average of series.averages ?? []) {
+        for (const average of (series.averages ?? [])
+          .filter((a) => a.to >= firstLap && a.from <= laps)
+          .map((a) => ({
+            ...a,
+            from: Math.max(a.from, firstLap),
+            to: Math.min(a.to, laps),
+          }))) {
           elements.push(
             <line
               key={`${key}-${series.key}-avg-${average.from}`}
@@ -512,10 +568,13 @@ export function LapChart({
               y2={y(average.ms)}
               stroke={color}
               strokeWidth={1.5}
-              opacity={0.5}
+              strokeDasharray={reference ? "4 4" : undefined}
+              opacity={reference ? 0.35 : 0.5}
             />,
           );
-          if (!compact) {
+          // A compared stint's average is a reference line; its number is
+          // on the page, and two labels this close would collide.
+          if (!compact && series.tone === "you") {
             // Beside the line's end, or above it when that would run off
             // the right edge (a stint that ends on the last lap).
             const fits = xCenter(average.to) + 62 <= width;
@@ -534,7 +593,7 @@ export function LapChart({
         }
         for (const note of series.notes ?? []) {
           const ms = series.lapsMs[note.lap - 1];
-          if (ms == null || compact) continue;
+          if (ms == null || compact || !onAxis(note.lap)) continue;
           const offScale = ms > hi;
           elements.push(
             <text
@@ -569,7 +628,7 @@ export function LapChart({
                 x={L - 8}
                 y={y(v) + 3.5}
                 textAnchor="end"
-                className="fill-tone-500 text-[10.5px] tabular-nums"
+                className={chartTickClass}
               >
                 {v}%
               </text>
@@ -597,9 +656,31 @@ export function LapChart({
           </g>,
         );
       }
-      for (const stint of stints.length
+      const wearStints = stints.length
         ? stints
-        : [{ from: 1, to: laps, compound: "" }]) {
+        : [{ from: firstLap, to: laps, compound: "" }];
+      // The compared stint first, so your line draws over it.
+      for (const stint of panel.compare ? wearStints : []) {
+        const pts: string[] = [];
+        for (let lap = stint.from; lap <= stint.to; lap++) {
+          const v = panel.compare![lap - 1];
+          if (v != null)
+            pts.push(`${xCenter(lap).toFixed(1)},${y(v).toFixed(1)}`);
+        }
+        if (pts.length < 2) continue;
+        elements.push(
+          <polyline
+            key={`${key}-wc-${stint.from}`}
+            points={pts.join(" ")}
+            fill="none"
+            stroke={tone.compare}
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            opacity={0.55}
+          />,
+        );
+      }
+      for (const stint of wearStints) {
         const pts: [number, number][] = [];
         for (let lap = stint.from; lap <= stint.to; lap++) {
           const v = panel.wear[lap - 1];
@@ -646,6 +727,127 @@ export function LapChart({
         }
       }
     }
+
+    if (panel.kind === "gap") {
+      const values = panel.gapMs.flatMap((v, i) =>
+        v != null && onAxis(i + 1) ? [{ lap: i + 1, v }] : [],
+      );
+      const lo = Math.min(0, ...values.map((p) => p.v));
+      const hi = Math.max(0, ...values.map((p) => p.v));
+      const pad = Math.max(250, (hi - lo) * 0.12);
+      const [dLo, dHi] = [lo - pad, hi + pad];
+      // Gained time (negative) plots low, like a quicker lap above it.
+      const y = (ms: number) =>
+        top + ((dHi - ms) / (dHi - dLo)) * (bottom - top);
+      const zero = y(0);
+      if (!compact) {
+        const step = niceStep((dHi - dLo) / 1000) * 1000;
+        for (let t = Math.ceil(dLo / step) * step; t <= dHi; t += step) {
+          elements.push(
+            <g key={`${key}-g${t}`}>
+              <line
+                x1={L}
+                x2={L + plotW}
+                y1={y(t)}
+                y2={y(t)}
+                className={t === 0 ? "stroke-tone-600" : "stroke-tone-800"}
+              />
+              <text
+                x={L - 8}
+                y={y(t) + 3.5}
+                textAnchor="end"
+                className={chartTickClass}
+              >
+                {t === 0 ? "0" : `${t > 0 ? "+" : "−"}${Math.abs(t / 1000)} s`}
+              </text>
+            </g>,
+          );
+        }
+      }
+      if (values.length > 0) {
+        // The run starts level, on the lap before the first paired one.
+        const startX = Math.max(L, xCenter(values[0].lap - 1));
+        const pts = [
+          [startX, zero],
+          ...values.map((p) => [xCenter(p.lap), y(p.v)]),
+        ];
+        const line = pts.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`);
+        const area = [
+          ...line,
+          `${pts[pts.length - 1][0].toFixed(1)},${zero.toFixed(1)}`,
+        ];
+        elements.push(
+          <g key={`${key}-area`}>
+            <clipPath id={`${key}-ahead`}>
+              <rect
+                x={L}
+                y={zero}
+                width={plotW}
+                height={Math.max(0, bottom - zero)}
+              />
+            </clipPath>
+            <clipPath id={`${key}-behind`}>
+              <rect
+                x={L}
+                y={top}
+                width={plotW}
+                height={Math.max(0, zero - top)}
+              />
+            </clipPath>
+            <polygon
+              points={area.join(" ")}
+              clipPath={`url(#${key}-ahead)`}
+              className="fill-ahead/15"
+            />
+            <polygon
+              points={area.join(" ")}
+              clipPath={`url(#${key}-behind)`}
+              className="fill-behind/15"
+            />
+          </g>,
+          <polyline
+            key={`${key}-line`}
+            points={line.join(" ")}
+            fill="none"
+            stroke="var(--color-tone-200)"
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />,
+          ...values.map((p) => (
+            <circle
+              key={`${key}-d${p.lap}`}
+              cx={xCenter(p.lap)}
+              cy={y(p.v)}
+              r={compact ? 2 : 2.8}
+              fill="var(--color-tone-200)"
+            />
+          )),
+        );
+        const last = values[values.length - 1];
+        if (!compact) {
+          const fits = xCenter(last.lap) + 56 <= width;
+          elements.push(
+            <text
+              key={`${key}-end`}
+              x={fits ? xCenter(last.lap) + 9 : xCenter(last.lap) - 6}
+              y={fits ? y(last.v) + 4 : y(last.v) - 8}
+              textAnchor={fits ? "start" : "end"}
+              className={cn(
+                "text-[11px] font-semibold tabular-nums",
+                last.v < 0
+                  ? "fill-ahead"
+                  : last.v > 0
+                    ? "fill-behind"
+                    : "fill-tone-300",
+              )}
+            >
+              {`${last.v > 0 ? "+" : last.v < 0 ? "−" : ""}${(Math.abs(last.v) / 1000).toFixed(2)} s`}
+            </text>,
+          );
+        }
+      }
+    }
   });
 
   if (!compact) {
@@ -680,15 +882,18 @@ export function LapChart({
         </text>,
       );
     }
-    const step = laps > 40 ? 10 : 5;
-    for (let lap = 1; lap <= laps; lap++) {
-      if (lap !== 1 && lap % step !== 0 && lap !== laps) continue;
+    const step = span > 40 ? 10 : 5;
+    for (let lap = firstLap; lap <= laps; lap++) {
+      if (lap !== firstLap && lap % step !== 0 && lap !== laps) continue;
       if (
         lap !== laps &&
         laps - lap < step / 2 &&
         lap % step === 0 &&
-        lap !== 1
+        lap !== firstLap
       )
+        continue;
+      // Too close to the first label to read.
+      if (lap !== firstLap && lap - firstLap < step / 2 && lap !== laps)
         continue;
       elements.push(
         <text
@@ -696,7 +901,7 @@ export function LapChart({
           x={xCenter(lap)}
           y={contentBottom + 14}
           textAnchor="middle"
-          className="fill-tone-500 text-[10.5px] tabular-nums"
+          className={chartTickClass}
         >
           L{lap}
         </text>,
@@ -741,7 +946,7 @@ export function LapChart({
               const px = event.clientX - rect.left;
               const lap = Math.min(
                 laps,
-                Math.max(1, Math.floor((px - L) / slot) + 1),
+                Math.max(firstLap, firstLap + Math.floor((px - L) / slot)),
               );
               setHover({ lap, y: event.clientY - rect.top });
             }}
@@ -759,8 +964,8 @@ export function LapChart({
               key={stint.from}
               className="absolute top-0 flex h-6 items-center justify-center overflow-hidden rounded-md border-2 border-tone-900 text-xs font-semibold whitespace-nowrap"
               style={{
-                left: `${((stint.from - 1) / laps) * 100}%`,
-                width: `${((stint.to - stint.from + 1) / laps) * 100}%`,
+                left: `${((stint.from - firstLap) / span) * 100}%`,
+                width: `${((stint.to - stint.from + 1) / span) * 100}%`,
                 backgroundColor: getCompoundColor(stint.compound),
                 color:
                   stint.compound === "Soft" || stint.compound === "Wet"
@@ -770,7 +975,7 @@ export function LapChart({
             >
               {!compact && (
                 <span className="truncate px-1">
-                  {plotW * ((stint.to - stint.from + 1) / laps) > 70
+                  {plotW * ((stint.to - stint.from + 1) / span) > 70
                     ? (stint.label ??
                       `${stint.compound} · ${stint.to - stint.from + 1}`)
                     : stint.compound.charAt(0)}
@@ -782,7 +987,7 @@ export function LapChart({
       )}
       {tip && hover && (
         <div
-          className="pointer-events-none absolute z-10 min-w-44 rounded-xl bg-tone-900 px-3 py-2 text-xs shadow-xl shadow-tone-1000/30 ring-1 ring-tone-700"
+          className={cn(chartTooltipClass, "absolute z-10 min-w-44 px-3 py-2")}
           style={{
             left:
               xCenter(hover.lap) + 190 > width

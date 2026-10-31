@@ -1,3 +1,4 @@
+import { insetTileClass } from "../ui/surfaces";
 import { ChevronDown, Plus, X } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { msToLapTime } from "../../utils/format";
@@ -22,7 +23,10 @@ export function LapChips({
       {slots.map((slot, index) => (
         <div
           key={slot.key}
-          className="flex min-w-0 max-w-full items-stretch rounded-xl bg-tone-800/60 ring-1 ring-inset ring-tone-0/[0.05]"
+          className={cn(
+            insetTileClass,
+            "flex min-w-0 max-w-full items-stretch",
+          )}
         >
           <button
             type="button"

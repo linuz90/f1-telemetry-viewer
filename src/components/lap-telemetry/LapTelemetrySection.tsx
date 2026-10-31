@@ -38,11 +38,13 @@ import {
   useLapTraces,
 } from "../../hooks/useLapRecordings";
 import { useSessionList } from "../../hooks/useSessionList";
+import { cn } from "../../utils/cn";
 import { msToLapTime } from "../../utils/format";
 import { trackPath } from "../../utils/routes";
 import { getTrackDisplayName } from "../../utils/tracks";
-import { Card } from "../Card";
+import { Panel } from "../ui/Panel";
 import { buttonVariants } from "../ui/Button";
+import { scrollBelowPageTabsClass } from "../ui/pageTabs";
 import { SectionHeader } from "../ui/SectionHeader";
 import { driverLabel, recordingLabel } from "./labels";
 import { LapChips } from "./LapChips";
@@ -69,13 +71,12 @@ export type LapTelemetryScope =
 
 function SectionShell({ children }: { children: ReactNode }) {
   return (
-    <Card
-      as="section"
+    <Panel
       id={LAP_TELEMETRY_ANCHOR}
-      className="scroll-mt-20 space-y-4"
+      className={cn("space-y-4", scrollBelowPageTabsClass)}
     >
       {children}
-    </Card>
+    </Panel>
   );
 }
 

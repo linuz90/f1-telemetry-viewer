@@ -1,3 +1,4 @@
+import { menuItemClass } from "../ui/surfaces";
 import {
   useEffect,
   useMemo,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import { useTelemetry } from "../../context/TelemetryContext";
 import { useScopedSessions, useTrackIndex } from "../../hooks/useSessionLog";
+import { Dialog, DialogClose, DialogPopup, DialogTitle } from "../ui/Dialog";
 import { sessionRowLabel, summaryKind } from "../../analysis/sessionKind";
 import {
   getTrackDisplayName,
@@ -42,6 +44,7 @@ import {
   sessionClock,
   sessionResult,
 } from "../sessions/sessionFormat";
+import { SessionResult } from "../sessions/SessionResult";
 import { sessionBestLapMs, sessionDayKey } from "../../analysis/sessionLog";
 import { recentTracks } from "../../analysis/trackIndex";
 import type { SessionSummary } from "../../types/telemetry";
@@ -195,28 +198,7 @@ function SessionTrailing({
   if (result) {
     return (
       <span className="text-sm whitespace-nowrap">
-        <b
-          className={cn(
-            "font-semibold text-tone-50",
-            result.tone === "best" && "text-best",
-          )}
-        >
-          {result.main}
-        </b>
-        {result.detail && (
-          <span
-            className={cn(
-              "ml-1 text-xs",
-              result.tone === "gain"
-                ? "text-ahead"
-                : result.tone === "loss"
-                  ? "text-behind"
-                  : "text-tone-500",
-            )}
-          >
-            {result.detail}
-          </span>
-        )}
+        <SessionResult result={result} />
       </span>
     );
   }
@@ -265,7 +247,6 @@ export function CommandPalette({
     if (open) {
       setQuery("");
       setActive(0);
-      requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
 
@@ -489,8 +470,6 @@ export function CommandPalette({
       ?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
-  if (!open) return null;
-
   const close = () => setCommandPaletteOpen(false);
   const run = (item: PaletteItem | undefined) => {
     if (!item) return;
@@ -500,17 +479,12 @@ export function CommandPalette({
 
   let row = -1;
   return (
-    <div
-      className="fixed inset-0 z-[70] flex justify-center bg-tone-1000/50 px-4 pt-[10vh] backdrop-blur-[2px]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) close();
-      }}
-    >
-      <div
-        role="dialog"
-        aria-label="Search"
-        className="h-max w-full max-w-2xl overflow-hidden rounded-2xl bg-tone-900 shadow-2xl shadow-tone-1000/50 ring-1 ring-tone-800"
+    <Dialog open={open} onOpenChange={setCommandPaletteOpen}>
+      <DialogPopup
+        initialFocus={inputRef}
+        className="top-[10vh] max-w-2xl translate-y-0 overflow-hidden"
       >
+        <DialogTitle className="sr-only">Search</DialogTitle>
         <div className="flex items-center gap-3 border-b border-tone-800 px-4">
           <Search aria-hidden className="size-4 text-tone-500" />
           <input
@@ -518,10 +492,11 @@ export function CommandPalette({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Escape") close();
               if (event.key === "ArrowDown") {
                 event.preventDefault();
-                setActive((i) => Math.min(results.length - 1, i + 1));
+                setActive((i) =>
+                  Math.max(0, Math.min(results.length - 1, i + 1)),
+                );
               }
               if (event.key === "ArrowUp") {
                 event.preventDefault();
@@ -529,16 +504,20 @@ export function CommandPalette({
               }
               if (event.key === "Enter") run(results[active]);
             }}
+            aria-label="Search tracks, sessions, drivers"
             placeholder="Search tracks, sessions, drivers"
-            className="h-14 flex-1 bg-transparent text-base text-tone-50 outline-none placeholder:text-tone-500"
+            className="h-14 min-w-0 flex-1 bg-transparent text-base text-tone-50 outline-none placeholder:text-tone-500"
           />
-          <kbd className="rounded-md px-1.5 py-0.5 text-xs text-tone-500 ring-1 ring-tone-800">
-            esc
-          </kbd>
+          <DialogClose
+            aria-label="Close search"
+            className="rounded-md px-1.5 py-0.5 text-xs text-tone-500 ring-1 ring-tone-800 outline-none hover:text-tone-200 focus-visible:ring-tone-500"
+          >
+            <kbd>esc</kbd>
+          </DialogClose>
         </div>
         <div
           ref={listRef}
-          className="max-h-[min(72vh,620px)] overflow-y-auto p-2"
+          className="max-h-[min(72dvh,620px)] overflow-y-auto p-2"
         >
           {results.length === 0 && (
             <p className="px-3 py-8 text-center text-sm text-tone-500">
@@ -559,12 +538,10 @@ export function CommandPalette({
                     key={item.key}
                     type="button"
                     data-index={i}
+                    data-highlighted={i === active ? "" : undefined}
                     onMouseMove={() => i !== active && setActive(i)}
                     onClick={() => run(item)}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-xl px-2.5 py-1.5 text-left",
-                      i === active && "bg-tone-800/80",
-                    )}
+                    className={cn(menuItemClass, "gap-3 rounded-xl")}
                   >
                     {item.visual}
                     <span className="min-w-0 flex-1">
@@ -603,7 +580,7 @@ export function CommandPalette({
         <div className="border-t border-tone-800 px-4 py-2 text-xs text-tone-500">
           ↑↓ move · ↵ open · try “sakhir setups”, “monza race” or a driver
         </div>
-      </div>
-    </div>
+      </DialogPopup>
+    </Dialog>
   );
 }

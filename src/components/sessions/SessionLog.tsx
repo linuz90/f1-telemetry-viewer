@@ -1,9 +1,10 @@
+import { cardSurface } from "../ui/surfaces";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import type { SessionLogDay, SessionLogGroup } from "../../analysis/sessionLog";
 import { sessionBestLapMs } from "../../analysis/sessionLog";
-import { sessionRowLabel } from "../../analysis/sessionKind";
+import { sessionRowLabel, summaryKind } from "../../analysis/sessionKind";
 import type { SessionSummary } from "../../types/telemetry";
 import { getCompoundColor } from "../../utils/colors";
 import { getTrackDisplayName } from "../../utils/tracks";
@@ -11,10 +12,13 @@ import { msToLapTime } from "../../utils/format";
 import { sessionSummaryPath } from "../../utils/routes";
 import { cn } from "../../utils/cn";
 import { sessionSaveSlugs } from "../../utils/deduplicateSessions";
+import { SessionKindIcon } from "../SessionKindIcon";
 import { TrackFlag } from "../TrackFlag";
 import { RecordedLapsIcon } from "../lap-telemetry/RecordedLapsIcon";
+import { SessionResult } from "./SessionResult";
 import {
   formatDayLabel,
+  offlineGroupLabel,
   offlineGroupSummary,
   sessionClock,
   sessionCompounds,
@@ -72,33 +76,16 @@ function SessionLogRow({
       <span className="text-xs text-tone-500 tabular-nums">
         {sessionClock(session)}
       </span>
-      <span className="text-tone-100">{sessionRowLabel(session)}</span>
+      <span className="text-tone-100">
+        <SessionKindIcon
+          kind={summaryKind(session)}
+          className="mr-1.5 text-tone-500"
+        />
+        {sessionRowLabel(session)}
+      </span>
       <span className="col-start-2 row-start-2 md:col-start-auto md:row-start-auto">
         {result ? (
-          <>
-            <b
-              className={cn(
-                "font-semibold text-tone-50",
-                result.tone === "best" && "text-best",
-              )}
-            >
-              {result.main}
-            </b>{" "}
-            {result.detail && (
-              <span
-                className={cn(
-                  "text-xs",
-                  result.tone === "gain"
-                    ? "text-ahead"
-                    : result.tone === "loss"
-                      ? "text-behind"
-                      : "text-tone-500",
-                )}
-              >
-                {result.detail}
-              </span>
-            )}
-          </>
+          <SessionResult result={result} />
         ) : isPb ? (
           <span className="rounded px-1 text-[11px] text-best ring-1 ring-best/40">
             PB
@@ -134,7 +121,10 @@ function OnlineGroup({
   isPb: (s: SessionSummary) => boolean;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl bg-tone-900 ring-1 ring-active/25">
+    // The active-tinted ring sets online events apart from practice.
+    <div
+      className={cn(cardSurface, "overflow-hidden rounded-xl ring-active/25")}
+    >
       <div className="px-4 pt-2.5 pb-1 text-xs font-medium text-active">
         Online{group.driverCount ? ` · ${group.driverCount} drivers` : ""}
       </div>
@@ -167,7 +157,7 @@ function OfflineGroup({
       : `${sessionClock(oldest)}–${sessionClock(newest)}`;
   const hasPb = group.sessions.some(isPb);
   return (
-    <div className="overflow-hidden rounded-xl bg-tone-900 ring-1 ring-tone-800">
+    <div className={cn(cardSurface, "overflow-hidden rounded-xl")}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -178,16 +168,21 @@ function OfflineGroup({
           {span}
         </span>
         <span className="text-tone-400 max-md:hidden">
-          {group.offlineLabel === "Time trial"
-            ? "Time trial"
-            : `Practice${group.offlineLabel && group.offlineLabel !== "Offline" ? ` vs ${group.offlineLabel}` : ""}`}
+          {offlineGroupLabel(group)}
         </span>
         <span className="text-tone-400">
           <span className="md:hidden">{span} · </span>
           {offlineGroupSummary(group).map((part, i) => (
             <span key={part.label}>
               {i > 0 && " · "}
-              {part.label}
+              {/* Keeps the glyph on the line of the count it labels. */}
+              <span className="whitespace-nowrap">
+                <SessionKindIcon
+                  kind={part.kind}
+                  className="mr-1 text-tone-500"
+                />
+                {part.label}
+              </span>
               {part.bestMs && (
                 <>
                   , best{" "}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Flag, Repeat, Sparkles, Trophy } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Crown, Repeat, Sparkles, Trophy } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { TelemetrySession } from "../../types/telemetry";
 import { useTelemetry } from "../../context/TelemetryContext";
 import { useScopedSessions } from "../../hooks/useSessionLog";
@@ -27,24 +27,26 @@ import {
   useSessionTab,
 } from "../../components/session/SessionShell";
 import {
-  Panel,
-  SetupSheet,
   StatDoors,
   WorthList,
   type StatDoor,
 } from "../../components/session/SessionParts";
+import { Panel } from "../../components/ui/Panel";
+import { heroCardClass, insetTileClass } from "../../components/ui/surfaces";
+import { tableRowFocusedClass } from "../../components/ui/table";
 import { QualifyingTable } from "../../components/QualifyingTable";
 import { SectorComparison } from "../../components/SectorComparison";
 import { SessionDriverSelect } from "../../components/SessionDriverSelect";
 import { LapTelemetrySection } from "../../components/lap-telemetry/LapTelemetrySection";
 import { DuplicateNotice } from "../../components/DuplicateNotice";
+import { SessionSetup } from "./SessionSetup";
 
 const TABS = [
   { key: "overview", label: "Overview" },
   { key: "laps", label: "Laps" },
   { key: "results", label: "Results" },
   { key: "lap-telemetry", label: "Lap telemetry" },
-  { key: "car", label: "Car" },
+  { key: "setup", label: "Setup" },
 ] as const;
 
 /** Gap rows around you: the front of the grid and the cars either side. */
@@ -213,7 +215,7 @@ export function QualifyingView({
         },
         {
           label: "Pole",
-          icon: Flag,
+          icon: Crown,
           value: pole ? msToLapTime(pole.ms) : "—",
           note: pole
             ? pole.d.index === focused.index
@@ -244,7 +246,7 @@ export function QualifyingView({
     <>
       {tab === "overview" && summary && (
         <>
-          <section className="relative overflow-hidden rounded-2xl bg-tone-900 p-5 ring-1 ring-tone-800 sm:p-6">
+          <section className={cn(heroCardClass, "overflow-hidden")}>
             <TrackOutline
               track={trackName}
               glow
@@ -282,9 +284,7 @@ export function QualifyingView({
                     key={row.d.index}
                     className={cn(
                       "grid grid-cols-[2rem_1fr_4.5rem] items-center gap-3 rounded-lg px-2 py-1 text-sm sm:grid-cols-[2rem_10rem_1fr_4.5rem]",
-                      me
-                        ? "bg-active/10 font-semibold text-tone-50"
-                        : "text-tone-400",
+                      me ? tableRowFocusedClass : "text-tone-400",
                     )}
                   >
                     <span className={me ? "text-active" : "text-tone-500"}>
@@ -323,10 +323,7 @@ export function QualifyingView({
                   const delta = ref ? own - ref : 0;
                   const best = own > 0 && own <= sessionBestSectors[i];
                   return (
-                    <div
-                      key={sector}
-                      className="rounded-xl bg-tone-800/40 p-3.5 ring-1 ring-tone-800"
-                    >
+                    <div key={sector} className={cn(insetTileClass, "p-3.5")}>
                       <div className="text-xs text-tone-500">
                         Sector {sector}
                       </div>
@@ -401,38 +398,13 @@ export function QualifyingView({
           }}
         />
       )}
-      {tab === "car" && (
-        <div className="grid items-start gap-5 lg:grid-cols-2">
-          {focused["car-setup"]?.["is-valid"] && focused["is-player"] ? (
-            <Panel>
-              <SetupSheet
-                setup={focused["car-setup"]}
-                title="Setup used"
-                meta="This session"
-                action={
-                  activeFormulaKey ? (
-                    <Link
-                      to={trackPath(
-                        activeFormulaKey,
-                        getTrackId(trackName),
-                        "setups",
-                      )}
-                      className="text-xs text-tone-500 hover:text-tone-100"
-                    >
-                      {getTrackDisplayName(trackName)} setups →
-                    </Link>
-                  ) : undefined
-                }
-              />
-            </Panel>
-          ) : (
-            <Panel title="Setup">
-              <p className="text-sm text-tone-500">
-                The game only exports your own setup.
-              </p>
-            </Panel>
-          )}
-        </div>
+      {tab === "setup" && (
+        <SessionSetup
+          kind="qualifying"
+          driver={focused}
+          bestLapMs={summary?.bestMs ?? 0}
+          trackName={trackName}
+        />
       )}
     </>,
   );

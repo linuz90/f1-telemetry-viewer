@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Gauge, ListOrdered, Repeat, Timer, Trophy } from "lucide-react";
+import { Activity, ListOrdered, Repeat, Trophy, Zap } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { DriverData, TelemetrySession } from "../../types/telemetry";
 import { useTelemetry } from "../../context/TelemetryContext";
 import { useScopedSessions } from "../../hooks/useSessionLog";
 import { useTrackHistory } from "../../hooks/useTrackHistory";
+import { useStintComparison } from "../../hooks/useStintComparison";
 import { buildRaceStory, buildRaceHeadline } from "../../analysis/raceStory";
 import {
   buildRacePaceRank,
@@ -22,6 +23,7 @@ import {
   type StartReactionRating,
 } from "../../analysis/startReactionAnalysis";
 import { buildSessionSpeedAnalysis } from "../../analysis/speedAnalysis";
+import { placeComparisonOnLaps } from "../../analysis/stintCompare";
 import { summaryKind } from "../../analysis/sessionKind";
 import { sessionDayKey } from "../../analysis/sessionLog";
 import { getRaceControlEvents } from "../../utils/raceControl";
@@ -50,17 +52,40 @@ import {
   type LapChartTooltipRow,
 } from "../../components/charts/LapChart";
 import { TrackOutline } from "../../components/TrackOutline";
+import { SESSION_KIND_ICON } from "../../components/sessionTypeMeta";
 import {
   SessionShell,
   useSessionTab,
 } from "../../components/session/SessionShell";
 import {
-  Panel,
-  SetupSheet,
   StatDoors,
   WorthList,
   type StatDoor,
 } from "../../components/session/SessionParts";
+import { Panel } from "../../components/ui/Panel";
+import { SectionHeader } from "../../components/ui/SectionHeader";
+import {
+  cardClass,
+  cardSurface,
+  heroCardClass,
+  insetTileClass,
+} from "../../components/ui/surfaces";
+import {
+  tableCellClass,
+  tableClass,
+  tableHeadCellClass,
+  tableHeadClass,
+  tableRowClass,
+} from "../../components/ui/table";
+import {
+  paceTone,
+  signedPercent,
+  signedSeconds,
+  StintCompareLine,
+  StintComparePicker,
+  stintCompareTooltipRows,
+  wearTone,
+} from "../../components/session/StintCompare";
 import { RaceResultsTable } from "../../components/RaceResultsTable";
 import { RaceControlTimeline } from "../../components/RaceControlTimeline";
 import { StintComparisonTable } from "../../components/StintComparisonTable";
@@ -71,6 +96,7 @@ import { LapTelemetrySection } from "../../components/lap-telemetry/LapTelemetry
 import { DuplicateNotice } from "../../components/DuplicateNotice";
 import { LapTable } from "./LapTable";
 import { DriverPanel } from "./DriverPanel";
+import { SessionSetup } from "./SessionSetup";
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -78,7 +104,7 @@ const TABS = [
   { key: "tyres", label: "Tyres" },
   { key: "lap-telemetry", label: "Lap telemetry" },
   { key: "results", label: "Results" },
-  { key: "car", label: "Car" },
+  { key: "setup", label: "Setup" },
 ] as const;
 
 /** Reaction text tone: AGENTS.md reads a start over 0.5 s as severe. */
@@ -162,6 +188,17 @@ export function RaceView({
       start: buildStartReactionModel(session, focused),
     };
   }, [session, focused]);
+  // The player's stints against their earlier ones here at this race length:
+  // did practice pace hold up, did this race beat the last?
+  const stintModel = useStintComparison(session, slug, focused);
+  const stintHistory = useMemo(
+    () =>
+      stintModel.defaults.map((comparison) => ({
+        comparison,
+        label: stintModel.label(comparison.b),
+      })),
+    [stintModel.defaults, stintModel.label],
+  );
   const worth = useMemo(
     () =>
       model?.story && model.headline && focused
@@ -172,9 +209,10 @@ export function RaceView({
             headline: model.headline,
             pace: model.pace,
             pbs,
+            stintHistory,
           })
         : [],
-    [model, session, focused, pbs],
+    [model, session, focused, pbs, stintHistory],
   );
   const compareSeries = useMemo(
     () => (compare ? buildDriverLapSeries(compare, session) : null),
@@ -268,6 +306,19 @@ export function RaceView({
     compound: s.compound,
   }));
 
+  // One stint against an earlier one, charted over that stint's laps.
+  const stintComparison = stintModel.comparison;
+  const stintPlaced = stintComparison
+    ? placeComparisonOnLaps(stintComparison, totalLaps)
+    : null;
+  const stintCompareLabel = stintModel.compare
+    ? stintModel.label(stintModel.compare)
+    : "";
+  const activeStint = stintModel.active;
+  const showStintCompare =
+    !!activeStint &&
+    (stintModel.pool.length > 0 || stintModel.stints.length > 1);
+
   const tooltip = (lap: number) => {
     const rows: LapChartTooltipRow[] = [];
     if (story?.trace[lap])
@@ -326,7 +377,7 @@ export function RaceView({
   const stats: StatDoor[] = [
     {
       label: "Race pace",
-      icon: Gauge,
+      icon: Activity,
       value: pace ? (
         <>
           {ordinal(pace.rank)}{" "}
@@ -362,7 +413,8 @@ export function RaceView({
       : { label: "Laps", icon: Repeat, value: String(story?.lastLap ?? 0) },
     {
       label: "Best lap",
-      icon: Timer,
+      // Race control's fastest-lap glyph; Timer belongs to qualifying.
+      icon: Zap,
       value: ownBestMs ? msToLapTime(ownBestMs) : "—",
       tone: ownBestMs && ownBestMs === fastestOverall ? "best" : undefined,
       note:
@@ -376,7 +428,7 @@ export function RaceView({
     quali?.qualifyingPosition
       ? {
           label: "Quali",
-          icon: ListOrdered,
+          icon: SESSION_KIND_ICON.qualifying,
           value: `P${quali.qualifyingPosition}`,
           note: quali.bestLapTimeMs
             ? msToLapTime(quali.bestLapTimeMs)
@@ -433,7 +485,7 @@ export function RaceView({
     >
       {tab === "overview" && (
         <>
-          <section className="relative overflow-hidden rounded-2xl bg-tone-900 p-5 ring-1 ring-tone-800 sm:p-6">
+          <section className={cn(heroCardClass, "overflow-hidden")}>
             <TrackOutline
               track={trackName}
               glow
@@ -478,7 +530,12 @@ export function RaceView({
             {/* A race without position history still shows its reaction. */}
             {!story && reaction && (
               <div className="relative mt-4 flex flex-wrap gap-1.5">
-                <span className="rounded-full bg-tone-800/60 px-3 py-1 text-xs text-tone-400 ring-1 ring-tone-800">
+                <span
+                  className={cn(
+                    insetTileClass,
+                    "rounded-full px-3 py-1 text-xs text-tone-400",
+                  )}
+                >
                   Start{reaction}
                 </span>
               </div>
@@ -488,7 +545,10 @@ export function RaceView({
                 {story.chips.map((chip) => (
                   <span
                     key={chip.key}
-                    className="rounded-full bg-tone-800/60 px-3 py-1 text-xs text-tone-400 ring-1 ring-tone-800"
+                    className={cn(
+                      insetTileClass,
+                      "rounded-full px-3 py-1 text-xs text-tone-400",
+                    )}
                   >
                     {chip.label}{" "}
                     <b
@@ -534,10 +594,10 @@ export function RaceView({
               onExpand={() => setExpandedWorth(true)}
             />
             <section>
-              <h2 className="mb-2.5 text-base font-semibold text-tone-50">
-                Next time at {getTrackDisplayName(trackName)}
-              </h2>
-              <div className="rounded-2xl bg-tone-900 p-5 ring-1 ring-tone-800">
+              <SectionHeader
+                title={`Next time at ${getTrackDisplayName(trackName)}`}
+              />
+              <div className={cardClass}>
                 {lifeByCompound.size > 0 && (
                   <>
                     <div className="text-xs text-tone-500">
@@ -674,6 +734,7 @@ export function RaceView({
               ✕ contact · ! warning, your own only.
             </p>
           </Panel>
+          <DamageTimeline perLapInfo={focused["per-lap-info"] ?? []} />
           <Panel title="Every lap">
             <LapTable
               driver={focused}
@@ -684,7 +745,7 @@ export function RaceView({
             />
           </Panel>
           {raceControl.length > 0 && (
-            <details className="group rounded-2xl bg-tone-900 ring-1 ring-tone-800">
+            <details className={cn(cardSurface, "group")}>
               <summary className="cursor-pointer list-none px-5 py-4 text-sm font-medium text-tone-200 hover:text-tone-50">
                 All race control events, every driver
                 <span className="ml-2 text-xs font-normal text-tone-500">
@@ -740,21 +801,57 @@ export function RaceView({
             />
           </Panel>
           <Panel title="Stints" className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-tone-500">
-                  <th className="py-2 pr-3 font-normal">Stint</th>
-                  <th className="py-2 pr-3 text-right font-normal">Laps</th>
-                  <th className="py-2 pr-3 text-right font-normal">
+            <table className={tableClass}>
+              <thead className={tableHeadClass}>
+                <tr>
+                  <th className={tableHeadCellClass({ layout: "flush" })}>
+                    Stint
+                  </th>
+                  <th
+                    className={tableHeadCellClass({
+                      align: "right",
+                      layout: "flush",
+                    })}
+                  >
+                    Laps
+                  </th>
+                  <th
+                    className={tableHeadCellClass({
+                      align: "right",
+                      layout: "flush",
+                    })}
+                  >
                     Race pace
                   </th>
-                  <th className="py-2 pr-3 text-right font-normal">
+                  <th
+                    className={tableHeadCellClass({
+                      align: "right",
+                      layout: "flush",
+                    })}
+                  >
                     Wear a lap
                   </th>
-                  <th className="py-2 pr-3 text-right font-normal">Peak</th>
-                  <th className="py-2 text-right font-normal">
+                  <th
+                    className={tableHeadCellClass({
+                      align: "right",
+                      layout: "flush",
+                    })}
+                  >
+                    Peak
+                  </th>
+                  <th
+                    className={tableHeadCellClass({
+                      align: "right",
+                      layout: "flush",
+                    })}
+                  >
                     Life to {PUNCTURE_THRESHOLD}%
                   </th>
+                  {stintModel.defaults.length > 0 && (
+                    <th className={tableHeadCellClass({ layout: "flush" })}>
+                      Last time here
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="tabular-nums">
@@ -771,12 +868,17 @@ export function RaceView({
                     );
                     const compound =
                       stint["tyre-set-data"]["visual-tyre-compound"];
+                    const before = stintModel.defaults.find(
+                      (c) => c.a.startLap === stint["start-lap"],
+                    );
                     return (
-                      <tr
-                        key={stint["start-lap"]}
-                        className="border-t border-tone-800/70"
-                      >
-                        <td className="py-2 pr-3 text-tone-100">
+                      <tr key={stint["start-lap"]} className={tableRowClass}>
+                        <td
+                          className={tableCellClass({
+                            layout: "flush",
+                            className: "text-tone-100",
+                          })}
+                        >
                           <span className="inline-flex items-center gap-2">
                             <span
                               className="size-2.5 rounded-full"
@@ -788,23 +890,95 @@ export function RaceView({
                             {stint["end-lap"]}
                           </span>
                         </td>
-                        <td className="py-2 pr-3 text-right text-tone-300">
+                        <td
+                          className={tableCellClass({
+                            align: "right",
+                            layout: "flush",
+                            className: "text-tone-300",
+                          })}
+                        >
                           {stint["stint-length"]}
                         </td>
-                        <td className="py-2 pr-3 text-right font-mono text-tone-100">
+                        <td
+                          className={tableCellClass({
+                            align: "right",
+                            mono: true,
+                            layout: "flush",
+                            className: "text-tone-100",
+                          })}
+                        >
                           {chart?.averageMs
                             ? msToLapTime(chart.averageMs)
                             : "–"}
                         </td>
-                        <td className="py-2 pr-3 text-right text-tone-300">
+                        <td
+                          className={tableCellClass({
+                            align: "right",
+                            layout: "flush",
+                            className: "whitespace-nowrap text-tone-300",
+                          })}
+                        >
                           {rate > 0 ? `${rate.toFixed(1)}%` : "–"}
+                          {before?.wearPerLapDelta != null && (
+                            <span
+                              className={cn(
+                                "ml-1.5 text-[11px]",
+                                wearTone(before.wearPerLapDelta),
+                              )}
+                              title={`Against your ${stintModel.label(before.b)}`}
+                            >
+                              {signedPercent(before.wearPerLapDelta)}
+                            </span>
+                          )}
                         </td>
-                        <td className="py-2 pr-3 text-right text-tone-300">
+                        <td
+                          className={tableCellClass({
+                            align: "right",
+                            layout: "flush",
+                            className: "text-tone-300",
+                          })}
+                        >
                           {peak > 0 ? `${Math.round(peak)}%` : "–"}
                         </td>
-                        <td className="py-2 text-right text-tone-100">
+                        <td
+                          className={tableCellClass({
+                            align: "right",
+                            layout: "flush",
+                            className: "text-tone-100",
+                          })}
+                        >
                           {life.lifeLaps > 0 ? `~${life.lifeLaps} laps` : "–"}
                         </td>
+                        {stintModel.defaults.length > 0 && (
+                          <td
+                            className={tableCellClass({
+                              layout: "flush",
+                              className: "whitespace-nowrap text-tone-500",
+                            })}
+                          >
+                            {before?.deltaMs != null ? (
+                              <button
+                                type="button"
+                                className="hover:text-tone-200"
+                                onClick={() =>
+                                  stintModel.select(before.a.id, before.b.id)
+                                }
+                              >
+                                <span
+                                  className={cn(
+                                    "font-mono",
+                                    paceTone(before.deltaMs),
+                                  )}
+                                >
+                                  {signedSeconds(before.deltaMs)}
+                                </span>{" "}
+                                s a lap vs {stintModel.label(before.b)}
+                              </button>
+                            ) : (
+                              "–"
+                            )}
+                          </td>
+                        )}
                       </tr>
                     );
                   },
@@ -820,6 +994,109 @@ export function RaceView({
               </p>
             )}
           </Panel>
+          {showStintCompare && activeStint && (
+            <Panel
+              title="Against your earlier stints"
+              hint={`${getTrackDisplayName(trackName)}, ${activeStint.raceLaps}-lap races · laps paired by tyre age`}
+              action={<StintComparePicker model={stintModel} />}
+            >
+              <StintCompareLine model={stintModel} className="mb-3" />
+              <LapChart
+                firstLap={activeStint.startLap}
+                laps={Math.min(activeStint.endLap, totalLaps)}
+                panels={[
+                  {
+                    kind: "time",
+                    height: 170,
+                    series: [
+                      ...(stintPlaced
+                        ? [
+                            {
+                              key: "compare",
+                              tone: "compare" as const,
+                              lapsMs: stintPlaced.lapsMs,
+                              excluded: stintPlaced.excluded,
+                            },
+                          ]
+                        : []),
+                      {
+                        key: "you",
+                        tone: "you" as const,
+                        lapsMs: series.lapsMs,
+                        excluded: series.excluded,
+                        averages:
+                          activeStint.averageMs != null
+                            ? [
+                                {
+                                  from: activeStint.startLap,
+                                  to: activeStint.endLap,
+                                  ms: activeStint.averageMs,
+                                },
+                              ]
+                            : [],
+                      },
+                    ],
+                  },
+                  ...(stintPlaced && stintComparison!.pairs.length > 0
+                    ? [
+                        {
+                          kind: "gap" as const,
+                          height: 80,
+                          label: `Gap to ${stintCompareLabel}`,
+                          gapMs: stintPlaced.gapMs,
+                        },
+                      ]
+                    : []),
+                  {
+                    kind: "wear",
+                    height: 110,
+                    wear: series.wear,
+                    compare: stintPlaced?.wear,
+                  },
+                ]}
+                bands={bands}
+                pits={series.pitInLaps}
+                stints={stints}
+                tooltip={(lap) => {
+                  const ms = series.lapsMs[lap - 1];
+                  const wear = series.wear[lap - 1];
+                  const reason = series.excluded.get(lap);
+                  return {
+                    title: `Lap ${lap}`,
+                    rows: [
+                      ...(ms
+                        ? [
+                            {
+                              tone: "you" as const,
+                              value: msToLapTime(ms),
+                              label: reason
+                                ? `not counted: ${reason}`
+                                : "lap time",
+                            },
+                          ]
+                        : []),
+                      ...(wear != null
+                        ? [
+                            {
+                              tone: "you" as const,
+                              value: `${Math.round(wear)}%`,
+                              label: "worst wheel",
+                            },
+                          ]
+                        : []),
+                      ...(stintPlaced
+                        ? stintCompareTooltipRows(
+                            stintPlaced,
+                            lap,
+                            stintCompareLabel,
+                          )
+                        : []),
+                    ],
+                  };
+                }}
+              />
+            </Panel>
+          )}
           <Panel
             title="Against the field"
             hint="Each stint against the best on the same compound"
@@ -873,41 +1150,13 @@ export function RaceView({
         </div>
       )}
 
-      {tab === "car" && (
-        <div className="grid items-start gap-5 lg:grid-cols-2">
-          {focused["car-setup"]?.["is-valid"] && focused["is-player"] ? (
-            <Panel>
-              <SetupSheet
-                setup={focused["car-setup"]}
-                title="Setup used"
-                meta={`${getTrackDisplayName(trackName)} race`}
-                action={
-                  activeFormulaKey ? (
-                    <Link
-                      to={trackPath(
-                        activeFormulaKey,
-                        getTrackId(trackName),
-                        "setups",
-                      )}
-                      className="text-xs text-tone-500 hover:text-tone-100"
-                    >
-                      {getTrackDisplayName(trackName)} setups →
-                    </Link>
-                  ) : undefined
-                }
-              />
-            </Panel>
-          ) : (
-            <Panel title="Setup">
-              <p className="text-sm text-tone-500">
-                The game only exports your own setup.
-              </p>
-            </Panel>
-          )}
-          <Panel>
-            <DamageTimeline perLapInfo={focused["per-lap-info"] ?? []} />
-          </Panel>
-        </div>
+      {tab === "setup" && (
+        <SessionSetup
+          kind="race"
+          driver={focused}
+          bestLapMs={ownBestMs ?? 0}
+          trackName={trackName}
+        />
       )}
 
       <DuplicateNotice

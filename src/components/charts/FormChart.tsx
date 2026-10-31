@@ -1,3 +1,5 @@
+import { cn } from "../../utils/cn";
+import { chartTickClass, chartTooltipClass } from "./chartStyles";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { FormRace } from "../../analysis/onlineForm";
@@ -63,7 +65,7 @@ export function FormChart({
                 x={L - 7}
                 y={y(p) + 3.5}
                 textAnchor="end"
-                className="fill-tone-500 text-[10.5px] tabular-nums"
+                className={chartTickClass}
               >
                 P{p}
               </text>
@@ -150,7 +152,7 @@ export function FormChart({
                   x={x(i)}
                   y={height - 3}
                   textAnchor="middle"
-                  className="fill-tone-500 text-[10px]"
+                  className={chartTickClass}
                 >
                   {formatDayLabel(race.session.date.split("T")[0]).replace(
                     /^\w+ /,
@@ -164,7 +166,7 @@ export function FormChart({
       </svg>
       {hovered && hover != null && (
         <div
-          className="pointer-events-none absolute z-10 rounded-lg bg-tone-900 px-2.5 py-1.5 text-xs whitespace-nowrap shadow-xl ring-1 ring-tone-700"
+          className={cn(chartTooltipClass, "absolute z-10 whitespace-nowrap")}
           style={{
             left: Math.min(width - 180, Math.max(0, x(hover) - 80)),
             top: 0,

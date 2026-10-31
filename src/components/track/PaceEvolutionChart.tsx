@@ -1,3 +1,6 @@
+import { chartTooltipClass } from "../charts/chartStyles";
+import { cn } from "../../utils/cn";
+import { FunnelX } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -12,13 +15,13 @@ import type {
   PaceEvolutionPoint,
   RaceContext,
 } from "../../utils/stats/trackPaceEvolution";
-import { CHART_THEME, TOOLTIP_STYLE } from "../../constants/colors";
+import { CHART_THEME } from "../../constants/colors";
 import { getCompoundColor } from "../../utils/colors";
 import { msToLapTime } from "../../utils/format";
 import { PEAK_PACE_WINDOW } from "../../utils/stats/peakPace";
-import { cardClass } from "../Card";
+import { EmptyState } from "../EmptyState";
 import { SegmentedControl } from "../ui/SegmentedControl";
-import { SectionHeader } from "../ui/SectionHeader";
+import { Panel } from "../ui/Panel";
 import { formatLapTick, lapTimeAxis } from "../charts/lapTimeAxis";
 import { HStack } from "../ui/Stack";
 
@@ -120,26 +123,26 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
   );
 
   return (
-    <section className={cardClass}>
-      <SectionHeader
-        title="Peak pace evolution"
-        hint={`Race by race, per compound: the mean of your fastest ${PEAK_PACE_WINDOW} clean laps`}
-        action={
-          showFilter ? (
-            <SegmentedControl<ContextFilter>
-              ariaLabel="Race context filter"
-              options={CONTEXT_FILTER_OPTIONS}
-              value={filter}
-              onChange={setFilter}
-            />
-          ) : undefined
-        }
-      />
-
+    <Panel
+      title="Peak pace evolution"
+      hint={`Race by race, per compound: the mean of your fastest ${PEAK_PACE_WINDOW} clean laps`}
+      action={
+        showFilter ? (
+          <SegmentedControl<ContextFilter>
+            ariaLabel="Race context filter"
+            options={CONTEXT_FILTER_OPTIONS}
+            value={filter}
+            onChange={setFilter}
+          />
+        ) : undefined
+      }
+    >
       {filtered.length === 0 ? (
-        <div className="py-12 text-center text-sm text-tone-500">
-          No races match this filter.
-        </div>
+        <EmptyState
+          icon={FunnelX}
+          title="No races match this filter"
+          className="min-h-55"
+        />
       ) : (
         <ResponsiveContainer width="100%" height={220}>
           <LineChart
@@ -165,7 +168,6 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
               domain={[axis.domain[0] / 1000, axis.domain[1] / 1000]}
             />
             <Tooltip
-              {...TOOLTIP_STYLE}
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const row = payload[0]?.payload as
@@ -178,19 +180,9 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
                 const point = filtered.find((d) => d.idx === row.idx);
                 return (
                   <div
-                    style={{
-                      ...TOOLTIP_STYLE.contentStyle,
-                      padding: "8px 12px",
-                      color: "var(--color-tone-200)",
-                    }}
+                    className={cn(chartTooltipClass, "px-3 py-2 text-tone-200")}
                   >
-                    <div
-                      style={{
-                        color: "var(--color-tone-400)",
-                        marginBottom: 2,
-                        fontSize: 11,
-                      }}
-                    >
+                    <div className="mb-0.5 text-tone-400">
                       {row.date} · {row.label}
                     </div>
                     {point && (
@@ -287,6 +279,6 @@ export function PaceEvolutionChart({ data }: { data: PaceEvolutionPoint[] }) {
           ))}
         </HStack>
       )}
-    </section>
+    </Panel>
   );
 }

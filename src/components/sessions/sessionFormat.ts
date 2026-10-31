@@ -1,5 +1,5 @@
 import type { SessionSummary } from "../../types/telemetry";
-import { summaryKind } from "../../analysis/sessionKind";
+import { summaryKind, type SessionKind } from "../../analysis/sessionKind";
 import type { SessionLogGroup } from "../../analysis/sessionLog";
 import { isDnfResultStatus } from "../../analysis/dashboardResultStats";
 
@@ -91,34 +91,47 @@ export function sessionCompounds(session: SessionSummary): string[] {
   return (session.stints ?? []).map((stint) => stint.compound);
 }
 
+/** "Practice vs AI 110", "Practice", or "Time trial". */
+export function offlineGroupLabel(group: SessionLogGroup): string {
+  if (group.offlineLabel === "Time trial") return "Time trial";
+  return group.offlineLabel && group.offlineLabel !== "Offline"
+    ? `Practice vs ${group.offlineLabel}`
+    : "Practice";
+}
+
 /** The folded practice group's summary line pieces. */
 export function offlineGroupSummary(group: SessionLogGroup): {
+  kind: SessionKind;
   label: string;
   bestMs?: number;
 }[] {
-  const parts: { label: string; bestMs?: number }[] = [];
+  const parts: { kind: SessionKind; label: string; bestMs?: number }[] = [];
   const plural = (n: number, word: string) =>
     `${n} ${word}${n === 1 ? "" : "s"}`;
   if (group.counts.qualifying) {
     parts.push({
+      kind: "qualifying",
       label: plural(group.counts.qualifying, "quali run"),
       bestMs: group.bestMs.qualifying,
     });
   }
   if (group.counts["long-run"]) {
     parts.push({
+      kind: "long-run",
       label: plural(group.counts["long-run"], "long run"),
       bestMs: group.bestMs["long-run"],
     });
   }
   if (group.counts.race) {
     parts.push({
+      kind: "race",
       label: plural(group.counts.race, "race"),
       bestMs: group.bestMs.race,
     });
   }
   if (group.counts["time-trial"]) {
     parts.push({
+      kind: "time-trial",
       label: plural(group.counts["time-trial"], "time trial"),
       bestMs: group.bestMs["time-trial"],
     });

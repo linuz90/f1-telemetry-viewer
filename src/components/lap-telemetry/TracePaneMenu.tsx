@@ -1,7 +1,12 @@
 import { ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { cn } from "../../utils/cn";
-import { CheckboxMenuItem } from "../ui/CheckboxMenuItem";
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuItem,
+  MenuPopup,
+  MenuSeparator,
+  MenuTrigger,
+} from "../ui/Menu";
 import {
   DEFAULT_PANE_VISIBILITY,
   PANE_SPECS,
@@ -19,90 +24,51 @@ export function TracePaneMenu({
   visibility: PaneVisibility;
   onChange: (next: PaneVisibility) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      // Claims the key so LapComparisonView's Esc-to-reset-zoom skips it.
-      event.preventDefault();
-      setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
   const visibleCount = available.filter((id) => visibility[id]).length;
   const isDefault = available.every(
     (id) => visibility[id] === DEFAULT_PANE_VISIBILITY[id],
   );
 
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className={cn(
-          "flex items-center gap-1.5 rounded-lg bg-tone-900/60 px-2.5 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-tone-600",
-          open ? "text-tone-100" : "text-tone-300 hover:text-tone-100",
-        )}
-      >
+    <Menu>
+      <MenuTrigger className="group flex items-center gap-1.5 rounded-lg bg-tone-900/60 px-2.5 py-1.5 text-xs font-medium text-tone-300 transition-colors hover:text-tone-100 data-popup-open:text-tone-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-tone-600">
         Traces
         <span className="tabular-nums text-tone-500">
           {visibleCount}/{available.length}
         </span>
         <ChevronDown
-          className={cn(
-            "size-3 text-tone-500 transition-transform",
-            open && "rotate-180",
-          )}
+          aria-hidden
+          className="size-3 text-tone-500 transition-transform group-data-popup-open:rotate-180"
         />
-      </button>
-
-      {open && (
-        <div
-          role="group"
-          aria-label="Visible traces"
-          className="absolute left-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-tone-800 bg-tone-900 py-1 shadow-lg shadow-black/20"
-        >
-          {available.map((id) => (
-            <CheckboxMenuItem
-              key={id}
-              checked={visibility[id]}
-              // Keep one pane so the chart never collapses to a bare axis.
-              disabled={visibility[id] && visibleCount === 1}
-              onToggle={() =>
-                onChange({ ...visibility, [id]: !visibility[id] })
-              }
+      </MenuTrigger>
+      <MenuPopup aria-label="Visible traces" className="w-44">
+        {available.map((id) => (
+          <MenuCheckboxItem
+            key={id}
+            checked={visibility[id]}
+            // Keep one pane so the chart never collapses to a bare axis.
+            disabled={visibility[id] && visibleCount === 1}
+            onCheckedChange={(checked) =>
+              onChange({ ...visibility, [id]: checked })
+            }
+          >
+            {PANE_SPECS[id].label}
+          </MenuCheckboxItem>
+        ))}
+        {!isDefault && (
+          <>
+            <MenuSeparator />
+            {/* Resetting is the last thing you do here, and this row
+                disappears once the panes are back to default, so close. */}
+            <MenuItem
+              onClick={() => onChange(DEFAULT_PANE_VISIBILITY)}
+              className="text-xs text-tone-400"
             >
-              {PANE_SPECS[id].label}
-            </CheckboxMenuItem>
-          ))}
-          {!isDefault && (
-            <>
-              <div className="my-1 h-px bg-tone-800" />
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => onChange(DEFAULT_PANE_VISIBILITY)}
-                className="w-full px-3 py-2 text-left text-xs text-tone-400 transition-colors hover:bg-tone-800/60 hover:text-tone-200"
-              >
-                Reset to default
-              </button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+              Reset to default
+            </MenuItem>
+          </>
+        )}
+      </MenuPopup>
+    </Menu>
   );
 }

@@ -9,42 +9,13 @@ import {
 } from "lucide-react";
 import type { CarSetup } from "../../types/telemetry";
 import type { WorthItem, WorthTarget } from "../../analysis/worthALook";
+import { sessionKindLabel, type SessionKind } from "../../analysis/sessionKind";
 import { formatSetupText } from "../../analysis/shareText";
 import { cn } from "../../utils/cn";
-
-export function Panel({
-  title,
-  hint,
-  action,
-  children,
-  className,
-}: {
-  title?: ReactNode;
-  hint?: ReactNode;
-  action?: ReactNode;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={cn(
-        "rounded-2xl bg-tone-900 p-5 ring-1 ring-tone-800",
-        className,
-      )}
-    >
-      {(title || action) && (
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            {title && <h2 className="font-semibold text-tone-50">{title}</h2>}
-            {hint && <p className="mt-0.5 text-xs text-tone-500">{hint}</p>}
-          </div>
-          {action}
-        </div>
-      )}
-      {children}
-    </section>
-  );
-}
+import { SessionKindIcon } from "../SessionKindIcon";
+import { Panel } from "../ui/Panel";
+import { SectionHeader } from "../ui/SectionHeader";
+import { cardSurface } from "../ui/surfaces";
 
 export interface StatDoor {
   label: string;
@@ -144,8 +115,8 @@ export function WorthList({
   const shown = expanded ? items : items.slice(0, WORTH_SHOWN);
   return (
     <section>
-      <h2 className="mb-2.5 text-base font-semibold text-tone-50">{title}</h2>
-      <ol className="overflow-hidden rounded-2xl bg-tone-900 ring-1 ring-tone-800">
+      <SectionHeader title={title} />
+      <ol className={cn(cardSurface, "overflow-hidden")}>
         {shown.map((item, i) => (
           <li
             key={item.id}
@@ -228,6 +199,34 @@ function setupRows(setup: CarSetup): { label: string; value: string }[] {
     }
   }
   return rows;
+}
+
+/**
+ * The card every setup sits in, on a session's Setup tab and a track's Setups
+ * tab alike: the kind's glyph and "Race setup" above it, so one setup reads
+ * the same wherever it shows. `aside` fills the right of that label row.
+ */
+export function SetupPanel({
+  kind,
+  aside,
+  children,
+}: {
+  kind: SessionKind;
+  aside?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Panel className="self-start">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-xs text-tone-500">
+          <SessionKindIcon kind={kind} className="mr-1" />
+          {sessionKindLabel(kind)} setup
+        </span>
+        {aside}
+      </div>
+      {children}
+    </Panel>
+  );
 }
 
 /**

@@ -31,10 +31,11 @@ import { SectionHeader } from "./ui/SectionHeader";
 import { SegmentedControl } from "./ui/SegmentedControl";
 import {
   tableCellClass,
-  tableClass,
+  tableClassDense,
   tableHeadCellClass,
   tableHeadClass,
   tableRowClass,
+  tableRowFocusedClass,
 } from "./ui/table";
 import { formatPenaltySummary } from "../utils/raceControl";
 
@@ -286,7 +287,7 @@ export function RaceResultsTable({
           }
         />
         <ScrollArea axis="x">
-          <table className={tableClass}>
+          <table className={tableClassDense}>
             <thead className={tableHeadClass}>
               <tr>
                 <th className={thClass()} {...sortableHeaderProps("pos")}>
@@ -491,7 +492,7 @@ export function RaceResultsTable({
                     }
                     className={cn(
                       tableRowClass,
-                      isFocused && "bg-active/10 text-tone-0 font-medium",
+                      isFocused && tableRowFocusedClass,
                       onDriverSelect &&
                         !isFocused &&
                         "cursor-pointer hover:bg-tone-800/50",
@@ -664,7 +665,7 @@ export function RaceResultsTable({
     <div>
       <SectionHeader size="sm" title="Classification" />
       <ScrollArea axis="x">
-        <table className={tableClass}>
+        <table className={tableClassDense}>
           <thead className={tableHeadClass}>
             <tr>
               <th className={thClass()} {...sortableHeaderProps("pos")}>
@@ -733,8 +734,7 @@ export function RaceResultsTable({
                   key={d.index}
                   className={cn(
                     tableRowClass,
-                    d.index === focusedDriverIndex &&
-                      "bg-tone-800/40 text-tone-0 font-medium",
+                    d.index === focusedDriverIndex && tableRowFocusedClass,
                   )}
                 >
                   <td className={tableCellClass()}>{fc.position}</td>

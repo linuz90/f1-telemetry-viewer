@@ -47,7 +47,7 @@ const PIT_LOSS_HIGH_CONFIDENCE_SPREAD_MS = 3_000;
 // Lap-time cost of fuel: 0.028 ± 0.004 s/kg with driver-race fixed effects
 // over 352 human driver-races in F1 25, F1 26 and F2 (the player alone,
 // 0.021 ± 0.011 over 69 races). Per-track values ranged 0.017–0.053.
-const FUEL_LAP_TIME_MS_PER_KG = 30;
+export const FUEL_LAP_TIME_MS_PER_KG = 30;
 // A compound's clean laps only count as pace evidence from more than one race
 // and more than a handful of laps. One short stint carries that race's fuel
 // load and conditions: Sakhir's only Soft laps came after a late Safety Car on

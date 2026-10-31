@@ -1,5 +1,4 @@
 import type {
-  CarSetup,
   DriverData,
   LapHistoryEntry,
   TelemetrySession,
@@ -11,11 +10,7 @@ import {
   driverBestLapTimeMs,
   sessionDriverBestLapTimeMs,
 } from "../utils/stats/drivers";
-import {
-  getRacePaceLapSamples,
-  hasCompleteLapTiming,
-  isCompleteValidLap,
-} from "../utils/stats/laps";
+import { hasCompleteLapTiming, isCompleteValidLap } from "../utils/stats/laps";
 import {
   getCompletedStints,
   getDriverStints,
@@ -23,6 +18,14 @@ import {
   stintGreenLife,
 } from "../utils/stats/tyres";
 import { buildRaceDriverStats } from "./resultsAnalysis";
+import {
+  detailNamesFade,
+  gapTurn,
+  stintCompareDetail,
+  stintDeltaClaim,
+  type ComparableStint,
+  type StintComparison,
+} from "./stintCompare";
 import {
   describeMoment,
   significantMoments,
@@ -49,7 +52,7 @@ export type WorthTarget =
   | "tyres"
   | "lap-telemetry"
   | "results"
-  | "car"
+  | "setup"
   | "track"
   | "race"
   | "qualifying"
@@ -82,14 +85,14 @@ export const PB_GAP_MIN_S = 0.1;
 export const WEAR_VS_FIELD_MIN = 0.5;
 /** Laps a compound needs before its wear rate is evidence. */
 export const WEAR_MIN_STINT_LAPS = 5;
-/** Long-run pace difference vs the previous run worth naming (seconds). */
+/** Stint pace difference vs an earlier stint worth naming (seconds a lap). */
 export const LONG_RUN_PACE_MIN_S = 0.1;
-/** Clean laps a long-run compound needs before it is compared. */
-export const LONG_RUN_MIN_LAPS = 2;
 /** Clean-lap fade within one stint worth naming (seconds per lap). */
 export const STINT_FADE_MIN_S_PER_LAP = 0.15;
-/** Clean laps a stint needs before its fade is a trend. */
-export const STINT_FADE_MIN_LAPS = 4;
+/** Time a stint gave back after its gap to another peaked (seconds). */
+export const GAP_TURN_MIN_S = 0.5;
+/** ...and the share of the peak that is, so a long stint's wobble is not a turn. */
+export const GAP_TURN_MIN_SHARE = 0.3;
 
 const PLACES_WEIGHT = 1000;
 
@@ -196,6 +199,7 @@ export function buildRaceWorthALook({
   headline,
   pace,
   pbs,
+  stintHistory = [],
 }: {
   session: TelemetrySession;
   driver: DriverData;
@@ -203,6 +207,8 @@ export function buildRaceWorthALook({
   headline: RaceHeadline;
   pace: RacePaceRank | null;
   pbs: TrackPBs | null;
+  /** Each race stint against the latest earlier stint on its tyre here. */
+  stintHistory?: LabelledStintComparison[];
 }): WorthItem[] {
   const items: WorthItem[] = [];
   const drivers = session["classification-data"] ?? [];
@@ -352,6 +358,27 @@ export function buildRaceWorthALook({
       target: "tyres",
       targetLabel: "Tyres",
       weight: Math.abs(delta) / 10,
+    });
+  }
+
+  // Did practice pace hold up in the race, or did this race beat the last?
+  for (const { comparison: c, label } of stintHistory) {
+    if (c.deltaMs == null || Math.abs(c.deltaMs) < LONG_RUN_PACE_MIN_S * 1000)
+      continue;
+    items.push({
+      id: `stint-history-${c.a.id}`,
+      tone: c.deltaMs > 0 ? "loss" : "gain",
+      claim: stintDeltaClaim(c, label)!,
+      evidence:
+        [
+          `${c.pairs.length} laps paired by tyre age${c.fuelCorrected ? " on equal fuel" : ""}.`,
+          stintCompareDetail(c),
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined,
+      target: "tyres",
+      targetLabel: "Tyres",
+      weight: Math.abs(c.deltaMs) / 1000,
     });
   }
 
@@ -707,165 +734,62 @@ export function buildTimeTrialWorthALook({
 
 // --- Long runs --------------------------------------------------------------
 
-export interface LongRunStint {
-  compound: string;
-  startLap: number;
-  endLap: number;
-  /** Mean of the stint's clean laps (Race Pace rules), or null under two. */
-  averageMs: number | null;
-  cleanLaps: number;
-  bestMs: number;
-  wearPerLap: number;
-  /** Projected laps to the 75 % puncture line from this stint's rate. */
-  lifeLaps: number;
-  /** Clean-lap trend, seconds per lap (positive = slowing). */
-  fadeSPerLap: number | null;
+/** One stint comparison as Worth a look reads it: the label names the other
+ *  stint ("18:24 run"), which takes the page's date context. */
+export interface LabelledStintComparison {
+  comparison: StintComparison;
+  label: string;
 }
 
-function slope(points: { x: number; y: number }[]): number {
-  const n = points.length;
-  const mx = points.reduce((s, p) => s + p.x, 0) / n;
-  const my = points.reduce((s, p) => s + p.y, 0) / n;
-  const num = points.reduce((s, p) => s + (p.x - mx) * (p.y - my), 0);
-  const den = points.reduce((s, p) => s + (p.x - mx) ** 2, 0);
-  return den > 0 ? num / den : 0;
-}
-
-export function buildLongRunStints(driver: DriverData): LongRunStint[] {
-  const samples = getRacePaceLapSamples(driver);
-  const neutralised = getNeutralisedLaps(driver["per-lap-info"]);
-  const laps = driver["session-history"]["lap-history-data"];
-  return getCompletedStints(getDriverStints(driver)).map((stint) => {
-    const start = stint["start-lap"];
-    const end = stint["end-lap"];
-    const clean = samples.filter(
-      (s) => s.lapNumber >= start && s.lapNumber <= end,
-    );
-    // A deleted lap is not a best lap, however fast it was.
-    const stintLaps = laps
-      .slice(start - 1, end)
-      .filter((lap) => isCompleteValidLap(lap))
-      .map((lap) => lap["lap-time-in-ms"]);
-    const life = stintGreenLife(stint, neutralised);
-    return {
-      compound: stint["tyre-set-data"]["visual-tyre-compound"],
-      startLap: start,
-      endLap: end,
-      averageMs:
-        clean.length >= LONG_RUN_MIN_LAPS
-          ? clean.reduce((s, c) => s + c.timeMs, 0) / clean.length
-          : null,
-      cleanLaps: clean.length,
-      bestMs: stintLaps.length ? Math.min(...stintLaps) : 0,
-      wearPerLap: life.wearPerLap,
-      lifeLaps: life.lifeLaps,
-      fadeSPerLap:
-        clean.length >= STINT_FADE_MIN_LAPS
-          ? slope(clean.map((c) => ({ x: c.lapNumber, y: c.timeMs / 1000 })))
-          : null,
-    };
-  });
-}
-
-/** Per-compound pooled stint numbers (a run can split one compound in two). */
-export function longRunByCompound(
-  stints: LongRunStint[],
-): Map<string, { averageMs: number | null; cleanLaps: number }> {
-  const map = new Map<string, { totalMs: number; cleanLaps: number }>();
-  for (const stint of stints) {
-    if (stint.averageMs == null) continue;
-    const entry = map.get(stint.compound) ?? { totalMs: 0, cleanLaps: 0 };
-    entry.totalMs += stint.averageMs * stint.cleanLaps;
-    entry.cleanLaps += stint.cleanLaps;
-    map.set(stint.compound, entry);
-  }
-  return new Map(
-    [...map].map(([compound, { totalMs, cleanLaps }]) => [
-      compound,
-      { averageMs: cleanLaps ? totalMs / cleanLaps : null, cleanLaps },
-    ]),
-  );
-}
-
-const SETUP_COMPARE: { key: keyof CarSetup; label: string }[] = [
-  { key: "front-wing", label: "front wing" },
-  { key: "rear-wing", label: "rear wing" },
-  { key: "on-throttle", label: "on-throttle diff" },
-  { key: "off-throttle", label: "off-throttle diff" },
-  { key: "front-anti-roll-bar", label: "front anti-roll bar" },
-  { key: "rear-anti-roll-bar", label: "rear anti-roll bar" },
-  { key: "front-left-tyre-pressure", label: "front tyre pressure" },
-  { key: "rear-left-tyre-pressure", label: "rear tyre pressure" },
-];
-
-export function describeSetupDifference(
-  current: CarSetup | null | undefined,
-  previous: CarSetup | null | undefined,
-): string | null {
-  if (!current || !previous) return null;
-  const changes = SETUP_COMPARE.filter(
-    ({ key }) =>
-      Number(current[key]).toFixed(1) !== Number(previous[key]).toFixed(1),
-  ).map(({ key, label }) => `${label} ${previous[key]} → ${current[key]}`);
-  if (changes.length === 0) return "Same setup.";
-  return `Setup changed: ${changes.slice(0, 3).join(", ")}${changes.length > 3 ? `, +${changes.length - 3} more` : ""}.`;
-}
-
-export interface LongRunComparison {
-  compound: string;
-  deltaMs: number;
-  previousMs: number;
-  currentMs: number;
-  previousDate: string;
-  setupNote: string | null;
-}
-
-export function compareLongRuns(
-  current: { driver: DriverData },
-  previous: { driver: DriverData; date: string } | null,
-): LongRunComparison[] {
-  if (!previous) return [];
-  const now = longRunByCompound(buildLongRunStints(current.driver));
-  const before = longRunByCompound(buildLongRunStints(previous.driver));
-  const setupNote = describeSetupDifference(
-    current.driver["car-setup"],
-    previous.driver["car-setup"],
-  );
-  const out: LongRunComparison[] = [];
-  for (const [compound, entry] of now) {
-    const prev = before.get(compound);
-    if (entry.averageMs == null || prev?.averageMs == null) continue;
-    out.push({
-      compound,
-      deltaMs: entry.averageMs - prev.averageMs,
-      previousMs: prev.averageMs,
-      currentMs: entry.averageMs,
-      previousDate: previous.date,
-      setupNote,
-    });
-  }
-  return out;
+/** A gap that peaked and turned back: "You were 2.65 s up on your 18:24 run
+ *  after lap 6, then gave 1.33 s back by lap 8." */
+function gapTurnItem({
+  comparison,
+  label,
+}: LabelledStintComparison): WorthItem | null {
+  const turn = gapTurn(comparison);
+  if (!turn) return null;
+  const peakS = Math.abs(turn.peak.gapMs) / 1000;
+  const backS = turn.givenBackMs / 1000;
+  if (backS < GAP_TURN_MIN_S || backS / peakS < GAP_TURN_MIN_SHARE) return null;
+  const up = turn.peak.gapMs < 0;
+  const endS = Math.abs(turn.last.gapMs) / 1000;
+  // A lead that became a deficit (or the reverse) says where it ended.
+  const flipped = up ? turn.last.gapMs > 0 : turn.last.gapMs < 0;
+  return {
+    id: `gap-turn-${comparison.a.id}`,
+    tone: up ? "loss" : "gain",
+    claim: `You were ${peakS.toFixed(2)} s ${up ? "up on" : "down on"} your ${label} after lap ${turn.peak.lapA}, then ${up ? "gave" : "took"} ${backS.toFixed(2)} s back by lap ${turn.last.lapA}${flipped ? `, ending ${endS.toFixed(2)} s ${up ? "down" : "up"}` : ""}.`,
+    evidence: `${comparison.pairs.length} laps paired by tyre age.`,
+    target: "laps",
+    targetLabel: "Laps",
+    weight: backS / comparison.pairs.length,
+  };
 }
 
 export function buildLongRunWorthALook({
   stints,
   comparisons,
-  headlineCompound,
+  headline,
 }: {
-  stints: LongRunStint[];
-  comparisons: LongRunComparison[];
-  /** Compound the headline already compared, never repeated. */
-  headlineCompound: string | null;
+  stints: ComparableStint[];
+  /** Each stint against its default (the latest earlier run on its tyre). */
+  comparisons: LabelledStintComparison[];
+  /** The comparison the headline already tells, never repeated. */
+  headline: StintComparison | null;
 }): WorthItem[] {
   const items: WorthItem[] = [];
-  for (const c of comparisons) {
-    if (c.compound === headlineCompound) continue;
+  for (const entry of comparisons) {
+    const { comparison: c, label } = entry;
+    const turn = gapTurnItem(entry);
+    if (turn) items.push(turn);
+    if (c === headline || c.deltaMs == null) continue;
     if (Math.abs(c.deltaMs) < LONG_RUN_PACE_MIN_S * 1000) continue;
     items.push({
-      id: `compare-${c.compound}`,
+      id: `compare-${c.a.id}`,
       tone: c.deltaMs > 0 ? "loss" : "gain",
-      claim: `${c.compound}s ran ${seconds(Math.abs(c.deltaMs))} s a lap ${c.deltaMs > 0 ? "slower" : "faster"} than your last run here.`,
-      evidence: c.setupNote ?? undefined,
+      claim: stintDeltaClaim(c, label)!,
+      evidence: stintCompareDetail(c) || undefined,
       target: "laps",
       targetLabel: "Laps",
       weight: Math.abs(c.deltaMs) / 1000,
@@ -877,6 +801,8 @@ export function buildLongRunWorthALook({
       stint.fadeSPerLap < STINT_FADE_MIN_S_PER_LAP
     )
       continue;
+    // The headline's detail already set this fade against the other run's.
+    if (headline?.a.id === stint.id && detailNamesFade(headline)) continue;
     items.push({
       id: `fade-${stint.startLap}`,
       tone: "loss",

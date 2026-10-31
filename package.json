@@ -17,7 +17,7 @@
     "dev:prod": "vite --mode devprod",
     "build": "pnpm typecheck:node && tsc && vite build",
     "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
-    "test": "pnpm test:session-index && pnpm test:tracks && pnpm test:lap-stats && pnpm test:race-pace && pnpm test:energy-stats && pnpm test:fuel && pnpm test:speed && pnpm test:session-story && pnpm test:search && pnpm test:normalization && pnpm test:share-text && pnpm test:strategy && pnpm test:tyre-wear && pnpm test:lap-recording && pnpm test:lap-telemetry",
+    "test": "pnpm test:session-index && pnpm test:tracks && pnpm test:lap-stats && pnpm test:race-pace && pnpm test:energy-stats && pnpm test:fuel && pnpm test:speed && pnpm test:session-story && pnpm test:search && pnpm test:normalization && pnpm test:share-text && pnpm test:strategy && pnpm test:tyre-wear && pnpm test:lap-recording && pnpm test:lap-telemetry && pnpm test:stint-compare",
     "test:session-index": "tsx --test src/plugin/session-summary-index.test.ts",
     "test:tracks": "tsx --test src/utils/tracks.test.ts",
     "test:lap-stats": "tsx --test tests/lap-stats.test.ts",
@@ -33,6 +33,7 @@
     "test:tyre-wear": "tsx --test tests/tyre-wear.test.ts",
     "test:lap-recording": "tsx --test tests/lap-recording.test.ts",
     "test:lap-telemetry": "tsx --test tests/lap-telemetry.test.ts",
+    "test:stint-compare": "tsx --test tests/stint-compare.test.ts",
     "check:lap-telemetry": "tsx scripts/check-lap-telemetry.ts",
     "benchmark:session-index": "tsx scripts/benchmark-session-index.ts",
     "format": "prettier . --write --ignore-unknown",
@@ -56,8 +57,8 @@
     "vite": "^8.1.0"
   },
   "dependencies": {
+    "@base-ui/react": "^1.9.0",
     "@fontsource-variable/geist": "^5.2.8",
-    "@radix-ui/react-tooltip": "^1.2.10",
     "@tanstack/react-query": "^5.101.2",
     "@vercel/analytics": "^1.6.1",
     "class-variance-authority": "^0.7.1",

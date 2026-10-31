@@ -92,9 +92,6 @@ export const DAMAGE_COLORS = {
 export const CHART_THEME = {
   grid: "var(--color-tone-800)",
   axis: "var(--color-tone-500)",
-  tooltipBg: "var(--color-tone-900)",
-  tooltipBorder: "var(--color-tone-800)",
-  tooltipLabel: "var(--color-tone-400)",
   muted: "var(--color-tone-600)",
   best: "#a855f7",
   player: "var(--color-chart-you)",
@@ -107,14 +104,3 @@ export const CHART_THEME = {
 
 /** Lap Telemetry slots A and B reuse the app's player/rival tokens. */
 export const LAP_SLOT_COLORS = [CHART_THEME.player, CHART_THEME.rival] as const;
-
-/** Reusable Recharts tooltip content style. */
-export const TOOLTIP_STYLE = {
-  contentStyle: {
-    backgroundColor: CHART_THEME.tooltipBg,
-    border: `1px solid ${CHART_THEME.tooltipBorder}`,
-    borderRadius: "8px",
-    fontSize: "12px",
-  },
-  labelStyle: { color: CHART_THEME.tooltipLabel },
-} as const;

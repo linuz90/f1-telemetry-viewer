@@ -1,3 +1,16 @@
+import { pageClass } from "../components/ui/page";
+import { SectionHeader } from "../components/ui/SectionHeader";
+import { PageHeader } from "../components/ui/PageHeader";
+import {
+  SegmentedControl,
+  type SegmentedOption,
+} from "../components/ui/SegmentedControl";
+import { SESSION_KIND_ICON } from "../components/sessionTypeMeta";
+import {
+  cardClass,
+  cardHoverClass,
+  cardSurface,
+} from "../components/ui/surfaces";
 import { useEffect, useMemo, type MouseEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTelemetry } from "../context/TelemetryContext";
@@ -30,12 +43,17 @@ import { formatDayLabel } from "../components/sessions/sessionFormat";
 import { TrackOutline } from "../components/TrackOutline";
 import { PillSelect } from "../components/ui/PillSelect";
 
-const TYPE_OPTIONS: { value: SessionTypeFilter; label: string }[] = [
+// Kind glyphs come from the same map SessionKindIcon reads.
+const TYPE_OPTIONS: readonly SegmentedOption<SessionTypeFilter>[] = [
   { value: "all", label: "All" },
-  { value: "race", label: "Races" },
-  { value: "long-run", label: "Long runs" },
-  { value: "quali", label: "Qualifying" },
-  { value: "tt", label: "Time trial" },
+  { value: "race", label: "Races", icon: SESSION_KIND_ICON.race },
+  {
+    value: "long-run",
+    label: "Long runs",
+    icon: SESSION_KIND_ICON["long-run"],
+  },
+  { value: "quali", label: "Qualifying", icon: SESSION_KIND_ICON.qualifying },
+  { value: "tt", label: "Time trial", icon: SESSION_KIND_ICON["time-trial"] },
 ];
 
 /** A whole card opens its page; ⌘/Ctrl-click opens it in a new tab, as a
@@ -80,7 +98,7 @@ function LatestRaceCard({
   return (
     <section
       onClick={(event) => openCard(event, href, navigate)}
-      className="relative cursor-pointer overflow-hidden rounded-2xl bg-tone-900 p-5 ring-1 ring-tone-800 transition-shadow hover:ring-tone-700"
+      className={cn(cardClass, cardHoverClass, "relative overflow-hidden")}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -181,7 +199,7 @@ function FormCard() {
   return (
     <section
       onClick={(event) => openCard(event, formPath(activeFormulaKey), navigate)}
-      className="cursor-pointer rounded-2xl bg-tone-900 p-5 ring-1 ring-tone-800 transition-shadow hover:ring-tone-700"
+      className={cn(cardClass, cardHoverClass)}
     >
       <div className="text-xs text-tone-500">
         Your {stats.mode === "session-history" ? "" : "online "}form ·{" "}
@@ -260,29 +278,13 @@ function FilterBar({
   const index = useTrackIndex();
   return (
     <div className="sticky top-14 z-20 -mx-4 flex flex-wrap items-center gap-2 bg-canvas/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
-      <div
-        role="tablist"
-        aria-label="Session type"
-        className="flex overflow-x-auto rounded-xl bg-tone-900 p-1 ring-1 ring-tone-800"
-      >
-        {TYPE_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            role="tab"
-            aria-selected={filters.type === option.value}
-            onClick={() => onChange({ ...filters, type: option.value })}
-            className={cn(
-              "rounded-lg px-3 py-1 text-sm whitespace-nowrap transition-colors",
-              filters.type === option.value
-                ? "bg-tone-800 font-medium text-tone-50"
-                : "text-tone-400 hover:text-tone-100",
-            )}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl<SessionTypeFilter>
+        ariaLabel="Session type"
+        scrollable
+        options={TYPE_OPTIONS}
+        value={filters.type}
+        onChange={(type) => onChange({ ...filters, type })}
+      />
       <PillSelect
         value={filters.mode}
         onChange={(mode) =>
@@ -367,19 +369,19 @@ export function SessionsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-6 pb-16 sm:px-6">
-      <div className="mb-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-tone-50">
-          {mode === "demo" ? "Demo" : (activeFormula?.label ?? "Sessions")}
-        </h1>
-        <p className="mt-1 text-sm text-tone-500">
-          {scoped.length} session{scoped.length === 1 ? "" : "s"} across{" "}
-          {trackIndex.entries.length} track
-          {trackIndex.entries.length === 1 ? "" : "s"}
-          {scoped[0] &&
-            ` · last driven ${formatDayLabel(sessionDayKey(scoped[0]))}`}
-        </p>
-      </div>
+    <div className={pageClass}>
+      <PageHeader
+        title={mode === "demo" ? "Demo" : (activeFormula?.label ?? "Sessions")}
+        subtitle={
+          <>
+            {scoped.length} session{scoped.length === 1 ? "" : "s"} across{" "}
+            {trackIndex.entries.length} track
+            {trackIndex.entries.length === 1 ? "" : "s"}
+            {scoped[0] &&
+              ` · last driven ${formatDayLabel(sessionDayKey(scoped[0]))}`}
+          </>
+        }
+      />
 
       {(latestRace || scoped.length > 0) && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
@@ -395,19 +397,19 @@ export function SessionsPage() {
         </div>
       )}
 
-      <div className="mt-8 flex items-baseline gap-3">
-        <h2 className="text-lg font-semibold tracking-tight text-tone-50">
-          Sessions
-        </h2>
-        <span className="text-sm text-tone-500">
-          {areSessionFiltersDefault(filters)
-            ? "newest first"
-            : `${filtered.length} of ${scoped.length}`}
-        </span>
-      </div>
+      <SectionHeader
+        size="lg"
+        title="Sessions"
+        hint={
+          areSessionFiltersDefault(filters)
+            ? "Newest first"
+            : `${filtered.length} of ${scoped.length}`
+        }
+        className="mt-8"
+      />
       <FilterBar filters={filters} onChange={changeFilters} />
       {filtered.length === 0 ? (
-        <div className="rounded-2xl bg-tone-900 px-5 py-10 text-center ring-1 ring-tone-800">
+        <div className={cn(cardSurface, "px-5 py-10 text-center")}>
           <p className="text-sm text-tone-300">
             {scoped.length === 0
               ? "No sessions in this scope yet."

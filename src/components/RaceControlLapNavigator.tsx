@@ -1,3 +1,5 @@
+import { insetTileClass } from "./ui/surfaces";
+import { cn } from "../utils/cn";
 import {
   ChevronDown,
   ChevronLeft,
@@ -31,7 +33,10 @@ export function RaceControlLapNavigator({
     <div
       role="group"
       aria-label="Navigate race-control laps"
-      className="grid h-7.5 w-full min-w-0 grid-cols-[1.875rem_minmax(0,1fr)_1.875rem] overflow-hidden rounded-lg bg-tone-900/70 ring-1 ring-inset ring-tone-800/80 transition-shadow hover:ring-tone-700 focus-within:ring-2 focus-within:ring-tone-600/70"
+      className={cn(
+        insetTileClass,
+        "grid h-7.5 w-full min-w-0 grid-cols-[1.875rem_minmax(0,1fr)_1.875rem] overflow-hidden rounded-lg transition-shadow hover:ring-tone-700 focus-within:ring-2 focus-within:ring-tone-600/70",
+      )}
     >
       <Button
         size="icon"

@@ -10,15 +10,13 @@ import {
   REPO_URL,
 } from "../constants/links";
 import { pullRequestUrl } from "../utils/links";
-import { cn } from "../utils/cn";
 
-const TYPE_CONFIG: Record<
-  string,
-  { icon: ComponentType<{ className?: string }>; bg: string; fg: string }
-> = {
-  feat: { icon: Sparkles, bg: "bg-emerald-500/15", fg: "text-emerald-400" },
-  fix: { icon: Wrench, bg: "bg-amber-500/15", fg: "text-amber-400" },
-  docs: { icon: FileText, bg: "bg-blue-500/15", fg: "text-blue-400" },
+// Neutral glyphs: the type is a scanning aid, and green/amber carry gain and
+// warning meanings elsewhere in the app.
+const TYPE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
+  feat: Sparkles,
+  fix: Wrench,
+  docs: FileText,
 };
 
 function groupByDate(
@@ -44,58 +42,53 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
   const dates = Object.keys(grouped);
 
   return (
-    <Modal onClose={onClose} className="max-w-[680px] max-h-[70vh]">
-      {/* Header */}
-      <div className="flex items-center gap-4 px-6 pt-5 pb-4 border-b border-tone-0/[0.05] pr-14">
-        <h2 className="text-base font-semibold text-tone-100">What's new</h2>
-        <div className="flex items-center gap-1">
+    <Modal
+      onClose={onClose}
+      title="What's new"
+      className="max-h-[70vh] max-w-xl"
+      footer={
+        <div className="flex items-center gap-4">
           <a
             href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-tone-400 hover:text-tone-200 hover:bg-tone-0/[0.04] transition-colors"
+            className="flex items-center gap-1.5 transition-colors hover:text-tone-200"
           >
-            <Github className="h-3.5 w-3.5" />
+            <Github className="size-3.5" />
             GitHub
           </a>
           <a
             href={AUTHOR_TWITTER_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-tone-400 hover:text-tone-200 hover:bg-tone-0/[0.04] transition-colors"
+            className="flex items-center gap-1.5 transition-colors hover:text-tone-200"
           >
-            <XIcon className="h-3 w-3" />
+            <XIcon className="size-3" />
             {AUTHOR_TWITTER_HANDLE}
           </a>
         </div>
-      </div>
-
-      {/* Content */}
-      <ScrollArea axis="y" className="px-6 py-4 space-y-5">
+      }
+    >
+      <ScrollArea axis="y" className="min-h-0 space-y-5 px-5 pb-5">
         {dates.length === 0 && (
           <p className="text-sm text-tone-500">No changelog available.</p>
         )}
         {dates.map((date) => (
-          <div key={date}>
-            <h3 className="text-xs font-medium text-tone-500 mb-2">
+          <section key={date}>
+            <h3 className="mb-1.5 text-xs font-medium text-tone-500">
               {formatDate(date)}
             </h3>
-            <ul className="space-y-1.5">
+            <ul className="space-y-1">
               {grouped[date].map((entry) => {
-                const config = TYPE_CONFIG[entry.type];
+                const Icon = TYPE_ICONS[entry.type];
                 return (
                   <li key={entry.hash} className="flex items-start gap-2.5">
-                    {config && (
-                      <span
-                        className={cn(
-                          "shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded",
-                          config.bg,
-                        )}
-                      >
-                        <config.icon className={cn("h-3 w-3", config.fg)} />
-                      </span>
-                    )}
-                    <span className="text-sm text-tone-300 leading-snug">
+                    <span className="mt-[3px] size-3.5 shrink-0 text-tone-500">
+                      {Icon && <Icon className="size-3.5" />}
+                    </span>
+                    {/* Commit subjects are lowercase; a flex item is a block,
+                        so first-letter can capitalise them here. */}
+                    <span className="min-w-0 flex-1 text-sm leading-snug text-tone-300 first-letter:uppercase">
                       {entry.message}
                       {entry.pr && (
                         <>
@@ -104,7 +97,7 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
                             href={pullRequestUrl(entry.pr)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center rounded px-1.5 py-0.5 text-2xs leading-none font-medium bg-tone-800 text-tone-500 hover:bg-tone-700 hover:text-tone-300 transition-colors align-middle"
+                            className="text-xs text-tone-600 tabular-nums transition-colors hover:text-tone-300"
                           >
                             #{entry.pr}
                           </a>
@@ -115,7 +108,7 @@ export function ChangelogModal({ onClose }: { onClose: () => void }) {
                 );
               })}
             </ul>
-          </div>
+          </section>
         ))}
       </ScrollArea>
     </Modal>

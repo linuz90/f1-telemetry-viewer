@@ -1,4 +1,5 @@
 import { Flag, Gauge, Timer, type LucideIcon } from "lucide-react";
+import type { SessionKind } from "../analysis/sessionKind";
 import type { TrackSessionKind } from "../analysis/trackAnalysis";
 import type { BadgeTone } from "./ui/Badge";
 
@@ -22,3 +23,14 @@ export const TRACK_KIND_META = {
   race: { icon: Flag, color: "text-red-400/70", badgeTone: "red" },
   "time-trial": { icon: Gauge, color: "text-cyan-400/70", badgeTone: "sky" },
 } satisfies Record<TrackSessionKind, SessionTypeMeta>;
+
+/**
+ * The same glyphs by `summaryKind()`. A long run is a race save cut short, and
+ * the track page files it under races, so it keeps the flag.
+ */
+export const SESSION_KIND_ICON: Record<SessionKind, LucideIcon> = {
+  race: TRACK_KIND_META.race.icon,
+  "long-run": TRACK_KIND_META.race.icon,
+  qualifying: TRACK_KIND_META.qualifying.icon,
+  "time-trial": TRACK_KIND_META["time-trial"].icon,
+};

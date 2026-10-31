@@ -9,7 +9,7 @@ F1 Telemetry Viewer is a local-first React app for visualizing telemetry JSON ex
 - No database.
 - Local dev indexes telemetry summaries and streams raw telemetry JSON from disk.
 - Production/demo mode reads committed demo data or user-uploaded JSON/zip/`.pngt` files.
-- Focused Node test suites cover the session-summary index, complete-lap timing, Race Pace estimation, fuel aggregation, tyre wear rates, the race story and session log, Track Strategy synthesis, and lap recordings and their tips. No general UI test runner or linter is configured.
+- Focused Node test suites cover the session-summary index, complete-lap timing, Race Pace estimation, fuel aggregation, tyre wear rates, the race story and session log, Track Strategy synthesis, stint comparison, and lap recordings and their tips. No general UI test runner or linter is configured.
 
 ## Commands
 
@@ -38,6 +38,7 @@ pnpm test:strategy            # Run Track Strategy synthesis regressions (dry + 
 pnpm test:tyre-wear           # Run green-flag tyre wear rate regressions
 pnpm test:lap-recording       # Run .pngt reader, completeness and API regressions
 pnpm test:lap-telemetry       # Run lap-comparison tips, defaults and track-map calibration
+pnpm test:stint-compare       # Run stint comparison: tyre-age pairing, fuel correction, setup diffs
 pnpm check:lap-telemetry [folder] # Re-measure lap-tip clock accuracy and tip census on real recordings
 pnpm generate-track-geometry  # Regenerate src/constants/trackGeometry.ts (turn markers, circuit paths)
 pnpm typecheck:node           # Type-check Node servers/plugins/scripts
@@ -115,15 +116,16 @@ Product surfaces:
 Shared UI:
 
 - `src/components/Layout.tsx` and `src/components/shell/` — top bar with the Sessions and Tracks hover menus, ⌘K palette, scroll memory.
-- `src/components/session/` — `SessionShell` (‹ › and J/K through the filtered log, day switcher, tabs) and `SessionParts` (`Panel`, `StatDoors`, `WorthList`, `SetupSheet`).
+- `src/components/session/` — `SessionShell` (‹ › and J/K through the filtered log, day switcher, tabs) and `SessionParts` (`StatDoors`, `WorthList`, `SetupSheet`).
+- `src/components/ui/pageTabs.ts` — the sticky tab bar shared by session and track pages and its tab-switch scroll; a sticky element or scroll target inside a tab panel takes its offset from here so it clears the stuck bar.
 - `src/components/sessions/SessionLog.tsx` — the session log, grouped by day, track and online event.
 - `src/components/charts/` — `LapChart`, `TrendChart`, `FormChart`.
 - `src/components/track/`
-- `src/components/ui/` (`StintChip`, `PillSelect`, table recipes, etc.)
+- `src/components/ui/` — style primitives (`PageHeader`, `Panel`, `SectionHeader`, `surfaces.ts`, `table.ts`, `page.ts`) and Base UI wrappers (`Menu`, `NavigationMenu`, `Dialog`, `Modal`, `PillSelect`, `SegmentedControl`, `FocusToggle`), plus `StintChip` and friends.
 
 Telemetry intelligence:
 
-- `src/analysis/` — product-facing models, rankings, buckets, chart-ready data. Page models: `sessionKind`, `sessionLog`, `raceStory`, `worthALook`, `lapChartModel`, `onlineForm`, `trackIndex`, `trackBriefing`, `trackSetups`.
+- `src/analysis/` — product-facing models, rankings, buckets, chart-ready data. Page models: `sessionKind`, `sessionLog`, `raceStory`, `worthALook`, `stintCompare`, `lapChartModel`, `onlineForm`, `trackIndex`, `trackBriefing`, `trackSetups`.
 - `src/utils/stats/` — low-level reusable telemetry/math primitives.
 - `src/constants/` — shared tokens, routes, storage keys, setup ranges, track calendars.
 - `src/utils/tracks.ts` is the one entry point for track identity and per-track lookups; per-track tables in `src/constants/` are keyed by its canonical ids.
@@ -207,6 +209,13 @@ Analysis layer:
 - Product-specific ranking, curation, bucketing, and insight thresholds belong in `src/analysis/`.
 - Add concise why-comments for exporter quirks, thresholds, and comparison policies.
 
+Stint comparison:
+
+- A stint is compared with the player's other stints at the same track, formula scope and race length (`src/analysis/stintCompare.ts`; its header holds the model). Laps pair by tyre age on laps Race Pace counts in both, each pair corrected to equal fuel at `FUEL_LAP_TIME_MS_PER_KG`; wear is never corrected, since managing it is part of the result. The delta is the mean of the pairs, never the gap between two stint averages.
+- Pace travels with wear a lap, fade and the setup diff wherever a comparison shows: a quicker stint that wears more is a trade.
+- Long runs lead with it: each stint beside its earlier runs on the same tyre (the progression), the chart's compare line and gap panel, and the lap table's deltas. Races carry it in the Tyres tab, since orange on their other charts is the rival driver. `?vs=` and `?stint=` hold the pair.
+- Summaries carry the stints lap by lap (`SessionSummary.stintLaps`); changing `buildPlayerStintLaps()` needs a `SESSION_SUMMARY_CACHE_VERSION` bump. Pits n' Giggles' summaries lack it, so `useStintComparison` loads the newest few sessions' JSON instead.
+
 Fuel recommendations:
 
 - Session pages are retrospective: lead with the game's signed lap-margin estimate at the finish or last captured lap. Do not turn one session into a future-load recommendation or present the game estimate as physical range.
@@ -261,7 +270,7 @@ Pages:
 - Each session page leads with a hero headline. A new insight goes into the ranked Worth a look list (`src/analysis/worthALook.ts`), never a new tile or card.
 - Worth a look takes every item that clears its threshold in the Tuning section; `WorthList` shows five and folds the rest behind "Show N more". `rankWorthItems()` ranks places before seconds. The list carries no padding or placeholder items and never repeats the headline, and imperative advice comes only from lap-telemetry tips.
 - Position changes come from `buildRaceStory()`: a pit cycle nets out once nearby cars have made their matching stop, and a swap that comes back within two laps reads as steady, so chips and headlines never credit a pit cycle or a back-and-forth as places gained.
-- Anything per lap is drawn by `LapChart`: a line on a normal time axis (quicker laps lower, pit and SC laps in an "off scale" gutter above), the compound strip beneath, SC/VSC as grey washes, pit hairlines, and the driver's own events lane. A faded dot is a lap Race Pace leaves out (`buildDriverLapSeries()`), a flat line a stint average. Stacked panels (position over lap time) are labelled and spaced apart. Dates are progress lines (`TrendChart`), drivers are sorted bars, places on track use the circuit map; no donuts. A single driver's line is neutral ink; with a comparison driver on the chart, you are `--color-chart-you` (cyan) and they are `--color-chart-compare` (orange). Purple is the fastest.
+- Anything per lap is drawn by `LapChart`: a line on a normal time axis (quicker laps lower, pit and SC laps in an "off scale" gutter above), the compound strip beneath, SC/VSC as grey washes, pit hairlines, and the driver's own events lane. A faded dot is a lap Race Pace leaves out (`buildDriverLapSeries()`), a flat line a stint average. Stacked panels (position over lap time) are labelled and spaced apart. Dates are progress lines (`TrendChart`), drivers are sorted bars, places on track use the circuit map; no donuts. A single driver's line is neutral ink; with a comparison driver or stint on the chart, you are `--color-chart-you` (cyan) and they are `--color-chart-compare` (orange), drawn lighter and thinner as a reference beside your line; Lap telemetry's A and B use the same pair. Purple is the fastest.
 - Race pages show no whole-race sector split: it is not actionable. Qualifying keeps its one-lap sector cards.
 - Circuit maps are `TrackOutline`, drawn from `trackGeometry.ts` in the brand red. `detail` adds the chequered timing line, sector splits (lap fractions from `session-info` `sector-2/3-lap-distance-start`, which older exports leave at 0) and turn numbers, each label placed on the side of the track with the most room.
 - The track Setups tab shows the quali setup (fastest or latest), the race setup and every setup run there; `setupIdentity()` ignores brake bias and fuel, which drivers change mid-session.
@@ -279,8 +288,10 @@ Styling:
 - Neutrals use the theme-aware `tone-*` scale (`bg-tone-900`, `text-tone-500`, `ring-tone-0/[0.06]`), never `zinc-*`, `white` or `black`, which stay fixed in light mode. Inline and SVG colours use `var(--color-tone-*)`; for a translucent dynamic colour use `color-mix(in oklab, <color> N%, transparent)`, since compound and chart colours can be CSS variables and break hex-alpha suffixes.
 - Accent text in 200–400 shades is remapped to darker shades in light mode; meaning-bearing colour goes through `best`/`ahead`/`behind`/`warning`/`active` and `CHART_THEME`.
 - `brand` is the logo's red (`AppLogo`, track maps, the What's new dot). It never carries data, so a loss is always `behind`.
-- Reuse shared primitives before adding one-off styles.
-- Keep chart/card constants in `src/constants/` or shared UI modules.
+- Every surface and recurring recipe has one source of truth; compose it with `cn()` and override only layout (padding, radius, width, position). Cards, tiles, wells, menus, dialogs and the hero card come from `src/components/ui/surfaces.ts`; a page opens with `PageHeader` (and its `Breadcrumb`), a titled card is `Panel`, headers are `SectionHeader` (`lg` page section spanning several cards, `md` one card's title inside or directly above it, `sm` subsection); tables use `ui/table.ts` (`inset` cells when rows can be highlighted, `flush` otherwise, `edge` for a table filling an unpadded card); page width is `ui/page.ts`; chart tooltips and ticks are `charts/chartStyles.ts`. A surface that needs a different fill, ring or shadow gets a new recipe there rather than an inline copy.
+- Variants go through `cva` composed with `cn()`. Menu and list rows take their state from attributes, not extra classes: `menuItemClass` for rows Base UI or the ⌘K palette highlight (`data-highlighted`), `listItemClass` for plain link or button rows; `aria-current="page"` tints the row for the page you are on `active`, and `data-selected`, `data-checked` or `aria-pressed` marks a picked row. The current driver's table row is `tableRowFocusedClass`, also `active`.
+- Interactive widgets are Base UI (`@base-ui/react`, docs bundled in `node_modules/@base-ui/react/docs`) wrapped in `src/components/ui/`: `Menu`, `NavigationMenu` (top-bar panels), `Dialog` and `Modal`, `PillSelect` and `MultiPillSelect`, `Tooltip`, `SegmentedControl`, `FocusToggle`. A new menu, popup, dialog, select or toggle builds on them, so focus, keyboard, outside click and exit animation come from Base UI rather than hand-written handlers. Popups open and close with `popMotionClass` (backdrops `fadeMotionClass`), a transition on Base UI's starting/ending attributes from `--transform-origin`.
+- Anything labelled as qualifying, race, long run or time trial (tabs, filters, stat labels, panel headers, table cells) carries that kind's glyph through `SessionKindIcon`: Timer for quali, Flag for race and long run, Gauge for time trial (`src/components/sessionTypeMeta.ts`). The glyph stays neutral; it never takes the kind's colour, and those three icons mean nothing else in labels or stat cards. Every session and track page tab renders through `PageTab` with its glyph from `PAGE_TAB_ICONS` (`src/components/ui/pageTabs.ts`).
 - Color carries meaning (semantic tokens in `src/index.css`): purple (`best`, the `purple` accent) means fastest or session best, as in F1 broadcasts; green and red (`ahead`, `behind`) mean gaining or losing against a rival or a previous result.
 - In a tile that mixes prose with a number, tint only the number (`Slower by <span className="text-behind">+0.583</span>`); verbs, labels and units stay neutral so the eye lands on the data. A tile showing one bare value keeps its full color.
 

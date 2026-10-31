@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "../utils/cn";
 import { getCompoundColor } from "../utils/colors";
-import { dynamicAccentCardStyle } from "./Card";
+import { dynamicAccentCardStyle } from "./ui/surfaces";
 import { Tooltip } from "./Tooltip";
 import { HStack } from "./ui/Stack";
 import { tableRowClass } from "./ui/table";
@@ -60,9 +60,8 @@ export function CompoundStatCard({
       rows.some((row) => row.comparisonValue != null)),
   );
 
-  // Shared accent-tile recipe (see Card.tsx) — compound color drives a linear
-  // top-left → bottom-right gradient and a 1px inset accent ring. Mirrors the
-  // static-color accents (podium chips, insight cards, best-lap highlights).
+  // The shared surface recipe lets compound colours use the same gradient and
+  // inset accent ring as the other compound cards.
   return (
     <div
       className={cn("rounded-xl px-3 py-3", className)}

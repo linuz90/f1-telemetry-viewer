@@ -1,3 +1,6 @@
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
+import { cva } from "class-variance-authority";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../../utils/cn";
@@ -30,10 +33,15 @@ interface Props<T extends string> {
   className?: string;
 }
 
-const SIZE = {
-  sm: { container: "gap-0.5 p-0.5", button: "px-2 py-1 text-xs" },
-  md: { container: "gap-1 p-1", button: "px-3 py-1.5 text-xs" },
-} as const;
+const containerVariants = cva("flex rounded-lg bg-tone-900/60", {
+  variants: { size: { sm: "gap-0.5 p-0.5", md: "gap-1 p-1" } },
+});
+const optionVariants = cva(
+  "rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-tone-600",
+  {
+    variants: { size: { sm: "px-2 py-1 text-xs", md: "px-3 py-1.5 text-xs" } },
+  },
+);
 
 export function SegmentedControl<T extends string>({
   options,
@@ -45,14 +53,14 @@ export function SegmentedControl<T extends string>({
   scrollable = false,
   className,
 }: Props<T>) {
-  const styles = SIZE[size];
+  // Radios keep one choice selected and share a single Tab stop with arrow navigation.
   return (
-    <div
-      role="radiogroup"
+    <RadioGroup
+      value={value}
+      onValueChange={onChange}
       aria-label={ariaLabel}
       className={cn(
-        "flex rounded-lg bg-tone-900/60",
-        styles.container,
+        containerVariants({ size }),
         scrollable && ["max-w-full", scrollAxisClass.x, scrollbarClass.subtle],
         className,
       )}
@@ -65,20 +73,18 @@ export function SegmentedControl<T extends string>({
             ? `${opt.mobileLabel}, ${opt.label}`
             : opt.label;
         return (
-          <button
+          <Radio.Root
             key={opt.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
+            value={opt.value}
+            nativeButton
+            render={<button type="button" />}
             aria-label={
               opt.meta != null
                 ? `${accessibleLabel} ${opt.meta}`
                 : accessibleLabel
             }
-            onClick={() => onChange(opt.value)}
             className={cn(
-              "rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-tone-600",
-              styles.button,
+              optionVariants({ size }),
               fullWidth ? "flex-1" : "shrink-0",
               active
                 ? "bg-tone-800 text-tone-100"
@@ -126,9 +132,9 @@ export function SegmentedControl<T extends string>({
                 </span>
               )}
             </span>
-          </button>
+          </Radio.Root>
         );
       })}
-    </div>
+    </RadioGroup>
   );
 }

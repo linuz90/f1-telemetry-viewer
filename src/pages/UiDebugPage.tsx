@@ -1,6 +1,7 @@
+import { wellClass } from "../components/ui/surfaces";
 import { Flag, Gauge, Search, Timer } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Card } from "../components/Card";
+import { Panel } from "../components/ui/Panel";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { TyreLifeEvidenceBar } from "../components/track/TyreLifeEvidenceBar";
 import { LapComparisonView } from "../components/lap-telemetry/LapComparisonView";
@@ -226,6 +227,7 @@ export function UiDebugPage() {
       >
         <div className="space-y-8">
           <SectionHeader
+            size="lg"
             title="Badges, Controls & Chips"
             hint="Small UI variants, explicit sizes, and compound styling"
           />
@@ -523,7 +525,7 @@ export function UiDebugPage() {
       </DebugSection>
 
       <DebugSection file="src/components/charts/LapChart.tsx">
-        <Card as="section" className="space-y-4">
+        <Panel className="space-y-4">
           <LapChartLegend
             items={[
               { tone: "you", label: "ALONSO" },
@@ -583,7 +585,7 @@ export function UiDebugPage() {
               },
             ]}
           />
-        </Card>
+        </Panel>
       </DebugSection>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -605,14 +607,14 @@ export function UiDebugPage() {
       </DebugSection>
 
       <DebugSection file="src/components/lap-telemetry/LapComparisonView.tsx">
-        <Card as="section" className="space-y-4">
+        <Panel className="space-y-4">
           <LapComparisonView
             slots={lapTelemetryFixture.slots}
             laps={lapTelemetryFixture.laps}
             sectorStarts={[1757, 3179]}
             track="Melbourne"
           />
-        </Card>
+        </Panel>
       </DebugSection>
     </div>
   );
@@ -748,7 +750,12 @@ function DebugComponentLabel({ children }: { children: ReactNode }) {
 
 function DebugCodeChip({ children }: { children: ReactNode }) {
   return (
-    <code className="inline-flex rounded-md bg-tone-950/55 px-1.5 py-0.5 font-mono text-2xs leading-none text-tone-500 ring-1 ring-tone-0/[0.04]">
+    <code
+      className={cn(
+        wellClass,
+        "inline-flex rounded-md px-1.5 py-0.5 font-mono text-2xs leading-none text-tone-500",
+      )}
+    >
       {children}
     </code>
   );

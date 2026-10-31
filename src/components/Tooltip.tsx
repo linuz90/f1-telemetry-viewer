@@ -2,11 +2,11 @@ import {
   Fragment,
   cloneElement,
   isValidElement,
-  type ComponentProps,
   type ReactElement,
   type ReactNode,
 } from "react";
-import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
+import { popMotionClass } from "./ui/surfaces";
 import { cn } from "../utils/cn";
 
 interface TooltipProps {
@@ -15,25 +15,16 @@ interface TooltipProps {
   className?: string;
 }
 
-export function TooltipProvider({
-  delayDuration = 150,
-  ...props
-}: ComponentProps<typeof TooltipPrimitive.Provider>) {
+/** Mounted once at the root: tooltips share its delay, and once one is open,
+ *  moving to the next opens it without waiting again (`timeout`). */
+export function TooltipProvider({ children }: { children: ReactNode }) {
   return (
-    <TooltipPrimitive.Provider
-      delayDuration={delayDuration}
-      skipDelayDuration={100}
-      {...props}
-    />
+    <TooltipPrimitive.Provider delay={150} timeout={100}>
+      {children}
+    </TooltipPrimitive.Provider>
   );
 }
 
-/**
- * Compatibility wrapper around the shadcn/Radix tooltip primitive. Radix owns
- * viewport collision, portal rendering, hover/focus handling, and escape-key
- * dismissal; keeping this tiny wrapper preserves the app's existing
- * `<Tooltip text="...">` call sites.
- */
 export function Tooltip({ text, children, className = "" }: TooltipProps) {
   const trigger: ReactElement =
     isValidElement<{ className?: string }>(children) &&
@@ -48,26 +39,37 @@ export function Tooltip({ text, children, className = "" }: TooltipProps) {
     );
 
   return (
-    <TooltipProvider>
-      <TooltipPrimitive.Root>
-        <TooltipPrimitive.Trigger asChild>{trigger}</TooltipPrimitive.Trigger>
-        <TooltipPrimitive.Portal>
-          <TooltipPrimitive.Content
-            side="top"
-            align="center"
-            sideOffset={6}
-            collisionPadding={8}
+    <TooltipPrimitive.Root>
+      {/* Base UI tooltips are visual-only; keep the hint available to screen readers. */}
+      <TooltipPrimitive.Trigger render={trigger} aria-description={text} />
+      <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Positioner
+          side="top"
+          sideOffset={6}
+          collisionPadding={8}
+          className="z-50 outline-none"
+        >
+          <TooltipPrimitive.Popup
             className={cn(
-              "z-50 max-w-64 rounded-md border border-tone-700 bg-tone-800 px-2.5 py-1.5 text-left text-xs font-normal leading-snug text-tone-300 shadow-lg",
-              "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-              "data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1",
+              "max-w-64 rounded-md border border-tone-700 bg-tone-800 px-2.5 py-1.5 text-left text-xs font-normal leading-snug text-tone-300 shadow-lg",
+              popMotionClass,
             )}
           >
             {text}
-            <TooltipPrimitive.Arrow className="fill-tone-800" />
-          </TooltipPrimitive.Content>
-        </TooltipPrimitive.Portal>
-      </TooltipPrimitive.Root>
-    </TooltipProvider>
+            <TooltipPrimitive.Arrow className="data-[side=top]:bottom-[-5px] data-[side=bottom]:top-[-5px] data-[side=bottom]:rotate-180 data-[side=left]:right-[-7px] data-[side=left]:-rotate-90 data-[side=right]:left-[-7px] data-[side=right]:rotate-90">
+              <svg
+                width="10"
+                height="5"
+                viewBox="0 0 10 5"
+                aria-hidden="true"
+                className="fill-tone-800"
+              >
+                <path d="M0 0H10L5 5Z" />
+              </svg>
+            </TooltipPrimitive.Arrow>
+          </TooltipPrimitive.Popup>
+        </TooltipPrimitive.Positioner>
+      </TooltipPrimitive.Portal>
+    </TooltipPrimitive.Root>
   );
 }

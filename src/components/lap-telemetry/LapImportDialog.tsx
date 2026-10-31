@@ -1,4 +1,6 @@
-import { useId, useMemo, useState } from "react";
+import { listItemClass } from "../ui/surfaces";
+import { lapColorBarClass } from "./lapColorBar";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   familyOf,
@@ -35,7 +37,6 @@ export function LapImportDialog() {
 function OwnerForm({ entry }: { entry: LapImport }) {
   const { setOwner, closePrompt } = useLapImports();
   const close = () => closePrompt(entry.slug);
-  const titleId = useId();
   const { formulaOptions } = useTelemetry();
   const { recordings } = useLapRecordingList();
   const navigate = useNavigate();
@@ -107,26 +108,17 @@ function OwnerForm({ entry }: { entry: LapImport }) {
   return (
     <Modal
       onClose={close}
-      labelledBy={titleId}
+      title="Whose laps are these?"
+      description={`${getTrackDisplayName(entry.raw.track)} · ${recordingLabel(entry.raw)} · ${entry.fileName}`}
       className="max-h-[85vh] max-w-lg"
     >
       <form
-        className="flex min-h-0 flex-col gap-4 p-5"
+        className="flex min-h-0 flex-col gap-4 px-5 pb-5"
         onSubmit={(event) => {
           event.preventDefault();
           confirm();
         }}
       >
-        <div className="pr-8">
-          <h3 id={titleId} className="text-lg font-semibold text-tone-100">
-            Whose laps are these?
-          </h3>
-          <p className="text-xs text-tone-500">
-            {getTrackDisplayName(entry.raw.track)} · {recordingLabel(entry.raw)}{" "}
-            · {entry.fileName}
-          </p>
-        </div>
-
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl
             ariaLabel="Whose file"
@@ -158,7 +150,7 @@ function OwnerForm({ entry }: { entry: LapImport }) {
             {who === "me" ? "yours" : "theirs"}?
           </p>
           <div
-            role="radiogroup"
+            role="group"
             aria-label="Car"
             className="max-h-[40vh] space-y-0.5 overflow-y-auto"
           >
@@ -166,18 +158,12 @@ function OwnerForm({ entry }: { entry: LapImport }) {
               <button
                 key={driver.index}
                 type="button"
-                role="radio"
-                aria-checked={driver.index === driverIndex}
+                aria-pressed={driver.index === driverIndex}
                 onClick={() => setDriverIndex(driver.index)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
-                  driver.index === driverIndex
-                    ? "bg-tone-800 text-tone-100 ring-1 ring-inset ring-tone-0/[0.08]"
-                    : "text-tone-400 hover:bg-tone-800/50",
-                )}
+                className={cn(listItemClass, "text-sm text-tone-400")}
               >
                 <span
-                  className="h-3.5 w-1 shrink-0 rounded-full"
+                  className={lapColorBarClass}
                   style={{ backgroundColor: recordingTeamColor(driver.team) }}
                 />
                 <span className="flex-1 truncate">

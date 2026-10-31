@@ -2,6 +2,7 @@ import type {
   DriverData,
   ParticipantData,
   PlayerRaceResult,
+  PlayerStintLaps,
   PlayerStintSummary,
   RivalEntry,
   SessionSummary,
@@ -38,6 +39,7 @@ import {
   getWorstStintEndWear,
 } from "./stats/tyres";
 import { buildSessionSpeedAnalysis } from "../analysis/speedAnalysis";
+import { buildPlayerStintLaps } from "../analysis/stintCompare";
 
 export interface BuiltSessionSummary {
   summary: SessionSummary & { fileSize: number };
@@ -55,7 +57,9 @@ export interface BuiltSessionSummary {
 // long runs saved before the flag need; split stints on one tyre set merge
 // (`getDriverStints()`); rival keys use `driverNameKey()`, so names with
 // non-breaking spaces match. (8 was this work before it met 7.)
-export const SESSION_SUMMARY_CACHE_VERSION = 9;
+// 11: race summaries carry the player's stints lap by lap (`stintLaps`) and
+// setup, for stint comparison. (10 was this work with a keyed setup.)
+export const SESSION_SUMMARY_CACHE_VERSION = 11;
 
 function getDrivers(session: TelemetrySession | undefined): DriverData[] {
   return session?.["classification-data"] ?? [];
@@ -171,6 +175,7 @@ interface RaceTelemetryExtras {
   topSpeedTrapRank?: number;
   topSpeedTrapTotal?: number;
   stints?: PlayerStintSummary[];
+  stintLaps?: PlayerStintLaps;
   purpleSectors?: { s1: boolean; s2: boolean; s3: boolean };
   overtakesMade?: number;
   overtakesTaken?: number;
@@ -433,6 +438,8 @@ function buildRaceTelemetryExtras(
     });
   }
   if (stintSummaries.length > 0) extras.stints = stintSummaries;
+  const stintLaps = buildPlayerStintLaps(session, player);
+  if (stintLaps) extras.stintLaps = stintLaps;
 
   const fastest = session.records?.fastest;
   if (fastest) {

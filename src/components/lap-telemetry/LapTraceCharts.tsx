@@ -1,3 +1,4 @@
+import { chartTickClass } from "../charts/chartStyles";
 import {
   memo,
   useEffect,
@@ -316,7 +317,7 @@ const TracePane = memo(function TracePane({
         x={GUTTER_LEFT - 6}
         y={y(hi) + 10}
         textAnchor="end"
-        className="fill-tone-600 font-mono text-[10px] tabular-nums"
+        className={chartTickClass}
       >
         {spec.format(
           id === "gap" || spec.step ? hi - (spec.step ? 0.5 : 0) : hi,
@@ -326,7 +327,7 @@ const TracePane = memo(function TracePane({
         x={GUTTER_LEFT - 6}
         y={y(lo) - 3}
         textAnchor="end"
-        className="fill-tone-600 font-mono text-[10px] tabular-nums"
+        className={chartTickClass}
       >
         {spec.format(spec.step ? lo + 0.5 : lo)}
       </text>
@@ -449,7 +450,7 @@ function DistanceAxis({
           x={x(d)}
           y={13}
           textAnchor="middle"
-          className="fill-tone-600 font-mono text-[10px] tabular-nums"
+          className={chartTickClass}
         >
           {step >= 1000
             ? `${d / 1000} km`

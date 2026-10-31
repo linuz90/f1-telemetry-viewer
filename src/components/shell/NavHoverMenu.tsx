@@ -1,34 +1,39 @@
 import type { ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { cn } from "../../utils/cn";
+import {
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuTrigger,
+} from "../ui/NavigationMenu";
 
 /**
- * A top-bar link that opens a quick menu after a short hover or on keyboard
- * focus, while a click still navigates. Pure CSS so there is no extra
- * dependency; touch screens (`hover: none`) and phone-width windows, where
- * the menu would not fit, never show it and just navigate.
+ * A top-bar section: the label is a link to the section's page, and hovering
+ * it (or ArrowDown from the keyboard) opens a panel of shortcuts. Phones hide
+ * the panel and keep the plain link.
  */
 export function NavHoverMenu({
   to,
   label,
   active,
   children,
-  align = "start",
 }: {
   to: string;
   label: string;
   active: boolean;
   children: ReactNode;
-  align?: "start" | "end";
 }) {
   return (
-    <div className="group/nav relative">
-      <NavLink
-        to={to}
-        end
+    <NavigationMenuItem>
+      <NavigationMenuTrigger
+        nativeButton={false}
+        // Base UI marks a non-button trigger role="button"; this one is a link
+        // first, so screen readers should announce it as one.
+        role="link"
+        render={<Link to={to} aria-current={active ? "page" : undefined} />}
         className={cn(
-          "inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm transition-colors",
+          "group inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-tone-600",
           active
             ? "font-medium text-tone-50"
             : "text-tone-400 hover:text-tone-100",
@@ -37,23 +42,11 @@ export function NavHoverMenu({
         {label}
         <ChevronDown
           aria-hidden
-          className="size-3 text-tone-600 transition-transform group-hover/nav:rotate-180 max-sm:hidden"
+          className="size-3 text-tone-600 transition-transform group-data-popup-open:rotate-180 max-sm:hidden"
         />
-      </NavLink>
-      <div
-        className={cn(
-          "invisible absolute top-full z-50 pt-2 opacity-0 transition-[opacity,visibility,translate] duration-150",
-          "-translate-y-1 group-hover/nav:visible group-hover/nav:translate-y-0 group-hover/nav:opacity-100 group-hover/nav:delay-150",
-          "group-focus-within/nav:visible group-focus-within/nav:translate-y-0 group-focus-within/nav:opacity-100",
-          "max-sm:hidden [@media(hover:none)]:hidden",
-          align === "start" ? "-left-2" : "-right-2",
-        )}
-      >
-        <div className="rounded-xl bg-tone-900 p-1.5 text-sm shadow-2xl shadow-tone-1000/40 ring-1 ring-tone-800">
-          {children}
-        </div>
-      </div>
-    </div>
+      </NavigationMenuTrigger>
+      <NavigationMenuContent>{children}</NavigationMenuContent>
+    </NavigationMenuItem>
   );
 }
 

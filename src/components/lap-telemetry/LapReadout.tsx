@@ -1,3 +1,4 @@
+import { wellClass } from "../ui/surfaces";
 import { useMemo, useState, type ReactNode } from "react";
 import {
   lowerBound,
@@ -146,7 +147,7 @@ export function LapReadout({
           .join(" · ");
 
   return (
-    <div className="rounded-xl bg-tone-950/40 px-3 py-2 ring-1 ring-inset ring-tone-0/[0.04]">
+    <div className={cn(wellClass, "px-3 py-2")}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <PlaybackControls playback={playback} />
@@ -260,7 +261,7 @@ function InputCard({
 
   return (
     <div
-      className="flex flex-col gap-1.5 rounded-lg bg-tone-950/60 px-2.5 py-2"
+      className={cn(wellClass, "flex flex-col gap-1.5 rounded-lg px-2.5 py-2")}
       style={{
         boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${slot.color} 28%, transparent)`,
       }}
