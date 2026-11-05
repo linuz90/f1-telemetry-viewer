@@ -652,6 +652,11 @@ test("default laps: focused driver first, then the rival, else the session's qui
   );
   // A standing start is only compared with another standing start.
   assert.deepEqual(defaultComparison(pool[3], pool, session)?.ref, pool[4].ref);
+  // A rival without a recorded start leaves the fastest other start.
+  assert.deepEqual(
+    defaultComparison(pool[3], pool, { ...session, rivalDriverIndex: 14 })?.ref,
+    pool[4].ref,
+  );
 });
 
 test("on a track page, quali compares with your other runs and races pick nothing", () => {
@@ -668,6 +673,15 @@ test("on a track page, quali compares with your other runs and races pick nothin
     defaultComparison(a, pool, { scope: "track", kind: "qualifying" })
       ?.lapTimeMs,
     77_268,
+  );
+  // A friend's lap opens against your best just the same.
+  const friend = candidate("friend-file", 4, 2, 76_900, { isFriend: true });
+  assert.equal(
+    defaultComparison(friend, [...pool, friend], {
+      scope: "track",
+      kind: "qualifying",
+    })?.lapTimeMs,
+    77_164,
   );
   // Laps from different races differ in fuel and traffic, not just driving.
   assert.equal(

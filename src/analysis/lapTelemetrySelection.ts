@@ -394,20 +394,22 @@ export function defaultComparison(
   },
 ): LapCandidate | undefined {
   if (a.standingStart) {
-    return fastest(
-      pool.filter(
-        (c) =>
-          c.standingStart &&
-          c.ref.recordingSlug === a.ref.recordingSlug &&
-          !isSameLap(c, a) &&
-          (options.rivalDriverIndex == null ||
-            c.ref.driverIndex === options.rivalDriverIndex),
-      ),
+    const starts = pool.filter(
+      (c) =>
+        c.standingStart &&
+        c.ref.recordingSlug === a.ref.recordingSlug &&
+        !isSameLap(c, a),
+    );
+    return (
+      fastest(
+        starts.filter((c) => c.ref.driverIndex === options.rivalDriverIndex),
+      ) ?? fastest(starts)
     );
   }
   const others = pool.filter((c) => c.eligible && !isSameLap(c, a));
   if (options.scope === "track") {
-    if (options.kind === "race" || !a.isPlayer) return undefined;
+    // A friend's or rival's lap compares with your best just the same.
+    if (options.kind === "race") return undefined;
     return fastest(
       others.filter(
         (c) => c.isPlayer && c.ref.recordingSlug !== a.ref.recordingSlug,
