@@ -406,3 +406,42 @@ export function defaultComparison(
     fastest(others)
   );
 }
+
+/**
+ * What a zero-click pair is, for the line under the lap chips: "your fastest
+ * lap against the fastest lap in this session". Without it the section
+ * opens on two laps nobody chose and gives no hint which they are.
+ */
+export function describeDefaultPair(
+  a: LapCandidate,
+  b: LapCandidate | undefined,
+  pool: readonly LapCandidate[],
+  /** "in this session", "at Hungaroring". */
+  where: string,
+): string {
+  const eligible = pool.filter((c) => c.eligible);
+  const whose = (c: LapCandidate) =>
+    c.isPlayer ? "your" : `${c.driverName}'s`;
+  const ownBest = (c: LapCandidate) =>
+    fastest(
+      eligible.filter((other) =>
+        c.isPlayer
+          ? other.isPlayer
+          : other.ref.recordingSlug === c.ref.recordingSlug &&
+            other.ref.driverIndex === c.ref.driverIndex,
+      ),
+    );
+  const overall = fastest(eligible);
+  const phrase = (c: LapCandidate, preferOverall: boolean) => {
+    if (c.standingStart) return `${whose(c)} start`;
+    if (preferOverall && overall && isSameLap(overall, c))
+      return `the fastest lap ${where}`;
+    const best = ownBest(c);
+    return best && isSameLap(best, c)
+      ? `${whose(c)} fastest lap`
+      : `${whose(c)} lap ${c.ref.lapNumber}`;
+  };
+  return b
+    ? `${phrase(a, false)} against ${phrase(b, true)}`
+    : phrase(a, false);
+}

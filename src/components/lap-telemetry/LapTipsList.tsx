@@ -58,13 +58,12 @@ export function tipTone(tip: Pick<LapTip, "timeS">): "behind" | "ahead" {
 function groupBySector(tips: readonly LapTip[]) {
   const groups: {
     sector?: 1 | 2 | 3;
-    tips: { tip: LapTip; number: number }[];
+    tips: LapTip[];
   }[] = [];
-  tips.forEach((tip, index) => {
+  tips.forEach((tip) => {
     const last = groups[groups.length - 1];
-    const entry = { tip, number: index + 1 };
-    if (last && last.sector === tip.sector) last.tips.push(entry);
-    else groups.push({ sector: tip.sector, tips: [entry] });
+    if (last && last.sector === tip.sector) last.tips.push(tip);
+    else groups.push({ sector: tip.sector, tips: [tip] });
   });
   return groups;
 }
@@ -223,11 +222,7 @@ export function LapTipsList({
           is collapsed. */}
       {!expanded && selectedIndex >= 0 && (
         <ol id={listId} className="mt-2">
-          <TipRow
-            tip={tips[selectedIndex]}
-            number={selectedIndex + 1}
-            {...rowProps}
-          />
+          <TipRow tip={tips[selectedIndex]} {...rowProps} />
         </ol>
       )}
 
@@ -254,7 +249,7 @@ function TipGroups({
   id: string;
   tips: readonly LapTip[];
   sectorDeltasS?: readonly [number, number, number];
-} & Omit<TipRowProps, "ref" | "tip" | "number">) {
+} & Omit<TipRowProps, "ref" | "tip">) {
   const groups = groupBySector(tips);
   const scrollRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef(new Map<string, HTMLLIElement>());
@@ -305,7 +300,7 @@ function TipGroups({
             </div>
           )}
           <ol>
-            {group.tips.map(({ tip, number }) => (
+            {group.tips.map((tip) => (
               <TipRow
                 key={tip.id}
                 ref={(el) => {
@@ -313,7 +308,6 @@ function TipGroups({
                   else rowRefs.current.delete(tip.id);
                 }}
                 tip={tip}
-                number={number}
                 selectedTipId={selectedTipId}
                 {...rowProps}
               />
@@ -328,7 +322,6 @@ function TipGroups({
 interface TipRowProps {
   ref?: (el: HTMLLIElement | null) => void;
   tip: LapTip;
-  number: number;
   largest: number;
   selectedTipId: string | null;
   hoveredTipId: string | null;
@@ -339,7 +332,6 @@ interface TipRowProps {
 function TipRow({
   ref,
   tip,
-  number,
   largest,
   selectedTipId,
   hoveredTipId,
@@ -363,7 +355,7 @@ function TipRow({
         onBlur={() => onHoverTip(null)}
         aria-pressed={selected}
         className={cn(
-          "grid w-full grid-cols-[1.25rem_minmax(0,1fr)_4.5rem] items-start gap-x-3 rounded-xl px-2.5 py-2 text-left transition-colors",
+          "grid w-full grid-cols-[2.75rem_minmax(0,1fr)_4.5rem] items-start gap-x-3 rounded-xl px-2.5 py-2 text-left transition-colors",
           selected
             ? "bg-tone-800/70 ring-1 ring-inset ring-tone-0/[0.06]"
             : hovered
@@ -371,8 +363,12 @@ function TipRow({
               : "hover:bg-tone-800/40",
         )}
       >
-        <span className="flex size-5 items-center justify-center rounded-full font-mono text-2xs font-semibold text-tone-400 ring-1 ring-inset ring-tone-700">
-          {number}
+        {/* The same label as the tip's marker on the track map. */}
+        <span
+          aria-hidden
+          className="flex h-5 min-w-5 items-center justify-center justify-self-start rounded-full px-1.5 font-mono text-2xs font-semibold whitespace-nowrap text-tone-400 ring-1 ring-inset ring-tone-700"
+        >
+          {tip.marker || "·"}
         </span>
         <span className="min-w-0">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

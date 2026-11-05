@@ -15,6 +15,7 @@ import {
   defaultComparison,
   defaultLapA,
   familyOf,
+  describeDefaultPair,
   isInFamily,
   isSoloSelection,
   LAP_TELEMETRY_ANCHOR,
@@ -531,6 +532,16 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   };
 
   const trackName = getTrackDisplayName(family?.track ?? "");
+  // A pair the URL does not name was picked here, so say what it is.
+  const autoPick =
+    urlRefs.length === 0 && selected[0]
+      ? describeDefaultPair(
+          selected[0],
+          selected[1],
+          scope.kind === "session" ? sessionPool : familyPool,
+          scope.kind === "session" ? "in this session" : `at ${trackName}`,
+        )
+      : null;
   const canAdd =
     slots.length > 0 &&
     slots.length < MAX_SELECTED_LAPS &&
@@ -554,6 +565,12 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
           writeSelection(selected.filter((_, i) => i !== index))
         }
       />
+
+      {autoPick && (
+        <p className="-mt-1 text-xs text-tone-500">
+          Picked for you: {autoPick}. Click a lap above to change it.
+        </p>
+      )}
 
       {slots.length === 1 && !canAdd && (
         <p className="text-sm text-tone-500">

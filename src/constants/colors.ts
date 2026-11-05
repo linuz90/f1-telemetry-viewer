@@ -16,6 +16,19 @@ export const COMPOUND_COLORS: Record<string, string> = {
   C5: "#ef4444",
 };
 
+/**
+ * ERS deploy modes in Pits n' Giggles' own palette, so the lap readout's
+ * battery gauge matches its HUD. Keyed by `ers.deploy_mode` (0 None,
+ * 1 Medium, 2 Hotlap, 3 Boost, called Overtake on 2025 cars). PnG gives Boost
+ * with Overtake Mode unlocked #41bff3; recordings cannot tell that apart yet.
+ */
+export const ERS_MODE_COLORS: Record<number, string> = {
+  0: "#444444",
+  1: "#e6d800",
+  2: "#00e676",
+  3: "#ff1744",
+};
+
 /** F1 team colors, including numeric IDs from newer telemetry exports. */
 export const TEAM_COLORS: Record<string, string> = {
   Ferrari: "#e8002d",

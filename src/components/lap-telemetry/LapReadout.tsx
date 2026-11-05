@@ -6,10 +6,11 @@ import {
   type LapSeries,
   type LapSeriesSet,
 } from "../../analysis/lapTelemetryAnalysis";
-import { CHART_THEME } from "../../constants/colors";
+import { CHART_THEME, ERS_MODE_COLORS } from "../../constants/colors";
 import { LAP_INPUT_GHOST_STORAGE_KEY } from "../../constants/storage";
 import { F1_26_COMPARISON_KEY } from "../../constants/formulas";
 import { cn } from "../../utils/cn";
+import { msToLapTime } from "../../utils/format";
 import { getFormulaComparisonKey } from "../../utils/sessionTypes";
 import { getTrackCorners } from "../../utils/tracks";
 import { readStoredBoolean, writeStoredBoolean } from "../../utils/storage";
@@ -242,6 +243,11 @@ function InputCard({
           getFormulaComparisonKey(recording.formula, recording.gameYear) ===
             F1_26_COMPARISON_KEY,
         );
+  // The gauge takes the deploy mode's colour; recordings without the mode
+  // channel keep the battery's.
+  const ersColor =
+    (ersModeValue !== null && ERS_MODE_COLORS[Math.round(ersModeValue)]) ||
+    CHART_THEME.harvest;
   const ghostChannels = ghost?.channels;
 
   let ersTrend: "deploy" | "harvest" | null = null;
@@ -273,6 +279,14 @@ function InputCard({
             style={{ backgroundColor: slot.color }}
           />
           <span className="text-tone-500">{slot.slot}</span> {slot.label}
+          {/* Which lap this is, where the eye already is. */}
+          <span className="text-tone-500">
+            {" "}
+            · L{slot.candidate.ref.lapNumber} ·{" "}
+            <span className="font-mono">
+              {msToLapTime(slot.candidate.lapTimeMs)}
+            </span>
+          </span>
         </span>
         {gapS !== null && (
           <span className="shrink-0 font-mono text-2xs tabular-nums">
@@ -353,12 +367,11 @@ function InputCard({
                   </>
                 )
               }
-              readoutColor={CHART_THEME.harvest}
               wide
               value={battery}
               ghostValue={read(ghostChannels?.ersMj)}
               max={BATTERY_MAX_MJ}
-              color={CHART_THEME.harvest}
+              color={ersColor}
               title={battery === null ? undefined : `${battery.toFixed(2)} MJ`}
             />
           )}
@@ -394,12 +407,9 @@ function InputCard({
             // Never empty, so the centred column cannot jump.
             <span
               className={cn(
-                "mt-1 text-[9px] font-semibold uppercase tracking-wide",
-                derating
-                  ? "text-tone-600"
-                  : ersModeValue !== null && Math.round(ersModeValue) === 3
-                    ? "text-warning"
-                    : "text-tone-500",
+                "mt-1 flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide",
+                // The dot carries the mode's colour; the word stays ink.
+                derating ? "text-tone-600" : "text-tone-500",
               )}
               title={
                 derating
@@ -407,6 +417,13 @@ function InputCard({
                   : "ERS deploy mode"
               }
             >
+              {ersMode && !derating && (
+                <span
+                  aria-hidden
+                  className="size-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: ersColor }}
+                />
+              )}
               {derating ? "Derating" : (ersMode ?? "–")}
             </span>
           )}
@@ -497,7 +514,6 @@ function InputTrail({
 function InputBar({
   label,
   readout,
-  readoutColor,
   wide = false,
   value,
   ghostValue,
@@ -508,7 +524,6 @@ function InputBar({
   label: string;
   /** Value printed above the bar. */
   readout: ReactNode;
-  readoutColor?: string;
   /** Room for a "100%" readout. */
   wide?: boolean;
   value: number | null;
@@ -525,10 +540,7 @@ function InputBar({
       className={cn("flex flex-col items-center gap-0.5", wide ? "w-8" : "w-5")}
       title={title}
     >
-      <span
-        className="whitespace-nowrap font-mono text-2xs font-medium leading-none tabular-nums text-tone-400"
-        style={readoutColor ? { color: readoutColor } : undefined}
-      >
+      <span className="whitespace-nowrap font-mono text-2xs font-medium leading-none tabular-nums text-tone-400">
         {readout}
       </span>
       <div className="relative w-5 flex-1 overflow-hidden rounded-sm bg-tone-0/[0.06]">

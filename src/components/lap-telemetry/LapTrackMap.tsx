@@ -251,7 +251,7 @@ export function LapTrackMap({
               </g>
             );
           })}
-        {tips.map((tip, index) => {
+        {tips.map((tip) => {
           const active = tip.id === activeTipId;
           const mid = outlinePointAt(
             outline,
@@ -259,8 +259,14 @@ export function LapTrackMap({
           );
           const color =
             tipTone(tip) === "behind" ? CHART_THEME.behind : CHART_THEME.ahead;
-          // Labels are sized for the ~270 px the map renders at: about 9 px text.
+          // Labels are sized for the ~270 px the map renders at: about 9 px
+          // text. A pill fits "T13–14"; without a turn it is a plain dot.
           const radius = active ? 22 : 20;
+          const fontSize = radius * 1.05;
+          const halfWidth = tip.marker
+            ? Math.max(radius, (tip.marker.length * fontSize * 0.62) / 2 + 9)
+            : radius * 0.6;
+          const halfHeight = tip.marker ? radius : radius * 0.6;
           return (
             <g
               key={`label-${tip.id}`}
@@ -270,24 +276,29 @@ export function LapTrackMap({
               onPointerEnter={() => onHoverTip(tip)}
               onPointerLeave={() => onHoverTip(null)}
             >
-              <circle
-                cx={mid.x}
-                cy={mid.y}
-                r={radius}
+              <title>{tip.title}</title>
+              <rect
+                x={mid.x - halfWidth}
+                y={mid.y - halfHeight}
+                width={halfWidth * 2}
+                height={halfHeight * 2}
+                rx={halfHeight}
                 fill={active ? color : "var(--color-tone-950)"}
                 stroke={color}
                 strokeWidth={3}
               />
-              <text
-                x={mid.x}
-                y={mid.y + radius * 0.36}
-                textAnchor="middle"
-                className="font-mono font-bold"
-                fontSize={radius * 1.05}
-                fill={active ? "var(--color-tone-950)" : color}
-              >
-                {index + 1}
-              </text>
+              {tip.marker && (
+                <text
+                  x={mid.x}
+                  y={mid.y + radius * 0.36}
+                  textAnchor="middle"
+                  className="font-mono font-bold"
+                  fontSize={fontSize}
+                  fill={active ? "var(--color-tone-950)" : color}
+                >
+                  {tip.marker}
+                </text>
+              )}
             </g>
           );
         })}

@@ -160,6 +160,11 @@ test("turn markers name corners, complexes and flat-out stretches", () => {
       "Turn 5",
     ],
   );
+  // The map shows the same turns, never a running count of tips.
+  assert.deepEqual(
+    units.map((unit) => unit.marker),
+    ["→T1", "T1–2", "→T5", "T5"],
+  );
 });
 
 test("tips name the official turn, or lap distance when no marker is near", () => {
