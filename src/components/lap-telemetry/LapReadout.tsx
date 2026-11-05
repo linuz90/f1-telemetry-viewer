@@ -106,6 +106,7 @@ export function LapReadout({
   sectorStarts,
   track,
   showBattery,
+  rest,
 }: {
   series: LapSeriesSet;
   slots: readonly SlotLap[];
@@ -116,8 +117,11 @@ export function LapReadout({
   sectorStarts?: [number, number];
   /** False for cars that record no battery trace. */
   showBattery: boolean;
+  /** Where the cards rest without a hover or playback: a tip's stretch. */
+  rest?: { distance: number; label: string };
 }) {
   const hover = useHoverDistance(hoverStore);
+  const shown = hover ?? rest?.distance ?? null;
   const corners = useMemo(
     () => (track ? getTrackCorners(track, series.trackLengthM) : []),
     [track, series.trackLengthM],
@@ -137,7 +141,9 @@ export function LapReadout({
     hover === null || !lapA ? null : valueAt(series.grid, lapA.time, hover);
   const head =
     hover === null
-      ? "Play the lap or hover the traces"
+      ? rest
+        ? `${rest.label} · hover the traces or play the lap`
+        : "Play the lap or hover the traces"
       : [
           elapsed === null ? null : formatElapsed(elapsed),
           `${(hover / 1000).toFixed(3)} km`,
@@ -181,11 +187,11 @@ export function LapReadout({
               lap={lap}
               ghost={ghost}
               grid={series.grid}
-              distance={hover}
+              distance={shown}
               // Gap is A's, so it reads "A +0.045" on the comparison's card.
               gapS={
-                slotIndex > 0 && gap && hover !== null
-                  ? valueAt(series.grid, gap.gapS, hover)
+                slotIndex > 0 && gap && shown !== null
+                  ? valueAt(series.grid, gap.gapS, shown)
                   : null
               }
               showBattery={showBattery}

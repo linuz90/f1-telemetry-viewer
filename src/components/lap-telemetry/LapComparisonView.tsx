@@ -113,6 +113,25 @@ export function LapComparisonView({
       selectedTip ? { from: selectedTip.from, to: selectedTip.to } : undefined,
     [selectedTip],
   );
+  // Without a hover the readouts rest on the tip in focus, else the one
+  // worth most, so the cards open on a moment that matters, not on dashes.
+  const restTip =
+    selectedTip ??
+    comparison?.tips.reduce<LapTip | undefined>(
+      (best, tip) =>
+        tip.kind !== "note" &&
+        (!best || Math.abs(tip.timeS) > Math.abs(best.timeS))
+          ? tip
+          : best,
+      undefined,
+    );
+  const rest = useMemo(
+    () =>
+      restTip
+        ? { distance: (restTip.from + restTip.to) / 2, label: restTip.title }
+        : undefined,
+    [restTip],
+  );
   const comparisonSlot = slots[1];
   const comparisonName = !comparisonSlot
     ? ""
@@ -254,6 +273,7 @@ export function LapComparisonView({
           sectorStarts={sectorStarts}
           track={track}
           showBattery={hasBattery}
+          rest={rest}
         />
         <LapTraceCharts
           series={series}

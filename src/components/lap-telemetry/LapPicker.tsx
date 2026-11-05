@@ -45,6 +45,7 @@ const PRESET_COLUMNS = [
   "sm:grid-cols-1",
   "sm:grid-cols-2",
   "sm:grid-cols-3",
+  "sm:grid-cols-2",
 ];
 
 interface PickerRow {
@@ -352,7 +353,8 @@ export function LapPicker({
                       <span
                         className={cn(
                           "ml-auto font-mono text-sm tabular-nums",
-                          preset.id === "my-best"
+                          preset.id === "my-best" ||
+                            preset.id === "my-other-run"
                             ? "text-tone-100"
                             : "text-best",
                         )}

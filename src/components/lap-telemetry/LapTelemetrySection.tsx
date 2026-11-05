@@ -15,7 +15,6 @@ import {
   defaultComparison,
   defaultLapA,
   familyOf,
-  describeDefaultPair,
   isInFamily,
   isSoloSelection,
   LAP_TELEMETRY_ANCHOR,
@@ -48,6 +47,7 @@ import { buttonVariants } from "../ui/Button";
 import { scrollBelowPageTabsClass } from "../ui/pageTabs";
 import { SectionHeader } from "../ui/SectionHeader";
 import { driverLabel, recordingLabel } from "./labels";
+import { CompareSuggestions } from "./CompareSuggestions";
 import { LapChips } from "./LapChips";
 import { LapComparisonView } from "./LapComparisonView";
 import { LapImportsRow } from "./LapImportsRow";
@@ -254,6 +254,8 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
         a,
         scope.kind === "session" ? sessionPool : familyPool,
         {
+          scope: scope.kind,
+          kind: family?.kind,
           rivalDriverIndex,
         },
       );
@@ -263,6 +265,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   }, [
     candidateByKey,
     familyPool,
+    family?.kind,
     focusedDriverIndex,
     rivalDriverIndex,
     scope.kind,
@@ -324,6 +327,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
               team: candidate.team,
               isPlayer: candidate.isPlayer,
               sessionType: candidate.recording.sessionType,
+              recordingSlug: candidate.ref.recordingSlug,
               lapNumber: candidate.ref.lapNumber,
               lapTimeMs: candidate.lapTimeMs,
               sectorEndsMs: recorded?.sectorEndsMs,
@@ -393,11 +397,17 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
         detail: [
           // "Session best" says more about a comparison lap than where it is from.
           index > 0
-            ? presets.find(
+            ? (presets.find(
                 (preset) =>
                   preset.candidate &&
                   sameLapRef(preset.candidate.ref, candidate.ref),
-              )?.label
+              )?.label ??
+              // The driver the race page compares you with, as it picked B.
+              (rivalDriverIndex != null &&
+              candidate.ref.driverIndex === rivalDriverIndex &&
+              candidate.ref.recordingSlug === selected[0]?.ref.recordingSlug
+                ? "Race rival"
+                : undefined))
             : undefined,
           candidate.recording.slug === ownRecordingSlug
             ? undefined
@@ -408,7 +418,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
           .filter(Boolean)
           .join(" · "),
       })),
-    [selected, presets, ownRecordingSlug],
+    [selected, presets, ownRecordingSlug, rivalDriverIndex],
   );
   const slotsByKey = useMemo(
     () => new Map(slots.map((slot) => [slot.key, slot.slot])),
@@ -532,16 +542,6 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   };
 
   const trackName = getTrackDisplayName(family?.track ?? "");
-  // A pair the URL does not name was picked here, so say what it is.
-  const autoPick =
-    urlRefs.length === 0 && selected[0]
-      ? describeDefaultPair(
-          selected[0],
-          selected[1],
-          scope.kind === "session" ? sessionPool : familyPool,
-          scope.kind === "session" ? "in this session" : `at ${trackName}`,
-        )
-      : null;
   const canAdd =
     slots.length > 0 &&
     slots.length < MAX_SELECTED_LAPS &&
@@ -557,7 +557,8 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
       <LapChips
         slots={slots}
         fastestKey={slots.length > 1 ? fastestKey : undefined}
-        canAdd={canAdd}
+        // Alone, lap A gets the suggestions row below instead of a bare add.
+        canAdd={canAdd && slots.length > 1}
         onOpenPicker={setPickerSlot}
         // Removing A promotes B; the lone lap is written as solo so the
         // default comparison does not come straight back.
@@ -566,10 +567,13 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
         }
       />
 
-      {autoPick && (
-        <p className="-mt-1 text-xs text-tone-500">
-          Picked for you: {autoPick}. Click a lap above to change it.
-        </p>
+      {slots.length === 1 && canAdd && (
+        <CompareSuggestions
+          a={selected[0]}
+          presets={presets}
+          onPick={(candidate) => writeSelection([selected[0], candidate])}
+          onMore={() => setPickerSlot(1)}
+        />
       )}
 
       {slots.length === 1 && !canAdd && (

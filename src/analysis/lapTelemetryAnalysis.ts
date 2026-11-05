@@ -276,6 +276,8 @@ export interface LapContext {
   team?: string;
   isPlayer: boolean;
   sessionType: string;
+  /** The recording the lap is from: two race laps from different races. */
+  recordingSlug?: string;
   lapNumber: number;
   lapTimeMs: number;
   /** Official elapsed time at the ends of sectors 1 and 2, from the paired session JSON. */
@@ -2133,9 +2135,19 @@ function compareContext(
     });
   }
   if (isRaceSessionType(ca.sessionType) || isRaceSessionType(cb.sessionType)) {
+    // Fuel load and tyre age move a race lap by seconds, so laps from two
+    // races compare the races before the driving.
+    const otherRace =
+      isRaceSessionType(ca.sessionType) &&
+      isRaceSessionType(cb.sessionType) &&
+      !!ca.recordingSlug &&
+      !!cb.recordingSlug &&
+      ca.recordingSlug !== cb.recordingSlug;
     items.push({
       id: "traffic",
-      label: "Race lap: traffic and tow can play a part",
+      label: otherRace
+        ? "Laps from different races: fuel, tyres and traffic differ"
+        : "Race lap: traffic and tow can play a part",
       tone: "differs",
     });
   }

@@ -127,6 +127,81 @@ function Cursor({
   );
 }
 
+/** Labelled tips besides the active one: the ones worth most. */
+const MAP_LABELS = 3;
+
+/**
+ * Each tip's marker on the map, in drawing order. Only the active tip and the
+ * `MAP_LABELS` worth most carry their turn label, and a label that would
+ * overlap one already placed stays a dot: on a 27-turn street circuit every
+ * label at once is a pile. Pills are sized for the ~270 px the map renders
+ * at (about 9 px text) and slide inward rather than past the view's edge.
+ */
+function placeMarkers(
+  tips: readonly LapTip[],
+  activeTipId: string | null,
+  outline: readonly OutlinePoint[],
+  trackLengthM: number,
+  box: { left: number },
+) {
+  const byPriority = [...tips].sort(
+    (x, y) =>
+      Number(y.id === activeTipId) - Number(x.id === activeTipId) ||
+      Math.abs(y.timeS) - Math.abs(x.timeS),
+  );
+  const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  let labels = 0;
+  const markers = byPriority.map((tip) => {
+    const active = tip.id === activeTipId;
+    const mid = outlinePointAt(outline, (tip.from + tip.to) / 2 / trackLengthM);
+    const radius = active ? 22 : 20;
+    const fontSize = radius * 1.05;
+    const pillHalfWidth = Math.max(
+      radius,
+      (tip.marker.length * fontSize * 0.62) / 2 + 9,
+    );
+    const edge = pillHalfWidth + 3;
+    const x = Math.min(
+      Math.max(mid.x, box.left + edge),
+      box.left + MAP_WIDTH - edge,
+    );
+    const pill = {
+      x0: x - pillHalfWidth,
+      x1: x + pillHalfWidth,
+      y0: mid.y - radius,
+      y1: mid.y + radius,
+    };
+    const labelled =
+      !!tip.marker &&
+      (active ||
+        (labels < MAP_LABELS &&
+          !placed.some(
+            (other) =>
+              pill.x0 < other.x1 &&
+              pill.x1 > other.x0 &&
+              pill.y0 < other.y1 &&
+              pill.y1 > other.y0,
+          )));
+    if (labelled) {
+      placed.push(pill);
+      if (!active) labels += 1;
+    }
+    const dot = active ? 9 : 7;
+    return {
+      tip,
+      active,
+      labelled,
+      x: labelled ? x : mid.x,
+      y: mid.y,
+      halfWidth: labelled ? pillHalfWidth : dot,
+      halfHeight: labelled ? radius : dot,
+      fontSize,
+    };
+  });
+  // Drawn lowest priority first, so the active marker ends up on top.
+  return markers.reverse();
+}
+
 /**
  * Where each tip sits on the circuit, and where the chart cursor is. Drawn
  * from the layout's real reference lap; layouts without one use the outline
@@ -187,6 +262,7 @@ export function LapTrackMap({
   const normal = { x: (-tangent.y / norm) * 20, y: (tangent.x / norm) * 20 };
 
   const box = mapBox(outline);
+  const markers = placeMarkers(tips, activeTipId, outline, trackLengthM, box);
   return (
     <figure className="relative">
       <svg
@@ -255,38 +331,21 @@ export function LapTrackMap({
               </g>
             );
           })}
-        {[...tips]
-          // As with the stretches, the active label sits on top: pills can
-          // overlap where a circuit packs turns close together.
-          .sort(
-            (x, y) =>
-              Number(x.id === activeTipId) - Number(y.id === activeTipId),
-          )
-          .map((tip) => {
-            const active = tip.id === activeTipId;
-            const mid = outlinePointAt(
-              outline,
-              (tip.from + tip.to) / 2 / trackLengthM,
-            );
+        {markers.map(
+          ({
+            tip,
+            active,
+            labelled,
+            x,
+            y,
+            halfWidth,
+            halfHeight,
+            fontSize,
+          }) => {
             const color =
               tipTone(tip) === "behind"
                 ? CHART_THEME.behind
                 : CHART_THEME.ahead;
-            // Labels are sized for the ~270 px the map renders at: about 9 px
-            // text. A pill fits "T13–14"; without a turn it is a plain dot.
-            const radius = active ? 22 : 20;
-            const fontSize = radius * 1.05;
-            const halfWidth = tip.marker
-              ? Math.max(radius, (tip.marker.length * fontSize * 0.62) / 2 + 9)
-              : radius * 0.6;
-            const halfHeight = tip.marker ? radius : radius * 0.6;
-            // A wide pill by the edge of a wide circuit slides inward rather
-            // than being cut off by the fixed-width view.
-            const edge = halfWidth + 3;
-            const x = Math.min(
-              Math.max(mid.x, box.left + edge),
-              box.left + MAP_WIDTH - edge,
-            );
             return (
               <g
                 key={`label-${tip.id}`}
@@ -299,7 +358,7 @@ export function LapTrackMap({
                 <title>{tip.title}</title>
                 <rect
                   x={x - halfWidth}
-                  y={mid.y - halfHeight}
+                  y={y - halfHeight}
                   width={halfWidth * 2}
                   height={halfHeight * 2}
                   rx={halfHeight}
@@ -307,10 +366,10 @@ export function LapTrackMap({
                   stroke={color}
                   strokeWidth={3}
                 />
-                {tip.marker && (
+                {labelled && (
                   <text
                     x={x}
-                    y={mid.y + radius * 0.36}
+                    y={y + fontSize * 0.34}
                     textAnchor="middle"
                     className="font-mono font-bold"
                     fontSize={fontSize}
@@ -321,7 +380,8 @@ export function LapTrackMap({
                 )}
               </g>
             );
-          })}
+          },
+        )}
         <Cursor
           store={hoverStore}
           outline={outline}
