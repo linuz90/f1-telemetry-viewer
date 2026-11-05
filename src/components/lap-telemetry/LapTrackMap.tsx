@@ -82,7 +82,7 @@ function stretchPoints(
  * A fixed width keeps strokes and labels the same size on every circuit; the
  * height follows the layout so wide circuits leave no empty bands.
  */
-function mapViewBox(outline: readonly OutlinePoint[]): string {
+function mapBox(outline: readonly OutlinePoint[]) {
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
@@ -95,7 +95,10 @@ function mapViewBox(outline: readonly OutlinePoint[]): string {
   }
   const left = (minX + maxX) / 2 - MAP_WIDTH / 2;
   const height = maxY - minY + 2 * MAP_MARGIN;
-  return `${left.toFixed(1)} ${(minY - MAP_MARGIN).toFixed(1)} ${MAP_WIDTH} ${height.toFixed(1)}`;
+  return {
+    left,
+    viewBox: `${left.toFixed(1)} ${(minY - MAP_MARGIN).toFixed(1)} ${MAP_WIDTH} ${height.toFixed(1)}`,
+  };
 }
 
 function Cursor({
@@ -183,10 +186,11 @@ export function LapTrackMap({
   const norm = Math.hypot(tangent.x, tangent.y) || 1;
   const normal = { x: (-tangent.y / norm) * 20, y: (tangent.x / norm) * 20 };
 
+  const box = mapBox(outline);
   return (
     <figure className="relative">
       <svg
-        viewBox={mapViewBox(outline)}
+        viewBox={box.viewBox}
         className="w-full"
         role="img"
         aria-label="Track map with tip locations"
@@ -251,57 +255,73 @@ export function LapTrackMap({
               </g>
             );
           })}
-        {tips.map((tip) => {
-          const active = tip.id === activeTipId;
-          const mid = outlinePointAt(
-            outline,
-            (tip.from + tip.to) / 2 / trackLengthM,
-          );
-          const color =
-            tipTone(tip) === "behind" ? CHART_THEME.behind : CHART_THEME.ahead;
-          // Labels are sized for the ~270 px the map renders at: about 9 px
-          // text. A pill fits "T13–14"; without a turn it is a plain dot.
-          const radius = active ? 22 : 20;
-          const fontSize = radius * 1.05;
-          const halfWidth = tip.marker
-            ? Math.max(radius, (tip.marker.length * fontSize * 0.62) / 2 + 9)
-            : radius * 0.6;
-          const halfHeight = tip.marker ? radius : radius * 0.6;
-          return (
-            <g
-              key={`label-${tip.id}`}
-              className="cursor-pointer"
-              opacity={activeTipId && !active ? 0.7 : 1}
-              onClick={() => onSelectTip(tip)}
-              onPointerEnter={() => onHoverTip(tip)}
-              onPointerLeave={() => onHoverTip(null)}
-            >
-              <title>{tip.title}</title>
-              <rect
-                x={mid.x - halfWidth}
-                y={mid.y - halfHeight}
-                width={halfWidth * 2}
-                height={halfHeight * 2}
-                rx={halfHeight}
-                fill={active ? color : "var(--color-tone-950)"}
-                stroke={color}
-                strokeWidth={3}
-              />
-              {tip.marker && (
-                <text
-                  x={mid.x}
-                  y={mid.y + radius * 0.36}
-                  textAnchor="middle"
-                  className="font-mono font-bold"
-                  fontSize={fontSize}
-                  fill={active ? "var(--color-tone-950)" : color}
-                >
-                  {tip.marker}
-                </text>
-              )}
-            </g>
-          );
-        })}
+        {[...tips]
+          // As with the stretches, the active label sits on top: pills can
+          // overlap where a circuit packs turns close together.
+          .sort(
+            (x, y) =>
+              Number(x.id === activeTipId) - Number(y.id === activeTipId),
+          )
+          .map((tip) => {
+            const active = tip.id === activeTipId;
+            const mid = outlinePointAt(
+              outline,
+              (tip.from + tip.to) / 2 / trackLengthM,
+            );
+            const color =
+              tipTone(tip) === "behind"
+                ? CHART_THEME.behind
+                : CHART_THEME.ahead;
+            // Labels are sized for the ~270 px the map renders at: about 9 px
+            // text. A pill fits "T13–14"; without a turn it is a plain dot.
+            const radius = active ? 22 : 20;
+            const fontSize = radius * 1.05;
+            const halfWidth = tip.marker
+              ? Math.max(radius, (tip.marker.length * fontSize * 0.62) / 2 + 9)
+              : radius * 0.6;
+            const halfHeight = tip.marker ? radius : radius * 0.6;
+            // A wide pill by the edge of a wide circuit slides inward rather
+            // than being cut off by the fixed-width view.
+            const edge = halfWidth + 3;
+            const x = Math.min(
+              Math.max(mid.x, box.left + edge),
+              box.left + MAP_WIDTH - edge,
+            );
+            return (
+              <g
+                key={`label-${tip.id}`}
+                className="cursor-pointer"
+                opacity={activeTipId && !active ? 0.7 : 1}
+                onClick={() => onSelectTip(tip)}
+                onPointerEnter={() => onHoverTip(tip)}
+                onPointerLeave={() => onHoverTip(null)}
+              >
+                <title>{tip.title}</title>
+                <rect
+                  x={x - halfWidth}
+                  y={mid.y - halfHeight}
+                  width={halfWidth * 2}
+                  height={halfHeight * 2}
+                  rx={halfHeight}
+                  fill={active ? color : "var(--color-tone-950)"}
+                  stroke={color}
+                  strokeWidth={3}
+                />
+                {tip.marker && (
+                  <text
+                    x={x}
+                    y={mid.y + radius * 0.36}
+                    textAnchor="middle"
+                    className="font-mono font-bold"
+                    fontSize={fontSize}
+                    fill={active ? "var(--color-tone-950)" : color}
+                  >
+                    {tip.marker}
+                  </text>
+                )}
+              </g>
+            );
+          })}
         <Cursor
           store={hoverStore}
           outline={outline}
