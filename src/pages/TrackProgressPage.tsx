@@ -558,9 +558,15 @@ export function TrackProgressPage() {
     return true;
   });
   const selectedTab = tabs.includes(pageTab) ? pageTab : "overview";
-  const lapKind: TrackSessionKind = isTrackSessionTab(lapKindChoice)
-    ? lapKindChoice
-    : getPreferredTrackTab(availableKinds);
+  // Only kinds with laps to show, so the tab never opens on an empty section.
+  const recordedKinds = availableKinds.filter((kind) =>
+    recordedLapTabs.includes(kind),
+  );
+  const lapKinds = recordedKinds.length > 0 ? recordedKinds : availableKinds;
+  const lapKind: TrackSessionKind =
+    isTrackSessionTab(lapKindChoice) && lapKinds.includes(lapKindChoice)
+      ? lapKindChoice
+      : getPreferredTrackTab(lapKinds);
 
   const setTab = (tab: TrackPageTab) => {
     setPageTab(tab);
@@ -1048,10 +1054,10 @@ export function TrackProgressPage() {
 
         {selectedTab === "lap-telemetry" && activeFormulaKey && (
           <>
-            {availableKinds.length > 1 && (
+            {lapKinds.length > 1 && (
               <SegmentedControl<TrackSessionKind>
                 ariaLabel="Laps from"
-                options={availableKinds.map((value) => ({
+                options={lapKinds.map((value) => ({
                   value,
                   label: TRACK_KIND_LABELS[value],
                 }))}

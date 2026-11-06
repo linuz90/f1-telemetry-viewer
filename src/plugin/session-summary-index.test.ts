@@ -44,13 +44,13 @@ import { telemetryServer } from "./telemetry-server.ts";
 
 const RACE_DEMO = fileURLToPath(
   new URL(
-    "../../public/demo/race-spa-2026-01-26-22-14-52.json",
+    "../../tests/fixtures/session-index/race-spa-2026-01-26-22-14-52.json",
     import.meta.url,
   ),
 );
 const QUALIFYING_DEMO = fileURLToPath(
   new URL(
-    "../../public/demo/short-qualifying-zandvoort-2026-02-07-11-33-48.json",
+    "../../tests/fixtures/session-index/short-qualifying-zandvoort-2026-02-07-11-33-48.json",
     import.meta.url,
   ),
 );

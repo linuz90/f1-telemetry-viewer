@@ -381,11 +381,11 @@ async function runBenchmark(options: BenchmarkOptions) {
   const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
   const defaultRaceFixture = path.join(
     repositoryRoot,
-    "public/demo/race-spa-2026-01-26-22-14-52.json",
+    "tests/fixtures/session-index/race-spa-2026-01-26-22-14-52.json",
   );
   const defaultQualifyingFixture = path.join(
     repositoryRoot,
-    "public/demo/short-qualifying-zandvoort-2026-02-07-11-33-48.json",
+    "tests/fixtures/session-index/short-qualifying-zandvoort-2026-02-07-11-33-48.json",
   );
 
   // Reject obvious overlaps before mkdir has any chance to mutate source data;

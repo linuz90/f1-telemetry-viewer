@@ -1,15 +1,18 @@
 /**
- * Generates trimmed demo telemetry files from real session data.
- * Keeps the player + top 5 other drivers to reduce file size.
+ * Generates the public demo from real sessions: one online race weekend at
+ * Sakhir with a lap recording, and three long runs at Miami for stint
+ * comparison. Every human name becomes a fictional handle, so nothing in
+ * `public/demo/` identifies a real player, and the script fails if one survives.
  *
  * Usage: TELEMETRY_DIR=/path/to/data pnpm generate-demo
  *        (or set TELEMETRY_DIR in .env)
  *
- * Source files are hardcoded below — update paths if the originals move.
+ * Source files are hardcoded below; update paths if the originals move.
  */
 
 import fs from "fs";
 import path from "path";
+import JSZip from "jszip";
 import type {
   SessionSummary,
   TelemetrySession,
@@ -40,14 +43,50 @@ function readTelemetryDir(): string {
 
 const TELEMETRY_DIR = readTelemetryDir();
 
-const SOURCES = [
-  // Race at Spa — full 20-driver race, ~3.1MB → trimmed
-  "2026_01_26/race-info/Race_Spa_2026_01_26_22_14_52.json",
-  // Short Qualifying at Zandvoort — ~597KB → trimmed
-  "2026_02_07/race-info/Short_Qualifying_Zandvoort_2026_02_07_11_33_48.json",
+interface DemoSource {
+  path: string;
+  /** Drivers to keep; the race and the recorded quali keep the full field. */
+  keep?: number;
+  /** The session's `.pngt`, bundled so the demo has Lap telemetry. */
+  recording?: string;
+}
+
+const SOURCES: DemoSource[] = [
+  { path: "2026_10_26/race-info/Race_Sakhir_2026_10_26_22_36_52.json" },
+  {
+    path: "2026_10_26/race-info/Short_Qualifying_Sakhir_2026_10_26_21_29_32.json",
+    recording:
+      "2026_10_26/telemetry/Short_Qualifying_Sakhir_2026_10_26_21_29_32.pngt",
+  },
+  // An earlier run on the race's tyres, for the Tyres tab's comparison.
+  {
+    path: "2026_10_26/race-info/Race_Sakhir_Manual_2026_10_26_18_29_18.json",
+    keep: 6,
+  },
+  {
+    path: "2026_10_30/race-info/Race_Miami_Manual_2026_10_30_18_07_16.json",
+    keep: 6,
+  },
+  {
+    path: "2026_10_30/race-info/Race_Miami_Manual_2026_10_30_18_24_39.json",
+    keep: 6,
+  },
+  {
+    path: "2026_10_30/race-info/Race_Miami_Manual_2026_10_30_18_38_16.json",
+    keep: 6,
+  },
 ];
 
-const KEEP_DRIVERS = 6; // player + 5 others
+/** Stand-ins for human players, one per name across every source. */
+const HANDLES = `Apex_Hunter LateBraker KerbHopper DRS_Train Tow_Tom GravelTrap
+  Slipstream07 BoxBoxBox Undercut_Joe ColdTyres PurpleSector1 FlatOut_Mo
+  TrailBrake42 MarblesMike PitWall_Pat Oversteer88 Understeer_Uli LockUp_Lou
+  Backmarker9 BlueFlag_Bo SendIt_Sam DirtyAir_Dan HotLap_Hana RedMist_Rio
+  Chicane_Cal Hairpin_Hugo Paddock_Pia Grid_Gus Fuel_Saver_Ed TyreWhisperer
+  Delta_Dee Sector3_Sol Parc_Ferme Kerb_Kid Rain_Master11 Safety_Sid`.split(
+  /\s+/,
+);
+
 const OUT_DIR = path.resolve(import.meta.dirname, "../public/demo");
 
 interface DriverEntry {
@@ -66,7 +105,10 @@ interface DriverEntry {
   [key: string]: unknown;
 }
 
-function pickDrivers(classificationData: DriverEntry[]): Set<string> {
+function pickDrivers(
+  classificationData: DriverEntry[],
+  keep: number,
+): Set<string> {
   const player = classificationData.find((d) => d["is-player"]);
   const names = new Set<string>();
 
@@ -84,7 +126,7 @@ function pickDrivers(classificationData: DriverEntry[]): Set<string> {
     });
 
   for (const d of others) {
-    if (names.size >= KEEP_DRIVERS) break;
+    if (names.size >= keep) break;
     names.add(d["driver-name"]);
   }
 
@@ -141,28 +183,97 @@ function trimSession(
   return data;
 }
 
+/**
+ * Who needs a stand-in: any name that isn't an AI driver's upper-case surname
+ * or a "Team '26 #8" placeholder, and every online human whatever their name.
+ */
+function humanNames(session: TelemetrySession): string[] {
+  const online = session["session-info"]?.["network-game"] === 1;
+  return (session["classification-data"] as unknown as DriverEntry[]).flatMap(
+    (driver) => {
+      const name = driver["driver-name"];
+      if (!name || /#\d+$/.test(name)) return [];
+      const participant = driver["participant-data"] as
+        | { "ai-controlled"?: boolean }
+        | undefined;
+      const surname = /^[\p{Lu}' -]+$/u.test(name);
+      return !surname || (online && !participant?.["ai-controlled"])
+        ? [name]
+        : [];
+    },
+  );
+}
+
+function nameReplacer(names: readonly string[]) {
+  if (names.length > HANDLES.length) {
+    throw new Error(`Need ${names.length} handles, have ${HANDLES.length}`);
+  }
+  // PnG writes non-ASCII as \\uXXXX, so a name has an escaped form on disk.
+  const escapedForm = (name: string) =>
+    name.replace(
+      /[^\x00-\x7f]/g,
+      (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
+    );
+  const handles = new Map(
+    names.flatMap((name, i) =>
+      [name, escapedForm(name)].map((form) => [form.toLowerCase(), HANDLES[i]]),
+    ),
+  );
+  const escaped = [...handles.keys()]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(
+    `(?<![\\p{L}\\p{N}_])(${escaped.join("|")})(?![\\p{L}\\p{N}_])`,
+    "giu",
+  );
+  return (text: string) =>
+    text.replace(pattern, (name) => handles.get(name.toLowerCase())!);
+}
+
+/** A recording with every name in its JSON entries replaced. */
+async function anonymiseRecording(
+  source: Buffer,
+  replaceNames: (text: string) => string,
+): Promise<Buffer> {
+  const zip = await JSZip.loadAsync(source);
+  for (const entry of Object.values(zip.files)) {
+    if (entry.dir || !entry.name.endsWith(".json")) continue;
+    zip.file(entry.name, replaceNames(await entry.async("text")));
+  }
+  return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+}
+
 // --- Main ---
 
-fs.mkdirSync(OUT_DIR, { recursive: true });
+fs.rmSync(OUT_DIR, { recursive: true, force: true });
+fs.mkdirSync(path.join(OUT_DIR, "recordings"), { recursive: true });
+
+const sources = SOURCES.map((source) => ({
+  ...source,
+  filename: path.basename(source.path),
+  text: fs.readFileSync(path.join(TELEMETRY_DIR, source.path), "utf-8"),
+}));
+const realNames = [
+  ...new Set(
+    sources.flatMap((s) => humanNames(JSON.parse(s.text) as TelemetrySession)),
+  ),
+].sort();
+const replaceNames = nameReplacer(realNames);
 
 const manifest = [];
+const recordings: { file: string; session: string }[] = [];
 
-for (const relPath of SOURCES) {
-  const srcPath = path.join(TELEMETRY_DIR, relPath);
-  const filename = path.basename(relPath);
-
+for (const { filename, keep, recording, text } of sources) {
   console.log(`Processing ${filename}...`);
-  const raw = JSON.parse(fs.readFileSync(srcPath, "utf-8")) as TelemetrySession;
-  const rawText = JSON.stringify(raw);
+  const raw = JSON.parse(replaceNames(text)) as TelemetrySession;
   const rawSummary = buildSessionSummary(
     filename,
     raw,
-    Buffer.byteLength(rawText),
+    Buffer.byteLength(text),
   ).summary;
-  const keepNames = pickDrivers(raw["classification-data"]);
-  console.log(
-    `  Keeping ${keepNames.size} drivers: ${[...keepNames].join(", ")}`,
-  );
+  const drivers = raw["classification-data"] as unknown as DriverEntry[];
+  const keepNames = pickDrivers(drivers, keep ?? drivers.length);
+  console.log(`  Keeping ${keepNames.size} drivers`);
 
   const trimmed = trimSession(
     raw as unknown as Record<string, unknown>,
@@ -175,14 +286,19 @@ for (const relPath of SOURCES) {
   fs.writeFileSync(outPath, json);
   console.log(`  Written ${outPath} (${(json.length / 1024).toFixed(0)} KB)`);
 
-  // Don't surface the user's real online opponents in the no-data demo.
-  // The Spa race's `rivals` roster contains the actual gamertags of people
-  // the user races with — stripping it keeps the dashboard's Rivals &
-  // Teammates section sourced entirely from synthetic fictional names.
-  // The detail page (raceResultsTable etc.) still shows real names from the
-  // underlying JSON, which is acceptable as an authentic sample race.
-  const sanitizedSummary = { ...rawSummary, rivals: undefined };
-  manifest.push(sanitizedSummary);
+  manifest.push(rawSummary);
+
+  if (recording) {
+    const file = path.basename(recording);
+    fs.writeFileSync(
+      path.join(OUT_DIR, "recordings", file),
+      await anonymiseRecording(
+        fs.readFileSync(path.join(TELEMETRY_DIR, recording)),
+        replaceNames,
+      ),
+    );
+    recordings.push({ file, session: filename });
+  }
 }
 
 // Append synthetic online race summaries (no backing detail JSON). These exist
@@ -202,4 +318,31 @@ const manifestPath = path.join(OUT_DIR, "sessions.json");
 fs.writeFileSync(manifestPath, `${JSON.stringify(fullManifest, null, 2)}\n`);
 console.log(
   `Manifest written to ${manifestPath} (${fullManifest.length} sessions)`,
+);
+fs.writeFileSync(
+  path.join(OUT_DIR, "recordings.json"),
+  `${JSON.stringify(recordings, null, 2)}\n`,
+);
+
+// Everything public must read clean, recordings included.
+const published = fs
+  .readdirSync(OUT_DIR, { recursive: true, encoding: "utf-8" })
+  .map((file) => path.join(OUT_DIR, file))
+  .filter((file) => fs.statSync(file).isFile());
+for (const file of published) {
+  const texts = file.endsWith(".pngt")
+    ? await Promise.all(
+        Object.values((await JSZip.loadAsync(fs.readFileSync(file))).files)
+          .filter((entry) => entry.name.endsWith(".json"))
+          .map((entry) => entry.async("text")),
+      )
+    : [fs.readFileSync(file, "utf-8")];
+  for (const text of texts) {
+    const lower = text.toLowerCase();
+    const leak = realNames.find((name) => lower.includes(name.toLowerCase()));
+    if (leak) throw new Error(`A real name survived in ${file}`);
+  }
+}
+console.log(
+  `Checked ${published.length} files: ${realNames.length} names replaced`,
 );
