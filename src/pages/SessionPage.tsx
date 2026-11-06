@@ -2,12 +2,14 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { Upload, ArrowLeft } from "lucide-react";
 import { useSession } from "../hooks/useSession";
 import { useTelemetry } from "../context/TelemetryContext";
-import { isRaceSession } from "../utils/stats/drivers";
+import { sessionKind } from "../analysis/sessionKind";
 import { dashboardPath, sessionPath } from "../utils/routes";
 import { getFormulaComparisonKey } from "../utils/sessionTypes";
 import { ActionEmptyState } from "../components/ActionEmptyState";
-import { RaceSessionView } from "./RaceSessionView";
-import { QualifyingSessionView } from "./QualifyingSessionView";
+import { RaceView } from "./session/RaceView";
+import { QualifyingView } from "./session/QualifyingView";
+import { LongRunView } from "./session/LongRunView";
+import { TimeTrialView } from "./session/TimeTrialView";
 import { Button, buttonVariants } from "../components/ui/Button";
 import { HStack } from "../components/ui/Stack";
 
@@ -26,7 +28,7 @@ export function SessionPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-zinc-500">
+      <div className="flex items-center justify-center h-full text-tone-500">
         Loading session...
       </div>
     );
@@ -61,7 +63,7 @@ export function SessionPage() {
                   to={backToDashboardPath}
                   className={buttonVariants({ variant: "secondary" })}
                 >
-                  Back to dashboard
+                  Back to sessions
                 </Link>
               </HStack>
             }
@@ -97,7 +99,7 @@ export function SessionPage() {
                 to={backToDashboardPath}
                 className={buttonVariants({ variant: "secondary" })}
               >
-                Back to dashboard
+                Back to sessions
               </Link>
             )
           }
@@ -114,9 +116,16 @@ export function SessionPage() {
     return <Navigate to={sessionPath(sessionFormulaKey, slug)} replace />;
   }
 
-  return isRaceSession(session) ? (
-    <RaceSessionView key={slug} session={session} slug={slug} />
-  ) : (
-    <QualifyingSessionView key={slug} session={session} slug={slug} />
-  );
+  // The page follows what the session was for the driver, not the exporter's
+  // type: an offline race saved before the flag is a long run.
+  switch (sessionKind(session)) {
+    case "race":
+      return <RaceView key={slug} session={session} slug={slug} />;
+    case "long-run":
+      return <LongRunView key={slug} session={session} slug={slug} />;
+    case "time-trial":
+      return <TimeTrialView key={slug} session={session} slug={slug} />;
+    default:
+      return <QualifyingView key={slug} session={session} slug={slug} />;
+  }
 }

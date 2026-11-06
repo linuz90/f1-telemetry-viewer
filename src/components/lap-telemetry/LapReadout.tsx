@@ -1,3 +1,4 @@
+import { wellClass } from "../ui/surfaces";
 import { useMemo, useState, type ReactNode } from "react";
 import {
   lowerBound,
@@ -5,10 +6,11 @@ import {
   type LapSeries,
   type LapSeriesSet,
 } from "../../analysis/lapTelemetryAnalysis";
-import { CHART_THEME } from "../../constants/colors";
+import { CHART_THEME, ERS_MODE_COLORS } from "../../constants/colors";
 import { LAP_INPUT_GHOST_STORAGE_KEY } from "../../constants/storage";
 import { F1_26_COMPARISON_KEY } from "../../constants/formulas";
 import { cn } from "../../utils/cn";
+import { msToLapTime } from "../../utils/format";
 import { getFormulaComparisonKey } from "../../utils/sessionTypes";
 import { getTrackCorners } from "../../utils/tracks";
 import { readStoredBoolean, writeStoredBoolean } from "../../utils/storage";
@@ -104,6 +106,7 @@ export function LapReadout({
   sectorStarts,
   track,
   showBattery,
+  rest,
 }: {
   series: LapSeriesSet;
   slots: readonly SlotLap[];
@@ -114,8 +117,11 @@ export function LapReadout({
   sectorStarts?: [number, number];
   /** False for cars that record no battery trace. */
   showBattery: boolean;
+  /** Where the cards rest without a hover or playback: a tip's stretch. */
+  rest?: { distance: number; label: string };
 }) {
   const hover = useHoverDistance(hoverStore);
+  const shown = hover ?? rest?.distance ?? null;
   const corners = useMemo(
     () => (track ? getTrackCorners(track, series.trackLengthM) : []),
     [track, series.trackLengthM],
@@ -135,7 +141,9 @@ export function LapReadout({
     hover === null || !lapA ? null : valueAt(series.grid, lapA.time, hover);
   const head =
     hover === null
-      ? "Play the lap or hover the traces"
+      ? rest
+        ? `${rest.label} · hover the traces or play the lap`
+        : "Play the lap or hover the traces"
       : [
           elapsed === null ? null : formatElapsed(elapsed),
           `${(hover / 1000).toFixed(3)} km`,
@@ -146,11 +154,11 @@ export function LapReadout({
           .join(" · ");
 
   return (
-    <div className="rounded-xl bg-zinc-950/40 px-3 py-2 ring-1 ring-inset ring-white/[0.04]">
+    <div className={cn(wellClass, "px-3 py-2")}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <PlaybackControls playback={playback} />
-          <span className="truncate font-mono text-2xs tabular-nums text-zinc-500">
+          <span className="truncate font-mono text-2xs tabular-nums text-tone-500">
             {head}
           </span>
         </div>
@@ -179,11 +187,11 @@ export function LapReadout({
               lap={lap}
               ghost={ghost}
               grid={series.grid}
-              distance={hover}
+              distance={shown}
               // Gap is A's, so it reads "A +0.045" on the comparison's card.
               gapS={
-                slotIndex > 0 && gap && hover !== null
-                  ? valueAt(series.grid, gap.gapS, hover)
+                slotIndex > 0 && gap && shown !== null
+                  ? valueAt(series.grid, gap.gapS, shown)
                   : null
               }
               showBattery={showBattery}
@@ -241,6 +249,11 @@ function InputCard({
           getFormulaComparisonKey(recording.formula, recording.gameYear) ===
             F1_26_COMPARISON_KEY,
         );
+  // The gauge takes the deploy mode's colour; recordings without the mode
+  // channel keep the battery's.
+  const ersColor =
+    (ersModeValue !== null && ERS_MODE_COLORS[Math.round(ersModeValue)]) ||
+    CHART_THEME.harvest;
   const ghostChannels = ghost?.channels;
 
   let ersTrend: "deploy" | "harvest" | null = null;
@@ -260,29 +273,37 @@ function InputCard({
 
   return (
     <div
-      className="flex flex-col gap-1.5 rounded-lg bg-zinc-950/60 px-2.5 py-2"
+      className={cn(wellClass, "flex flex-col gap-1.5 rounded-lg px-2.5 py-2")}
       style={{
         boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${slot.color} 28%, transparent)`,
       }}
     >
       <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="min-w-0 truncate text-zinc-300">
+        <span className="min-w-0 truncate text-tone-300">
           <span
             className="mr-1.5 inline-block size-2 rounded-full align-middle"
             style={{ backgroundColor: slot.color }}
           />
-          <span className="text-zinc-500">{slot.slot}</span> {slot.label}
+          <span className="text-tone-500">{slot.slot}</span> {slot.label}
+          {/* Which lap this is, where the eye already is. */}
+          <span className="text-tone-500">
+            {" "}
+            · L{slot.candidate.ref.lapNumber} ·{" "}
+            <span className="font-mono">
+              {msToLapTime(slot.candidate.lapTimeMs)}
+            </span>
+          </span>
         </span>
         {gapS !== null && (
           <span className="shrink-0 font-mono text-2xs tabular-nums">
-            <span className="text-zinc-600">A </span>
+            <span className="text-tone-600">A </span>
             <span
               className={cn(
                 gapS > 0.0005
                   ? "text-behind"
                   : gapS < -0.0005
                     ? "text-ahead"
-                    : "text-zinc-400",
+                    : "text-tone-400",
               )}
             >
               {gapS >= 0 ? "+" : "−"}
@@ -352,12 +373,11 @@ function InputCard({
                   </>
                 )
               }
-              readoutColor={CHART_THEME.harvest}
               wide
               value={battery}
               ghostValue={read(ghostChannels?.ersMj)}
               max={BATTERY_MAX_MJ}
-              color={CHART_THEME.harvest}
+              color={ersColor}
               title={battery === null ? undefined : `${battery.toFixed(2)} MJ`}
             />
           )}
@@ -366,39 +386,36 @@ function InputCard({
           {ghostChannels && at !== null && (
             <SteeringWheel
               steering={read(ghostChannels.steering)}
-              className="absolute text-zinc-300 opacity-25"
+              className="absolute text-tone-300 opacity-25"
             />
           )}
           <SteeringWheel
             steering={steering}
             className={cn(
               "relative",
-              steering === null ? "text-zinc-700" : "text-zinc-300",
+              steering === null ? "text-tone-700" : "text-tone-300",
             )}
           />
         </div>
         <div className="flex w-14 shrink-0 flex-col items-end justify-center font-mono tabular-nums leading-none">
           {/* Captioned so the big number never reads as a turn number. */}
           <span className="flex items-baseline gap-1">
-            <span className="text-[9px] uppercase text-zinc-600">Gear</span>
-            <span className="text-2xl font-semibold text-zinc-100">
+            <span className="text-[9px] uppercase text-tone-600">Gear</span>
+            <span className="text-2xl font-semibold text-tone-100">
               {gear === null ? "–" : gear <= 0 ? "N" : Math.round(gear)}
             </span>
           </span>
-          <span className="mt-1 text-sm text-zinc-300">
+          <span className="mt-1 text-sm text-tone-300">
             {speed === null ? "–" : Math.round(speed)}
           </span>
-          <span className="mt-0.5 text-[9px] text-zinc-600">km/h</span>
+          <span className="mt-0.5 text-[9px] text-tone-600">km/h</span>
           {showBattery && (
             // Never empty, so the centred column cannot jump.
             <span
               className={cn(
-                "mt-1 text-[9px] font-semibold uppercase tracking-wide",
-                derating
-                  ? "text-zinc-600"
-                  : ersModeValue !== null && Math.round(ersModeValue) === 3
-                    ? "text-warning"
-                    : "text-zinc-500",
+                "mt-1 flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide",
+                // The dot carries the mode's colour; the word stays ink.
+                derating ? "text-tone-600" : "text-tone-500",
               )}
               title={
                 derating
@@ -406,6 +423,13 @@ function InputCard({
                   : "ERS deploy mode"
               }
             >
+              {ersMode && !derating && (
+                <span
+                  aria-hidden
+                  className="size-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: ersColor }}
+                />
+              )}
               {derating ? "Derating" : (ersMode ?? "–")}
             </span>
           )}
@@ -458,7 +482,7 @@ function InputTrail({
     <svg
       viewBox="0 -4 100 108"
       preserveAspectRatio="none"
-      className="min-w-0 flex-1 rounded bg-white/[0.015]"
+      className="min-w-0 flex-1 rounded bg-tone-0/[0.015]"
       aria-hidden
     >
       {[
@@ -496,7 +520,6 @@ function InputTrail({
 function InputBar({
   label,
   readout,
-  readoutColor,
   wide = false,
   value,
   ghostValue,
@@ -507,7 +530,6 @@ function InputBar({
   label: string;
   /** Value printed above the bar. */
   readout: ReactNode;
-  readoutColor?: string;
   /** Room for a "100%" readout. */
   wide?: boolean;
   value: number | null;
@@ -524,13 +546,10 @@ function InputBar({
       className={cn("flex flex-col items-center gap-0.5", wide ? "w-8" : "w-5")}
       title={title}
     >
-      <span
-        className="whitespace-nowrap font-mono text-2xs font-medium leading-none tabular-nums text-zinc-400"
-        style={readoutColor ? { color: readoutColor } : undefined}
-      >
+      <span className="whitespace-nowrap font-mono text-2xs font-medium leading-none tabular-nums text-tone-400">
         {readout}
       </span>
-      <div className="relative w-5 flex-1 overflow-hidden rounded-sm bg-white/[0.06]">
+      <div className="relative w-5 flex-1 overflow-hidden rounded-sm bg-tone-0/[0.06]">
         {ghostValue !== null && (
           <div
             className="absolute inset-x-0 bottom-0 opacity-30"
@@ -542,7 +561,7 @@ function InputBar({
           style={{ height: `${fill}%`, backgroundColor: color }}
         />
       </div>
-      <span className="text-[9px] leading-none text-zinc-600">{label}</span>
+      <span className="text-[9px] leading-none text-tone-600">{label}</span>
     </div>
   );
 }

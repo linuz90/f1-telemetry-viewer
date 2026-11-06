@@ -18,12 +18,12 @@ export function ActionEmptyState({
 }) {
   return (
     <VStack align="center" className={cn("max-w-sm text-center", className)}>
-      <HStack justify="center" className="h-12 w-12 rounded-full bg-zinc-900">
-        <Icon className="h-5 w-5 text-zinc-500" />
+      <HStack justify="center" className="h-12 w-12 rounded-full bg-tone-900">
+        <Icon className="h-5 w-5 text-tone-500" />
       </HStack>
       <div>
-        <h3 className="text-base font-medium text-zinc-200">{title}</h3>
-        <p className="mt-1 text-sm text-zinc-500">{message}</p>
+        <h3 className="text-base font-medium text-tone-200">{title}</h3>
+        <p className="mt-1 text-sm text-tone-500">{message}</p>
       </div>
       {actions}
     </VStack>

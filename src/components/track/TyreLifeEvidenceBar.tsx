@@ -29,7 +29,7 @@ export function TyreLifeEvidenceBar({
 
   return (
     <div>
-      <div className="relative mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+      <div className="relative mt-2 h-1.5 overflow-hidden rounded-full bg-tone-800">
         <div
           className="absolute inset-y-0 left-0 rounded-full"
           style={{ width: `${seenPct}%`, backgroundColor: color, opacity: 0.9 }}
@@ -44,7 +44,7 @@ export function TyreLifeEvidenceBar({
           />
         )}
       </div>
-      <div className="mt-1 whitespace-nowrap font-mono text-2xs tabular-nums text-zinc-500">
+      <div className="mt-1 whitespace-nowrap font-mono text-2xs tabular-nums text-tone-500">
         seen {seenLaps} green laps · {Math.round(seenWear)}%
       </div>
     </div>

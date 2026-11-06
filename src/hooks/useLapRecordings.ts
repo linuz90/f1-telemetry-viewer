@@ -1,6 +1,7 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { useLapImports } from "../context/LapImportsContext";
+import { SESSION_TAB_QUERY_PARAM } from "../constants/routes";
 import { useTelemetry } from "../context/TelemetryContext";
 import {
   LAP_TELEMETRY_ANCHOR,
@@ -111,19 +112,25 @@ export function useLapTraces(refs: readonly LapRef[]): LapTraceState[] {
 }
 
 /**
- * Links that open a lap in the Lap Telemetry section, matched to lap-table
- * rows by lap time in ms: the viewer's lap ordinals skip untimed laps, so
- * lap numbers do not line up with the recording's.
+ * Finds a session's recorded lap by its lap time in ms: the viewer's lap
+ * ordinals skip untimed laps, so lap numbers do not line up with the
+ * recording's. `"player"` reads the recording's own player slot, for a
+ * session whose JSON is not loaded. `sessionSlugs` takes a session's saves
+ * (`sessionSaveSlugs()`), since dedupe can leave its recording on a hidden one.
  */
-export function useLapTraceLinks(
-  sessionSlug: string,
-  driverIndex: number | undefined,
-): ((lapTimeMs: number) => string | undefined) | undefined {
+export function useRecordedLapFinder(
+  sessionSlugs: readonly string[],
+  driverIndex: number | "player" | undefined,
+): ((lapTimeMs: number) => LapRef | undefined) | undefined {
   const { mode, lapRecordingStore } = useTelemetry();
   const { recordings } = useLapRecordingList();
   const recording = recordings.find(
-    (entry) => entry.sessionSlug === sessionSlug && entry.completeLapCount > 0,
+    (entry) =>
+      !!entry.sessionSlug &&
+      sessionSlugs.includes(entry.sessionSlug) &&
+      entry.completeLapCount > 0,
   );
+  const index = driverIndex === "player" ? recording?.playerIndex : driverIndex;
   const { data: manifest } = useQuery({
     ...lapRecordingManifestQueryOptions(
       mode,
@@ -133,9 +140,7 @@ export function useLapTraceLinks(
     enabled: !!recording,
   });
   return useMemo(() => {
-    const driver = manifest?.drivers.find(
-      (entry) => entry.index === driverIndex,
-    );
+    const driver = manifest?.drivers.find((entry) => entry.index === index);
     if (!manifest || !driver) return undefined;
     const lapsByTime = new Map<number, number>();
     for (const lap of driver.laps) {
@@ -147,7 +152,33 @@ export function useLapTraceLinks(
       const lapNumber = lapsByTime.get(Math.round(lapTimeMs));
       return lapNumber === undefined
         ? undefined
-        : `?${LAPS_QUERY_PARAM}=${lapRefKey({ recordingSlug: manifest.slug, driverIndex: driver.index, lapNumber })}#${LAP_TELEMETRY_ANCHOR}`;
+        : {
+            recordingSlug: manifest.slug,
+            driverIndex: driver.index,
+            lapNumber,
+          };
     };
-  }, [driverIndex, manifest]);
+  }, [index, manifest]);
+}
+
+/** The Lap Telemetry section with these laps selected, A first. */
+export function lapTelemetryHref(refs: readonly LapRef[]): string {
+  return `?${SESSION_TAB_QUERY_PARAM}=lap-telemetry&${LAPS_QUERY_PARAM}=${refs.map(lapRefKey).join(",")}#${LAP_TELEMETRY_ANCHOR}`;
+}
+
+/** Links that open a lap in the Lap Telemetry section, matched to lap-table
+ *  rows by lap time in ms (`useRecordedLapFinder`). */
+export function useLapTraceLinks(
+  sessionSlug: string,
+  driverIndex: number | undefined,
+): ((lapTimeMs: number) => string | undefined) | undefined {
+  const slugs = useMemo(() => [sessionSlug], [sessionSlug]);
+  const find = useRecordedLapFinder(slugs, driverIndex);
+  return useMemo(() => {
+    if (!find) return undefined;
+    return (lapTimeMs: number) => {
+      const ref = find(lapTimeMs);
+      return ref ? lapTelemetryHref([ref]) : undefined;
+    };
+  }, [find]);
 }

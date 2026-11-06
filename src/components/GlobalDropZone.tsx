@@ -99,8 +99,8 @@ export function GlobalDropZone() {
           <VStack align="center">
             {filesLoading ? (
               <>
-                <div className="h-12 w-12 animate-spin rounded-full border-4 border-zinc-600 border-t-red-500" />
-                <p className="text-lg font-medium text-zinc-200">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-tone-600 border-t-red-500" />
+                <p className="text-lg font-medium text-tone-200">
                   Loading telemetry...
                 </p>
               </>
@@ -113,10 +113,10 @@ export function GlobalDropZone() {
                   <Upload className="h-7 w-7 text-behind" />
                 </HStack>
                 <div className="text-center">
-                  <p className="text-lg font-medium text-zinc-200">
+                  <p className="text-lg font-medium text-tone-200">
                     Drop telemetry files
                   </p>
-                  <p className="mt-1 text-sm text-zinc-400">
+                  <p className="mt-1 text-sm text-tone-400">
                     .json session files or a .zip of your data folder
                     {recordsLaps && ", or a friend's .pngt laps to compare"}
                   </p>

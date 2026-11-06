@@ -118,6 +118,21 @@ export function getTrackCountryName(track: string): string | null {
   return code ? (englishRegionNames.of(code.toUpperCase()) ?? null) : null;
 }
 
+/**
+ * Every name a driver might type for a track: the display name, the locality,
+ * the exporter aliases and the country ("bahrain" finds Sakhir).
+ */
+export function getTrackSearchNames(track: string): string[] {
+  const { definition, baseName } = resolveTrack(track);
+  return [
+    definition?.displayName ?? baseName,
+    definition?.location,
+    ...(definition?.aliases ?? []),
+    getTrackCountryName(track),
+    track,
+  ].filter((name): name is string => Boolean(name));
+}
+
 /** Get ISO country code for a track name, or null for unknown tracks. */
 export function getTrackCountryCode(track: string): string | null {
   return resolveTrack(track).definition?.countryCode ?? null;

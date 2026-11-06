@@ -12,7 +12,7 @@ import {
   F1_PIT_LOSS_DEFAULT_SECONDS,
   getF1PitLossDefaultMs,
 } from "../constants/pitLoss";
-import { buildTrackGroups } from "../components/dashboard/helpers";
+import { buildTrackIndex } from "../analysis/trackIndex";
 import type { SessionSummary } from "../types/telemetry";
 import {
   getTrackCorners,
@@ -145,19 +145,18 @@ test("canonical ids retain the matching F1 pit-loss defaults", () => {
   }
 });
 
-test("group models retain the exporter label for unknown tracks", () => {
+test("track index retains the exporter label for unknown tracks", () => {
   const summary = {
     track: "Fantasy_Circuit",
     formula: "F1",
     gameYear: 26,
+    date: "2026-10-01T12:00:00.000Z",
+    sessionType: "Practice",
   } as SessionSummary;
-  const groups = buildTrackGroups([
-    { summary, isRace: false, bestLapMs: 0, validLapCount: 0 },
-  ]);
-  const [group] = Object.values(groups);
+  const [entry] = buildTrackIndex([summary], "f1-26").entries;
 
-  assert.equal(group?.track, "Fantasy_Circuit");
-  assert.equal(group?.key.startsWith("fantasy-circuit::"), true);
+  assert.equal(entry?.track, "Fantasy_Circuit");
+  assert.equal(entry?.trackId, "fantasy-circuit");
 });
 
 test("does not collapse different circuits in the same country", () => {

@@ -1,5 +1,9 @@
-import { ChevronDown, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { Select } from "@base-ui/react/select";
+import { cva } from "class-variance-authority";
+import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { menuItemClass, menuSurfaceClass, popMotionClass } from "./surfaces";
 import {
   FORM_CONTROL_CHROME_STYLES,
   FORM_CONTROL_CONTAINER_STYLES,
@@ -15,36 +19,63 @@ export interface PillSelectOption {
   value: PillSelectValue;
   label: string;
   disabled?: boolean;
+  /** Consecutive options with the same group render under one heading. */
+  group?: string;
+}
+
+const triggerVariants = cva(
+  cn(FORM_CONTROL_CHROME_STYLES, "flex items-center gap-2 text-left"),
+  {
+    variants: {
+      size: {
+        sm: cn(FORM_CONTROL_SIZE_STYLES.sm.control, "px-2.5"),
+        md: cn(FORM_CONTROL_SIZE_STYLES.md.control, "px-3"),
+      },
+    },
+    defaultVariants: { size: "md" },
+  },
+);
+
+const renderOption = (option: PillSelectOption) => (
+  <Select.Item
+    key={String(option.value)}
+    value={String(option.value)}
+    label={option.label}
+    disabled={option.disabled}
+    className={cn(menuItemClass, "text-xs text-tone-300")}
+  >
+    <Select.ItemText className="min-w-0 flex-1">{option.label}</Select.ItemText>
+    <Select.ItemIndicator>
+      <Check aria-hidden className="size-3.5" />
+    </Select.ItemIndicator>
+  </Select.Item>
+);
+
+function renderOptions(options: readonly PillSelectOption[]) {
+  const out: ReactNode[] = [];
+  for (let i = 0; i < options.length; ) {
+    const group = options[i].group;
+    if (!group) {
+      out.push(renderOption(options[i++]));
+      continue;
+    }
+    const members: PillSelectOption[] = [];
+    while (i < options.length && options[i].group === group)
+      members.push(options[i++]);
+    out.push(
+      <Select.Group key={`group-${group}-${i}`}>
+        <Select.GroupLabel className="px-2.5 pt-2 pb-1 text-2xs font-medium text-tone-500">
+          {group}
+        </Select.GroupLabel>
+        {members.map(renderOption)}
+      </Select.Group>,
+    );
+  }
+  return out;
 }
 
 export type PillSelectWidth = FormControlWidth;
 export type PillSelectSize = FormControlSize;
-
-const SIZE: Record<
-  PillSelectSize,
-  { indicator: string; dot: string; icon: string; select: string }
-> = {
-  sm: {
-    indicator: "left-2.5",
-    dot: "size-1.5",
-    icon: "right-2 size-3",
-    select: cn(
-      FORM_CONTROL_SIZE_STYLES.sm.control,
-      FORM_CONTROL_SIZE_STYLES.sm.yPadding,
-      "pl-6 pr-7",
-    ),
-  },
-  md: {
-    indicator: "left-3",
-    dot: "size-1.5",
-    icon: "right-2.5 size-3",
-    select: cn(
-      FORM_CONTROL_SIZE_STYLES.md.control,
-      FORM_CONTROL_SIZE_STYLES.md.yPadding,
-      "pl-6.5 pr-8",
-    ),
-  },
-};
 
 export function PillSelect({
   value,
@@ -68,61 +99,67 @@ export function PillSelect({
   size?: PillSelectSize;
   className?: string;
 }) {
-  const styles = SIZE[size];
   return (
-    <span
-      className={cn(
-        FORM_CONTROL_CONTAINER_STYLES,
-        "items-center",
-        "text-zinc-200",
-        FORM_CONTROL_WIDTH_STYLES[width],
-        className,
-      )}
+    <Select.Root
+      value={String(value)}
+      onValueChange={(next) => next !== null && onChange(next)}
+      items={options.map((option) => ({
+        value: String(option.value),
+        label: option.label,
+      }))}
     >
-      {LeadingIcon ? (
-        <LeadingIcon
-          aria-hidden="true"
-          className={cn(
-            "pointer-events-none absolute size-3 text-zinc-500",
-            styles.indicator,
-          )}
-        />
-      ) : (
-        <span
-          className={cn(
-            "pointer-events-none absolute rounded-full bg-zinc-500/60",
-            styles.indicator,
-            styles.dot,
-          )}
-          style={{ backgroundColor: dotColor }}
-        />
-      )}
-      <select
-        value={String(value)}
-        onChange={(event) => onChange(event.target.value)}
-        aria-label={ariaLabel}
+      <span
         className={cn(
-          FORM_CONTROL_CHROME_STYLES,
-          "appearance-none",
-          styles.select,
+          FORM_CONTROL_CONTAINER_STYLES,
+          FORM_CONTROL_WIDTH_STYLES[width],
+          className,
         )}
       >
-        {options.map((option) => (
-          <option
-            key={String(option.value)}
-            value={String(option.value)}
-            disabled={option.disabled}
+        <Select.Trigger
+          aria-label={ariaLabel}
+          className={triggerVariants({ size })}
+        >
+          {LeadingIcon ? (
+            <LeadingIcon
+              aria-hidden
+              className="size-3 shrink-0 text-tone-500"
+            />
+          ) : (
+            <span
+              aria-hidden
+              className="size-1.5 shrink-0 rounded-full bg-tone-500/60"
+              style={{ backgroundColor: dotColor }}
+            />
+          )}
+          <Select.Value className="min-w-0 flex-1 truncate" />
+          <Select.Icon>
+            <ChevronDown
+              aria-hidden
+              className="size-3 shrink-0 text-tone-500"
+            />
+          </Select.Icon>
+        </Select.Trigger>
+      </span>
+      <Select.Portal>
+        <Select.Positioner
+          sideOffset={6}
+          align="end"
+          alignItemWithTrigger={false}
+          className="z-50 outline-none"
+        >
+          <Select.Popup
+            className={cn(
+              menuSurfaceClass,
+              popMotionClass,
+              "min-w-(--anchor-width) max-w-[min(24rem,calc(100vw-2rem))] outline-none",
+            )}
           >
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        className={cn(
-          "pointer-events-none absolute text-zinc-500",
-          styles.icon,
-        )}
-      />
-    </span>
+            <Select.List className="max-h-[min(24rem,calc(var(--available-height)-0.75rem))] overflow-y-auto">
+              {renderOptions(options)}
+            </Select.List>
+          </Select.Popup>
+        </Select.Positioner>
+      </Select.Portal>
+    </Select.Root>
   );
 }

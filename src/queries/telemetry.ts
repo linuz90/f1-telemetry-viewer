@@ -1,6 +1,7 @@
 import { queryOptions, type QueryClient } from "@tanstack/react-query";
 import type { SessionSummary, TelemetrySession } from "../types/telemetry";
 import { normalizeSession } from "../utils/normalizeSession";
+import { deduplicateSessions } from "../utils/deduplicateSessions";
 
 export type Mode = "detecting" | "api" | "demo" | "upload";
 export type DataSourceMode = Exclude<Mode, "detecting">;
@@ -48,7 +49,26 @@ export function getSessionPollIntervalMs(): number {
 export async function fetchSessionList(url: string): Promise<SessionSummary[]> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to load session list: ${url}`);
-  return res.json() as Promise<SessionSummary[]>;
+  return finishHostSessionList((await res.json()) as SessionSummary[]);
+}
+
+/**
+ * Pits n' Giggles builds its session list in Python, a port of an older
+ * summary builder that neither flags auto-saves nor deduplicates, so each
+ * periodic `Just_in_case` snapshot would list as a session of its own. Our
+ * index always sets `isAutoSave` and dedupes; a list without it gets the
+ * same treatment here (slugs keep the filename's words, hyphenated).
+ */
+function finishHostSessionList(sessions: SessionSummary[]): SessionSummary[] {
+  if (sessions.every((s) => s.isAutoSave !== undefined)) return sessions;
+  return deduplicateSessions(
+    sessions.map((s) => ({
+      ...s,
+      fileSize: s.fileSize ?? 0,
+      isAutoSave:
+        s.isAutoSave ?? /(^|-)just-in-case(-|$)/.test(s.slug.toLowerCase()),
+    })),
+  );
 }
 
 // One-shot startup probe deciding where session data comes from: the local dev

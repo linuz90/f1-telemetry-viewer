@@ -1,26 +1,35 @@
+import { cva } from "class-variance-authority";
 import type { ReactNode } from "react";
 import { cn } from "../../utils/cn";
 
 export type InsightValueSize = "sm" | "md" | "lg" | "xl";
 export type InsightDetailSize = "xs" | "sm" | "md";
 
-const VALUE_SIZE: Record<InsightValueSize, string> = {
-  sm: "text-sm leading-snug font-semibold",
-  md: "text-lg font-medium",
-  lg: "text-xl font-medium",
-  xl: "text-2xl font-medium",
-};
+const valueVariants = cva("break-words tracking-tight", {
+  variants: {
+    size: {
+      sm: "text-sm leading-snug font-semibold",
+      md: "text-lg font-medium",
+      lg: "text-xl font-medium",
+      xl: "text-2xl font-medium",
+    },
+  },
+});
 
-const DETAIL_SIZE: Record<InsightDetailSize, string> = {
-  xs: "text-2xs leading-snug",
-  sm: "text-xs leading-relaxed",
-  md: "text-sm leading-relaxed",
-};
+const detailVariants = cva("break-words", {
+  variants: {
+    size: {
+      xs: "text-2xs leading-snug",
+      sm: "text-xs leading-relaxed",
+      md: "text-sm leading-relaxed",
+    },
+  },
+});
 
 export function InsightValue({
   children,
   size = "lg",
-  tone = "text-zinc-100",
+  tone = "text-tone-100",
   className,
 }: {
   children: ReactNode;
@@ -29,14 +38,7 @@ export function InsightValue({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "break-words font-mono tabular-nums",
-        VALUE_SIZE[size],
-        tone,
-        className,
-      )}
-    >
+    <div className={cn(valueVariants({ size }), tone, className)}>
       {children}
     </div>
   );
@@ -45,7 +47,7 @@ export function InsightValue({
 export function InsightDetail({
   children,
   size = "md",
-  tone = "text-zinc-400",
+  tone = "text-tone-400",
   className,
 }: {
   children: ReactNode;
@@ -54,14 +56,7 @@ export function InsightDetail({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "break-words font-mono tabular-nums",
-        DETAIL_SIZE[size],
-        tone,
-        className,
-      )}
-    >
+    <div className={cn(detailVariants({ size }), tone, className)}>
       {children}
     </div>
   );

@@ -1,82 +1,78 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
-import { cn } from "../../utils/cn";
-
-const TRANSITION_MS = 180;
+import {
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogPopup,
+  DialogTitle,
+} from "./Dialog";
 
 interface ModalProps {
   // Omit to make the modal non-dismissable (no Escape, no backdrop click, no X).
   onClose?: () => void;
+  /** Standard header; also names the dialog. Omit for a custom layout. */
+  title?: ReactNode;
+  description?: ReactNode;
+  /** Quiet bottom bar for links and credits, like the command palette's. */
+  footer?: ReactNode;
+  /** The body. With a title, pad it `px-5 pb-5` to line up with the header. */
   children: ReactNode;
   // Sizing/extra classes applied to the inner panel.
   className?: string;
-  /** Id of the element that names the dialog, usually its heading. */
-  labelledBy?: string;
 }
 
 export function Modal({
   onClose,
+  title,
+  description,
+  footer,
   children,
   className,
-  labelledBy,
 }: ModalProps) {
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    // Trigger enter transition on next frame so the initial closed state paints first.
-    const raf = requestAnimationFrame(() => setOpen(true));
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
-  const handleClose = useCallback(() => {
-    if (!onClose) return;
-    setOpen(false);
-    window.setTimeout(onClose, TRANSITION_MS);
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!onClose) return;
-    // Capture phase plus preventDefault claims the key before page-level Esc
-    // handlers (Lap Telemetry's zoom reset) see it.
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      handleClose();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose, handleClose]);
+  // Callers mount an already-open modal; Base UI needs an open transition to animate it.
+  useEffect(() => setOpen(true), []);
 
   return (
-    <div
-      className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-[180ms] ease-out",
-        open ? "opacity-100" : "opacity-0",
-      )}
-      onClick={handleClose}
+    <Dialog
+      open={open}
+      disablePointerDismissal={!onClose}
+      onOpenChange={(nextOpen, details) => {
+        if (!onClose) details.cancel();
+        else setOpen(nextOpen);
+      }}
+      // Callers unmount on close, so let Base UI finish the exit first.
+      onOpenChangeComplete={(nextOpen) => !nextOpen && onClose?.()}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={labelledBy}
-        onClick={(e) => e.stopPropagation()}
-        className={cn(
-          "relative flex w-full flex-col rounded-3xl bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950 shadow-2xl ring-1 ring-white/[0.06] transition-all duration-[180ms] ease-out",
-          open ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]",
-          className,
-        )}
-      >
+      <DialogPopup className={className}>
         {onClose && (
-          <button
-            onClick={handleClose}
-            className="absolute top-4 right-4 z-10 rounded-lg p-1 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+          <DialogClose
+            className="absolute top-3.5 right-3.5 z-10 rounded-md p-1 text-tone-500 transition-colors hover:bg-tone-800 hover:text-tone-200"
             aria-label="Close"
           >
-            <X className="h-4 w-4" />
-          </button>
+            <X className="size-4" />
+          </DialogClose>
+        )}
+        {title && (
+          <div className="shrink-0 px-5 pt-4 pb-3 pr-12">
+            <DialogTitle className="font-semibold text-tone-50">
+              {title}
+            </DialogTitle>
+            {description && (
+              <DialogDescription className="mt-0.5 text-xs text-tone-500">
+                {description}
+              </DialogDescription>
+            )}
+          </div>
         )}
         {children}
-      </div>
-    </div>
+        {footer && (
+          <div className="shrink-0 border-t border-tone-800 px-5 py-2.5 text-xs text-tone-500">
+            {footer}
+          </div>
+        )}
+      </DialogPopup>
+    </Dialog>
   );
 }

@@ -12,7 +12,7 @@ export const FORM_CONTROL_WIDTH_STYLES: Record<FormControlWidth, string> = {
 };
 
 export const FORM_CONTROL_CHROME_STYLES =
-  "w-full min-w-0 border border-zinc-800/80 bg-zinc-900/70 font-medium text-zinc-200 outline-none transition-colors hover:border-zinc-700 focus:ring-1 focus:ring-zinc-500/40";
+  "w-full min-w-0 border border-tone-800/80 bg-tone-900/70 font-medium text-tone-200 outline-none transition-colors hover:border-tone-700 focus:ring-1 focus:ring-tone-500/40";
 
 export const FORM_CONTROL_SIZE_STYLES: Record<
   FormControlSize,

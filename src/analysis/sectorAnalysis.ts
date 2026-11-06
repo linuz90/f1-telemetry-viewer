@@ -1,17 +1,11 @@
 import type {
-  DriverData,
   LapHistoryEntry,
   PerLapInfo,
-  TelemetrySession,
   TyreStintBasic,
 } from "../types/telemetry";
-import { bestSectorTimeMs, sectorTimeMs } from "../utils/format";
+import { msToLapTime, sectorTimeMs } from "../utils/format";
 import { ersDeployMjForLap, ersHarvestMjForLap } from "../utils/stats/energy";
-import {
-  getValidLaps,
-  hasCompleteLapTiming,
-  isCompleteValidLap,
-} from "../utils/stats/laps";
+import { hasCompleteLapTiming, isCompleteValidLap } from "../utils/stats/laps";
 
 /**
  * Sector-level analysis for qualifying/session detail views.
@@ -46,77 +40,6 @@ export interface SectorBreakdownModel {
   bestBySector: Record<SectorKey, number>;
   worstBySector: Record<SectorKey, number>;
   validLapCount: number;
-}
-
-export interface SectorVsBestEntry {
-  label: "S1" | "S2" | "S3";
-  focusedBest: number | null;
-  focusedBestLapNumber: number | null;
-  sessionBest: number;
-  sessionBestLapNumber: number | null;
-  sessionBestDriver: string;
-  sessionBestTeam: string;
-  isFocusedBest: boolean;
-  deltaMs: number | null;
-}
-
-export interface SectorVsBestModel {
-  focusedBestLap: number | null;
-  focusedBestLapNumber: number | null;
-  sessionBestLap: number;
-  sessionBestLapNumber: number | null;
-  sessionBestLapDriver: string;
-  sessionBestLapTeam: string;
-  isFocusedBestLap: boolean;
-  lapDeltaMs: number | null;
-  sectors: SectorVsBestEntry[];
-}
-
-const SECTOR_DEFS = [
-  { sector: 1, key: "s1", label: "S1" },
-  { sector: 2, key: "s2", label: "S2" },
-  { sector: 3, key: "s3", label: "S3" },
-] as const;
-
-interface ValidLapSample {
-  driver: DriverData;
-  lap: LapHistoryEntry;
-  lapNumber: number;
-}
-
-interface BestLapSample {
-  value: number;
-  lapNumber: number;
-  driverName: string;
-  team: string;
-}
-
-function validLapSamples(driver: DriverData): ValidLapSample[] {
-  return driver["session-history"]["lap-history-data"]
-    .map((lap, index) => ({ driver, lap, lapNumber: index + 1 }))
-    .filter((sample) => isCompleteValidLap(sample.lap));
-}
-
-function findBestSample(
-  samples: readonly ValidLapSample[],
-  valueFor: (lap: LapHistoryEntry) => number,
-): BestLapSample | null {
-  let best: BestLapSample | null = null;
-
-  for (const sample of samples) {
-    const value = valueFor(sample.lap);
-    if (value <= 0) continue;
-    if (!best || value < best.value) {
-      best = {
-        value,
-        lapNumber: sample.lapNumber,
-        driverName: sample.driver["driver-name"],
-        team: sample.driver.team,
-      };
-    }
-  }
-
-  return best;
 }
 
 function buildLapCompoundMap(stints: readonly TyreStintBasic[] | undefined) {
@@ -176,7 +99,7 @@ export function buildSectorBreakdownModel({
         s2: sectorTimeMs(lap, 2) / 1000,
         s3: sectorTimeMs(lap, 3) / 1000,
         total: lap["lap-time-in-ms"] / 1000,
-        totalStr: lap["lap-time-str"],
+        totalStr: msToLapTime(lap["lap-time-in-ms"]),
         valid: isCompleteValidLap(lap),
         compound: compoundByLap.get(lapNumber),
         deployMj: ers?.deployMj,
@@ -220,88 +143,5 @@ export function buildSectorBreakdownModel({
       s3: worstFor("s3"),
     },
     validLapCount: validLaps.length,
-  };
-}
-
-export function buildSectorVsBestModel({
-  session,
-  focusedDriverIndex,
-}: {
-  session: TelemetrySession;
-  focusedDriverIndex: number;
-}): SectorVsBestModel | null {
-  const drivers = session["classification-data"];
-  const focused = drivers.find((driver) => driver.index === focusedDriverIndex);
-  if (!focused) return null;
-
-  const focusedValid = getValidLaps(
-    focused["session-history"]["lap-history-data"],
-  );
-  const focusedSamples = validLapSamples(focused);
-  const focusedBestLapSample = findBestSample(
-    focusedSamples,
-    (lap) => lap["lap-time-in-ms"],
-  );
-  const sessionSamples = drivers.flatMap(validLapSamples);
-
-  // Scan all valid laps instead of trusting classification order. Some debug
-  // exports have partial final classification but complete lap histories.
-  const sessionBestLapSample = findBestSample(
-    sessionSamples,
-    (lap) => lap["lap-time-in-ms"],
-  );
-  const focusedBestLap = focusedBestLapSample?.value ?? null;
-  const sessionBestLap = sessionBestLapSample?.value ?? 0;
-
-  const isFocusedBestLap =
-    focusedBestLap !== null &&
-    sessionBestLap > 0 &&
-    Math.abs(focusedBestLap - sessionBestLap) < 1;
-  const lapDeltaMs =
-    focusedBestLap !== null && sessionBestLap > 0
-      ? focusedBestLap - sessionBestLap
-      : null;
-
-  return {
-    focusedBestLap,
-    focusedBestLapNumber: focusedBestLapSample?.lapNumber ?? null,
-    sessionBestLap,
-    sessionBestLapNumber: sessionBestLapSample?.lapNumber ?? null,
-    sessionBestLapDriver: sessionBestLapSample?.driverName ?? "",
-    sessionBestLapTeam: sessionBestLapSample?.team ?? "",
-    isFocusedBestLap,
-    lapDeltaMs,
-    sectors: SECTOR_DEFS.map(({ sector, label }) => {
-      const focusedBestMs = bestSectorTimeMs(focusedValid, sector);
-      const focusedBest = focusedBestMs > 0 ? focusedBestMs : null;
-      const focusedBestSample = findBestSample(focusedSamples, (lap) =>
-        sectorTimeMs(lap, sector),
-      );
-      const sessionBestSample = findBestSample(sessionSamples, (lap) =>
-        sectorTimeMs(lap, sector),
-      );
-      const sessionBest = sessionBestSample?.value ?? 0;
-
-      const isFocusedBest =
-        focusedBest !== null &&
-        sessionBest > 0 &&
-        Math.abs(focusedBest - sessionBest) < 1;
-      const deltaMs =
-        focusedBest !== null && sessionBest > 0
-          ? focusedBest - sessionBest
-          : null;
-
-      return {
-        label,
-        focusedBest,
-        focusedBestLapNumber: focusedBestSample?.lapNumber ?? null,
-        sessionBest,
-        sessionBestLapNumber: sessionBestSample?.lapNumber ?? null,
-        sessionBestDriver: sessionBestSample?.driverName ?? "",
-        sessionBestTeam: sessionBestSample?.team ?? "",
-        isFocusedBest,
-        deltaMs,
-      };
-    }),
   };
 }

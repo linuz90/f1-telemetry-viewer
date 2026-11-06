@@ -82,7 +82,7 @@ function stretchPoints(
  * A fixed width keeps strokes and labels the same size on every circuit; the
  * height follows the layout so wide circuits leave no empty bands.
  */
-function mapViewBox(outline: readonly OutlinePoint[]): string {
+function mapBox(outline: readonly OutlinePoint[]) {
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
@@ -95,7 +95,10 @@ function mapViewBox(outline: readonly OutlinePoint[]): string {
   }
   const left = (minX + maxX) / 2 - MAP_WIDTH / 2;
   const height = maxY - minY + 2 * MAP_MARGIN;
-  return `${left.toFixed(1)} ${(minY - MAP_MARGIN).toFixed(1)} ${MAP_WIDTH} ${height.toFixed(1)}`;
+  return {
+    left,
+    viewBox: `${left.toFixed(1)} ${(minY - MAP_MARGIN).toFixed(1)} ${MAP_WIDTH} ${height.toFixed(1)}`,
+  };
 }
 
 function Cursor({
@@ -118,10 +121,85 @@ function Cursor({
       cy={point.y}
       r={9}
       fill={color}
-      stroke="#09090b"
+      stroke="var(--color-tone-950)"
       strokeWidth={3}
     />
   );
+}
+
+/** Labelled tips besides the active one: the ones worth most. */
+const MAP_LABELS = 3;
+
+/**
+ * Each tip's marker on the map, in drawing order. Only the active tip and the
+ * `MAP_LABELS` worth most carry their turn label, and a label that would
+ * overlap one already placed stays a dot: on a 27-turn street circuit every
+ * label at once is a pile. Pills are sized for the ~270 px the map renders
+ * at (about 9 px text) and slide inward rather than past the view's edge.
+ */
+function placeMarkers(
+  tips: readonly LapTip[],
+  activeTipId: string | null,
+  outline: readonly OutlinePoint[],
+  trackLengthM: number,
+  box: { left: number },
+) {
+  const byPriority = [...tips].sort(
+    (x, y) =>
+      Number(y.id === activeTipId) - Number(x.id === activeTipId) ||
+      Math.abs(y.timeS) - Math.abs(x.timeS),
+  );
+  const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  let labels = 0;
+  const markers = byPriority.map((tip) => {
+    const active = tip.id === activeTipId;
+    const mid = outlinePointAt(outline, (tip.from + tip.to) / 2 / trackLengthM);
+    const radius = active ? 22 : 20;
+    const fontSize = radius * 1.05;
+    const pillHalfWidth = Math.max(
+      radius,
+      (tip.marker.length * fontSize * 0.62) / 2 + 9,
+    );
+    const edge = pillHalfWidth + 3;
+    const x = Math.min(
+      Math.max(mid.x, box.left + edge),
+      box.left + MAP_WIDTH - edge,
+    );
+    const pill = {
+      x0: x - pillHalfWidth,
+      x1: x + pillHalfWidth,
+      y0: mid.y - radius,
+      y1: mid.y + radius,
+    };
+    const labelled =
+      !!tip.marker &&
+      (active ||
+        (labels < MAP_LABELS &&
+          !placed.some(
+            (other) =>
+              pill.x0 < other.x1 &&
+              pill.x1 > other.x0 &&
+              pill.y0 < other.y1 &&
+              pill.y1 > other.y0,
+          )));
+    if (labelled) {
+      placed.push(pill);
+      if (!active) labels += 1;
+    }
+    const dot = active ? 9 : 7;
+    return {
+      tip,
+      active,
+      labelled,
+      x: labelled ? x : mid.x,
+      y: mid.y,
+      halfWidth: labelled ? pillHalfWidth : dot,
+      halfHeight: labelled ? radius : dot,
+      fontSize,
+    };
+  });
+  // Drawn lowest priority first, so the active marker ends up on top.
+  return markers.reverse();
 }
 
 /**
@@ -183,10 +261,12 @@ export function LapTrackMap({
   const norm = Math.hypot(tangent.x, tangent.y) || 1;
   const normal = { x: (-tangent.y / norm) * 20, y: (tangent.x / norm) * 20 };
 
+  const box = mapBox(outline);
+  const markers = placeMarkers(tips, activeTipId, outline, trackLengthM, box);
   return (
     <figure className="relative">
       <svg
-        viewBox={mapViewBox(outline)}
+        viewBox={box.viewBox}
         className="w-full"
         role="img"
         aria-label="Track map with tip locations"
@@ -194,7 +274,7 @@ export function LapTrackMap({
         <polygon
           points={polylinePoints(outline)}
           fill="none"
-          stroke="#3f3f46"
+          stroke="var(--color-tone-700)"
           strokeWidth={11}
           strokeLinejoin="round"
         />
@@ -203,7 +283,7 @@ export function LapTrackMap({
           y1={start.y - normal.y}
           x2={start.x + normal.x}
           y2={start.y + normal.y}
-          stroke="#e4e4e7"
+          stroke="var(--color-tone-200)"
           strokeWidth={6}
           strokeLinecap="round"
         />
@@ -251,46 +331,57 @@ export function LapTrackMap({
               </g>
             );
           })}
-        {tips.map((tip, index) => {
-          const active = tip.id === activeTipId;
-          const mid = outlinePointAt(
-            outline,
-            (tip.from + tip.to) / 2 / trackLengthM,
-          );
-          const color =
-            tipTone(tip) === "behind" ? CHART_THEME.behind : CHART_THEME.ahead;
-          // Labels are sized for the ~270 px the map renders at: about 9 px text.
-          const radius = active ? 22 : 20;
-          return (
-            <g
-              key={`label-${tip.id}`}
-              className="cursor-pointer"
-              opacity={activeTipId && !active ? 0.7 : 1}
-              onClick={() => onSelectTip(tip)}
-              onPointerEnter={() => onHoverTip(tip)}
-              onPointerLeave={() => onHoverTip(null)}
-            >
-              <circle
-                cx={mid.x}
-                cy={mid.y}
-                r={radius}
-                fill={active ? color : "#09090b"}
-                stroke={color}
-                strokeWidth={3}
-              />
-              <text
-                x={mid.x}
-                y={mid.y + radius * 0.36}
-                textAnchor="middle"
-                className="font-mono font-bold"
-                fontSize={radius * 1.05}
-                fill={active ? "#09090b" : color}
+        {markers.map(
+          ({
+            tip,
+            active,
+            labelled,
+            x,
+            y,
+            halfWidth,
+            halfHeight,
+            fontSize,
+          }) => {
+            const color =
+              tipTone(tip) === "behind"
+                ? CHART_THEME.behind
+                : CHART_THEME.ahead;
+            return (
+              <g
+                key={`label-${tip.id}`}
+                className="cursor-pointer"
+                opacity={activeTipId && !active ? 0.7 : 1}
+                onClick={() => onSelectTip(tip)}
+                onPointerEnter={() => onHoverTip(tip)}
+                onPointerLeave={() => onHoverTip(null)}
               >
-                {index + 1}
-              </text>
-            </g>
-          );
-        })}
+                <title>{tip.title}</title>
+                <rect
+                  x={x - halfWidth}
+                  y={y - halfHeight}
+                  width={halfWidth * 2}
+                  height={halfHeight * 2}
+                  rx={halfHeight}
+                  fill={active ? color : "var(--color-tone-950)"}
+                  stroke={color}
+                  strokeWidth={3}
+                />
+                {labelled && (
+                  <text
+                    x={x}
+                    y={y + fontSize * 0.34}
+                    textAnchor="middle"
+                    className="font-mono font-bold"
+                    fontSize={fontSize}
+                    fill={active ? "var(--color-tone-950)" : color}
+                  >
+                    {tip.marker}
+                  </text>
+                )}
+              </g>
+            );
+          },
+        )}
         <Cursor
           store={hoverStore}
           outline={outline}
@@ -299,7 +390,7 @@ export function LapTrackMap({
         />
       </svg>
       {!surveyed && (
-        <figcaption className="mt-1 text-center text-2xs text-zinc-600">
+        <figcaption className="mt-1 text-center text-2xs text-tone-600">
           Positions follow the circuit drawing, not GPS
         </figcaption>
       )}

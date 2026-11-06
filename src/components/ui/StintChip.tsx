@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { getCompoundColor, hexToRgbTriplet } from "../../utils/colors";
+import { getCompoundColor } from "../../utils/colors";
 
 /**
  * Shared visual treatment for tyre-compound stint chips — the colored blocks
@@ -14,13 +14,12 @@ import { getCompoundColor, hexToRgbTriplet } from "../../utils/colors";
  */
 
 /** Compounds whose base color is bright enough that dark text reads better
- *  than white. Medium (#eab308) is yellow, Hard (#e5e7eb) is near-white, and
+ *  than white. Medium is yellow, Hard is near-white (grey in light mode), and
  *  the C1–C3 fallback aliases match those visually. */
 const LIGHT_BG_COMPOUNDS = new Set(["Medium", "Hard", "C1", "C2", "C3"]);
 
 export function stintChipStyle(compound: string): CSSProperties {
   const color = getCompoundColor(compound);
-  const rgb = hexToRgbTriplet(color);
   return {
     backgroundColor: color,
     // Subtle vertical gradient kept from the broadcast look, but lighter than
@@ -30,7 +29,7 @@ export function stintChipStyle(compound: string): CSSProperties {
     // Soft compound-tinted outer glow instead of the old inset bevel — gives
     // the chip a hint of lift against the dark surface. Callers MUST avoid
     // `overflow-hidden` on the wrapping ribbon, otherwise this gets clipped.
-    boxShadow: `0 0 30px 0 rgba(${rgb}, 0.12)`,
+    boxShadow: `0 0 30px 0 color-mix(in oklab, ${color} 12%, transparent)`,
     color: LIGHT_BG_COMPOUNDS.has(compound) ? "#18181b" : "#fff",
   };
 }

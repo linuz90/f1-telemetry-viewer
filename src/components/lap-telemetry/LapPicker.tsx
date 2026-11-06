@@ -1,3 +1,5 @@
+import { listItemClass } from "../ui/surfaces";
+import { lapColorBarClass } from "./lapColorBar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   bestLapCandidates,
@@ -43,6 +45,7 @@ const PRESET_COLUMNS = [
   "sm:grid-cols-1",
   "sm:grid-cols-2",
   "sm:grid-cols-3",
+  "sm:grid-cols-2",
 ];
 
 interface PickerRow {
@@ -73,13 +76,14 @@ function RowButton({
     <button
       type="button"
       data-slot={slot}
+      aria-pressed={!!slot}
       onClick={() => onPick(row.candidate)}
       className={cn(
-        "grid w-full grid-cols-[1.5rem_5rem_1fr_auto] items-center gap-x-3 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-zinc-800/60",
-        slot && "bg-zinc-800/50",
+        listItemClass,
+        "grid grid-cols-[1.5rem_5rem_1fr_auto] gap-x-3",
       )}
     >
-      <span className="font-mono text-2xs font-semibold text-zinc-400">
+      <span className="font-mono text-2xs font-semibold text-tone-400">
         {slot ?? ""}
       </span>
       <span
@@ -89,7 +93,7 @@ function RowButton({
             ? "text-best font-semibold"
             : highlight === "personal"
               ? "text-ahead font-semibold"
-              : "text-zinc-200",
+              : "text-tone-200",
         )}
       >
         {msToLapTime(row.lapTimeMs)}
@@ -97,17 +101,17 @@ function RowButton({
       <span className="flex min-w-0 items-center gap-2">
         {showTeam && (
           <span
-            className="h-3.5 w-1 shrink-0 rounded-full"
+            className={lapColorBarClass}
             style={{ backgroundColor: recordingTeamColor(row.team) }}
           />
         )}
-        <span className="truncate text-sm text-zinc-200">{row.driver}</span>
+        <span className="truncate text-sm text-tone-200">{row.driver}</span>
         {row.candidate.isFriend && (
           <Badge tone="sky" size="xs" shape="square" className="shrink-0">
             Friend
           </Badge>
         )}
-        <span className="hidden truncate text-xs text-zinc-500 sm:inline">
+        <span className="hidden truncate text-xs text-tone-500 sm:inline">
           {row.context}
         </span>
       </span>
@@ -300,16 +304,13 @@ export function LapPicker({
   }, [slotName]);
 
   return (
-    <Modal onClose={onClose} className="max-h-[85vh] max-w-2xl overflow-hidden">
-      <div ref={bodyRef} className="flex min-h-0 flex-col gap-3 p-5">
-        <div className="pr-8">
-          <h3 className="text-lg font-semibold text-zinc-100">
-            Choose lap {slotName}
-          </h3>
-          <p className="text-xs text-zinc-500">
-            Only laps recorded start to finish are listed.
-          </p>
-        </div>
+    <Modal
+      onClose={onClose}
+      title={`Choose lap ${slotName}`}
+      description="Only laps recorded start to finish are listed."
+      className="max-h-[85vh] max-w-2xl overflow-hidden"
+    >
+      <div ref={bodyRef} className="flex min-h-0 flex-col gap-3 px-5 pb-5">
         {/* A row of nothing but reasons says nothing the list does not. */}
         {presets.some((preset) => preset.candidate) && (
           <div className={cn("grid gap-2", PRESET_COLUMNS[presets.length])}>
@@ -326,14 +327,14 @@ export function LapPicker({
                   className={cn(
                     "flex min-w-0 flex-col gap-1 rounded-xl px-3 py-2 text-left ring-1 ring-inset transition-colors disabled:cursor-default",
                     slot === slotName
-                      ? "bg-zinc-800 ring-white/[0.1]"
-                      : "bg-zinc-800/40 ring-white/[0.04] enabled:hover:bg-zinc-800/80",
+                      ? "bg-tone-800 ring-tone-700"
+                      : "ring-tone-800 enabled:hover:bg-tone-800/60",
                   )}
                 >
                   <span className="flex items-center justify-between gap-2">
                     <Eyebrow>{preset.label}</Eyebrow>
                     {slot && (
-                      <span className="font-mono text-2xs font-semibold text-zinc-400">
+                      <span className="font-mono text-2xs font-semibold text-tone-400">
                         {slot}
                       </span>
                     )}
@@ -341,19 +342,20 @@ export function LapPicker({
                   {lap ? (
                     <span className="flex min-w-0 items-center gap-2">
                       <span
-                        className="h-3.5 w-1 shrink-0 rounded-full"
+                        className={lapColorBarClass}
                         style={{
                           backgroundColor: recordingTeamColor(lap.team),
                         }}
                       />
-                      <span className="truncate text-sm text-zinc-200">
+                      <span className="truncate text-sm text-tone-200">
                         {driverLabel(lap.driverName, lap.isPlayer)}
                       </span>
                       <span
                         className={cn(
                           "ml-auto font-mono text-sm tabular-nums",
-                          preset.id === "my-best"
-                            ? "text-zinc-100"
+                          preset.id === "my-best" ||
+                            preset.id === "my-other-run"
+                            ? "text-tone-100"
                             : "text-best",
                         )}
                       >
@@ -361,7 +363,7 @@ export function LapPicker({
                       </span>
                     </span>
                   ) : (
-                    <span className="block text-sm text-zinc-500 first-letter:uppercase">
+                    <span className="block text-sm text-tone-500 first-letter:uppercase">
                       {preset.reason}
                     </span>
                   )}
@@ -421,21 +423,17 @@ export function LapPicker({
                   key={driver.index}
                   className={cn(
                     driver.index === sessionManifest.playerIndex &&
-                      "mb-1 border-b border-white/[0.06] pb-1",
+                      "mb-1 border-b border-tone-0/[0.06] pb-1",
                   )}
                 >
                   <button
                     type="button"
+                    aria-pressed={driver.index === sessionDriver}
                     onClick={() => setSessionDriver(driver.index)}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
-                      driver.index === sessionDriver
-                        ? "bg-zinc-800 text-zinc-100"
-                        : "text-zinc-400 hover:bg-zinc-800/50",
-                    )}
+                    className={cn(listItemClass, "text-sm text-tone-400")}
                   >
                     <span
-                      className="h-3.5 w-1 shrink-0 rounded-full"
+                      className={lapColorBarClass}
                       style={{
                         backgroundColor: recordingTeamColor(driver.team),
                       }}
@@ -444,7 +442,7 @@ export function LapPicker({
                       className={cn(
                         "flex-1 truncate",
                         driver.index === sessionManifest.playerIndex &&
-                          "font-medium text-zinc-100",
+                          "font-medium text-tone-100",
                       )}
                     >
                       {driverLabel(
@@ -457,7 +455,7 @@ export function LapPicker({
                         "font-mono text-xs tabular-nums",
                         best && best.lapTimeMs === sessionFastest
                           ? "text-best"
-                          : "text-zinc-500",
+                          : "text-tone-500",
                       )}
                     >
                       {best ? msToLapTime(best.lapTimeMs) : "–"}
@@ -468,7 +466,7 @@ export function LapPicker({
             </ul>
             <div className="flex min-h-0 flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2 pl-2.5">
-                <span className="truncate text-xs text-zinc-500">
+                <span className="truncate text-xs text-tone-500">
                   {activeDriver &&
                     `${driverLabel(
                       activeDriver.driver.name,
@@ -521,7 +519,7 @@ export function LapPicker({
         ) : (
           <div className="max-h-[55vh] space-y-0.5 overflow-y-auto">
             {trackRows.length === 0 && (
-              <p className="px-2.5 py-4 text-sm text-zinc-500">
+              <p className="px-2.5 py-4 text-sm text-tone-500">
                 {who === "mine"
                   ? "No complete lap of yours here yet."
                   : who === "friends"

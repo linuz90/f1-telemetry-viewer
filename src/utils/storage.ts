@@ -1,12 +1,5 @@
 export type BrowserStorageKind = "local" | "session";
 
-interface StoredNumberOptions {
-  kind?: BrowserStorageKind;
-  fallback: number;
-  min?: number;
-  max?: number;
-}
-
 function getBrowserStorage(kind: BrowserStorageKind): Storage | null {
   if (typeof window === "undefined") return null;
 
@@ -55,18 +48,4 @@ export function writeStoredBoolean(
   kind: BrowserStorageKind = "local",
 ): void {
   writeStoredString(key, String(value), kind);
-}
-
-export function readStoredNumber(
-  key: string,
-  { kind = "local", fallback, min, max }: StoredNumberOptions,
-): number {
-  const value = readStoredString(key, kind);
-  if (value == null) return fallback;
-
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  if (min != null && parsed < min) return fallback;
-  if (max != null && parsed > max) return fallback;
-  return parsed;
 }

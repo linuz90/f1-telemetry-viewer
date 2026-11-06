@@ -1,7 +1,9 @@
-import { ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment } from "react";
+import { Select } from "@base-ui/react/select";
+import { cva } from "class-variance-authority";
+import { Check, ChevronDown } from "lucide-react";
 import { cn } from "../../utils/cn";
-import { CheckboxMenuItem } from "./CheckboxMenuItem";
+import { menuItemClass, menuSurfaceClass, popMotionClass } from "./surfaces";
 import {
   FORM_CONTROL_CHROME_STYLES,
   FORM_CONTROL_CONTAINER_STYLES,
@@ -10,6 +12,22 @@ import {
   type FormControlSize,
 } from "./formControl";
 import type { PillSelectOption, PillSelectWidth } from "./PillSelect";
+
+const triggerVariants = cva(
+  cn(
+    FORM_CONTROL_CHROME_STYLES,
+    "flex items-center justify-between gap-2 px-3",
+  ),
+  {
+    variants: {
+      size: {
+        sm: FORM_CONTROL_SIZE_STYLES.sm.control,
+        md: FORM_CONTROL_SIZE_STYLES.md.control,
+      },
+    },
+    defaultVariants: { size: "md" },
+  },
+);
 
 export function MultiPillSelect({
   value,
@@ -28,91 +46,88 @@ export function MultiPillSelect({
   size?: FormControlSize;
   className?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handlePointerDown(e: PointerEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [open]);
-
   const [allOption, ...typeOptions] = options;
-
-  const triggerLabel = (() => {
-    if (value.length === 0) return allOption?.label ?? "All types";
-    if (value.length === 1) {
-      const opt = typeOptions.find((o) => String(o.value) === value[0]);
-      return opt?.label ?? value[0];
-    }
-    return `${value.length} types`;
-  })();
-
-  function toggle(optValue: string) {
-    if (value.includes(optValue)) {
-      onChange(value.filter((v) => v !== optValue));
-    } else {
-      onChange([...value, optValue]);
-    }
-  }
-
-  const styles = FORM_CONTROL_SIZE_STYLES[size];
+  const allValue = String(allOption?.value ?? "");
+  const triggerLabel =
+    value.length === 0
+      ? (allOption?.label ?? "All types")
+      : value.length === 1
+        ? (typeOptions.find((option) => String(option.value) === value[0])
+            ?.label ?? value[0])
+        : `${value.length} types`;
 
   return (
-    <div
-      ref={containerRef}
-      className={cn(
-        FORM_CONTROL_CONTAINER_STYLES,
-        FORM_CONTROL_WIDTH_STYLES[width],
-        className,
-      )}
+    <Select.Root
+      multiple
+      value={value.length ? value : [allValue]}
+      // The first option resets the filter; it is not a type to combine.
+      onValueChange={(next) =>
+        onChange(
+          value.length > 0 && next.includes(allValue)
+            ? []
+            : next.filter((entry) => entry !== allValue),
+        )
+      }
     >
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+      <div
         className={cn(
-          FORM_CONTROL_CHROME_STYLES,
-          "flex items-center justify-between gap-2 px-3",
-          styles.control,
+          FORM_CONTROL_CONTAINER_STYLES,
+          FORM_CONTROL_WIDTH_STYLES[width],
+          className,
         )}
       >
-        <span className="truncate">{triggerLabel}</span>
-        <ChevronDown className="size-3 shrink-0 text-zinc-500" />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-full min-w-[12rem] overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 py-1 shadow-lg shadow-black/20">
-          <CheckboxMenuItem
-            checked={value.length === 0}
-            onToggle={() => onChange([])}
+        <Select.Trigger
+          aria-label={ariaLabel}
+          className={triggerVariants({ size })}
+        >
+          <span className="truncate">{triggerLabel}</span>
+          <Select.Icon>
+            <ChevronDown
+              aria-hidden
+              className="size-3 shrink-0 text-tone-500"
+            />
+          </Select.Icon>
+        </Select.Trigger>
+      </div>
+      <Select.Portal>
+        <Select.Positioner
+          sideOffset={6}
+          align="end"
+          alignItemWithTrigger={false}
+          className="z-50 outline-none"
+        >
+          <Select.Popup
+            className={cn(
+              menuSurfaceClass,
+              popMotionClass,
+              "min-w-[max(12rem,var(--anchor-width))] max-w-[calc(100vw-2rem)] outline-none",
+            )}
           >
-            {allOption?.label}
-          </CheckboxMenuItem>
-
-          <div className="my-1 h-px bg-zinc-800" />
-
-          {typeOptions.map((option) => (
-            <CheckboxMenuItem
-              key={String(option.value)}
-              checked={value.includes(String(option.value))}
-              disabled={option.disabled}
-              onToggle={() => toggle(String(option.value))}
-            >
-              {option.label}
-            </CheckboxMenuItem>
-          ))}
-        </div>
-      )}
-    </div>
+            <Select.List className="max-h-[min(24rem,calc(var(--available-height)-0.75rem))] overflow-y-auto">
+              {options.map((option, index) => (
+                <Fragment key={String(option.value)}>
+                  {index === 1 && (
+                    <Select.Separator className="my-1 h-px bg-tone-800" />
+                  )}
+                  <Select.Item
+                    value={String(option.value)}
+                    label={option.label}
+                    disabled={option.disabled}
+                    className={cn(menuItemClass, "text-xs text-tone-300")}
+                  >
+                    <span className="flex size-3.5 shrink-0 items-center justify-center">
+                      <Select.ItemIndicator>
+                        <Check aria-hidden className="size-3.5" />
+                      </Select.ItemIndicator>
+                    </span>
+                    <Select.ItemText>{option.label}</Select.ItemText>
+                  </Select.Item>
+                </Fragment>
+              ))}
+            </Select.List>
+          </Select.Popup>
+        </Select.Positioner>
+      </Select.Portal>
+    </Select.Root>
   );
 }

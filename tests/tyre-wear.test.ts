@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { PerLapInfo, TyreStint } from "../src/types/telemetry";
-import { buildStintDetails } from "../src/analysis/stintAnalysis";
-import { getNeutralisedLaps, stintWearRate } from "../src/utils/stats/tyres";
+import {
+  getNeutralisedLaps,
+  stintGreenLife,
+  stintWearRate,
+} from "../src/utils/stats/tyres";
 
 /** A stint whose history holds worst-wheel wear by lap number, including any
  *  snapshot PnG logs on the lap before the stint. */
@@ -80,7 +83,7 @@ test("a pit-in lap logged without wear does not count as a lap", () => {
   assert.equal(stintWearRate(stint, NO_NEUTRALISED_LAPS), 6);
 });
 
-test("the session stint card reads the Safety Car stint like Tyre Life does", () => {
+test("the session Tyres tab reads the Safety Car stint like Tyre Life does", () => {
   // Sakhir 26 Oct: Soft fitted under the SC on lap 23, restart on lap 25.
   const stint = buildStint(23, 29, {
     22: 0,
@@ -92,14 +95,11 @@ test("the session stint card reads the Safety Car stint like Tyre Life does", ()
     28: 24.98,
     29: 32.55,
   });
-  const [detail] = buildStintDetails(
-    [stint],
-    [],
+  const life = stintGreenLife(
+    stint,
     getNeutralisedLaps(perLapInfo(29, [23, 24, 25])),
   );
-  assert.ok(detail);
-  assert.equal(detail.peakWear, 32.55);
-  assert.ok(Math.abs(detail.wearRate - 6.3425) < 1e-9);
+  assert.ok(Math.abs(life.wearPerLap - 6.3425) < 1e-9);
   // Same projection as the Track page's Tyre Life card for this stint.
-  assert.equal(detail.estimatedLife, 12);
+  assert.equal(life.lifeLaps, 12);
 });

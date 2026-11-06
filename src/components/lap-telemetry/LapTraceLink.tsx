@@ -18,7 +18,7 @@ export function LapTraceLink({
       title="Open in Lap Telemetry"
       aria-label="Open in Lap Telemetry"
       className={cn(
-        "inline-flex items-center rounded p-0.5 align-middle text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-cyan-300",
+        "inline-flex items-center rounded p-0.5 align-middle text-tone-500 transition-colors hover:bg-tone-800 hover:text-cyan-300",
         className,
       )}
     >

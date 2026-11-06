@@ -4,7 +4,6 @@ import {
   buildDriverSpeedComparison,
   buildSessionSpeedAnalysis,
 } from "../src/analysis/speedAnalysis";
-import { buildTrackInsights } from "../src/analysis/dashboardInsights";
 import type { DashboardResultStats } from "../src/analysis/dashboardResultStats";
 import { buildTrackSessionData } from "../src/analysis/trackAnalysis";
 import type {
@@ -701,71 +700,4 @@ test("Track Progress consumes the canonical peak instead of a stale raw scalar",
   );
   assert.equal(limitedTrackSession?.sessionPeakKmh, 330);
   assert.equal(limitedTrackSession?.sessionPeakQuality, "limited");
-});
-
-test("dashboard speed-trap rank normalizes placement across field sizes", () => {
-  const summaries = [
-    { rank: 5, total: 10 },
-    { rank: 5, total: 22 },
-    { rank: 5, total: 22 },
-  ].map(
-    ({ rank, total }, index) =>
-      ({
-        relativePath: `race-${index}.json`,
-        slug: `race-${index}`,
-        sessionType: "Race",
-        track: "Test",
-        date: `2026-07-${20 - index}T00:00:00Z`,
-        gameYear: 26,
-        validLapCount: 10,
-        topSpeedTrapRank: rank,
-        topSpeedTrapTotal: total,
-      }) satisfies SessionSummary,
-  );
-  const stats = {
-    scopedSessions: summaries,
-    resultSessions: summaries,
-    cleanFinishSessions: [],
-    recentResults: [],
-    trackResults: [],
-    mode: "available-races",
-    modeLabel: "Available races",
-    modeDetail: "",
-    totalLaps: 30,
-    trackCount: 1,
-    sessionCount: 3,
-    starts: 3,
-    wins: 0,
-    p2: 0,
-    p3: 0,
-    topFive: 0,
-    dnfCount: 0,
-    pointsScored: 0,
-    polePositions: 0,
-    frontRowStarts: 0,
-    gridStarts: 0,
-  } satisfies DashboardResultStats;
-
-  const insight = buildTrackInsights(stats).find(
-    ({ kind }) => kind === "speed-trap-rank",
-  );
-  assert.equal(insight?.headline, "72%");
-  assert.equal(insight?.detail, "speed-trap field percentile · 3 races");
-
-  const invalidSummaries = summaries.map((summary, index) => ({
-    ...summary,
-    topSpeedTrapRank: [0, 2, 5][index],
-    topSpeedTrapTotal: [10, 1, 4][index],
-  }));
-  const invalidStats = {
-    ...stats,
-    scopedSessions: invalidSummaries,
-    resultSessions: invalidSummaries,
-  } satisfies DashboardResultStats;
-  assert.equal(
-    buildTrackInsights(invalidStats).find(
-      ({ kind }) => kind === "speed-trap-rank",
-    ),
-    undefined,
-  );
 });

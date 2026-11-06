@@ -27,7 +27,7 @@ export function DisclosureToggle({
       aria-controls={controls}
       onClick={() => onOpenChange(!open)}
       className={cn(
-        "group inline-flex items-center gap-1.5 rounded-md text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-600",
+        "group inline-flex items-center gap-1.5 rounded-md text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tone-600",
         className,
       )}
     >
@@ -35,7 +35,7 @@ export function DisclosureToggle({
       <ChevronDown
         aria-hidden
         className={cn(
-          "size-4 shrink-0 text-zinc-500 transition-transform group-hover:text-zinc-300",
+          "size-4 shrink-0 text-tone-500 transition-transform group-hover:text-tone-300",
           open && "rotate-180",
         )}
       />

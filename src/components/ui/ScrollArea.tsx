@@ -1,3 +1,4 @@
+import { cva } from "class-variance-authority";
 import type { ComponentProps } from "react";
 import { cn } from "../../utils/cn";
 
@@ -5,23 +6,37 @@ type ScrollAxis = "x" | "y" | "both";
 type ScrollTone = "default" | "subtle";
 type ScrollGutter = "auto" | "stable" | "both";
 
-export const scrollAxisClass: Record<ScrollAxis, string> = {
-  x: "overflow-x-auto",
-  y: "overflow-y-auto",
-  both: "overflow-auto",
-};
+const scrollVariants = cva("", {
+  variants: {
+    axis: { x: "overflow-x-auto", y: "overflow-y-auto", both: "overflow-auto" },
+    tone: {
+      default:
+        "scrollbar-thin scrollbar-thumb-tone-800 scrollbar-track-transparent hover:scrollbar-thumb-tone-700",
+      subtle:
+        "scrollbar-thin scrollbar-thumb-tone-0/[0.06] scrollbar-track-transparent hover:scrollbar-thumb-tone-0/[0.12]",
+    },
+    gutter: {
+      auto: "",
+      stable: "scrollbar-gutter-stable",
+      both: "scrollbar-gutter-both",
+    },
+  },
+});
 
-export const scrollbarClass: Record<ScrollTone, string> = {
-  default:
-    "scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent hover:scrollbar-thumb-zinc-700",
-  subtle:
-    "scrollbar-thin scrollbar-thumb-white/[0.06] scrollbar-track-transparent hover:scrollbar-thumb-white/[0.12]",
+// Standalone scrollers share the variants without needing a wrapper element.
+export const scrollAxisClass = {
+  x: scrollVariants({ axis: "x" }),
+  y: scrollVariants({ axis: "y" }),
+  both: scrollVariants({ axis: "both" }),
 };
-
-export const scrollbarGutterClass: Record<ScrollGutter, string> = {
-  auto: "",
-  stable: "scrollbar-gutter-stable",
-  both: "scrollbar-gutter-both",
+export const scrollbarClass = {
+  default: scrollVariants({ tone: "default" }),
+  subtle: scrollVariants({ tone: "subtle" }),
+};
+export const scrollbarGutterClass = {
+  auto: scrollVariants({ gutter: "auto" }),
+  stable: scrollVariants({ gutter: "stable" }),
+  both: scrollVariants({ gutter: "both" }),
 };
 
 type ScrollAreaProps = ComponentProps<"div"> & {
@@ -39,12 +54,7 @@ export function ScrollArea({
 }: ScrollAreaProps) {
   return (
     <div
-      className={cn(
-        scrollAxisClass[axis],
-        scrollbarClass[tone],
-        scrollbarGutterClass[gutter],
-        className,
-      )}
+      className={cn(scrollVariants({ axis, tone, gutter }), className)}
       {...props}
     />
   );

@@ -276,6 +276,8 @@ export interface LapContext {
   team?: string;
   isPlayer: boolean;
   sessionType: string;
+  /** The recording the lap is from: two race laps from different races. */
+  recordingSlug?: string;
   lapNumber: number;
   lapTimeMs: number;
   /** Official elapsed time at the ends of sectors 1 and 2, from the paired session JSON. */
@@ -749,9 +751,18 @@ export interface CornerUnit {
    * the layout has no turn markers ("the 4.66 km corner").
    */
   name: string;
+  /**
+   * The name shortened for the track map and the tip list: "T13", "T6–7",
+   * "→T11" for the run into Turn 11; empty where no turn is known. Never a
+   * running count, which reads as a turn number on a circuit map.
+   */
+  marker: string;
 }
 
-type DetectedUnit = Omit<CornerUnit, "phases" | "net" | "flatD" | "name">;
+type DetectedUnit = Omit<
+  CornerUnit,
+  "phases" | "net" | "flatD" | "name" | "marker"
+>;
 
 function km(distance: number): string {
   return (distance / 1000).toFixed(2);
@@ -825,7 +836,7 @@ function nearestTurn(
 function nameUnits(
   units: readonly (DetectedUnit & { flatD: number })[],
   corners: readonly TrackCorner[],
-): string[] {
+): { names: string[]; markers: string[] } {
   const covered: TrackCorner[][] = units.map(() => []);
   const unclaimed = new Set(corners);
   for (const corner of corners) {
@@ -868,6 +879,19 @@ function nameUnits(
         : undefined,
   );
 
+  const markers = units.map((unit, i) => {
+    if (unit.kind === "corner") {
+      const turns = covered[i];
+      if (turns.length === 0) return "";
+      const first = turns[0].number;
+      const last = turns[turns.length - 1].number;
+      return first === last ? `T${first}` : `T${first}–${last}`;
+    }
+    const end = entry[i + 1]?.number;
+    if (end) return `→T${end}`;
+    const start = entry[i]?.number;
+    return start ? `T${start}→` : "";
+  });
   const names = units.map((unit, i) => {
     if (unit.kind === "corner") {
       const turns = covered[i];
@@ -898,7 +922,7 @@ function nameUnits(
         ? `the run to ${names[1]}`
         : `the run from the line to ${km(units[0].to)} km`;
   }
-  return names;
+  return { names, markers };
 }
 
 /**
@@ -1184,6 +1208,8 @@ export interface LapTip {
   timeS: number;
   /** Where on the lap, for list titles: "Turn 1 exit", "Run to Turn 1". */
   title: string;
+  /** Its unit's `marker`, shown on the track map and beside the title. */
+  marker: string;
   /** Compact facts: "Throttle 104 m later · 22 km/h slower onto the straight". */
   summary: string;
   /** Imperative advice, only for the player's own lap and only on tips. */
@@ -2109,9 +2135,19 @@ function compareContext(
     });
   }
   if (isRaceSessionType(ca.sessionType) || isRaceSessionType(cb.sessionType)) {
+    // Fuel load and tyre age move a race lap by seconds, so laps from two
+    // races compare the races before the driving.
+    const otherRace =
+      isRaceSessionType(ca.sessionType) &&
+      isRaceSessionType(cb.sessionType) &&
+      !!ca.recordingSlug &&
+      !!cb.recordingSlug &&
+      ca.recordingSlug !== cb.recordingSlug;
     items.push({
       id: "traffic",
-      label: "Race lap: traffic and tow can play a part",
+      label: otherRace
+        ? "Laps from different races: fuel, tyres and traffic differ"
+        : "Race lap: traffic and tow can play a part",
       tone: "differs",
     });
   }
@@ -2190,10 +2226,11 @@ export function compareLaps(
     };
     return { ...unit, flatD, phases, net: phases.in + phases.out + phases.run };
   });
-  const names = nameUnits(measured, options.corners ?? []);
+  const { names, markers } = nameUnits(measured, options.corners ?? []);
   const units: CornerUnit[] = measured.map((unit, i) => ({
     ...unit,
     name: names[i],
+    marker: markers[i],
   }));
 
   const extraSpend = units.map(
@@ -2264,6 +2301,7 @@ export function compareLaps(
       category: explanation.category,
       timeS: unit.net,
       title: tipTitle(unit, explanation.category),
+      marker: unit.marker,
       summary: wash
         ? factLine([explanation.summary, "offset in the same corner"])
         : explanation.summary,

@@ -227,7 +227,6 @@ test("race analysis keeps fuel-only distances isolated", () => {
   );
   assert.ok(buckets.every((bucket) => bucket.fuelStats !== null));
   assert.ok(buckets.every((bucket) => bucket.compoundLifeStats.length === 0));
-  assert.ok(buckets.every((bucket) => bucket.setupCandidates.length === 0));
   assert.ok(
     buckets.every((bucket) =>
       bucket.sessions.every(

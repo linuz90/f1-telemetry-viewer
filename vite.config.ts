@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
   const base = leadingSlashBase.endsWith("/")
     ? leadingSlashBase
     : `${leadingSlashBase}/`;
+  // index.html reads %VITE_THEME%; a default keeps Vite from warning about
+  // an undefined variable on every build that doesn't force a theme.
+  process.env.VITE_THEME ??= env.VITE_THEME || "system";
 
   return {
     base,

@@ -38,13 +38,16 @@ import {
   useLapTraces,
 } from "../../hooks/useLapRecordings";
 import { useSessionList } from "../../hooks/useSessionList";
+import { cn } from "../../utils/cn";
 import { msToLapTime } from "../../utils/format";
 import { trackPath } from "../../utils/routes";
 import { getTrackDisplayName } from "../../utils/tracks";
-import { Card } from "../Card";
+import { Panel } from "../ui/Panel";
 import { buttonVariants } from "../ui/Button";
+import { scrollBelowPageTabsClass } from "../ui/pageTabs";
 import { SectionHeader } from "../ui/SectionHeader";
 import { driverLabel, recordingLabel } from "./labels";
+import { CompareSuggestions } from "./CompareSuggestions";
 import { LapChips } from "./LapChips";
 import { LapComparisonView } from "./LapComparisonView";
 import { LapImportsRow } from "./LapImportsRow";
@@ -69,13 +72,12 @@ export type LapTelemetryScope =
 
 function SectionShell({ children }: { children: ReactNode }) {
   return (
-    <Card
-      as="section"
+    <Panel
       id={LAP_TELEMETRY_ANCHOR}
-      className="scroll-mt-20 space-y-4"
+      className={cn("space-y-4", scrollBelowPageTabsClass)}
     >
       {children}
-    </Card>
+    </Panel>
   );
 }
 
@@ -252,6 +254,8 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
         a,
         scope.kind === "session" ? sessionPool : familyPool,
         {
+          scope: scope.kind,
+          kind: family?.kind,
           rivalDriverIndex,
         },
       );
@@ -261,6 +265,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   }, [
     candidateByKey,
     familyPool,
+    family?.kind,
     focusedDriverIndex,
     rivalDriverIndex,
     scope.kind,
@@ -322,6 +327,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
               team: candidate.team,
               isPlayer: candidate.isPlayer,
               sessionType: candidate.recording.sessionType,
+              recordingSlug: candidate.ref.recordingSlug,
               lapNumber: candidate.ref.lapNumber,
               lapTimeMs: candidate.lapTimeMs,
               sectorEndsMs: recorded?.sectorEndsMs,
@@ -391,11 +397,17 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
         detail: [
           // "Session best" says more about a comparison lap than where it is from.
           index > 0
-            ? presets.find(
+            ? (presets.find(
                 (preset) =>
                   preset.candidate &&
                   sameLapRef(preset.candidate.ref, candidate.ref),
-              )?.label
+              )?.label ??
+              // The driver the race page compares you with, as it picked B.
+              (rivalDriverIndex != null &&
+              candidate.ref.driverIndex === rivalDriverIndex &&
+              candidate.ref.recordingSlug === selected[0]?.ref.recordingSlug
+                ? "Race rival"
+                : undefined))
             : undefined,
           candidate.recording.slug === ownRecordingSlug
             ? undefined
@@ -406,7 +418,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
           .filter(Boolean)
           .join(" · "),
       })),
-    [selected, presets, ownRecordingSlug],
+    [selected, presets, ownRecordingSlug, rivalDriverIndex],
   );
   const slotsByKey = useMemo(
     () => new Map(slots.map((slot) => [slot.key, slot.slot])),
@@ -466,17 +478,17 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
     return (
       <SectionShell>
         <SectionHeader
-          title="Lap Telemetry"
+          title="Lap telemetry"
           hint="Recorded laps, aligned by distance"
         />
         <div className="flex items-start gap-3">
-          <CircleOff className="mt-0.5 size-4 shrink-0 text-zinc-600" />
-          <p className="text-sm text-zinc-400">
+          <CircleOff className="mt-0.5 size-4 shrink-0 text-tone-600" />
+          <p className="text-sm text-tone-400">
             This session was recorded, but no lap start to finish
             {partial ? (
               <>
                 : {whose === "You" ? "your" : `${whose}'s`}{" "}
-                <span className="font-mono text-zinc-200">
+                <span className="font-mono text-tone-200">
                   {msToLapTime(partial.lapTimeMs)}
                 </span>{" "}
                 on lap {partial.lapNumber} is incomplete ({partial.reason})
@@ -538,14 +550,15 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   return (
     <SectionShell>
       <SectionHeader
-        title="Lap Telemetry"
+        title="Lap telemetry"
         hint="Recorded laps, aligned by distance"
       />
 
       <LapChips
         slots={slots}
         fastestKey={slots.length > 1 ? fastestKey : undefined}
-        canAdd={canAdd}
+        // Alone, lap A gets the suggestions row below instead of a bare add.
+        canAdd={canAdd && slots.length > 1}
         onOpenPicker={setPickerSlot}
         // Removing A promotes B; the lone lap is written as solo so the
         // default comparison does not come straight back.
@@ -554,20 +567,29 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
         }
       />
 
+      {slots.length === 1 && canAdd && (
+        <CompareSuggestions
+          a={selected[0]}
+          presets={presets}
+          onPick={(candidate) => writeSelection([selected[0], candidate])}
+          onMore={() => setPickerSlot(1)}
+        />
+      )}
+
       {slots.length === 1 && !canAdd && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-tone-500">
           No other complete lap is recorded here to compare against yet.
         </p>
       )}
       {traceFailed && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-tone-500">
           Could not load the recorded traces for these laps.
         </p>
       )}
       {loading && (
         <div
           role="status"
-          className="h-64 animate-pulse rounded-xl bg-zinc-800/30"
+          className="h-64 animate-pulse rounded-xl bg-tone-800/30"
           aria-label="Loading lap traces"
         />
       )}

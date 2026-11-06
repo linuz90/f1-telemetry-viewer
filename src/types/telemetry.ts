@@ -32,6 +32,9 @@ export interface SessionSummary {
   topSpeedTrapTotal?: number;
   /** Player's tyre stints (one entry per stint) — race sessions only. */
   stints?: PlayerStintSummary[];
+  /** Player's stints lap by lap for stint comparison — race sessions only.
+   *  Pits n' Giggles' own summaries omit it; callers load the JSON instead. */
+  stintLaps?: PlayerStintLaps;
   /** Whether the player owns the purple sector in S1/S2/S3 for this session. */
   purpleSectors?: { s1: boolean; s2: boolean; s3: boolean };
   /** Overtakes the player completed on track (from overtakes.records). */
@@ -91,6 +94,42 @@ export interface PlayerStintSummary {
    *  from hand-built demo summaries. */
   greenLaps?: number;
   greenWear?: number;
+}
+
+/**
+ * The player's stints lap by lap, kept on the summary so a session page can
+ * compare a stint with every earlier one here without loading their JSON.
+ * Built by `buildPlayerStintLaps()` (`src/analysis/stintCompare.ts`).
+ */
+export interface PlayerStintLaps {
+  /** `total-laps`: stints compare only within one race length. */
+  raceLaps: number;
+  setup?: SetupSnapshot;
+  stints: StintTrace[];
+}
+
+/** A setup's identity values (`setupIdentity()`: brake bias and fuel left
+ *  out), in `SETUP_IDENTITY_KEYS` order; an array keeps every race summary
+ *  small. Changing that order needs a summary cache version bump. */
+export type SetupSnapshot = (number | null)[];
+
+/** One stint; every array is indexed by tyre age, index 0 being `startLap`. */
+export interface StintTrace {
+  compound: string;
+  startLap: number;
+  /** Complete lap times; null when the lap has no complete timing. */
+  lapMs: (number | null)[];
+  /** Laps Race Pace counts (`getRacePaceLapSamples()`). */
+  counted: boolean[];
+  /** Fastest complete valid lap, counted or not; a deleted lap never is. */
+  bestMs: number | null;
+  /** Worst-wheel wear % at the end of the lap; null without a snapshot. */
+  wear: (number | null)[];
+  /** Fuel in the tank at the end of the lap, kg; null when not exported. */
+  fuelKg: (number | null)[];
+  /** Green-flag wear rate and laps to the puncture line (`stintGreenLife()`). */
+  wearPerLap: number;
+  lifeLaps: number;
 }
 
 /**

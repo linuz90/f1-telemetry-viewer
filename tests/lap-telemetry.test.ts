@@ -160,6 +160,11 @@ test("turn markers name corners, complexes and flat-out stretches", () => {
       "Turn 5",
     ],
   );
+  // The map shows the same turns, never a running count of tips.
+  assert.deepEqual(
+    units.map((unit) => unit.marker),
+    ["→T1", "T1–2", "→T5", "T5"],
+  );
 });
 
 test("tips name the official turn, or lap distance when no marker is near", () => {
@@ -624,7 +629,7 @@ function candidate(
   };
 }
 
-test("default laps: focused driver first, then the rival, else the quickest lap", () => {
+test("default laps: focused driver first, then the rival, else the session's quickest", () => {
   const pool = [
     candidate("race", 21, 2, 92_741),
     candidate("race", 16, 2, 92_405),
@@ -638,16 +643,23 @@ test("default laps: focused driver first, then the rival, else the quickest lap"
     driverIndex: 21,
     lapNumber: 2,
   });
-  assert.equal(defaultComparison(a, pool)?.ref.driverIndex, 16);
+  const session = { scope: "session" } as const;
+  assert.equal(defaultComparison(a, pool, session)?.ref.driverIndex, 16);
   assert.equal(
-    defaultComparison(a, pool, { rivalDriverIndex: 14 })?.ref.driverIndex,
+    defaultComparison(a, pool, { ...session, rivalDriverIndex: 14 })?.ref
+      .driverIndex,
     14,
   );
   // A standing start is only compared with another standing start.
-  assert.deepEqual(defaultComparison(pool[3], pool)?.ref, pool[4].ref);
+  assert.deepEqual(defaultComparison(pool[3], pool, session)?.ref, pool[4].ref);
+  // A rival without a recorded start leaves the fastest other start.
+  assert.deepEqual(
+    defaultComparison(pool[3], pool, { ...session, rivalDriverIndex: 14 })?.ref,
+    pool[4].ref,
+  );
 });
 
-test("the fastest lap compares with the player's best from another run", () => {
+test("on a track page, quali compares with your other runs and races pick nothing", () => {
   const pool = [
     candidate("q-2049", 21, 1, 77_164),
     // The same session saved again: an identical lap, not another run.
@@ -657,11 +669,39 @@ test("the fastest lap compares with the player's best from another run", () => {
   ];
   const a = defaultLapA(pool, {})!;
   assert.equal(a.lapTimeMs, 77_164);
-  assert.equal(defaultComparison(a, pool)?.lapTimeMs, 77_268);
-  // Every preset lands on lap A's own copy, so one disabled button says so.
+  assert.equal(
+    defaultComparison(a, pool, { scope: "track", kind: "qualifying" })
+      ?.lapTimeMs,
+    77_268,
+  );
+  // A friend's lap opens against your best just the same.
+  const friend = candidate("friend-file", 4, 2, 76_900, { isFriend: true });
+  assert.equal(
+    defaultComparison(friend, [...pool, friend], {
+      scope: "track",
+      kind: "qualifying",
+    })?.lapTimeMs,
+    77_164,
+  );
+  // Laps from different races differ in fuel and traffic, not just driving.
+  assert.equal(
+    defaultComparison(a, pool, { scope: "track", kind: "race" }),
+    undefined,
+  );
+  // Your other run is one tap away even where it is not picked by itself.
+  assert.equal(
+    resolvePresets(a, pool).find((p) => p.id === "my-other-run")?.candidate
+      ?.lapTimeMs,
+    77_268,
+  );
+  // The bests land on lap A's own copy, so one disabled button says so;
+  // the other run is still offered.
   assert.deepEqual(
     resolvePresets(pool[1], pool).map((p) => [p.id, p.reason]),
-    [["session-best", "already lap A"]],
+    [
+      ["session-best", "already lap A"],
+      ["my-other-run", undefined],
+    ],
   );
 });
 

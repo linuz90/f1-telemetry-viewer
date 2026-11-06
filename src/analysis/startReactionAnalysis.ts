@@ -3,9 +3,8 @@ import { isRaceSession } from "../utils/sessionTypes";
 
 const MAX_VALID_REACTION_SECONDS = 5;
 
-export const START_REACTION_RAIL_TICKS = [0, 0.1, 0.2, 0.3, 0.4, 0.5] as const;
-export const START_REACTION_RAIL_MAX_SECONDS =
-  START_REACTION_RAIL_TICKS[START_REACTION_RAIL_TICKS.length - 1]!;
+/** Past this the start reads as severe, whatever happened next. */
+const SEVERE_START_REACTION_SECONDS = 0.5;
 
 export type StartReactionRating =
   | "exceptional"
@@ -17,8 +16,6 @@ export type StartReactionRating =
 export interface StartReactionModel {
   seconds: number;
   formatted: string;
-  markerPct: number;
-  isDisplayClamped: boolean;
   rating: StartReactionRating;
   label: string;
   detail: string;
@@ -26,10 +23,6 @@ export interface StartReactionModel {
 
 export function formatStartReactionTime(seconds: number): string {
   return `${seconds.toFixed(3)}s`;
-}
-
-export function formatStartReactionTick(seconds: number): string {
-  return `${seconds.toFixed(1)}s`;
 }
 
 function startReactionRating(
@@ -56,7 +49,7 @@ function startReactionRating(
       detail: "within the normal quick-start window",
     };
   }
-  if (seconds <= START_REACTION_RAIL_MAX_SECONDS) {
+  if (seconds <= SEVERE_START_REACTION_SECONDS) {
     return {
       rating: "bad",
       label: "Slow",
@@ -85,14 +78,11 @@ export function buildStartReactionModelFromSeconds(
     return null;
   }
 
-  const railRatio = seconds / START_REACTION_RAIL_MAX_SECONDS;
   const rating = startReactionRating(seconds);
 
   return {
     seconds,
     formatted: formatStartReactionTime(seconds),
-    markerPct: Math.min(railRatio, 1) * 100,
-    isDisplayClamped: railRatio > 1,
     ...rating,
   };
 }

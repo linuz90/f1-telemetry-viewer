@@ -229,7 +229,11 @@ function fastest(
   );
 }
 
-export type LapPresetId = "session-best" | "my-best" | "fastest-here";
+export type LapPresetId =
+  | "session-best"
+  | "my-best"
+  | "my-other-run"
+  | "fastest-here";
 
 export interface LapPreset {
   id: LapPresetId;
@@ -280,11 +284,26 @@ export function resolvePresets(
       eligible.filter((c) => c.isPlayer),
       "none of yours yet",
     ),
+    // When lap A is already your best, your next-best run is the one left.
+    resolve(
+      "my-other-run",
+      "My best in another run",
+      eligible.filter(
+        (c) =>
+          c.isPlayer &&
+          c.ref.recordingSlug !== a.ref.recordingSlug &&
+          // A re-saved session repeats lap A; that copy is not another run.
+          !isSameLap(c, a),
+      ),
+      "no other run of yours",
+    ),
     resolve("fastest-here", "Fastest by anyone here", eligible, "none yet"),
   ];
   const lapOf = (preset: LapPreset) =>
     preset.candidate ?? (preset.reason === taken ? a : undefined);
   return presets.filter((preset, index) => {
+    // Most players have one run here: say nothing rather than "none".
+    if (preset.id === "my-other-run" && !preset.candidate) return false;
     const lap = lapOf(preset);
     return (
       !lap ||
@@ -299,7 +318,7 @@ export function resolvePresets(
 /**
  * Laps to open after importing a file: the user's best at the circuit (same
  * session kind first) as A against the owner's best in the file. The user's
- * own file opens alone, so the default comparison fills B.
+ * own file opens alone, for the default comparison or the suggestions to fill B.
  */
 export function importedLapRefs(
   imported: LapRecordingSummary,
@@ -356,32 +375,47 @@ export function defaultLapA(
 }
 
 /**
- * The comparison for A when the URL names none: the selected rival's best,
- * else the fastest lap quicker than A, else the player's best from another
- * run, else the fastest lap by someone else.
+ * The comparison for A when the URL names none, only where one reference is
+ * obviously fair; otherwise none, and the section offers suggestions to pick
+ * from instead. In a session: a standing start against another standing
+ * start, else the selected rival's best, else the fastest lap by someone else
+ * in the session. On a track page: your best from another run, for
+ * qualifying and time trial only; race laps from different races differ in
+ * fuel, tyres and traffic far more than in driving, and recordings carry no
+ * race length to match them on.
  */
 export function defaultComparison(
   a: LapCandidate,
   pool: readonly LapCandidate[],
-  options: { rivalDriverIndex?: number | null } = {},
+  options: {
+    scope: "session" | "track";
+    kind?: TrackSessionKind;
+    rivalDriverIndex?: number | null;
+  },
 ): LapCandidate | undefined {
   if (a.standingStart) {
-    // A standing start only compares fairly with another standing start.
     const starts = pool.filter(
       (c) =>
         c.standingStart &&
         c.ref.recordingSlug === a.ref.recordingSlug &&
         !isSameLap(c, a),
     );
-    const start =
+    return (
       fastest(
         starts.filter((c) => c.ref.driverIndex === options.rivalDriverIndex),
-      ) ??
-      fastest(starts.filter((c) => c.lapTimeMs < a.lapTimeMs)) ??
-      fastest(starts);
-    if (start) return start;
+      ) ?? fastest(starts)
+    );
   }
   const others = pool.filter((c) => c.eligible && !isSameLap(c, a));
+  if (options.scope === "track") {
+    // A friend's or rival's lap compares with your best just the same.
+    if (options.kind === "race") return undefined;
+    return fastest(
+      others.filter(
+        (c) => c.isPlayer && c.ref.recordingSlug !== a.ref.recordingSlug,
+      ),
+    );
+  }
   if (options.rivalDriverIndex != null) {
     const rival = fastest(
       others.filter(
@@ -392,17 +426,14 @@ export function defaultComparison(
     );
     if (rival) return rival;
   }
-  const quicker = fastest(others.filter((c) => c.lapTimeMs < a.lapTimeMs));
-  if (quicker) return quicker;
-  const ownOtherRun = fastest(
-    others.filter(
-      (c) =>
-        c.isPlayer && a.isPlayer && c.ref.recordingSlug !== a.ref.recordingSlug,
+  // Someone else: the player keeps one identity across restarted runs,
+  // whose recordings can number them differently.
+  return fastest(
+    others.filter((c) =>
+      a.isPlayer
+        ? !c.isPlayer
+        : c.ref.recordingSlug !== a.ref.recordingSlug ||
+          c.ref.driverIndex !== a.ref.driverIndex,
     ),
-  );
-  return (
-    ownOtherRun ??
-    fastest(others.filter((c) => c.ref.driverIndex !== a.ref.driverIndex)) ??
-    fastest(others)
   );
 }

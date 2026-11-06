@@ -9,7 +9,9 @@ import {
 } from "../../analysis/lapTelemetryAnalysis";
 import { LAP_TIPS_OPEN_STORAGE_KEY } from "../../constants/storage";
 import { useTrackDisclosure } from "../../hooks/useTrackDisclosure";
+import { cn } from "../../utils/cn";
 import { getTrackCorners } from "../../utils/tracks";
+import { stickyBelowPageTabsClass } from "../ui/pageTabs";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { createHoverStore } from "./hoverStore";
 import { LapReadout } from "./LapReadout";
@@ -111,6 +113,36 @@ export function LapComparisonView({
       selectedTip ? { from: selectedTip.from, to: selectedTip.to } : undefined,
     [selectedTip],
   );
+  // Without a hover the readouts rest on the tip in focus, else the one
+  // worth most, so the cards open on a moment that matters, not on dashes.
+  // Zoomed to a sector, only tips in view count, and the resting point
+  // stays inside it.
+  const [viewFrom, viewTo] = zoom ?? [0, trackLengthM];
+  const restTip =
+    selectedTip ??
+    comparison?.tips.reduce<LapTip | undefined>(
+      (best, tip) =>
+        tip.kind !== "note" &&
+        tip.to > viewFrom &&
+        tip.from < viewTo &&
+        (!best || Math.abs(tip.timeS) > Math.abs(best.timeS))
+          ? tip
+          : best,
+      undefined,
+    );
+  const rest = useMemo(
+    () =>
+      restTip
+        ? {
+            distance: Math.min(
+              viewTo,
+              Math.max(viewFrom, (restTip.from + restTip.to) / 2),
+            ),
+            label: restTip.title,
+          }
+        : undefined,
+    [restTip, viewFrom, viewTo],
+  );
   const comparisonSlot = slots[1];
   const comparisonName = !comparisonSlot
     ? ""
@@ -186,8 +218,12 @@ export function LapComparisonView({
             onHoverTip={(tip) => setHoveredTipId(tip?.id ?? null)}
           />
           {track && (
-            // top-20 clears the race page's sticky session bar.
-            <div className="mx-auto w-full max-w-68 lg:sticky lg:top-20 lg:max-w-none lg:self-start">
+            <div
+              className={cn(
+                "mx-auto w-full max-w-68 lg:max-w-none lg:self-start",
+                stickyBelowPageTabsClass,
+              )}
+            >
               <LapTrackMap
                 track={track}
                 tips={comparison.tips}
@@ -231,7 +267,7 @@ export function LapComparisonView({
             />
           </div>
           <span
-            className="text-zinc-600 transition-colors hover:text-zinc-400"
+            className="text-tone-600 transition-colors hover:text-tone-400"
             title="Drag across the traces to zoom; double-click or Esc to reset"
           >
             <CircleHelp
@@ -248,6 +284,7 @@ export function LapComparisonView({
           sectorStarts={sectorStarts}
           track={track}
           showBattery={hasBattery}
+          rest={rest}
         />
         <LapTraceCharts
           series={series}

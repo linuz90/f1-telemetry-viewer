@@ -1,3 +1,4 @@
+import { cva } from "class-variance-authority";
 import { cn } from "../../utils/cn";
 
 export type BadgeTone =
@@ -12,26 +13,25 @@ export type BadgeTone =
 export type BadgeSize = "sm" | "xs";
 export type BadgeShape = "pill" | "square";
 
-const SIZE: Record<BadgeSize, string> = {
-  sm: "px-2.5 py-1 text-2xs font-semibold",
-  xs: "px-2 py-1 text-3xs font-bold",
-};
-
-const SHAPE: Record<BadgeShape, string> = {
-  pill: "rounded-full",
-  square: "rounded-md",
-};
-
-const TONE: Record<BadgeTone, string> = {
-  red: "bg-red-500/10 text-red-400",
-  amber: "bg-amber-500/10 text-amber-300",
-  yellow: "bg-yellow-500/20 text-yellow-400",
-  green: "bg-green-500/10 text-green-400",
-  sky: "bg-sky-500/10 text-sky-300",
-  rose: "bg-rose-500/10 text-rose-300",
-  purple: "bg-purple-500/10 text-purple-300",
-  zinc: "bg-zinc-800/80 text-zinc-400",
-};
+const badgeVariants = cva("inline-flex shrink-0 items-center", {
+  variants: {
+    size: {
+      sm: "px-2.5 py-1 text-2xs font-semibold",
+      xs: "px-2 py-1 text-3xs font-bold",
+    },
+    shape: { pill: "rounded-full", square: "rounded-md" },
+    tone: {
+      red: "bg-red-500/10 text-red-400",
+      amber: "bg-amber-500/10 text-amber-300",
+      yellow: "bg-yellow-500/20 text-yellow-400",
+      green: "bg-green-500/10 text-green-400",
+      sky: "bg-sky-500/10 text-sky-300",
+      rose: "bg-rose-500/10 text-rose-300",
+      purple: "bg-purple-500/10 text-purple-300",
+      zinc: "bg-tone-800/80 text-tone-400",
+    },
+  },
+});
 
 /**
  * Small rounded status badge — counts, alerts, tags.
@@ -62,13 +62,7 @@ export function Badge({
   return (
     <span
       {...props}
-      className={cn(
-        "inline-flex shrink-0 items-center",
-        SHAPE[shape],
-        SIZE[size],
-        tone && TONE[tone],
-        className,
-      )}
+      className={cn(badgeVariants({ shape, size, tone }), className)}
     >
       {children}
     </span>

@@ -17,13 +17,10 @@ import {
   sessionDriverBestLapTimeMs,
 } from "../utils/stats/drivers";
 import {
-  filterOutlierLaps,
-  getBestLapTime,
   getPitLapNumbers,
   getRacePaceLapSamples,
   getValidLaps,
   isCompleteValidLap,
-  medianLapTimeMs,
 } from "../utils/stats/laps";
 import {
   calculateRacePaceEstimate,
@@ -120,17 +117,6 @@ export interface QualifyingTableModel {
   bestS1: number | null;
   bestS2: number | null;
   bestS3: number | null;
-}
-
-export interface CompoundLapComparisonRow {
-  compound: string;
-  playerMedian: number;
-  rivalMedian: number;
-  playerBest: number;
-  rivalBest: number;
-  playerLapCount: number;
-  rivalLapCount: number;
-  deltaSeconds: number;
 }
 
 export interface StintComparisonRow {
@@ -617,75 +603,6 @@ export function buildQualifyingTableModel({
     bestS3:
       allBestLaps.length > 0 ? bestSectorTimeMs(allBestLaps, 3) || null : null,
   };
-}
-
-function getLapsForStint(
-  allLaps: readonly LapHistoryEntry[],
-  stint: TyreStint,
-): LapHistoryEntry[] {
-  return allLaps.slice(stint["start-lap"] - 1, stint["end-lap"]);
-}
-
-function groupCleanLapsByCompound({
-  stints,
-  laps,
-}: {
-  stints: readonly TyreStint[];
-  laps: readonly LapHistoryEntry[];
-}): Map<string, LapHistoryEntry[]> {
-  const byCompound = new Map<string, LapHistoryEntry[]>();
-
-  for (const stint of stints) {
-    const compound = stint["tyre-set-data"]["visual-tyre-compound"];
-    // Same-compound comparisons should describe actual running pace, not the
-    // artificial time loss from stops or obvious outliers.
-    const cleanLaps = filterOutlierLaps(getLapsForStint(laps, stint));
-    const existing = byCompound.get(compound) ?? [];
-    byCompound.set(compound, [...existing, ...cleanLaps]);
-  }
-
-  return byCompound;
-}
-
-export function buildCompoundLapComparisonRows({
-  playerStints,
-  playerLaps,
-  rivalStints,
-  rivalLaps,
-}: {
-  playerStints: readonly TyreStint[];
-  playerLaps: readonly LapHistoryEntry[];
-  rivalStints: readonly TyreStint[];
-  rivalLaps: readonly LapHistoryEntry[];
-}): CompoundLapComparisonRow[] {
-  const playerByCompound = groupCleanLapsByCompound({
-    stints: playerStints,
-    laps: playerLaps,
-  });
-  const rivalByCompound = groupCleanLapsByCompound({
-    stints: rivalStints,
-    laps: rivalLaps,
-  });
-
-  return [...new Set([...playerByCompound.keys()])]
-    .filter((compound) => rivalByCompound.has(compound))
-    .map((compound) => {
-      const playerCompoundLaps = playerByCompound.get(compound)!;
-      const rivalCompoundLaps = rivalByCompound.get(compound)!;
-      const playerMedian = medianLapTimeMs(playerCompoundLaps);
-      const rivalMedian = medianLapTimeMs(rivalCompoundLaps);
-
-      return {
-        compound,
-        playerMedian,
-        rivalMedian,
-        playerBest: getBestLapTime(playerCompoundLaps),
-        rivalBest: getBestLapTime(rivalCompoundLaps),
-        playerLapCount: playerCompoundLaps.length,
-        rivalLapCount: rivalCompoundLaps.length,
-        deltaSeconds: (playerMedian - rivalMedian) / 1000,
-      };
-    });
 }
 
 /**

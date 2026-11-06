@@ -27,7 +27,7 @@ export function CompoundSwatchLabel({
         )}
         style={{ backgroundColor: getCompoundColor(compound) }}
       />
-      <span className={cn("truncate text-zinc-300", labelClassName)}>
+      <span className={cn("truncate text-tone-300", labelClassName)}>
         {compound}
       </span>
     </span>

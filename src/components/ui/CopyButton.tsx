@@ -40,8 +40,8 @@ export function CopyButton({
         type="button"
         onClick={handleClick}
         className={cn(
-          "inline-flex size-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/[0.03] focus-visible:outline focus-visible:outline-1 focus-visible:outline-zinc-500",
-          copied ? "text-emerald-400" : "text-zinc-600 hover:text-zinc-300",
+          "inline-flex size-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-tone-0/[0.03] focus-visible:outline focus-visible:outline-1 focus-visible:outline-tone-500",
+          copied ? "text-emerald-400" : "text-tone-600 hover:text-tone-300",
           className,
         )}
         aria-label={copied ? "Copied" : label}

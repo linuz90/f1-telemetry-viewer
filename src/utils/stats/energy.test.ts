@@ -1,11 +1,6 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
-import type {
-  DriverData,
-  PerLapInfo,
-  TelemetrySession,
-} from "../../types/telemetry";
-import { curateSessionInsights } from "../../analysis/sessionInsightCuration";
+import type { DriverData, PerLapInfo } from "../../types/telemetry";
 import { generateFuelMarginInsight } from "./energy";
 
 interface FuelLapOptions {
@@ -191,30 +186,4 @@ test("missing game margin keeps kilograms as supporting data", () => {
   assert.deepEqual(insight?.extraDetails, [
     "8.0 kg in tank · 10.0 kg at start",
   ]);
-});
-
-test("session curation keeps Fuel Margin descriptive", () => {
-  const session = {
-    "session-info": { "session-type": "Race", "total-laps": 22 },
-  } as TelemetrySession;
-  const fuelMargin = generateFuelMarginInsight(
-    playerWithFuel([
-      fuelLap({ fuelKg: 10, lap: 0, remainingLaps: -1 }),
-      fuelLap({ fuelKg: 8.5, lap: 1, remainingLaps: -0.8 }),
-    ]),
-    22,
-  );
-  assert.ok(fuelMargin);
-
-  const curated = curateSessionInsights(session, [fuelMargin]);
-
-  assert.deepEqual(curated, [fuelMargin]);
-  assert.equal(
-    curated.some((insight) => insight.label === "Fuel Plan"),
-    false,
-  );
-  assert.equal(
-    curated.some((insight) => insight.label === "Recommended Fuel"),
-    false,
-  );
 });

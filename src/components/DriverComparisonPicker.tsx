@@ -82,7 +82,7 @@ export function DriverComparisonPicker({
       dotColor={selectedDriver ? getTeamColor(selectedDriver.team) : undefined}
       size={size}
       width={width}
-      className={cn(selectedIndex === null && "text-zinc-400")}
+      className={cn(selectedIndex === null && "text-tone-400")}
     />
   );
 }

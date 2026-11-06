@@ -10,7 +10,7 @@ export function DuplicateNotice({ count, isAutoSave }: DuplicateNoticeProps) {
   if (!count && !isAutoSave) return null;
 
   return (
-    <div className="flex flex-col items-center gap-1 text-xs text-zinc-600">
+    <div className="flex flex-col items-center gap-1 text-xs text-tone-600">
       {isAutoSave && (
         <HStack as="p" justify="center" className="gap-1.5">
           <Save className="h-3 w-3" />
