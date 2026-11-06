@@ -1,11 +1,22 @@
-# F1 Telemetry Viewer
+<p align="center">
+  <img src="assets/logo.png" alt="" width="96">
+</p>
 
-A local-first viewer for telemetry exported by [Pits n' Giggles](https://github.com/ashwin-nat/pits-n-giggles). It turns the JSON files saved after each F1 game session into a fast, private web app for race debriefs, qualifying pace, lap comparisons, tyre strategy, and track progress.
-
-Supports recent F1 (and F2) telemetry, including the newly released **2026 Season Pack**.
+<h1 align="center">F1 Telemetry Viewer</h1>
 
 <p align="center">
-  <img src="assets/demo.gif" alt="F1 Telemetry Viewer" width="900">
+  Race debriefs, lap comparisons, stint analysis and tyre strategy for your F1 game sessions.<br>
+  A private, local-first viewer for <a href="https://github.com/ashwin-nat/pits-n-giggles">Pits n' Giggles</a> telemetry.
+</p>
+
+<p align="center">
+  <a href="https://f1-telemetry-viewer.vercel.app"><strong>Try the live demo</strong></a>
+  &nbsp;·&nbsp;
+  <a href="#quick-start"><strong>Run it on your data</strong></a>
+</p>
+
+<p align="center">
+  <img src="assets/demo.gif" alt="A walkthrough: sessions home, a race debrief, stint comparison, ⌘K search, a track page and a lap comparison" width="900">
 </p>
 
 > [!NOTE]
@@ -13,160 +24,74 @@ Supports recent F1 (and F2) telemetry, including the newly released **2026 Seaso
 
 ## What It Does
 
-- 🏠 **Sessions home** - Your latest race and online form on top, then every session grouped by day, track and online event, with filters kept in the URL and ⌘K search across tracks, sessions and drivers.
-- 🧭 **Formula scopes** - Keep F1 26, F1 25, F2 25, and older data separate with one app-wide selector and clean scoped URLs such as `/f1-26`, `/f1-26/tracks/sakhir`, and `/f1-26/sessions/session-slug`.
-- 📊 **Session pages** - Each race, long run, qualifying session or time trial opens on a one-line headline of what happened and a ranked "Worth a look" list, then tabs for lap-by-lap charts, tyres, lap telemetry, results and the car setup. A long run, and each race stint in the Tyres tab, sits beside your earlier runs on the same tyre at that track: laps paired by tyre age on equal fuel, with wear, fade and setup changes. Rival history shows in the Results driver panel.
-- 📉 **Online form** - Grid against finish, race by race, with podiums, front-row starts and DNFs.
-- 📈 **Lap telemetry** - With Pits n' Giggles 5.0 lap recordings, compare two complete laps (yours, a rival's, a friend's `.pngt` dropped onto the page, or the fastest recorded at the track) on speed, throttle, brake, gear and battery traces, with a track map, lap playback, and tips on where the time went.
-- 🗺️ **Track pages** - A circuit map with the timing line, sectors and turn numbers, then your PBs, qualifying progress, a race plan with tyre life and fuel, your setups, and every saved session at that track.
-- 🔒 **Private data loading** - Use the local API during development, self-host against your telemetry folder, or drag in `.json` files (with their `.pngt` lap recordings) / a `.zip` in the browser. Hosted uploads stay in memory and imported lap files in browser storage; neither leaves your device.
+Supports recent F1 and F2 telemetry, including the **2026 Season Pack**.
 
-Online form prefers representative online races when there is enough human-grid data. If that is not available for a formula scope, it gracefully falls back to whatever race results or session history exists, so you only see an empty state when there is truly no data to show.
+- 🏠 **Sessions home.** Your latest race and online form on top, then every session grouped by day, track and online event, with ⌘K search across tracks, sessions and drivers.
+- 🏁 **Race debriefs.** Each race, long run, qualifying session or time trial opens on a headline of what happened and a ranked "Worth a look" list, with tabs for laps, tyres, lap telemetry, results and the car setup. Pit cycles and back-and-forth swaps are netted out, so a gained place is a real one.
+- 🛞 **Stint comparison.** A long run, and each race stint, sits beside your earlier runs on the same tyre at that track: laps paired by tyre age on equal fuel, with wear, fade and setup changes next to the pace.
+- 📈 **Lap telemetry.** With Pits n' Giggles 5.0 lap recordings, compare two laps on speed, throttle, brake, gear and battery, with a track map, playback and tips on where the time went, labelled by turn. Compare with a rival, the session best, your own best, or a friend's `.pngt` dropped onto the page.
+- 🗺️ **Track pages.** A circuit map with the timing line, sectors and turn numbers, then your PBs, qualifying progress, a race plan with tyre life and fuel, your setups, and every saved session there.
+- 📉 **Online form.** Grid against finish, race by race, with podiums, front-row starts and DNFs.
+- 🧭 **Formula scopes.** F1 26, F1 25, F2 25 and older data stay separate, with clean URLs such as `/f1-26/tracks/sakhir`.
+- 🔒 **Private by design.** No account and no database. Your telemetry stays on your machine, and files dragged into the hosted app never leave your browser.
 
-## Loading Your Data
+## Three Ways To Use It
 
-There are three ways to use the app:
+| Mode                                                  | Best for                                | How it works                                                                   |
+| ----------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------ |
+| [Hosted demo](https://f1-telemetry-viewer.vercel.app) | Trying it, or a quick look at your data | Sample data loads first; drag in `.json`, `.pngt` or `.zip` files to see yours |
+| Local                                                 | Your full telemetry folder              | Set `TELEMETRY_DIR` and run `pnpm dev`                                         |
+| Self-hosted                                           | An always-on machine or NAS             | Build once, then `pnpm start` serves the app and the telemetry API             |
 
-| Mode               | Best for                                   | How it works                                                           |
-| ------------------ | ------------------------------------------ | ---------------------------------------------------------------------- |
-| Local development  | Your full telemetry folder while building  | Set `TELEMETRY_DIR`; Vite serves `/api/sessions` from disk             |
-| Hosted/static demo | Trying the app or sharing it publicly      | Bundled sample data loads first; users can drag in their own files     |
-| Self-hosted server | Running it permanently on a machine or NAS | Build once, then serve `dist/` and the telemetry API with `pnpm start` |
-
-Telemetry files are scanned recursively, so your normal Pits n' Giggles folder structure can stay as-is. Filenames are expected to follow the Pits n' Giggles pattern:
-
-```txt
-SessionType_Track_YYYY_MM_DD_HH_mm_ss.json
-```
-
-For example:
-
-```txt
-Race_Monza_2026_05_18_21_40_00.json
-Short_Qualifying_Madrid_2026_06_12_20_18_00.json
-```
+It also ships inside Pits n' Giggles as its save viewer.
 
 ## Quick Start
+
+You need Node 22.12 or newer and [pnpm](https://pnpm.io).
 
 ```bash
 pnpm install
 cp .env.example .env
 ```
 
-Edit `.env` and point it at your telemetry folder:
+Point `.env` at your telemetry folder:
 
 ```bash
 TELEMETRY_DIR=/path/to/your/telemetry/files
 ```
 
-Then start the app:
+Then start the app and open the URL it prints, usually [http://localhost:5173](http://localhost:5173):
 
 ```bash
 pnpm dev
 ```
 
-Open the URL printed by Vite, usually [http://localhost:5173](http://localhost:5173).
-Managed Codex/Conductor/T3 Code worktrees use deterministic per-worktree ports so
-parallel branches do not silently drift to whichever port is next available.
+The folder is scanned recursively, so your normal Pits n' Giggles layout can stay as it is. Filenames follow the Pits n' Giggles pattern:
 
-## Commands
-
-```bash
-pnpm dev            # Start dev server, usually at http://localhost:5173
-pnpm dev:port       # Print the expected dev server port for this checkout
-pnpm dev:telemetry <folder>  # Start dev server with a specific telemetry folder
-pnpm dev:debug      # Start dev server with DEBUG_TELEMETRY_DIR from .env
-pnpm dev:prod       # Run the production-like demo/upload flow locally
-pnpm build          # Type-check and build the production app
-pnpm preview        # Preview the production build locally
-pnpm start          # Serve dist/ plus the telemetry API
-pnpm generate-demo  # Regenerate trimmed demo data in public/demo/
-pnpm find-session <slug-or-url>  # Resolve a session URL or slug to JSON
-pnpm test                        # Run all focused Node test suites
-pnpm test:session-index          # Run the focused Node session-index suite
-pnpm test:lap-stats              # Run complete-lap timing regressions
-pnpm test:race-pace              # Run Race Pace estimator/matching regressions
-pnpm test:energy-stats           # Run ERS/fuel energy-stat regressions
-pnpm test:fuel                   # Run the focused fuel-aggregation suite
-pnpm test:speed                  # Run canonical speed/aero inference regressions
-pnpm test:session-story          # Run session kind, session log, race story and online form regressions
-pnpm test:search                 # Run ⌘K palette matching (aliases, typos, accents)
-pnpm test:strategy               # Run Track Strategy synthesis regressions (dry + wet)
-pnpm test:tyre-wear              # Run green-flag tyre wear rate regressions
-pnpm test:lap-recording          # Run .pngt reader, completeness and API regressions
-pnpm test:lap-telemetry          # Run lap-comparison tips, defaults and track-map calibration
-pnpm check:lap-telemetry [folder] # Measure lap-tip accuracy on real recordings (aggregates only)
-pnpm generate-track-geometry     # Regenerate turn markers and circuit paths
-pnpm typecheck:node              # Type-check the servers, plugins, and scripts
-pnpm benchmark:session-index     # Benchmark a disposable 1,260-file corpus
+```txt
+SessionType_Track_YYYY_MM_DD_HH_mm_ss.json
 ```
 
-The default benchmark writes roughly 628 MiB into a uniquely owned temporary
-child (about 621 MiB of visible telemetry plus a 6.9 MiB hidden-cache fixture)
-and removes that child when it finishes. `--source-dir` runs may be larger. Use
-`pnpm benchmark:session-index -- --scratch-root /path/to/scratch` to measure the
-same filesystem class as a deployment, and always keep the scratch root outside
-your live telemetry folder. Add `--source-dir /path/to/safe/telemetry` to copy
-from a local representative corpus instead of the committed demo fixtures; the
-source remains read-only and only aggregate measurements are printed.
+Lap recordings (`.pngt`) anywhere under the folder pair with their session automatically.
 
-The session-summary index, complete-lap timing, Race Pace estimation, fuel
-aggregation, tyre wear rates, speed/aero inference, Track Strategy synthesis,
-and lap recordings and their tips have focused suites built on Node's test
-runner. No general UI
-test runner or linter is configured; `pnpm build` remains the main whole-app
-validation command.
+## Supported Data
 
-For debugging shared repro files without pointing at your full telemetry history, put the files in a small folder and launch against that folder:
-
-```bash
-pnpm dev:telemetry "/Users/linuz90/PC Stuff/Pits & Giggles/debug data"
-pnpm dev:telemetry /path/to/debug-data -- --host 127.0.0.1 --port 5174
-```
-
-The folder is served through the normal local `/api/sessions` flow, so scoped session URLs, track pages, and browser refreshes work the same way as your main telemetry directory.
-Run `pnpm dev:port -- --url` to print the expected local URL, or export
-`VITE_DEV_PORT` if you need to pin a specific dev-server port manually.
-
-If you have a larger generated/debug telemetry corpus, keep its path out of git
-and put it in your local `.env`:
-
-```bash
-DEBUG_TELEMETRY_DIR=/path/to/generated/debug-telemetry
-pnpm dev:debug
-```
-
-For contributors working with the Pits n' Giggles repo, this can point at the
-folder produced after running its integration telemetry downloader/generator
-(for example `poetry run python tests/integration_test/runner.py` in that
-repo). This is optional local QA data, not something the open-source app
-requires or commits.
+- Race, qualifying, time trial, practice and other Pits n' Giggles session JSON files
+- Pits n' Giggles 5.0 beta lap recordings (`.pngt`) for lap traces and comparisons
+- F1 26 and the 2026 Season Pack, F1 25, F2 25 and older F1 generations, with Madring in the F1 26 calendar
+- Online race rosters when available: rivals, teams, grid and finish, penalties, DNFs and fastest laps
+- Older exports with fewer fields; the UI shows what it can work out from them
 
 ## Self-Hosting
 
-Build the frontend once, then run the lightweight production server against your telemetry folder:
+Build once, then run the lightweight production server against your telemetry folder:
 
 ```bash
 pnpm build
 TELEMETRY_DIR=/path/to/your/telemetry pnpm start
 ```
 
-By default this serves the app at [http://localhost:3080](http://localhost:3080). Unlike `pnpm dev`, it does not run Vite's dev toolchain, file watchers, HMR, or source maps, so it is much lighter for an always-on setup.
-
-The local and self-hosted APIs keep a derived session-summary index under
-`.cache/f1-telemetry-viewer/` in the directory where the viewer is started.
-If that location would overlap the telemetry root or the served build output,
-the viewer refuses to persist there and continues with an in-memory index.
-The first request without a valid index is a cold build and must read each
-visible telemetry file once. Later requests, including the first request after
-a restart, normally stat the files and reuse unchanged summaries; adding or
-changing one save only reads that save.
-
-Pits n' Giggles 5.0 lap recordings (`.pngt`) under `TELEMETRY_DIR` are served from `/api/lap-recordings` by both `pnpm dev` and `pnpm start`. They are indexed in memory, not in the summary cache.
-
-The production server also applies normal HTTP caching and compression. Hashed assets and immutable session files receive long-lived browser cache headers, while the live session list uses an ETag so an unchanged refresh returns `304` without downloading the payload again. Text and JSON responses use Brotli or gzip when the client supports them.
-
-The cache can contain summary metadata such as driver and rival names, so its directory and files are created with private permissions where the operating system supports them. It never contains full telemetry JSON, and session-detail requests stream the original Pits n' Giggles file with transport-only HTTP compression. The viewer does not modify the telemetry folder or use Pits n' Giggles' `.png_session_cache.json`. You can safely delete `.cache/f1-telemetry-viewer/` while the viewer is stopped; the next session-list request will rebuild it. Embedded Pits n' Giggles builds continue to use their Python session API and do not initialize or create this viewer-owned Node cache.
+This serves the app at [http://localhost:3080](http://localhost:3080) on macOS, Linux or Windows, with HTTP caching and compression and none of Vite's dev tooling.
 
 | Variable        | Default               | Description                                        |
 | --------------- | --------------------- | -------------------------------------------------- |
@@ -175,7 +100,7 @@ The cache can contain summary metadata such as driver and rival names, so its di
 | `DIST_DIR`      | `./dist`              | Path to the built frontend                         |
 | `VITE_APP_NAME` | `F1 Telemetry Viewer` | Optional product-name override for embedded builds |
 
-Works on macOS, Linux, and Windows.
+The viewer keeps a derived summary index in `.cache/f1-telemetry-viewer/`, in the folder it starts from. The first start reads every file once; after that it only reads what changed. The index can hold driver and rival names, so it gets private file permissions where the system supports them. It never contains full telemetry, it never writes to your telemetry folder, and it's safe to delete while the viewer is stopped.
 
 ### Embedding
 
@@ -192,48 +117,45 @@ Pits n' Giggles bundles the viewer under `/save-viewer/` and serves its own sess
 
 At serve time it can set `window.__PNG_VERSION__` (page title) and `window.__PNG_SAVE_VIEWER_CONFIG__ = { sessionPollIntervalMs }` (session-list refresh, `null` to disable). Its `index.html` rewrites rely on the favicon and touch-icon links staying as they are. A session list without `isAutoSave` is deduplicated in the browser.
 
-## Stack
+## Development
 
-React 19, TypeScript, Vite 8, Tailwind CSS 4, Base UI, Recharts 3, React Router 7, JSZip, Motion, and lucide-react.
+```bash
+pnpm dev                     # Dev server against TELEMETRY_DIR
+pnpm dev:telemetry <folder>  # Dev server against one folder, for repro files
+pnpm dev:prod                # Demo and upload mode, without the local API
+pnpm build                   # Type-check and build
+pnpm test                    # All focused test suites
+pnpm test:<suite>            # One suite; package.json lists them
+pnpm generate-demo           # Rebuild public/demo/ from real sessions
+pnpm find-session <slug>     # Resolve a session URL or slug to its JSON file
+```
 
-## Supported Data
+`pnpm build` is the main whole-app check. The telemetry logic has focused suites on Node's test runner; there's no UI test runner or linter. `package.json` has the rest of the commands, and [AGENTS.md](AGENTS.md) records the telemetry rules behind the numbers.
 
-- Race, short qualifying, one-shot qualifying, time trial, practice, and other Pits n' Giggles session JSON files
-- Pits n' Giggles 5.0 beta lap recordings (`.pngt`) beside their session JSON, for lap traces and comparisons
-- Formula-aware comparisons for F1 26 / 2026 DLC, F1 25, F2 25, and older F1 generations
-- Current F1 26 track ordering, including Madrid / Madring support
-- Online race rosters when available, including rival identity, team, lap stats, overtakes, grid position, finish position, penalties, DNFs, and fastest-lap flags
-- Older exports that do not include all summary fields; the UI falls back to the data it can infer
+`pnpm generate-demo` swaps every human name for a fictional handle and fails if a real one survives, so nothing in `public/demo/` identifies a real player.
 
-## Architecture
+### Architecture
+
+React 19, TypeScript, Vite 8, Tailwind CSS 4, Base UI, Recharts 3, React Router 7, TanStack Query 5, JSZip, Motion and lucide-react.
 
 ```txt
 src/
-  components/    Shell, shared lap chart, session and track parts, tables, upload UI
-  analysis/      UI-ready telemetry models: race story, Worth a look, session log, track/setup analysis
-  context/       TelemetryProvider and browser zip/json loader
-  hooks/         Session list, session detail, and track history hooks
-  pages/         Sessions home, session pages, tracks, track page, and form routes
-  plugin/        Shared session and lap-recording indexes, Vite local telemetry API
-  utils/         Formatting, formula scopes, storage, summaries, routes, low-level stats
-  types/         TypeScript telemetry model
+  analysis/    Page models: race story, Worth a look, stint comparison, lap tips, strategy
+  components/  App shell, shared charts, session and track parts, Base UI wrappers
+  context/     TelemetryProvider, lap imports, browser zip and JSON loading
+  hooks/       Session lists, track history, lap recordings, stint comparison
+  pages/       Sessions home, session views, tracks, track page, online form
+  plugin/      Session and lap-recording indexes, the local telemetry API
+  queries/     TanStack Query definitions for sessions and recordings
+  utils/       Formatting, track identity, recording reader, low-level stats
 ```
 
-The production server and Vite plugin share the same incremental,
-viewer-owned summary index. It stores one pre-dedup summary per source file,
-then derives filtering, deduplication, ordering, and slug lookup globally on
-each change. This keeps the `/api/sessions` response and raw detail routes
-compatible with Pits n' Giggles while avoiding a full JSON reparse on every
-focus or polling refresh. Demo and browser-upload modes do not use the index.
+Every screen uses one data path: the local telemetry API, then the bundled demo, then browser uploads. The local dev server and `pnpm start` share one incremental index, so `/api/sessions` stays fast and keeps the shape Pits n' Giggles serves.
 
-The `TelemetryProvider` uses one data-access path for every screen:
+The game generation is part of the route (`/:formulaKey`), so the session log, PBs, tyre life and setups always describe one generation.
 
-1. Try the local telemetry API (`/api/sessions`).
-2. Fall back to bundled demo data (`public/demo/`).
-3. Fall back to browser upload mode.
+Telemetry calculations sit in two layers. `src/utils/stats/` holds small primitives such as lap filtering and tyre wear; `src/analysis/` holds product models and policies. Components render those models rather than reimplementing telemetry rules.
 
-That keeps the home page, track pages, and session pages working the same way whether the app is reading your local folder, serving demo data, or parsing files dropped into the browser.
+## License
 
-Formula/game scope is part of the route, not a query parameter. The root path redirects to the latest scope with data; all analysis screens live under `/:formulaKey` so the session log, track history, PBs, tyre life, and setups always describe the same game generation.
-
-Telemetry calculations are split into two layers. `src/utils/stats/` contains small reusable primitives such as lap filtering, ERS energy, tyre wear, and pace helpers. `src/analysis/` contains product-facing models and policies such as the race story and Worth a look ranking, online form, track progress buckets, track setups, and chart-ready lap/sector/stint/damage/tyre models. UI components should render those models rather than reimplementing telemetry rules inline.
+[MIT](LICENSE)

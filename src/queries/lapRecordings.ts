@@ -1,9 +1,13 @@
 import { queryOptions } from "@tanstack/react-query";
 import {
+  buildRecordingPairing,
+  openLapRecording,
   parseLapTrace,
   summarizeLapRecording,
   type OpenedLapRecording,
 } from "../utils/lapRecording/reader";
+import type { TelemetrySession } from "../types/telemetry";
+import { toSlug } from "../utils/parseFilename";
 import type {
   LapRecordingManifest,
   LapRecordingSummary,
@@ -29,6 +33,43 @@ export const lapRecordingKeys = {
 
 const apiBase = () => `${import.meta.env.BASE_URL}api/lap-recordings`;
 
+const demoLoads = new WeakMap<LapRecordingStore, Promise<void>>();
+
+/**
+ * The demo's bundled recordings (`public/demo/recordings.json`), opened once
+ * into the store like an upload. A missing file only leaves the demo without
+ * Lap telemetry.
+ */
+function loadDemoRecordings(store: LapRecordingStore): Promise<void> {
+  const loading =
+    demoLoads.get(store) ??
+    (async () => {
+      const base = `${import.meta.env.BASE_URL}demo/`;
+      const res = await fetch(`${base}recordings.json`);
+      if (!res.ok) return;
+      const entries = (await res.json()) as { file: string; session: string }[];
+      await Promise.all(
+        entries.map(async ({ file, session }) => {
+          const [data, json] = await Promise.all([
+            fetch(`${base}recordings/${file}`).then((r) => r.arrayBuffer()),
+            fetch(`${base}${toSlug(session)}.json`).then(
+              (r) => r.json() as Promise<TelemetrySession>,
+            ),
+          ]);
+          const recording = await openLapRecording(data, {
+            fileName: file,
+            pairing: buildRecordingPairing(session, json),
+          });
+          store.set(recording.manifest.slug, recording);
+        }),
+      );
+    })().catch((error) => {
+      console.warn("Skipping the demo's lap recordings", error);
+    });
+  demoLoads.set(store, loading);
+  return loading;
+}
+
 export function lapRecordingListQueryOptions(
   mode: Mode,
   store: LapRecordingStore,
@@ -38,6 +79,7 @@ export function lapRecordingListQueryOptions(
   return queryOptions({
     queryKey: lapRecordingKeys.list(mode),
     queryFn: async (): Promise<LapRecordingSummary[]> => {
+      if (mode === "demo") await loadDemoRecordings(store);
       const held = [...store.values()].map((recording) =>
         summarizeLapRecording(recording.manifest),
       );
