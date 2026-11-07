@@ -174,7 +174,7 @@ export function LapPicker({
   const currentInSession =
     !!current &&
     !!sessionManifest &&
-    current.ref.recordingSlug === sessionManifest.slug;
+    current.ref.recordingSlug === sessionManifest.id;
   const [view, setView] = useState<"session" | "track">(
     sessionManifest && (!current || currentInSession) ? "session" : "track",
   );
@@ -186,8 +186,7 @@ export function LapPicker({
     () =>
       (Object.keys(KIND_LABELS) as TrackSessionKind[]).filter((option) =>
         trackRecordings.some(
-          (recording) =>
-            trackTabForSessionType(recording.sessionType) === option,
+          (recording) => trackTabForSessionType(recording.type) === option,
         ),
       ),
     [trackRecordings],
@@ -195,7 +194,7 @@ export function LapPicker({
   // A track tab can hold a lap of another kind, e.g. your race lap against a
   // friend's qualifying lap, so the slot's own lap decides.
   const [selectedKind, setSelectedKind] = useState<TrackSessionKind>(
-    current ? trackTabForSessionType(current.recording.sessionType) : kind,
+    current ? trackTabForSessionType(current.recording.type) : kind,
   );
   const sessionDrivers = useMemo(() => {
     if (!sessionManifest || !sessionRecording) return [];
@@ -233,8 +232,7 @@ export function LapPicker({
 
   const trackRows = useMemo((): PickerRow[] => {
     const recordings = trackRecordings.filter(
-      (recording) =>
-        trackTabForSessionType(recording.sessionType) === selectedKind,
+      (recording) => trackTabForSessionType(recording.type) === selectedKind,
     );
     // The same session saved twice (a Manual save, then Just_in_case) holds
     // identical laps: list each once, keeping the copy in a slot, else the
@@ -284,6 +282,11 @@ export function LapPicker({
   const [lapOrder, setLapOrder] = useState<LapOrder>("lap");
   const activeDriver = sessionDrivers.find(
     (entry) => entry.driver.index === sessionDriver,
+  );
+  // Timed laps the recording did not capture whole are not offered; list them
+  // so a missing lap reads as skipped rather than lost.
+  const skippedLaps = (activeDriver?.driver.laps ?? []).filter(
+    (lap) => !lap.complete && !!lap.lapTime,
   );
   const activeLaps =
     lapOrder === "time"
@@ -513,6 +516,21 @@ export function LapPicker({
                     />
                   );
                 })}
+                {skippedLaps.map((lap) => (
+                  <div
+                    key={lap.lapNumber}
+                    className="grid grid-cols-[1.5rem_5rem_1fr] gap-x-3 px-2.5 py-1.5 text-xs text-tone-500"
+                  >
+                    <span />
+                    <span className="font-mono tabular-nums line-through">
+                      {msToLapTime(lap.lapTime!)}
+                    </span>
+                    <span className="truncate">
+                      Lap {lap.lapNumber} skipped:{" "}
+                      {lap.incompleteReason ?? "not recorded in full"}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

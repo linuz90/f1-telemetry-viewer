@@ -40,7 +40,7 @@ export function CompareSuggestions({
         {offered.map(({ id, label, candidate }) => {
           const gapS = (candidate.lapTimeMs - a.lapTimeMs) / 1000;
           const where =
-            candidate.recording.slug === a.recording.slug
+            candidate.recording.id === a.recording.id
               ? `Lap ${candidate.ref.lapNumber}`
               : recordingLabel(candidate.recording, candidate.ref.driverIndex);
           return (

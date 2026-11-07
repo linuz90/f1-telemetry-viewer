@@ -49,12 +49,12 @@ function OwnerForm({ entry }: { entry: LapImport }) {
         name: titleCaseName(driver.name),
         team: driver.team,
         best: summary.drivers.find((d) => d.index === driver.index)?.best,
-        complete: driver.laps.filter((lap) => lap.complete && lap.lapTimeMs)
+        complete: driver.laps.filter((lap) => lap.complete && lap.lapTime)
           .length,
       }))
       .sort(
         (a, b) =>
-          (a.best?.lapTimeMs ?? Infinity) - (b.best?.lapTimeMs ?? Infinity) ||
+          (a.best?.lapTime ?? Infinity) - (b.best?.lapTime ?? Infinity) ||
           b.complete - a.complete,
       );
   }, [entry.raw]);
@@ -109,7 +109,7 @@ function OwnerForm({ entry }: { entry: LapImport }) {
     <Modal
       onClose={close}
       title="Whose laps are these?"
-      description={`${getTrackDisplayName(entry.raw.track)} · ${recordingLabel(entry.raw)} · ${entry.fileName}`}
+      description={`${getTrackDisplayName(entry.raw.trackName)} · ${recordingLabel(entry.raw)} · ${entry.fileName}`}
       className="max-h-[85vh] max-w-lg"
     >
       <form
@@ -174,7 +174,7 @@ function OwnerForm({ entry }: { entry: LapImport }) {
                 </span>
                 <span className="font-mono text-xs tabular-nums text-tone-500">
                   {driver.best
-                    ? msToLapTime(driver.best.lapTimeMs)
+                    ? msToLapTime(driver.best.lapTime)
                     : driver.complete > 0
                       ? `${driver.complete} complete`
                       : "no complete lap"}

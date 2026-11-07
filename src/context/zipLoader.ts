@@ -60,7 +60,7 @@ export async function openLoadedRecordings(
         fileName: file.fileName,
         pairing: key ? pairings.get(key) : undefined,
       });
-      store.set(recording.manifest.slug, recording);
+      store.set(recording.manifest.id, recording);
     } catch {
       // Skip recordings this viewer cannot read (partial writes, new formats)
     }

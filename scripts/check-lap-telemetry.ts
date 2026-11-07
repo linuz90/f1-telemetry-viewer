@@ -147,18 +147,18 @@ async function main(): Promise<void> {
   const corpus = new Map<string, { recordings: number; laps: number }>();
   const byRecording: CheckedLap[][] = [];
   for (const summary of summaries) {
-    const manifest = await index.manifest(summary.slug);
+    const manifest = await index.manifest(summary.id);
     if (!manifest) continue;
-    const sessionPath = sessionPaths.get(recordingPairKey(manifest.fileName));
+    const sessionPath = sessionPaths.get(recordingPairKey(manifest.fileName ?? ""));
     const session = sessionPath
       ? (JSON.parse(await readFile(sessionPath, "utf-8")) as SessionJson)
       : undefined;
     const laps: CheckedLap[] = [];
     for (const driver of manifest.drivers) {
       for (const recorded of driver.laps) {
-        if (!recorded.complete || !recorded.lapTimeMs) continue;
+        if (!recorded.complete || !recorded.lapTime) continue;
         const bytes = await index.lapBytes(
-          manifest.slug,
+          manifest.id,
           driver.index,
           recorded.lapNumber,
         );
@@ -169,14 +169,14 @@ async function main(): Promise<void> {
             lap: prepareLap(
               await parseLapTrace(bytes),
               {
-                key: `${manifest.slug}~${driver.index}~${recorded.lapNumber}`,
+                key: `${manifest.id}~${driver.index}~${recorded.lapNumber}`,
                 driverName: driver.name,
                 team: driver.team,
                 isPlayer: manifest.playerIndex === driver.index,
-                sessionType: manifest.sessionType,
+                sessionType: manifest.type,
                 lapNumber: recorded.lapNumber,
-                lapTimeMs: recorded.lapTimeMs,
-                compound: recorded.compound,
+                lapTimeMs: recorded.lapTime,
+                compound: recorded.tyreCompound,
                 weather: manifest.weather,
                 ersMaxCapacityJ: manifest.ersMaxCapacityJ,
               },
@@ -186,7 +186,7 @@ async function main(): Promise<void> {
             officialMs: officialSectorEnds(
               session,
               driver.index,
-              recorded.lapTimeMs,
+              recorded.lapTime,
             ),
           });
         } catch {
@@ -196,7 +196,7 @@ async function main(): Promise<void> {
     }
     if (laps.length === 0) continue;
     byRecording.push(laps);
-    const conditions = `${manifest.track} · ${manifest.formula ?? "?"} · ${manifest.sessionType} · ${manifest.weather ?? "?"}`;
+    const conditions = `${manifest.trackName} · ${manifest.formula ?? "?"} · ${manifest.type} · ${manifest.weather ?? "?"}`;
     const seen = corpus.get(conditions) ?? { recordings: 0, laps: 0 };
     corpus.set(conditions, {
       recordings: seen.recordings + 1,
@@ -273,7 +273,7 @@ async function main(): Promise<void> {
 
           const comparison = compareLaps(a.lap, b.lap, {
             sectorStarts,
-            corners: getTrackCorners(a.manifest.track, a.lap.trackLengthM),
+            corners: getTrackCorners(a.manifest.trackName, a.lap.trackLengthM),
           });
           comparisons += 1;
           unitCount += comparison.units.length;
