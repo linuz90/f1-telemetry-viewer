@@ -18,11 +18,11 @@ export function driverLabel(name: string, isPlayer: boolean): string {
 export function recordingLabel(
   recording: Pick<
     LapRecordingSummary,
-    "sessionType" | "formula" | "date" | "imported" | "friendIndex"
+    "type" | "formula" | "date" | "imported" | "friendIndex"
   > & { drivers: readonly { index: number; name: string }[] },
   driverIndex?: number,
 ): string {
-  const label = `${formatSessionType(recording.sessionType, recording.formula)} · ${formatShortDate(recording.date)} ${formatTime(recording.date)}`;
+  const label = `${formatSessionType(recording.type, recording.formula)} · ${formatShortDate(recording.date)} ${formatTime(recording.date)}`;
   if (!recording.imported) return label;
   const friend = recording.drivers.find(
     (driver) => driver.index === recording.friendIndex,

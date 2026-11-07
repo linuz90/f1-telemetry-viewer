@@ -253,8 +253,8 @@ export function createLapRecordingIndex(options: {
     for (const recording of [...next.values()].sort((a, b) =>
       a.relativePath < b.relativePath ? -1 : 1,
     )) {
-      if (!bySlug.has(recording.manifest.slug)) {
-        bySlug.set(recording.manifest.slug, recording);
+      if (!bySlug.has(recording.manifest.id)) {
+        bySlug.set(recording.manifest.id, recording);
       }
     }
     if (parsed > 0) {
