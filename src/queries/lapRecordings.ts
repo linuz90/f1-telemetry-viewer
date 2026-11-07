@@ -47,27 +47,27 @@ async function fetchApiJson<T>(path: string): Promise<T | undefined> {
   return (await res.json()) as T;
 }
 
-/** A session row from `/sessions`: the manifest minus its drivers. */
+/** A session from `/sessions/<id>`: the manifest minus its drivers. */
 type ApiSession = Omit<LapRecordingManifest, "drivers">;
 type ApiDriver = Omit<LapRecordingManifest["drivers"][number], "laps">;
 
+/** Three requests, however many drivers: the session, its drivers, all their laps. */
 async function fetchApiManifest(
-  session: ApiSession,
-): Promise<LapRecordingManifest> {
-  const id = encodeURIComponent(session.id);
-  const drivers =
-    (await fetchApiJson<ApiDriver[]>(`/sessions/${id}/drivers`)) ?? [];
+  slug: string,
+): Promise<LapRecordingManifest | undefined> {
+  const id = encodeURIComponent(slug);
+  const [session, drivers, laps] = await Promise.all([
+    fetchApiJson<ApiSession>(`/sessions/${id}`),
+    fetchApiJson<ApiDriver[]>(`/sessions/${id}/drivers`),
+    fetchApiJson<Record<string, RecordedLap[]>>(`/sessions/${id}/laps`),
+  ]);
+  if (!session) return undefined;
   return {
     ...session,
-    drivers: await Promise.all(
-      drivers.map(async (driver) => ({
-        ...driver,
-        laps:
-          (await fetchApiJson<RecordedLap[]>(
-            `/sessions/${id}/drivers/${driver.index}/laps`,
-          )) ?? [],
-      })),
-    ),
+    drivers: (drivers ?? []).map((driver) => ({
+      ...driver,
+      laps: laps?.[driver.index] ?? [],
+    })),
   };
 }
 
@@ -124,10 +124,10 @@ export function lapRecordingListQueryOptions(
       if (mode !== "api") return held;
       // Hosts without the lap API answer 404 or their SPA page; no recordings
       // is the honest answer there, not an error.
-      const sessions = await fetchApiJson<ApiSession[]>("/sessions");
-      if (!sessions) return held;
-      const manifests = await Promise.all(sessions.map(fetchApiManifest));
-      return [...manifests.map(summarizeLapRecording), ...held];
+      const summaries = await fetchApiJson<LapRecordingSummary[]>(
+        "/sessions/summaries",
+      );
+      return [...(summaries ?? []), ...held];
     },
     enabled: importsReady && mode !== "detecting",
     staleTime: 10_000,
@@ -145,11 +145,9 @@ export function lapRecordingManifestQueryOptions(
       const held = store.get(slug);
       if (held) return held.manifest;
       if (mode !== "api") throw new Error(`Lap recording not found: ${slug}`);
-      const session = (await fetchApiJson<ApiSession[]>("/sessions"))?.find(
-        (entry) => entry.id === slug,
-      );
-      if (!session) throw new Error(`Failed to load lap recording: ${slug}`);
-      return fetchApiManifest(session);
+      const manifest = await fetchApiManifest(slug);
+      if (!manifest) throw new Error(`Failed to load lap recording: ${slug}`);
+      return manifest;
     },
     staleTime: Infinity,
   });
