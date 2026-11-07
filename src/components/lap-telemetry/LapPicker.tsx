@@ -283,6 +283,11 @@ export function LapPicker({
   const activeDriver = sessionDrivers.find(
     (entry) => entry.driver.index === sessionDriver,
   );
+  // Timed laps the recording did not capture whole are not offered; list them
+  // so a missing lap reads as skipped rather than lost.
+  const skippedLaps = (activeDriver?.driver.laps ?? []).filter(
+    (lap) => !lap.complete && !!lap.lapTime,
+  );
   const activeLaps =
     lapOrder === "time"
       ? [...(activeDriver?.laps ?? [])].sort(
@@ -511,6 +516,21 @@ export function LapPicker({
                     />
                   );
                 })}
+                {skippedLaps.map((lap) => (
+                  <div
+                    key={lap.lapNumber}
+                    className="grid grid-cols-[1.5rem_5rem_1fr] gap-x-3 px-2.5 py-1.5 text-xs text-tone-500"
+                  >
+                    <span />
+                    <span className="font-mono tabular-nums line-through">
+                      {msToLapTime(lap.lapTime!)}
+                    </span>
+                    <span className="truncate">
+                      Lap {lap.lapNumber} skipped:{" "}
+                      {lap.incompleteReason ?? "not recorded in full"}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
