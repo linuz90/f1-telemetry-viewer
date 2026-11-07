@@ -20,7 +20,11 @@ import { ZipUploadScreen } from "./components/ZipUploadScreen";
 import { GlobalDropZone } from "./components/GlobalDropZone";
 import { LapImportDialog } from "./components/lap-telemetry/LapImportDialog";
 import { PNG_VERSION_TITLE_PREFIX } from "./config/branding";
-import { dashboardPath, replaceFormulaScopeInPath } from "./utils/routes";
+import {
+  dashboardPath,
+  replaceFormulaScopeInPath,
+  sessionSummaryPath,
+} from "./utils/routes";
 
 const UiDebugPage = import.meta.env.DEV
   ? lazy(() =>
@@ -62,6 +66,7 @@ function AppRoutes() {
             />
           )}
           <Route index element={<DefaultScopeRedirect />} />
+          <Route path="sessions/:slug" element={<SessionSlugRedirect />} />
           <Route
             path=":formulaKey"
             element={
@@ -170,6 +175,16 @@ function ScopedFormulaRoute({ children }: { children: ReactNode }) {
   }
 
   return children;
+}
+
+/** Lets other apps link a session by slug alone; the canonical URL needs its formula scope. */
+function SessionSlugRedirect() {
+  const { slug } = useParams();
+  const { search } = useLocation();
+  const { sessions } = useTelemetry();
+  const session = sessions.find((entry) => entry.slug === slug);
+  if (!session) return <RouteNotFound />;
+  return <Navigate to={`${sessionSummaryPath(session)}${search}`} replace />;
 }
 
 function RouteNotFound() {
