@@ -111,7 +111,7 @@ async function handleLapRecordingRequest(
  * Vite plugin that serves telemetry JSON files from a local directory.
  * - GET /api/sessions — list all sessions with metadata
  * - GET /api/sessions/[slug] — return raw JSON for a session
- * - GET /api/lap-recordings/... — lap recordings, see lap-recording-index.ts
+ * - GET /lap-analyzer/api/v1/... — lap recordings, see lap-recording-index.ts
  *
  * `base` is the configured Vite base path (e.g. "/save-viewer/"). The dev
  * server does not strip it before handing requests to middleware, so

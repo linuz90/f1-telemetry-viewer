@@ -288,7 +288,10 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
     logger: { info() {}, warn() {} },
   });
 
-  const list = await resolveLapRecordingRequest("/api/lap-recordings", index);
+  const list = await resolveLapRecordingRequest(
+    "/lap-analyzer/api/v1/sessions/summaries",
+    index,
+  );
   const [summary] = JSON.parse(list.body as string) as LapRecordingSummary[];
   assert.equal(
     summary.sessionSlug,
@@ -305,7 +308,7 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   );
 
   const manifest = await resolveLapRecordingRequest(
-    `/api/lap-recordings/${summary.id}`,
+    `/lap-analyzer/api/v1/sessions/${summary.id}`,
     index,
   );
   assert.equal(
@@ -314,7 +317,7 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   );
 
   const lap = await resolveLapRecordingRequest(
-    `/api/lap-recordings/${summary.id}/21/1`,
+    `/lap-analyzer/api/v1/telemetry/${summary.id}/21/1`,
     index,
   );
   assert.equal(lap.contentType, "application/octet-stream");
@@ -325,13 +328,13 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   );
 
   for (const missing of [
-    `/api/lap-recordings/${summary.id}/21/9`,
-    `/api/lap-recordings/${summary.id}/21`,
+    `/lap-analyzer/api/v1/telemetry/${summary.id}/21/9`,
+    `/lap-analyzer/api/v1/telemetry/${summary.id}/21`,
     // Number() would read these as driver 21, lap 1.
-    `/api/lap-recordings/${summary.id}/0x15/1`,
-    `/api/lap-recordings/${summary.id}/21/1e0`,
-    "/api/lap-recordings/..%2Fsecret",
-    "/api/lap-recordings/no-such-recording",
+    `/lap-analyzer/api/v1/telemetry/${summary.id}/0x15/1`,
+    `/lap-analyzer/api/v1/telemetry/${summary.id}/21/1e0`,
+    "/lap-analyzer/api/v1/sessions/..%2Fsecret",
+    "/lap-analyzer/api/v1/sessions/no-such-recording",
   ]) {
     assert.equal(
       (await resolveLapRecordingRequest(missing, index)).status,
@@ -352,7 +355,12 @@ test("judgeLapCoverage matches the shared completeness cases", async () => {
   for (const c of cases) {
     const verdict = judgeLapCoverage(
       c.lapTimeMs,
-      { startDistanceM: c.start, endDistanceM: c.end, maxGapM: c.gap },
+      {
+        sampleCount: 1,
+        startDistanceM: c.start,
+        endDistanceM: c.end,
+        maxGapM: c.gap,
+      },
       c.trackLengthM,
     );
     assert.equal(verdict.complete, c.complete, JSON.stringify(c));
