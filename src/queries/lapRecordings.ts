@@ -12,6 +12,7 @@ import type {
   LapRecordingManifest,
   LapRecordingSummary,
   LapTrace,
+  RecordedLap,
 } from "../utils/lapRecording/types";
 import type { Mode } from "./telemetry";
 
@@ -31,7 +32,44 @@ export const lapRecordingKeys = {
     ["lap-recordings", mode, "lap", slug, driverIndex, lapNumber] as const,
 };
 
-const apiBase = () => `${import.meta.env.BASE_URL}api/lap-recordings`;
+/** Pits n' Giggles lap-analyzer API, the one source of `.pngt` data in API mode. */
+const API_BASE: string =
+  import.meta.env.VITE_LAP_API_BASE || "/lap-analyzer/api/v1";
+
+/** JSON from the lap API; undefined when the host has no such API (404 or its SPA page). */
+async function fetchApiJson<T>(path: string): Promise<T | undefined> {
+  const res = await fetch(`${API_BASE}${path}`);
+  if (res.status === 404) return undefined;
+  if (!res.ok) throw new Error(`Lap API ${path} failed: ${res.status}`);
+  if (!res.headers.get("content-type")?.includes("application/json")) {
+    return undefined;
+  }
+  return (await res.json()) as T;
+}
+
+/** A session row from `/sessions`: the manifest minus its drivers. */
+type ApiSession = Omit<LapRecordingManifest, "drivers">;
+type ApiDriver = Omit<LapRecordingManifest["drivers"][number], "laps">;
+
+async function fetchApiManifest(
+  session: ApiSession,
+): Promise<LapRecordingManifest> {
+  const id = encodeURIComponent(session.id);
+  const drivers =
+    (await fetchApiJson<ApiDriver[]>(`/sessions/${id}/drivers`)) ?? [];
+  return {
+    ...session,
+    drivers: await Promise.all(
+      drivers.map(async (driver) => ({
+        ...driver,
+        laps:
+          (await fetchApiJson<RecordedLap[]>(
+            `/sessions/${id}/drivers/${driver.index}/laps`,
+          )) ?? [],
+      })),
+    ),
+  };
+}
 
 const demoLoads = new WeakMap<LapRecordingStore, Promise<void>>();
 
@@ -60,7 +98,7 @@ function loadDemoRecordings(store: LapRecordingStore): Promise<void> {
             fileName: file,
             pairing: buildRecordingPairing(session, json),
           });
-          store.set(recording.manifest.slug, recording);
+          store.set(recording.manifest.id, recording);
         }),
       );
     })().catch((error) => {
@@ -84,16 +122,12 @@ export function lapRecordingListQueryOptions(
         summarizeLapRecording(recording.manifest),
       );
       if (mode !== "api") return held;
-      const res = await fetch(apiBase());
-      // Hosts that embed the viewer (Pits n' Giggles) may not serve this
-      // route, or answer it with their SPA page; no recordings is the honest
-      // answer there, not an error.
-      if (res.status === 404) return held;
-      if (!res.ok) throw new Error("Failed to load lap recordings");
-      if (!res.headers.get("content-type")?.includes("application/json")) {
-        return held;
-      }
-      return [...((await res.json()) as LapRecordingSummary[]), ...held];
+      // Hosts without the lap API answer 404 or their SPA page; no recordings
+      // is the honest answer there, not an error.
+      const sessions = await fetchApiJson<ApiSession[]>("/sessions");
+      if (!sessions) return held;
+      const manifests = await Promise.all(sessions.map(fetchApiManifest));
+      return [...manifests.map(summarizeLapRecording), ...held];
     },
     enabled: importsReady && mode !== "detecting",
     staleTime: 10_000,
@@ -111,9 +145,11 @@ export function lapRecordingManifestQueryOptions(
       const held = store.get(slug);
       if (held) return held.manifest;
       if (mode !== "api") throw new Error(`Lap recording not found: ${slug}`);
-      const res = await fetch(`${apiBase()}/${slug}`);
-      if (!res.ok) throw new Error(`Failed to load lap recording: ${slug}`);
-      return res.json() as Promise<LapRecordingManifest>;
+      const session = (await fetchApiJson<ApiSession[]>("/sessions"))?.find(
+        (entry) => entry.id === slug,
+      );
+      if (!session) throw new Error(`Failed to load lap recording: ${slug}`);
+      return fetchApiManifest(session);
     },
     staleTime: Infinity,
   });
@@ -135,7 +171,7 @@ export function lapTraceQueryOptions(
         bytes = await held.readLapBytes(driverIndex, lapNumber);
       } else if (mode === "api") {
         const res = await fetch(
-          `${apiBase()}/${slug}/${driverIndex}/${lapNumber}`,
+          `${API_BASE}/telemetry/${encodeURIComponent(slug)}/${driverIndex}/${lapNumber}`,
         );
         if (res.ok) bytes = new Uint8Array(await res.arrayBuffer());
       }
