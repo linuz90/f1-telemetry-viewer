@@ -246,10 +246,10 @@ export function TrackProgressPage() {
             // The section opens on eligible bests only.
             (recording) =>
               recording.drivers.some((driver) => driver.best) &&
-              isTrackSlugMatch(recording.track, trackId) &&
+              isTrackSlugMatch(recording.trackName, trackId) &&
               recordingFormulaKey(recording) === activeFormulaKey,
           )
-          .map((recording) => trackTabForSessionType(recording.sessionType)),
+          .map((recording) => trackTabForSessionType(recording.type)),
       ),
     ],
     [activeFormulaKey, lapRecordings, trackId],

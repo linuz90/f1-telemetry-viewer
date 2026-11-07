@@ -174,7 +174,7 @@ export function LapPicker({
   const currentInSession =
     !!current &&
     !!sessionManifest &&
-    current.ref.recordingSlug === sessionManifest.slug;
+    current.ref.recordingSlug === sessionManifest.id;
   const [view, setView] = useState<"session" | "track">(
     sessionManifest && (!current || currentInSession) ? "session" : "track",
   );
@@ -186,8 +186,7 @@ export function LapPicker({
     () =>
       (Object.keys(KIND_LABELS) as TrackSessionKind[]).filter((option) =>
         trackRecordings.some(
-          (recording) =>
-            trackTabForSessionType(recording.sessionType) === option,
+          (recording) => trackTabForSessionType(recording.type) === option,
         ),
       ),
     [trackRecordings],
@@ -195,7 +194,7 @@ export function LapPicker({
   // A track tab can hold a lap of another kind, e.g. your race lap against a
   // friend's qualifying lap, so the slot's own lap decides.
   const [selectedKind, setSelectedKind] = useState<TrackSessionKind>(
-    current ? trackTabForSessionType(current.recording.sessionType) : kind,
+    current ? trackTabForSessionType(current.recording.type) : kind,
   );
   const sessionDrivers = useMemo(() => {
     if (!sessionManifest || !sessionRecording) return [];
@@ -233,8 +232,7 @@ export function LapPicker({
 
   const trackRows = useMemo((): PickerRow[] => {
     const recordings = trackRecordings.filter(
-      (recording) =>
-        trackTabForSessionType(recording.sessionType) === selectedKind,
+      (recording) => trackTabForSessionType(recording.type) === selectedKind,
     );
     // The same session saved twice (a Manual save, then Just_in_case) holds
     // identical laps: list each once, keeping the copy in a slot, else the

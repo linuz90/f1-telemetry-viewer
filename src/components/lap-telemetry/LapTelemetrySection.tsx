@@ -100,7 +100,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
     [sessions],
   );
   const recordingsBySlug = useMemo(
-    () => new Map(recordings.map((recording) => [recording.slug, recording])),
+    () => new Map(recordings.map((recording) => [recording.id, recording])),
     [recordings],
   );
   const ownSlug = scope.kind === "session" ? scope.sessionSlug : undefined;
@@ -165,7 +165,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   );
 
   const trackSlugs = useMemo(
-    () => new Set(trackRecordings.map((r) => r.slug)),
+    () => new Set(trackRecordings.map((r) => r.id)),
     [trackRecordings],
   );
   // Only this param: other URL state (the track page's race length) must not
@@ -182,7 +182,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   const manifestSlugs = useMemo(
     () => [
       ...new Set([
-        ...sessionRecordings.map((recording) => recording.slug),
+        ...sessionRecordings.map((recording) => recording.id),
         ...urlRefs.map((ref) => ref.recordingSlug),
       ]),
     ],
@@ -191,12 +191,12 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   const { manifests, failed: failedManifests } =
     useLapRecordingManifests(manifestSlugs);
   const sessionManifest = sessionRecording
-    ? manifests.get(sessionRecording.slug)
+    ? manifests.get(sessionRecording.id)
     : undefined;
 
   const candidateByKey = useMemo(() => {
     const fromManifests = [...manifests.values()].flatMap((manifest) => {
-      const recording = recordingsBySlug.get(manifest.slug);
+      const recording = recordingsBySlug.get(manifest.id);
       return recording ? manifestCandidates(manifest, recording) : [];
     });
     return new Map(
@@ -208,14 +208,14 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
   }, [familyPool, manifests, recordingsBySlug]);
 
   const sessionPool = useMemo(() => {
-    const slugs = new Set(sessionRecordings.map((recording) => recording.slug));
+    const slugs = new Set(sessionRecordings.map((recording) => recording.id));
     return [...candidateByKey.values()].filter((c) =>
       slugs.has(c.ref.recordingSlug),
     );
   }, [candidateByKey, sessionRecordings]);
   // Default to this save's own laps; without any, the fastest hidden run's.
   const defaultRecordingSlug = ownRecording?.completeLapCount
-    ? ownRecording.slug
+    ? ownRecording.id
     : undefined;
 
   const focusedDriverIndex =
@@ -326,7 +326,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
               driverName: candidate.driverName,
               team: candidate.team,
               isPlayer: candidate.isPlayer,
-              sessionType: candidate.recording.sessionType,
+              sessionType: candidate.recording.type,
               recordingSlug: candidate.ref.recordingSlug,
               lapNumber: candidate.ref.lapNumber,
               lapTimeMs: candidate.lapTimeMs,
@@ -385,7 +385,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
     return selected[1] ? resolvePresets(selected[1], presetPool, "B") : presets;
   }, [pickerSlot, presets, selected, presetPool]);
 
-  const ownRecordingSlug = ownRecording?.slug;
+  const ownRecordingSlug = ownRecording?.id;
   const slots = useMemo(
     (): SlotLap[] =>
       selected.map((candidate, index) => ({
@@ -409,7 +409,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
                 ? "Race rival"
                 : undefined))
             : undefined,
-          candidate.recording.slug === ownRecordingSlug
+          candidate.recording.id === ownRecordingSlug
             ? undefined
             : recordingLabel(candidate.recording, candidate.ref.driverIndex),
           `Lap ${candidate.ref.lapNumber}`,
@@ -472,7 +472,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
       : "";
     const elsewhere = familyRecordings.some(
       (recording) =>
-        recording.slug !== sessionRecording.slug &&
+        recording.id !== sessionRecording.id &&
         recording.completeLapCount > 0,
     );
     return (
@@ -489,7 +489,7 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
               <>
                 : {whose === "You" ? "your" : `${whose}'s`}{" "}
                 <span className="font-mono text-tone-200">
-                  {msToLapTime(partial.lapTimeMs)}
+                  {msToLapTime(partial.lapTime)}
                 </span>{" "}
                 on lap {partial.lapNumber} is incomplete ({partial.reason})
               </>

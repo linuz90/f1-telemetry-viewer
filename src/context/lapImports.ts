@@ -51,14 +51,14 @@ export interface LapImport extends StoredLapImport {
  */
 export function applyImportOwner(
   raw: LapRecordingManifest,
-  slug: string,
+  id: string,
   owner: LapImportOwner | null,
 ): LapRecordingManifest {
   const friendName =
     owner && owner.name !== null ? owner.name.trim() || "Friend" : null;
   return {
     ...raw,
-    slug,
+    id,
     sessionSlug: undefined,
     playerIndex: owner && owner.name === null ? owner.driverIndex : undefined,
     friendIndex: friendName ? owner?.driverIndex : undefined,
@@ -131,7 +131,7 @@ export async function openDroppedFile(file: File): Promise<LapImport> {
   const opened = await openLapRecording(bytes, { fileName: file.name });
   return toLapImport(
     {
-      slug: importSlug(opened.manifest.slug, bytes),
+      slug: importSlug(opened.manifest.id, bytes),
       fileName: file.name,
       data: file,
       owner: null,

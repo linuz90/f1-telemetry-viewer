@@ -193,7 +193,7 @@ export function LapImportsProvider({ children }: { children: ReactNode }) {
       // API with a slug only this browser knows and flash a load error.
       queryClient.setQueryData<LapRecordingSummary[]>(
         lapRecordingKeys.list(mode),
-        (list) => list?.filter((recording) => recording.slug !== slug),
+        (list) => list?.filter((recording) => recording.id !== slug),
       );
       queryClient.removeQueries({
         predicate: (query) =>

@@ -95,7 +95,7 @@ test("recordings keep the 64-bit session UID and reject unknown format versions"
     { fileName: "Race_Melbourne_2026_10_05_17_00_04.pngt" },
   );
   assert.equal(manifest.sessionUid, "14519567076918017992");
-  assert.equal(manifest.slug, "race-melbourne-2026-10-05-17-00-04");
+  assert.equal(manifest.id, "race-melbourne-2026-10-05-17-00-04");
 
   await assert.rejects(
     openLapRecording(await buildPngt({ version: 2, drivers }), {
@@ -193,9 +193,9 @@ test("a recording pairs with its Just_in_case session JSON", () => {
     ersMaxCapacityJ: 4_000_000,
     lapTimings: {
       3: [
-        { lapTimeMs: 81_250, sectorEndsMs: [27_100, 48_500] },
-        { lapTimeMs: 95_000, sectorEndsMs: [62_000, 82_000] },
-        { lapTimeMs: 27_900 },
+        { lapTime: 81_250, sectorEndsMs: [27_100, 48_500] },
+        { lapTime: 95_000, sectorEndsMs: [62_000, 82_000] },
+        { lapTime: 27_900 },
       ],
       21: [],
     },
@@ -296,7 +296,7 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   assert.equal(summary.playerIndex, 21);
   assert.equal(summary.completeLapCount, 2);
   assert.deepEqual(
-    summary.drivers.map((driver) => [driver.name, driver.best?.lapTimeMs]),
+    summary.drivers.map((driver) => [driver.name, driver.best?.lapTime]),
     [
       ["OCON", fullLap.lapTimeMs + 500],
       ["RUSSELL", fullLap.lapTimeMs],
@@ -304,7 +304,7 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   );
 
   const manifest = await resolveLapRecordingRequest(
-    `/api/lap-recordings/${summary.slug}`,
+    `/api/lap-recordings/${summary.id}`,
     index,
   );
   assert.equal(
@@ -313,7 +313,7 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   );
 
   const lap = await resolveLapRecordingRequest(
-    `/api/lap-recordings/${summary.slug}/21/1`,
+    `/api/lap-recordings/${summary.id}/21/1`,
     index,
   );
   assert.equal(lap.contentType, "application/octet-stream");
@@ -324,11 +324,11 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   );
 
   for (const missing of [
-    `/api/lap-recordings/${summary.slug}/21/9`,
-    `/api/lap-recordings/${summary.slug}/21`,
+    `/api/lap-recordings/${summary.id}/21/9`,
+    `/api/lap-recordings/${summary.id}/21`,
     // Number() would read these as driver 21, lap 1.
-    `/api/lap-recordings/${summary.slug}/0x15/1`,
-    `/api/lap-recordings/${summary.slug}/21/1e0`,
+    `/api/lap-recordings/${summary.id}/0x15/1`,
+    `/api/lap-recordings/${summary.id}/21/1e0`,
     "/api/lap-recordings/..%2Fsecret",
     "/api/lap-recordings/no-such-recording",
   ]) {

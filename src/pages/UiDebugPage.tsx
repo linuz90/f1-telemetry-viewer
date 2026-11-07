@@ -690,9 +690,9 @@ const lapTelemetryFixture = (() => {
       isFriend: false,
       compound: "Soft",
       recording: {
-        slug: "fixture",
-        sessionType: "Short Qualifying",
-        track: "Melbourne",
+        id: "fixture",
+        type: "Short Qualifying",
+        trackName: "Melbourne",
         date: "2026-10-05T20:49:14",
         trackLengthM,
         completeLapCount: 2,

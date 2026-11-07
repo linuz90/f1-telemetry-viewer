@@ -65,7 +65,7 @@ export function useLapRecordingManifests(
       const manifests = new Map<string, LapRecordingManifest>();
       const failed = new Set<string>();
       results.forEach(({ data, isError }, i) => {
-        if (data) manifests.set(data.slug, data);
+        if (data) manifests.set(data.id, data);
         else if (isError) failed.add(slugs[i]);
       });
       return { manifests, failed };
@@ -134,7 +134,7 @@ export function useRecordedLapFinder(
   const { data: manifest } = useQuery({
     ...lapRecordingManifestQueryOptions(
       mode,
-      recording?.slug ?? "",
+      recording?.id ?? "",
       lapRecordingStore,
     ),
     enabled: !!recording,
@@ -144,8 +144,8 @@ export function useRecordedLapFinder(
     if (!manifest || !driver) return undefined;
     const lapsByTime = new Map<number, number>();
     for (const lap of driver.laps) {
-      if (lap.complete && lap.lapTimeMs)
-        lapsByTime.set(lap.lapTimeMs, lap.lapNumber);
+      if (lap.complete && lap.lapTime)
+        lapsByTime.set(lap.lapTime, lap.lapNumber);
     }
     if (lapsByTime.size === 0) return undefined;
     return (lapTimeMs: number) => {
@@ -153,7 +153,7 @@ export function useRecordedLapFinder(
       return lapNumber === undefined
         ? undefined
         : {
-            recordingSlug: manifest.slug,
+            recordingSlug: manifest.id,
             driverIndex: driver.index,
             lapNumber,
           };
