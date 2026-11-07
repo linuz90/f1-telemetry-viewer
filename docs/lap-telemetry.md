@@ -4,7 +4,7 @@ Lap recordings (`.pngt`, Pits n' Giggles 5.0 beta) and the Lap telemetry tab tha
 
 ## Where recordings come from
 
-- `src/plugin/lap-recording-index.ts` indexes recordings on their own and serves `/api/lap-recordings/...` for both the dev and self-hosted servers. Upload mode and browser imports open them through the same reader in `src/utils/lapRecording/`.
+- `src/plugin/lap-recording-index.ts` indexes recordings on their own and serves the Pits n' Giggles lap analyzer API (`/lap-analyzer/api/v1/...`) for both the dev and self-hosted servers. Upload mode and browser imports open them through the same reader in `src/utils/lapRecording/`.
 - The reader rejects unknown `.pngt` format versions and decodes only the channels in `LapChannel`. It is the one place to adapt when the beta format changes, except channel units, which `prepareLap()` normalises.
 - Recordings stay out of `SessionSummary` and the session index. They pair with session JSON through `resolvePairKey()` (a `_Manual_` save can be stamped up to 2 s after its recording) and stay reachable when `deduplicateSessions` hides their session. That is where restarted qualifying runs keep their only complete laps: the surviving row claims them through `duplicateSlugs` (`sessionSaveSlugs()`) for its glyph and session page.
 - Player index, track length and sector starts come from the paired session JSON; the recording has none of them.
