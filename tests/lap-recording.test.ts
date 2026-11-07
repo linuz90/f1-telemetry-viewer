@@ -9,6 +9,7 @@ import {
 } from "../src/plugin/lap-recording-index";
 import {
   buildRecordingPairing,
+  judgeLapCoverage,
   openLapRecording,
   parseLapTrace,
   recordingPairKey,
@@ -337,5 +338,24 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
       404,
       missing,
     );
+  }
+});
+
+test("judgeLapCoverage matches the shared completeness cases", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { cases } = JSON.parse(
+    await readFile(
+      new URL("./fixtures/lap-completeness-cases.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  for (const c of cases) {
+    const verdict = judgeLapCoverage(
+      c.lapTimeMs,
+      { startDistanceM: c.start, endDistanceM: c.end, maxGapM: c.gap },
+      c.trackLengthM,
+    );
+    assert.equal(verdict.complete, c.complete, JSON.stringify(c));
+    assert.equal(verdict.incompleteReason ?? null, c.reason, JSON.stringify(c));
   }
 });
