@@ -114,6 +114,7 @@ Pits n' Giggles bundles the viewer under `/save-viewer/` and serves its own sess
 | `VITE_EXTERNAL_LINK_TEMPLATE` | `/legacy/{slug}`  | Link from every session page to the host's view of the same save              |
 | `VITE_EXTERNAL_LINK_LABEL`    | `Legacy View`     | Label for that link                                                           |
 | `VITE_DISABLE_ANALYTICS`      | `true`            | Turns off Vercel Analytics                                                    |
+| `VITE_HIDE_IMPORT_HINT`       | `true`            | Hides the "Got a lap file from a friend?" hint in Lap telemetry               |
 
 At serve time it can set `window.__PNG_VERSION__` (page title) and `window.__PNG_SAVE_VIEWER_CONFIG__ = { sessionPollIntervalMs }` (session-list refresh, `null` to disable). Its `index.html` rewrites rely on the favicon and touch-icon links staying as they are. A session list without `isAutoSave` is deduplicated in the browser.
 
