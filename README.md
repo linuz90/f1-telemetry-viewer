@@ -130,7 +130,7 @@ pnpm generate-demo           # Rebuild public/demo/ from real sessions
 pnpm find-session <slug>     # Resolve a session URL or slug to its JSON file
 ```
 
-`pnpm build` is the main whole-app check. The telemetry logic has focused suites on Node's test runner; there's no UI test runner or linter. `package.json` has the rest of the commands, and [AGENTS.md](AGENTS.md) records the telemetry rules behind the numbers.
+`pnpm build` is the main whole-app check. The telemetry logic has focused suites on Node's test runner; there's no UI test runner or linter. `package.json` has the rest of the commands, and [`docs/`](docs/) records the telemetry rules behind the numbers.
 
 `pnpm generate-demo` swaps every human name for a fictional handle and fails if a real one survives, so nothing in `public/demo/` identifies a real player.
 
