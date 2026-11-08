@@ -32,7 +32,7 @@ const BATTERY_MAX_MJ = 4;
 const WHEEL_LOCK_DEG = 90;
 /**
  * The header names a turn within this of its marker. Markers sit up to ~50 m
- * from the game's slowest point (see AGENTS.md, Lap telemetry), and a corner's
+ * from the game's slowest point (see docs/lap-telemetry.md), and a corner's
  * braking and exit reach about this far either side.
  */
 const TURN_LABEL_RANGE_M = 120;

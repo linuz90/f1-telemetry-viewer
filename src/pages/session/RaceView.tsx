@@ -107,7 +107,7 @@ const TABS = [
   { key: "setup", label: "Setup" },
 ] as const;
 
-/** Reaction text tone: AGENTS.md reads a start over 0.5 s as severe. */
+/** Reaction text tone: docs/telemetry-data.md reads a start over 0.5 s as severe. */
 const REACTION_TONE: Partial<Record<StartReactionRating, string>> = {
   exceptional: "text-ahead",
   optimal: "text-ahead",
