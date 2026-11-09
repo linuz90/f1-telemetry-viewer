@@ -188,9 +188,11 @@ function SessionSlugRedirect() {
   const { slug = "" } = useParams();
   const { search } = useLocation();
   const { sessions } = useTelemetry();
-  const session = sessions.find((entry) =>
-    sessionSaveSlugs(entry).includes(slug),
-  );
+  // An exact row wins: two files can share a slug, one hidden under another
+  // session and one listed on its own.
+  const session =
+    sessions.find((entry) => entry.slug === slug) ??
+    sessions.find((entry) => sessionSaveSlugs(entry).includes(slug));
   if (!session) return <RouteNotFound />;
   return <Navigate to={`${sessionSummaryPath(session)}${search}`} replace />;
 }
