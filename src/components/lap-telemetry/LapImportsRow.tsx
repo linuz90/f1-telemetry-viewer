@@ -3,6 +3,9 @@ import { useLapImports } from "../../context/LapImportsContext";
 import type { LapImport } from "../../context/lapImports";
 import { recordingLabel } from "./labels";
 
+// Embedded builds (Pits n' Giggles) turn the drop-a-friend's-file hint off.
+const HIDE_IMPORT_HINT = import.meta.env.VITE_HIDE_IMPORT_HINT === "true";
+
 function ownerLabel(entry: LapImport): string {
   if (!entry.owner) return "Whose laps?";
   return entry.owner.name === null ? "Yours" : entry.owner.name || "Friend";
@@ -17,6 +20,7 @@ export function LapImportsRow({ slugs }: { slugs: ReadonlySet<string> }) {
   const here = imports.filter((entry) => slugs.has(entry.slug));
 
   if (here.length === 0) {
+    if (HIDE_IMPORT_HINT) return null;
     return (
       <p className="flex items-center gap-1.5 text-xs text-tone-600">
         <FileUp className="size-3.5 shrink-0" />

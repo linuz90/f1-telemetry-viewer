@@ -55,11 +55,13 @@ export function recordingPairKey(fileName: string): string {
 }
 
 /**
- * A `_Manual_` save can be stamped a second or two after the recording it
+ * A `_Manual_` save can be stamped a few seconds after the recording it
  * belongs to (`Race_Suzuka_..._10_34_13.pngt` beside
- * `Race_Suzuka_Manual_..._10_34_14.json`).
+ * `Race_Suzuka_Manual_..._10_34_14.json`; 3 s seen in real data). Matches
+ * Pits n' Giggles' `_PAIR_TOLERANCE_S` in `apps/web/save_viewer_routes.py`,
+ * so a recording pairs the same way embedded and standalone.
  */
-const PAIR_TOLERANCE_S = 2;
+const PAIR_TOLERANCE_S = 5;
 
 function shiftPairKey(key: string, seconds: number): string | undefined {
   const match = key.match(
@@ -132,8 +134,8 @@ function pairedLapTiming(lap: PairableLapHistory): PairedLapTiming {
   const s2 = ms(lap["sector-2-time-in-ms"], lap["sector-2-time-minutes"]);
   // Partial laps copy a sector into the lap time; their splits stay out.
   return s1 > 0 && s2 > 0 && s1 + s2 < lapTimeMs
-    ? { lapTimeMs, sectorEndsMs: [s1, s1 + s2] }
-    : { lapTimeMs };
+    ? { lapTime: lapTimeMs, sectorEndsMs: [s1, s1 + s2] }
+    : { lapTime: lapTimeMs };
 }
 
 /** Context the recording lacks, read from the paired session JSON. */
@@ -271,12 +273,12 @@ export function judgeLapCoverage(
 export function isEligibleBestLap(
   lap: RecordedLap,
   sessionType: string,
-): lap is RecordedLap & { lapTimeMs: number } {
+): lap is RecordedLap & { lapTime: number } {
   return (
     lap.complete &&
     lap.valid &&
-    lap.lapTimeMs != null &&
-    lap.lapTimeMs > 0 &&
+    lap.lapTime != null &&
+    lap.lapTime > 0 &&
     !lap.pitInLap &&
     !lap.pitOutLap &&
     !(isRaceSessionType(sessionType) && lap.lapNumber === 1)
@@ -396,14 +398,14 @@ export async function openLapRecording(
           const lapTimeMs = finitePositive(lap.lap_time_ms) ?? null;
           return {
             lapNumber,
-            lapTimeMs,
+            lapTime: lapTimeMs,
             // Beta files write `valid` as 1 / false.
             valid: lap.valid === true || lap.valid === 1,
-            compound:
+            tyreCompound:
               typeof lap.tyre_compound === "string"
                 ? lap.tyre_compound
                 : undefined,
-            tyreAgeLaps:
+            tyreLaps:
               typeof lap.tyre_laps === "number" ? lap.tyre_laps : undefined,
             pitInLap: lap.pit_in_lap === true,
             pitOutLap: lap.pit_out_lap === true,
@@ -428,7 +430,7 @@ export async function openLapRecording(
     0,
     ...parsedDrivers.flatMap((driver) =>
       (driver?.laps ?? [])
-        .filter((lap) => lap.lapTimeMs)
+        .filter((lap) => lap.lapTime)
         .map((lap) => lap.coverage.endDistanceM ?? 0),
     ),
   );
@@ -450,11 +452,11 @@ export async function openLapRecording(
           return {
             ...lap,
             sectorEndsMs:
-              timing && timing.lapTimeMs === lap.lapTimeMs
+              timing && timing.lapTime === lap.lapTime
                 ? timing.sectorEndsMs
                 : undefined,
             ...coverage,
-            ...judgeLapCoverage(lap.lapTimeMs, coverage, trackLengthM),
+            ...judgeLapCoverage(lap.lapTime, coverage, trackLengthM),
           };
         })
         .sort((a, b) => a.lapNumber - b.lapNumber),
@@ -476,11 +478,11 @@ export async function openLapRecording(
       ? session.session_type
       : parsedName.sessionType;
   const manifest: LapRecordingManifest = {
-    slug: lapRecordingSlug(options.fileName),
+    id: lapRecordingSlug(options.fileName),
     fileName: `${stripExtension(options.fileName)}${LAP_RECORDING_EXTENSION}`,
     sessionUid,
-    sessionType,
-    track:
+    type: sessionType,
+    trackName:
       typeof session.track?.name === "string"
         ? session.track.name
         : parsedName.track,
@@ -539,24 +541,24 @@ export function summarizeLapRecording(
     let fastestIncomplete: RecordedLap | undefined;
     for (const lap of driver.laps) {
       if (lap.complete) completeLapCount += 1;
-      if (isEligibleBestLap(lap, manifest.sessionType)) {
-        if (!best || lap.lapTimeMs < (best.lapTimeMs ?? Infinity)) best = lap;
+      if (isEligibleBestLap(lap, manifest.type)) {
+        if (!best || lap.lapTime < (best.lapTime ?? Infinity)) best = lap;
       } else if (
         !lap.complete &&
         lap.valid &&
-        lap.lapTimeMs &&
-        lap.lapTimeMs < (fastestIncomplete?.lapTimeMs ?? Infinity)
+        lap.lapTime &&
+        lap.lapTime < (fastestIncomplete?.lapTime ?? Infinity)
       ) {
         fastestIncomplete = lap;
       }
     }
     const fasterIncomplete =
-      fastestIncomplete?.lapTimeMs &&
-      fastestIncomplete.lapTimeMs < (best?.lapTimeMs ?? Infinity)
+      fastestIncomplete?.lapTime &&
+      fastestIncomplete.lapTime < (best?.lapTime ?? Infinity)
         ? {
             lapNumber: fastestIncomplete.lapNumber,
-            lapTimeMs: fastestIncomplete.lapTimeMs,
-            compound: fastestIncomplete.compound,
+            lapTime: fastestIncomplete.lapTime,
+            tyreCompound: fastestIncomplete.tyreCompound,
             reason: fastestIncomplete.incompleteReason ?? "partial trace",
           }
         : undefined;
@@ -564,11 +566,11 @@ export function summarizeLapRecording(
       index: driver.index,
       name: driver.name,
       team: driver.team,
-      best: best?.lapTimeMs
+      best: best?.lapTime
         ? {
             lapNumber: best.lapNumber,
-            lapTimeMs: best.lapTimeMs,
-            compound: best.compound,
+            lapTime: best.lapTime,
+            tyreCompound: best.tyreCompound,
           }
         : undefined,
       fasterIncomplete,
@@ -576,10 +578,10 @@ export function summarizeLapRecording(
   });
 
   return {
-    slug: manifest.slug,
+    id: manifest.id,
     sessionSlug: manifest.sessionSlug,
-    sessionType: manifest.sessionType,
-    track: manifest.track,
+    type: manifest.type,
+    trackName: manifest.trackName,
     formula: manifest.formula,
     gameYear: manifest.gameYear,
     date: manifest.date,

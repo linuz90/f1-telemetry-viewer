@@ -2,8 +2,8 @@
  * Shapes for Pits n' Giggles lap recordings (`.pngt`, format version 1).
  *
  * A recording is a zip beside the session JSON with distance-based traces for
- * every car's laps. These types are shared by the Node index, the API routes
- * and the browser (upload mode), so both apply the same completeness rules.
+ * every car's laps. Field names are the lap-analyzer API's (`/lap-analyzer/api/v1`),
+ * so API responses, the Node index and browser uploads all share one vocabulary.
  */
 
 export const LAP_RECORDING_FORMAT_VERSION = 1;
@@ -33,13 +33,13 @@ export type LapTrace = Readonly<Record<string, Float32Array | undefined>>;
 export interface RecordedLap {
   lapNumber: number;
   /** Official lap time; null for untimed laps. */
-  lapTimeMs: number | null;
+  lapTime: number | null;
   /** Official elapsed time at the ends of sectors 1 and 2, from the paired session JSON. */
   sectorEndsMs?: [number, number];
   valid: boolean;
-  compound?: string;
+  tyreCompound?: string;
   /** Tyre age in laps at the start of this lap, as exported. */
-  tyreAgeLaps?: number;
+  tyreLaps?: number;
   pitInLap: boolean;
   pitOutLap: boolean;
   sampleCount: number;
@@ -77,17 +77,18 @@ export interface RecordingPairing {
 }
 
 export interface PairedLapTiming {
-  lapTimeMs: number;
+  lapTime: number;
   sectorEndsMs?: [number, number];
 }
 
 export interface LapRecordingManifest {
-  slug: string;
-  fileName: string;
+  id: string;
+  /** Set for browser-opened files; the API names sessions by `id` only. */
+  fileName?: string;
   /** Kept as a string: the exporter writes a 64-bit integer. */
   sessionUid?: string;
-  sessionType: string;
-  track: string;
+  type: string;
+  trackName: string;
   formula?: string;
   gameYear?: number;
   appVersion?: string;
@@ -108,16 +109,16 @@ export interface LapRecordingManifest {
 
 export interface RecordedLapSummary {
   lapNumber: number;
-  lapTimeMs: number;
-  compound?: string;
+  lapTime: number;
+  tyreCompound?: string;
 }
 
-/** One row per recording for `GET /api/lap-recordings`. */
+/** One row per recording for `GET /lap-analyzer/api/v1/sessions` (aggregated client-side). */
 export interface LapRecordingSummary {
-  slug: string;
+  id: string;
   sessionSlug?: string;
-  sessionType: string;
-  track: string;
+  type: string;
+  trackName: string;
   formula?: string;
   gameYear?: number;
   date: string;

@@ -105,7 +105,7 @@ export interface LapCandidate {
  * comparing a lap with its own copy says nothing.
  */
 export function lapIdentity(candidate: LapCandidate): string {
-  return `${candidate.recording.track}|${candidate.recording.sessionType}|${candidate.driverName}|${candidate.ref.lapNumber}|${candidate.lapTimeMs}`;
+  return `${candidate.recording.trackName}|${candidate.recording.type}|${candidate.driverName}|${candidate.ref.lapNumber}|${candidate.lapTimeMs}`;
 }
 
 function isSameLap(a: LapCandidate, b: LapCandidate): boolean {
@@ -127,9 +127,9 @@ export function recordingFormulaKey(
 
 export function familyOf(recording: LapRecordingSummary): LapFamily {
   return {
-    track: recording.track,
+    track: recording.trackName,
     formulaKey: recordingFormulaKey(recording),
-    kind: trackTabForSessionType(recording.sessionType),
+    kind: trackTabForSessionType(recording.type),
   };
 }
 
@@ -138,10 +138,10 @@ export function isInFamily(
   family: Omit<LapFamily, "kind"> & { kind?: TrackSessionKind },
 ): boolean {
   return (
-    isSameTrack(recording.track, family.track) &&
+    isSameTrack(recording.trackName, family.track) &&
     recordingFormulaKey(recording) === family.formulaKey &&
     (family.kind === undefined ||
-      trackTabForSessionType(recording.sessionType) === family.kind)
+      trackTabForSessionType(recording.type) === family.kind)
   );
 }
 
@@ -155,16 +155,16 @@ export function bestLapCandidates(
         ? [
             {
               ref: {
-                recordingSlug: recording.slug,
+                recordingSlug: recording.id,
                 driverIndex: driver.index,
                 lapNumber: driver.best.lapNumber,
               },
-              lapTimeMs: driver.best.lapTimeMs,
+              lapTimeMs: driver.best.lapTime,
               driverName: driver.name,
               team: driver.team,
               isPlayer: driver.index === recording.playerIndex,
               isFriend: driver.index === recording.friendIndex,
-              compound: driver.best.compound,
+              compound: driver.best.tyreCompound,
               recording,
               eligible: true,
               valid: true,
@@ -184,25 +184,25 @@ export function manifestCandidates(
 ): LapCandidate[] {
   return manifest.drivers.flatMap((driver) =>
     driver.laps
-      .filter((lap) => lap.complete && lap.lapTimeMs)
+      .filter((lap) => lap.complete && lap.lapTime)
       .map((lap) => ({
         ref: {
-          recordingSlug: manifest.slug,
+          recordingSlug: manifest.id,
           driverIndex: driver.index,
           lapNumber: lap.lapNumber,
         },
-        lapTimeMs: lap.lapTimeMs!,
+        lapTimeMs: lap.lapTime!,
         driverName: driver.name,
         team: driver.team,
         isPlayer: driver.index === manifest.playerIndex,
         isFriend: driver.index === manifest.friendIndex,
-        compound: lap.compound,
+        compound: lap.tyreCompound,
         recording,
-        eligible: isEligibleBestLap(lap, manifest.sessionType),
+        eligible: isEligibleBestLap(lap, manifest.type),
         valid: lap.valid,
         pitLap: lap.pitInLap || lap.pitOutLap,
         standingStart:
-          isRaceSessionType(manifest.sessionType) && lap.lapNumber === 1,
+          isRaceSessionType(manifest.type) && lap.lapNumber === 1,
       })),
   );
 }
@@ -327,7 +327,7 @@ export function importedLapRefs(
 ): LapRef[] {
   const best = imported.drivers.find((d) => d.index === ownerIndex)?.best;
   const theirs = best && {
-    recordingSlug: imported.slug,
+    recordingSlug: imported.id,
     driverIndex: ownerIndex,
     lapNumber: best.lapNumber,
   };
@@ -336,7 +336,7 @@ export function importedLapRefs(
   const mine = bestLapCandidates(
     recordings.filter(
       (recording) =>
-        recording.slug !== imported.slug &&
+        recording.id !== imported.id &&
         isInFamily(recording, {
           track: family.track,
           formulaKey: family.formulaKey,
@@ -347,7 +347,7 @@ export function importedLapRefs(
     fastest(
       mine.filter(
         (candidate) =>
-          trackTabForSessionType(candidate.recording.sessionType) ===
+          trackTabForSessionType(candidate.recording.type) ===
           family.kind,
       ),
     ) ?? fastest(mine);

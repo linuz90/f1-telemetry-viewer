@@ -253,8 +253,8 @@ export function createLapRecordingIndex(options: {
     for (const recording of [...next.values()].sort((a, b) =>
       a.relativePath < b.relativePath ? -1 : 1,
     )) {
-      if (!bySlug.has(recording.manifest.slug)) {
-        bySlug.set(recording.manifest.slug, recording);
+      if (!bySlug.has(recording.manifest.id)) {
+        bySlug.set(recording.manifest.id, recording);
       }
     }
     if (parsed > 0) {
@@ -335,13 +335,10 @@ export interface LapRecordingResponse {
   cacheControl: string;
 }
 
-const LAP_RECORDINGS_PREFIX = "/api/lap-recordings";
+const LAP_RECORDINGS_PREFIX = "/lap-analyzer/api/v1";
 
 export function isLapRecordingPath(pathname: string): boolean {
-  return (
-    pathname === LAP_RECORDINGS_PREFIX ||
-    pathname.startsWith(`${LAP_RECORDINGS_PREFIX}/`)
-  );
+  return pathname.startsWith(`${LAP_RECORDINGS_PREFIX}/`);
 }
 
 function jsonResponse(status: number, value: unknown): LapRecordingResponse {
@@ -355,44 +352,70 @@ function jsonResponse(status: number, value: unknown): LapRecordingResponse {
 
 /**
  * Shared request handler for the dev middleware and the self-hosting server.
- *   GET /api/lap-recordings                       one summary row per recording
- *   GET /api/lap-recordings/<slug>                manifest with every lap
- *   GET /api/lap-recordings/<slug>/<driver>/<lap> raw `.npz` bytes of one lap
+ * It serves the part of Pits n' Giggles' lap analyzer API the viewer reads:
+ *   GET /lap-analyzer/api/v1/sessions/summaries        one summary row per recording
+ *   GET /lap-analyzer/api/v1/sessions/<slug>           the recording without drivers
+ *   GET /lap-analyzer/api/v1/sessions/<slug>/drivers   its drivers without laps
+ *   GET /lap-analyzer/api/v1/sessions/<slug>/laps      every driver's laps, by driver index
+ *   GET /lap-analyzer/api/v1/telemetry/<slug>/<driver>/<lap>  raw `.npz` bytes of one lap
  */
 export async function resolveLapRecordingRequest(
   pathname: string,
   index: LapRecordingIndex,
 ): Promise<LapRecordingResponse> {
-  const rest = pathname
+  const parts = pathname
     .slice(LAP_RECORDINGS_PREFIX.length)
-    .replace(/^\/+|\/+$/g, "");
-  if (rest === "") return jsonResponse(200, await index.list());
+    .replace(/^\/+|\/+$/g, "")
+    .split("/");
+  const notFound = (error: string) => jsonResponse(404, { error });
 
-  const parts = rest.split("/");
-  const slug = parts[0];
-  if (!/^[a-z0-9-]+$/.test(slug) || parts.length > 3 || parts.length === 2) {
-    return jsonResponse(404, { error: "Lap recording not found" });
+  if (
+    parts[0] === "sessions" &&
+    parts.length === 2 &&
+    parts[1] === "summaries"
+  ) {
+    return jsonResponse(200, await index.list());
   }
-  if (parts.length === 1) {
+  if (parts[0] === "sessions" && parts.length >= 2 && parts.length <= 3) {
+    const slug = parts[1];
+    if (!/^[a-z0-9-]+$/.test(slug)) return notFound("Lap recording not found");
     const manifest = await index.manifest(slug);
-    return manifest
-      ? jsonResponse(200, manifest)
-      : jsonResponse(404, { error: "Lap recording not found" });
+    if (!manifest) return notFound("Lap recording not found");
+    const { drivers, ...session } = manifest;
+    if (parts.length === 2) return jsonResponse(200, session);
+    if (parts[2] === "drivers") {
+      return jsonResponse(
+        200,
+        drivers.map(({ laps: _laps, ...driver }) => driver),
+      );
+    }
+    if (parts[2] === "laps") {
+      return jsonResponse(
+        200,
+        Object.fromEntries(drivers.map((d) => [d.index, d.laps])),
+      );
+    }
+    return notFound("Lap recording not found");
   }
-
-  if (!/^\d+$/.test(parts[1]) || !/^\d+$/.test(parts[2])) {
-    return jsonResponse(404, { error: "Lap not found" });
+  if (parts[0] === "telemetry" && parts.length === 4) {
+    const [, slug, driver, lap] = parts;
+    if (
+      !/^[a-z0-9-]+$/.test(slug) ||
+      !/^\d+$/.test(driver) ||
+      !/^\d+$/.test(lap)
+    ) {
+      return notFound("Lap not found");
+    }
+    const bytes = await index.lapBytes(slug, Number(driver), Number(lap));
+    if (!bytes) return notFound("Lap not found");
+    return {
+      status: 200,
+      contentType: "application/octet-stream",
+      body: bytes,
+      // TanStack keeps laps for the whole visit; no-cache keeps a rewritten
+      // recording from ever serving a stale lap after a reload.
+      cacheControl: "private, no-cache",
+    };
   }
-  const driverIndex = Number(parts[1]);
-  const lapNumber = Number(parts[2]);
-  const bytes = await index.lapBytes(slug, driverIndex, lapNumber);
-  if (!bytes) return jsonResponse(404, { error: "Lap not found" });
-  return {
-    status: 200,
-    contentType: "application/octet-stream",
-    body: bytes,
-    // TanStack keeps laps for the whole visit; no-cache keeps a rewritten
-    // recording from ever serving a stale lap after a reload.
-    cacheControl: "private, no-cache",
-  };
+  return notFound("Lap recording not found");
 }

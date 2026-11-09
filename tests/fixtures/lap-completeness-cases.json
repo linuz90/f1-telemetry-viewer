@@ -1,0 +1,16 @@
+{
+  "note": "Shared by the viewer's judgeLapCoverage (TS) and Pits n' Giggles' judge_lap_coverage (Python). Change both together.",
+  "cases": [
+    {"lapTimeMs": 80000, "start": 2.0, "end": 4379.0, "gap": 9.0, "trackLengthM": 4381, "complete": true, "reason": null},
+    {"lapTimeMs": null, "start": 2.0, "end": 4379.0, "gap": 9.0, "trackLengthM": 4381, "complete": false, "reason": "no lap time"},
+    {"lapTimeMs": 80000, "start": null, "end": null, "gap": null, "trackLengthM": 4381, "complete": false, "reason": "not recorded past the line"},
+    {"lapTimeMs": 80000, "start": 3811.0, "end": 4379.0, "gap": 9.0, "trackLengthM": 4381, "complete": false, "reason": "last 570 m only"},
+    {"lapTimeMs": 80000, "start": 0.0, "end": 1500.0, "gap": 9.0, "trackLengthM": 4381, "complete": false, "reason": "first 1500 m only"},
+    {"lapTimeMs": 80000, "start": 1000.0, "end": 3000.0, "gap": 9.0, "trackLengthM": 4381, "complete": false, "reason": "2000 m mid-lap only"},
+    {"lapTimeMs": 80000, "start": 0.0, "end": 4381.0, "gap": 45.0, "trackLengthM": 4381, "complete": false, "reason": "50 m gap in the trace"},
+    {"lapTimeMs": 80000, "start": 3995.0, "end": 4381.0, "gap": 9.0, "trackLengthM": 4381, "complete": false, "reason": "last 390 m only"},
+    {"lapTimeMs": 80000, "start": 30.0, "end": 4351.0, "gap": 30.0, "trackLengthM": 4381, "complete": true, "reason": null},
+    {"lapTimeMs": 80000, "start": 30.5, "end": 4381.0, "gap": 9.0, "trackLengthM": 4381, "complete": false, "reason": "last 4350 m only"},
+    {"lapTimeMs": 80000, "start": 36.0, "end": 4381.0, "gap": 9.0, "trackLengthM": 4381, "complete": false, "reason": "last 4350 m only"}
+  ]
+}

@@ -597,9 +597,9 @@ test("another driver's lap A is described, not advised", () => {
 // --- Selection -------------------------------------------------------------
 
 const recording = (slug: string, playerIndex = 21): LapRecordingSummary => ({
-  slug,
-  sessionType: "Race",
-  track: "Melbourne",
+  id: slug,
+  type: "Race",
+  trackName: "Melbourne",
   date: "2026-10-05T17:00:04",
   trackLengthM: 5276,
   playerIndex,
@@ -758,7 +758,7 @@ test("a lone lap round-trips as solo; an entry-point ref does not", () => {
 
 const completeLap = (lapNumber: number, lapTimeMs: number): RecordedLap => ({
   lapNumber,
-  lapTimeMs,
+  lapTime: lapTimeMs,
   valid: true,
   pitInLap: false,
   pitOutLap: false,
@@ -772,10 +772,10 @@ const completeLap = (lapNumber: number, lapTimeMs: number): RecordedLap => ({
 // A friend's Suzuka file. The player index stands in for a paired session
 // JSON: it is the friend's car, so it must never read as the viewer's.
 const friendFile: LapRecordingManifest = {
-  slug: "short-qualifying-suzuka-2026-10-17-18-14-02",
+  id: "short-qualifying-suzuka-2026-10-17-18-14-02",
   fileName: "Short_Qualifying_Suzuka_2026_10_17_18_14_02.pngt",
-  sessionType: "Short Qualifying",
-  track: "Suzuka",
+  type: "Short Qualifying",
+  trackName: "Suzuka",
   formula: "F1 26",
   gameYear: 25,
   date: "2026-10-17T18:14:02",
@@ -792,16 +792,16 @@ const ownSuzuka = (
   sessionType: string,
   lapTimeMs: number,
 ): LapRecordingSummary => ({
-  slug,
-  sessionType,
-  track: "Suzuka",
+  id: slug,
+  type: sessionType,
+  trackName: "Suzuka",
   formula: "F1 26",
   gameYear: 25,
   date: "2026-10-17T10:34:13",
   trackLengthM: 5_807,
   playerIndex: 3,
   completeLapCount: 1,
-  drivers: [{ index: 3, name: "RUSSELL", best: { lapNumber: 4, lapTimeMs } }],
+  drivers: [{ index: 3, name: "RUSSELL", best: { lapNumber: 4, lapTime: lapTimeMs } }],
 });
 
 test("a friend's imported laps carry their name and never count as yours", () => {
@@ -839,13 +839,13 @@ test("a friend's imported laps carry their name and never count as yours", () =>
   );
   const fastRace = ownSuzuka("race-suzuka", "Race", 88_500);
   assert.deepEqual(importedLapRefs(friend, 21, [fastRace, quali, friend]), [
-    { recordingSlug: quali.slug, driverIndex: 3, lapNumber: 4 },
+    { recordingSlug: quali.id, driverIndex: 3, lapNumber: 4 },
     { recordingSlug: slug, driverIndex: 21, lapNumber: 1 },
   ]);
   // Without a qualifying lap of yours, your race lap stands in.
   assert.equal(
     importedLapRefs(friend, 21, [fastRace, friend])[0]?.recordingSlug,
-    fastRace.slug,
+    fastRace.id,
   );
 
   // Marked as your own, the file's car is you and opens alone.

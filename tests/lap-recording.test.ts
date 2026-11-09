@@ -9,6 +9,7 @@ import {
 } from "../src/plugin/lap-recording-index";
 import {
   buildRecordingPairing,
+  judgeLapCoverage,
   openLapRecording,
   parseLapTrace,
   recordingPairKey,
@@ -95,7 +96,7 @@ test("recordings keep the 64-bit session UID and reject unknown format versions"
     { fileName: "Race_Melbourne_2026_10_05_17_00_04.pngt" },
   );
   assert.equal(manifest.sessionUid, "14519567076918017992");
-  assert.equal(manifest.slug, "race-melbourne-2026-10-05-17-00-04");
+  assert.equal(manifest.id, "race-melbourne-2026-10-05-17-00-04");
 
   await assert.rejects(
     openLapRecording(await buildPngt({ version: 2, drivers }), {
@@ -193,16 +194,16 @@ test("a recording pairs with its Just_in_case session JSON", () => {
     ersMaxCapacityJ: 4_000_000,
     lapTimings: {
       3: [
-        { lapTimeMs: 81_250, sectorEndsMs: [27_100, 48_500] },
-        { lapTimeMs: 95_000, sectorEndsMs: [62_000, 82_000] },
-        { lapTimeMs: 27_900 },
+        { lapTime: 81_250, sectorEndsMs: [27_100, 48_500] },
+        { lapTime: 95_000, sectorEndsMs: [62_000, 82_000] },
+        { lapTime: 27_900 },
       ],
       21: [],
     },
   });
 
-  // A Manual save stamped a second after its recording still pairs, across a
-  // minute rollover too, unless another recording owns that save outright.
+  // A Manual save stamped a few seconds after its recording still pairs, across
+  // a minute rollover too, unless another recording owns that save outright.
   const sessions = new Set([
     recordingPairKey("Race_Suzuka_Manual_2026_10_17_10_34_14.json"),
     recordingPairKey("Race_Suzuka_Manual_2026_10_18_10_41_00.json"),
@@ -228,7 +229,11 @@ test("a recording pairs with its Just_in_case session JSON", () => {
     ]),
     undefined,
   );
-  assert.equal(pair("Race_Suzuka_2026_10_17_10_34_11.pngt"), undefined);
+  assert.equal(
+    pair("Race_Suzuka_2026_10_17_10_34_11.pngt"),
+    "race_suzuka_2026_10_17_10_34_14",
+  );
+  assert.equal(pair("Race_Suzuka_2026_10_17_10_34_08.pngt"), undefined);
 });
 
 test("the API lists, describes and serves recorded laps from a telemetry folder", async (t) => {
@@ -287,7 +292,10 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
     logger: { info() {}, warn() {} },
   });
 
-  const list = await resolveLapRecordingRequest("/api/lap-recordings", index);
+  const list = await resolveLapRecordingRequest(
+    "/lap-analyzer/api/v1/sessions/summaries",
+    index,
+  );
   const [summary] = JSON.parse(list.body as string) as LapRecordingSummary[];
   assert.equal(
     summary.sessionSlug,
@@ -296,7 +304,7 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   assert.equal(summary.playerIndex, 21);
   assert.equal(summary.completeLapCount, 2);
   assert.deepEqual(
-    summary.drivers.map((driver) => [driver.name, driver.best?.lapTimeMs]),
+    summary.drivers.map((driver) => [driver.name, driver.best?.lapTime]),
     [
       ["OCON", fullLap.lapTimeMs + 500],
       ["RUSSELL", fullLap.lapTimeMs],
@@ -304,7 +312,7 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   );
 
   const manifest = await resolveLapRecordingRequest(
-    `/api/lap-recordings/${summary.slug}`,
+    `/lap-analyzer/api/v1/sessions/${summary.id}`,
     index,
   );
   assert.equal(
@@ -313,7 +321,7 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   );
 
   const lap = await resolveLapRecordingRequest(
-    `/api/lap-recordings/${summary.slug}/21/1`,
+    `/lap-analyzer/api/v1/telemetry/${summary.id}/21/1`,
     index,
   );
   assert.equal(lap.contentType, "application/octet-stream");
@@ -324,18 +332,42 @@ test("the API lists, describes and serves recorded laps from a telemetry folder"
   );
 
   for (const missing of [
-    `/api/lap-recordings/${summary.slug}/21/9`,
-    `/api/lap-recordings/${summary.slug}/21`,
+    `/lap-analyzer/api/v1/telemetry/${summary.id}/21/9`,
+    `/lap-analyzer/api/v1/telemetry/${summary.id}/21`,
     // Number() would read these as driver 21, lap 1.
-    `/api/lap-recordings/${summary.slug}/0x15/1`,
-    `/api/lap-recordings/${summary.slug}/21/1e0`,
-    "/api/lap-recordings/..%2Fsecret",
-    "/api/lap-recordings/no-such-recording",
+    `/lap-analyzer/api/v1/telemetry/${summary.id}/0x15/1`,
+    `/lap-analyzer/api/v1/telemetry/${summary.id}/21/1e0`,
+    "/lap-analyzer/api/v1/sessions/..%2Fsecret",
+    "/lap-analyzer/api/v1/sessions/no-such-recording",
   ]) {
     assert.equal(
       (await resolveLapRecordingRequest(missing, index)).status,
       404,
       missing,
     );
+  }
+});
+
+test("judgeLapCoverage matches the shared completeness cases", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { cases } = JSON.parse(
+    await readFile(
+      new URL("./fixtures/lap-completeness-cases.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  for (const c of cases) {
+    const verdict = judgeLapCoverage(
+      c.lapTimeMs,
+      {
+        sampleCount: 1,
+        startDistanceM: c.start,
+        endDistanceM: c.end,
+        maxGapM: c.gap,
+      },
+      c.trackLengthM,
+    );
+    assert.equal(verdict.complete, c.complete, JSON.stringify(c));
+    assert.equal(verdict.incompleteReason ?? null, c.reason, JSON.stringify(c));
   }
 });
