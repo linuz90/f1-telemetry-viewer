@@ -20,6 +20,7 @@ import { ZipUploadScreen } from "./components/ZipUploadScreen";
 import { GlobalDropZone } from "./components/GlobalDropZone";
 import { LapImportDialog } from "./components/lap-telemetry/LapImportDialog";
 import { PNG_VERSION_TITLE_PREFIX } from "./config/branding";
+import { sessionSaveSlugs } from "./utils/deduplicateSessions";
 import {
   dashboardPath,
   replaceFormulaScopeInPath,
@@ -177,12 +178,19 @@ function ScopedFormulaRoute({ children }: { children: ReactNode }) {
   return children;
 }
 
-/** Lets other apps link a session by slug alone; the canonical URL needs its formula scope. */
+/**
+ * Lets other apps link a session by slug alone; the canonical URL needs its
+ * formula scope. Pits n' Giggles links a recording's own save, often a
+ * Just_in_case copy the list hides as a duplicate, so a hidden save resolves
+ * to the row that kept it, which also claims its recordings.
+ */
 function SessionSlugRedirect() {
-  const { slug } = useParams();
+  const { slug = "" } = useParams();
   const { search } = useLocation();
   const { sessions } = useTelemetry();
-  const session = sessions.find((entry) => entry.slug === slug);
+  const session = sessions.find((entry) =>
+    sessionSaveSlugs(entry).includes(slug),
+  );
   if (!session) return <RouteNotFound />;
   return <Navigate to={`${sessionSummaryPath(session)}${search}`} replace />;
 }
