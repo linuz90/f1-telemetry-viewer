@@ -61,12 +61,15 @@ async function fetchApiManifest(
     fetchApiJson<ApiDriver[]>(`/sessions/${id}/drivers`),
     fetchApiJson<Record<string, RecordedLap[]>>(`/sessions/${id}/laps`),
   ]);
-  if (!session) return undefined;
+  // All three or none: a manifest without its drivers or laps would cache as
+  // an empty picker for the whole visit (`staleTime: Infinity`) instead of
+  // failing and retrying.
+  if (!session || !drivers || !laps) return undefined;
   return {
     ...session,
-    drivers: (drivers ?? []).map((driver) => ({
+    drivers: drivers.map((driver) => ({
       ...driver,
-      laps: laps?.[driver.index] ?? [],
+      laps: laps[driver.index] ?? [],
     })),
   };
 }
