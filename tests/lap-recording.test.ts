@@ -202,8 +202,8 @@ test("a recording pairs with its Just_in_case session JSON", () => {
     },
   });
 
-  // A Manual save stamped a second after its recording still pairs, across a
-  // minute rollover too, unless another recording owns that save outright.
+  // A Manual save stamped a few seconds after its recording still pairs, across
+  // a minute rollover too, unless another recording owns that save outright.
   const sessions = new Set([
     recordingPairKey("Race_Suzuka_Manual_2026_10_17_10_34_14.json"),
     recordingPairKey("Race_Suzuka_Manual_2026_10_18_10_41_00.json"),
@@ -229,7 +229,11 @@ test("a recording pairs with its Just_in_case session JSON", () => {
     ]),
     undefined,
   );
-  assert.equal(pair("Race_Suzuka_2026_10_17_10_34_11.pngt"), undefined);
+  assert.equal(
+    pair("Race_Suzuka_2026_10_17_10_34_11.pngt"),
+    "race_suzuka_2026_10_17_10_34_14",
+  );
+  assert.equal(pair("Race_Suzuka_2026_10_17_10_34_08.pngt"), undefined);
 });
 
 test("the API lists, describes and serves recorded laps from a telemetry folder", async (t) => {

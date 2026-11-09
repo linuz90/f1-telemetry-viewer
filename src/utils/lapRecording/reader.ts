@@ -55,11 +55,13 @@ export function recordingPairKey(fileName: string): string {
 }
 
 /**
- * A `_Manual_` save can be stamped a second or two after the recording it
+ * A `_Manual_` save can be stamped a few seconds after the recording it
  * belongs to (`Race_Suzuka_..._10_34_13.pngt` beside
- * `Race_Suzuka_Manual_..._10_34_14.json`).
+ * `Race_Suzuka_Manual_..._10_34_14.json`; 3 s seen in real data). Matches
+ * Pits n' Giggles' `_PAIR_TOLERANCE_S` in `apps/web/save_viewer_routes.py`,
+ * so a recording pairs the same way embedded and standalone.
  */
-const PAIR_TOLERANCE_S = 2;
+const PAIR_TOLERANCE_S = 5;
 
 function shiftPairKey(key: string, seconds: number): string | undefined {
   const match = key.match(
