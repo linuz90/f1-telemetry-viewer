@@ -28,10 +28,13 @@ export function NavigationMenuLink({
   );
 }
 
-export function NavigationMenuPopup() {
+export function NavigationMenuPopup({
+  anchor,
+}: Pick<ComponentProps<typeof BaseNavigationMenu.Positioner>, "anchor">) {
   return (
     <BaseNavigationMenu.Portal>
       <BaseNavigationMenu.Positioner
+        anchor={anchor}
         sideOffset={6}
         align="start"
         collisionPadding={8}
