@@ -1,6 +1,6 @@
 import { listItemClass, cardSurface } from "../ui/surfaces";
 import { pageGutterClass } from "../ui/page";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Bell, FolderUp, Search } from "lucide-react";
 import { useTelemetry } from "../../context/TelemetryContext";
@@ -46,7 +46,7 @@ import {
 } from "../sessions/sessionFormat";
 import { SessionResult } from "../sessions/SessionResult";
 import { SessionKindIcon } from "../SessionKindIcon";
-import { MenuSection, NavHoverMenu } from "./NavHoverMenu";
+import { MenuSection, NavSection } from "./NavSection";
 import {
   NavigationMenu,
   NavigationMenuLink,
@@ -359,17 +359,20 @@ export function TopBar({
     useTelemetry();
   const location = useLocation();
   const navigate = useNavigate();
-  // The Sessions and Tracks labels are links as well as panel triggers, so a
-  // click both navigates and pins the panel open; close it on every
+  // An open panel stays open when you click a Sessions or Tracks label (it is
+  // inside the menu, so not an outside click), so close it on every
   // navigation. `location.key` changes even when the click lands on the page
   // you are already on, where the pathname would not. Set during render so
   // the panel never paints over the new page.
-  const [navMenu, setNavMenu] = useState<unknown>(null);
+  const [navMenu, setNavMenu] = useState<string | null>(null);
   const [navKey, setNavKey] = useState(location.key);
   if (navKey !== location.key) {
     setNavKey(location.key);
     setNavMenu(null);
   }
+  // The shared popup anchors to the open section's whole item rather than
+  // its chevron trigger, so the panel lines up under the label.
+  const navItems = useRef<Record<string, HTMLLIElement | null>>({});
   const [, , section] = location.pathname.split("/");
   const onTracks = section === TRACKS_ROUTE_SEGMENT;
   const onSessions = !onTracks;
@@ -414,25 +417,41 @@ export function TopBar({
         {activeFormulaKey && (
           <NavigationMenu
             value={navMenu}
-            onValueChange={setNavMenu}
+            onValueChange={(value) => setNavMenu(value as string | null)}
             delay={150}
             closeDelay={150}
             className="sm:ml-2"
             aria-label="Main navigation"
           >
-            <NavigationMenuList className="flex items-center gap-0.5">
-              <NavHoverMenu to={home} label="Sessions" active={onSessions}>
+            <NavigationMenuList className="flex items-center gap-1">
+              <NavSection
+                value="sessions"
+                to={home}
+                label="Sessions"
+                active={onSessions}
+                itemRef={(el) => {
+                  navItems.current.sessions = el;
+                }}
+              >
                 <SessionsMenu />
-              </NavHoverMenu>
-              <NavHoverMenu
+              </NavSection>
+              <NavSection
+                value="tracks"
                 to={tracksPath(activeFormulaKey)}
                 label="Tracks"
                 active={onTracks}
+                itemRef={(el) => {
+                  navItems.current.tracks = el;
+                }}
               >
                 <TracksMenu />
-              </NavHoverMenu>
+              </NavSection>
             </NavigationMenuList>
-            <NavigationMenuPopup />
+            <NavigationMenuPopup
+              anchor={() =>
+                (navMenu ? navItems.current[navMenu] : null) ?? null
+              }
+            />
           </NavigationMenu>
         )}
         <div className="flex-1" />
