@@ -81,6 +81,24 @@ export function serializeLapRefs(refs: readonly LapRef[]): string {
   return (keys.length === 1 ? [...keys, SOLO_MARKER] : keys).join(",");
 }
 
+/**
+ * Opens these laps in the Pits n' Giggles lap analyzer (same `?laps=` refs, A
+ * first). Null outside a Pits n' Giggles build (`analyzerBase` unset), or when
+ * no lap can be shown there: imported recordings live only in this browser.
+ */
+export function lapAnalyzerUrl(
+  candidates: readonly LapCandidate[],
+  analyzerBase: string | undefined,
+): string | null {
+  if (!analyzerBase) return null;
+  const refs = candidates
+    .filter((candidate) => !candidate.recording.imported)
+    .map((candidate) => lapRefKey(candidate.ref));
+  return refs.length === 0
+    ? null
+    : `${analyzerBase}?${LAPS_QUERY_PARAM}=${refs.join(",")}`;
+}
+
 /** A selectable lap: a driver's best per recording, or any lap of a loaded manifest. */
 export interface LapCandidate {
   ref: LapRef;

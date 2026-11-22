@@ -16,6 +16,7 @@ import {
   defaultLapA,
   importedLapRefs,
   isSoloSelection,
+  lapAnalyzerUrl,
   parseLapRefs,
   resolvePresets,
   serializeLapRefs,
@@ -754,6 +755,27 @@ test("a lone lap round-trips as solo; an entry-point ref does not", () => {
   assert.ok(isSoloSelection(solo));
   assert.ok(!isSoloSelection("race-a~21~2"));
   assert.ok(!isSoloSelection(serializeLapRefs([a, { ...a, lapNumber: 3 }])));
+});
+
+test("the lap analyzer link carries A then B, and skips imported recordings", () => {
+  const a = candidate("race-a", 21, 2, 92_741);
+  const b = candidate("race-a", 16, 2, 92_405);
+  const friend = candidate("imported-friend", 21, 1, 91_000, {
+    recording: { ...recording("imported-friend"), imported: true },
+  });
+  assert.equal(
+    lapAnalyzerUrl([a, b], "/lap-analyzer/"),
+    "/lap-analyzer/?laps=race-a~21~2,race-a~16~2",
+  );
+  assert.equal(
+    lapAnalyzerUrl([a, friend], "/lap-analyzer/"),
+    "/lap-analyzer/?laps=race-a~21~2",
+  );
+  assert.equal(lapAnalyzerUrl([friend], "/lap-analyzer/"), null);
+  assert.equal(lapAnalyzerUrl([], "/lap-analyzer/"), null);
+  // Standalone build: no analyzer to link to.
+  assert.equal(lapAnalyzerUrl([a, b], undefined), null);
+  assert.equal(lapAnalyzerUrl([a, b], ""), null);
 });
 
 const completeLap = (lapNumber: number, lapTimeMs: number): RecordedLap => ({
