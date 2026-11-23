@@ -3,8 +3,10 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CloudRain,
   Route,
   SlidersHorizontal,
+  Sun,
   Timer,
   Upload,
 } from "lucide-react";
@@ -16,16 +18,9 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { ActionEmptyState } from "../components/ActionEmptyState";
-import { cardClass, heroCardClass } from "../components/ui/surfaces";
+import { cardClass, heroCardClass, wellClass } from "../components/ui/surfaces";
 import { pageClass } from "../components/ui/page";
 import { Breadcrumb, PageHeader } from "../components/ui/PageHeader";
-import {
-  tableCellClass,
-  tableClass,
-  tableHeadCellClass,
-  tableHeadClass,
-  tableRowClass,
-} from "../components/ui/table";
 import { CompoundStatCard } from "../components/CompoundStatCard";
 import { EmptyState } from "../components/EmptyState";
 import { SessionKindIcon } from "../components/SessionKindIcon";
@@ -84,6 +79,8 @@ import {
 } from "../analysis/trackBriefing";
 import {
   buildTrackSetups,
+  type SetupConditions,
+  type TrackSetupGroup,
   type TrackSetupUse,
   type TrackSetups,
 } from "../analysis/trackSetups";
@@ -176,6 +173,9 @@ export function TrackProgressPage() {
   const [lapKindChoice, setLapKindChoice] = useState<TrackSessionKind | null>(
     () => (isTrackSessionTab(requestedTab) ? requestedTab : null),
   );
+  // Setups tab conditions; null until picked, then dry when there is one.
+  const [setupConditions, setSetupConditions] =
+    useState<SetupConditions | null>(null);
   const activeTab: TrackSessionKind = isTrackSessionTab(pageTab)
     ? pageTab
     : (lapKindChoice ?? "race");
@@ -550,6 +550,8 @@ export function TrackProgressPage() {
     compoundLife: selectedCompoundLifeStats,
   });
   const setups = buildTrackSetups(data);
+  // The race plan is a dry plan unless this track only has wet races.
+  const planSetup = setups.dry?.race ?? setups.wet?.race ?? null;
 
   const tabs = TRACK_PAGE_TABS.filter((tab) => {
     if (tab === "qualifying") return qualiData.length > 0;
@@ -920,9 +922,12 @@ export function TrackProgressPage() {
                     totalLaps={recommendation!.totalLaps}
                     fuel={recommendation?.fuelTarget ?? null}
                     life={selectedCompoundLifeStats}
-                    setup={setups.race}
+                    setup={planSetup}
                     onOpenRace={() => setTab("race")}
-                    onOpenSetups={() => setTab("setups")}
+                    onOpenSetups={() => {
+                      if (planSetup) setSetupConditions(planSetup.conditions);
+                      setTab("setups");
+                    }}
                   />
                 ) : (
                   <EmptyState
@@ -1085,7 +1090,13 @@ export function TrackProgressPage() {
           </>
         )}
 
-        {selectedTab === "setups" && <TrackSetupsTab setups={setups} />}
+        {selectedTab === "setups" && (
+          <TrackSetupsTab
+            setups={setups}
+            conditions={setupConditions}
+            onConditionsChange={setSetupConditions}
+          />
+        )}
 
         {selectedTab === "sessions" && (
           <SessionLog days={trackSessionLog} isPb={isPbSession} />
@@ -1215,7 +1226,7 @@ function RacePlanSummary({
   totalLaps: number;
   fuel: TrackRaceRecommendation["fuelTarget"];
   life: CompoundLifeStats[];
-  setup: TrackSetups["race"];
+  setup: TrackSetupUse | null;
   onOpenRace: () => void;
   onOpenSetups: () => void;
 }) {
@@ -1295,7 +1306,8 @@ function RacePlanSummary({
                 .split("\n")[0]
                 .replace("Aerodynamics: ", "")}
             </b>{" "}
-            from {formatShortDate(setup.data.summary.date)} →
+            from {formatShortDate(setup.data.summary.date)}
+            {setup.conditions === "wet" && ", in the wet"} →
           </button>
         )}
         <button
@@ -1322,22 +1334,31 @@ const QUALI_SETUP_OPTIONS: readonly SegmentedOption<QualiSetupChoice>[] = [
   { value: "latest", label: "Latest" },
 ];
 
-function TrackSetupsTab({ setups }: { setups: TrackSetups }) {
+const CONDITIONS_OPTIONS: readonly SegmentedOption<SetupConditions>[] = [
+  { value: "dry", label: "Dry", icon: Sun },
+  { value: "wet", label: "Wet", icon: CloudRain },
+];
+
+function TrackSetupsTab({
+  setups,
+  conditions: requestedConditions,
+  onConditionsChange,
+}: {
+  setups: TrackSetups;
+  conditions: SetupConditions | null;
+  onConditionsChange: (next: SetupConditions) => void;
+}) {
   const [qualiChoice, setQualiChoice] = useState<QualiSetupChoice>("fastest");
-  const quali =
-    qualiChoice === "fastest" ? setups.qualiFastest : setups.qualiLatest;
-  // Opens the session's own Setup tab, the way that tab links back here.
-  const sessionLink = (use: TrackSetupUse) => (
-    <Link
-      to={`${sessionSummaryPath(use.data.summary)}?${SESSION_TAB_QUERY_PARAM}=setup`}
-      className="hover:text-tone-100"
-    >
-      {use.data.summary.isOnline ? "Online" : "Practice"}{" "}
-      {sessionKindLabel(use.kind).toLowerCase()} ·{" "}
-      {formatShortDate(use.data.summary.date)} →
-    </Link>
-  );
-  if (!setups.qualiFastest && !setups.race) {
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const hasBoth = setups.dry != null && setups.wet != null;
+  const conditions: SetupConditions =
+    requestedConditions && setups[requestedConditions]
+      ? requestedConditions
+      : setups.dry
+        ? "dry"
+        : "wet";
+  const current = setups[conditions];
+  if (!current) {
     return (
       <Panel>
         <EmptyState
@@ -1348,15 +1369,31 @@ function TrackSetupsTab({ setups }: { setups: TrackSetups }) {
       </Panel>
     );
   }
+  // Named only when the track has both, so a dry-only track reads as before.
+  const conditionsWord = hasBoth ? `${conditions} ` : "";
+  const quali =
+    qualiChoice === "fastest" ? current.qualiFastest : current.qualiLatest;
   return (
     <>
+      {hasBoth && (
+        <SegmentedControl<SetupConditions>
+          ariaLabel="Track conditions"
+          options={CONDITIONS_OPTIONS}
+          value={conditions}
+          onChange={(next) => {
+            setOpenKey(null);
+            onConditionsChange(next);
+          }}
+          className="w-fit"
+        />
+      )}
       <div className={panelGridClass}>
         <SetupPanel
           kind="qualifying"
           aside={
-            setups.qualiLatest &&
-            setups.qualiFastest &&
-            setups.qualiLatest !== setups.qualiFastest && (
+            current.qualiLatest &&
+            current.qualiFastest &&
+            current.qualiLatest !== current.qualiFastest && (
               <SegmentedControl<QualiSetupChoice>
                 size="sm"
                 ariaLabel="Qualifying setup"
@@ -1383,12 +1420,12 @@ function TrackSetupsTab({ setups }: { setups: TrackSetups }) {
                   </span>
                 </>
               }
-              meta={sessionLink(quali)}
+              meta={<SetupSessionLink use={quali} />}
             />
           ) : (
             <EmptyState
               icon={SlidersHorizontal}
-              title="No qualifying setup yet"
+              title={`No ${conditionsWord}qualifying setup yet`}
               message="Your fastest one shows here once you qualify."
             />
           )}
@@ -1396,172 +1433,186 @@ function TrackSetupsTab({ setups }: { setups: TrackSetups }) {
         <SetupPanel
           kind="race"
           aside={
-            setups.race && (
+            current.race && (
               <span className="text-xs text-tone-500">
-                {setups.raceIsFastest
+                {current.raceIsFastest
                   ? "latest, and your fastest race lap here"
                   : "latest"}
               </span>
             )
           }
         >
-          {setups.race ? (
+          {current.race ? (
             <SetupSheet
-              setup={setups.race.setup}
+              setup={current.race.setup}
               title={
                 <>
                   Best lap{" "}
                   <span className="font-mono">
-                    {msToLapTime(setups.race.data.bestLapMs)}
+                    {msToLapTime(current.race.data.bestLapMs)}
                   </span>
                 </>
               }
-              meta={sessionLink(setups.race)}
+              meta={<SetupSessionLink use={current.race} />}
             />
           ) : (
             <EmptyState
               icon={SlidersHorizontal}
-              title="No race setup yet"
+              title={`No ${conditionsWord}race setup yet`}
               message="Your latest one shows here once you race."
             />
           )}
         </SetupPanel>
       </div>
       <Panel
-        title="Every setup you've run here"
+        title={`Every ${conditionsWord}setup you've run here`}
         hint="Newest first. Brake bias changed from the wheel doesn't count as a new setup."
       >
-        <div className="overflow-x-auto">
-          <table className={tableClass}>
-            <thead className={tableHeadClass}>
-              <tr>
-                <th className={tableHeadCellClass({ layout: "flush" })}>
-                  Last used
-                </th>
-                <th className={tableHeadCellClass({ layout: "flush" })}>
-                  Used for
-                </th>
-                <th className={tableHeadCellClass({ layout: "flush" })}>
-                  Aero
-                </th>
-                <th className={tableHeadCellClass({ layout: "flush" })}>
-                  Diff
-                </th>
-                <th className={tableHeadCellClass({ layout: "flush" })}>ARB</th>
-                <th
-                  className={tableHeadCellClass({
-                    align: "right",
-                    layout: "flush",
-                  })}
-                >
-                  Sessions
-                </th>
-                <th
-                  className={tableHeadCellClass({
-                    align: "right",
-                    layout: "flush",
-                  })}
-                >
-                  Best lap
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {setups.history.map((group) => {
-                const lines = Object.fromEntries(
-                  formatSetupText(group.setup)
-                    .split("\n")
-                    .map((line) => line.split(/:\s*/)),
-                );
-                const isPb =
-                  setups.qualiFastest &&
-                  group.bestLapMs === setups.qualiFastest.data.bestLapMs;
-                return (
-                  <tr key={group.key} className={tableRowClass}>
-                    <td
-                      className={tableCellClass({
-                        layout: "flush",
-                        className: "text-tone-300",
-                      })}
-                    >
-                      {formatShortDate(group.lastDate)}
-                    </td>
-                    <td
-                      className={tableCellClass({
-                        layout: "flush",
-                        className: "text-tone-300",
-                      })}
-                    >
-                      <span className="flex flex-wrap gap-x-3">
-                        {group.kinds.map((k) => (
-                          <span key={k} className="whitespace-nowrap">
-                            <SessionKindIcon
-                              kind={k}
-                              className="mr-1 text-tone-500"
-                            />
-                            {sessionKindLabel(k)}
-                          </span>
-                        ))}
-                      </span>
-                    </td>
-                    <td
-                      className={tableCellClass({
-                        layout: "flush",
-                        mono: true,
-                        className: "text-tone-100",
-                      })}
-                    >
-                      {lines.Aerodynamics}
-                    </td>
-                    <td
-                      className={tableCellClass({
-                        layout: "flush",
-                        mono: true,
-                        className: "text-tone-100",
-                      })}
-                    >
-                      {lines.Transmission}
-                    </td>
-                    <td
-                      className={tableCellClass({
-                        layout: "flush",
-                        mono: true,
-                        className: "text-tone-100",
-                      })}
-                    >
-                      {lines.Suspension?.split(" ")[1]}
-                    </td>
-                    <td
-                      className={tableCellClass({
-                        align: "right",
-                        layout: "flush",
-                        className: "text-tone-400",
-                      })}
-                    >
-                      {group.sessionCount}
-                    </td>
-                    <td
-                      className={tableCellClass({
-                        align: "right",
-                        layout: "flush",
-                        mono: true,
-                        className: isPb ? "text-best" : "text-tone-100",
-                      })}
-                    >
-                      {msToLapTime(group.bestLapMs)}
-                      <SessionKindIcon
-                        kind={group.bestKind}
-                        label={`Set in ${sessionKindLabel(group.bestKind).toLowerCase()}`}
-                        className="ml-1.5 text-xs text-tone-500"
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ul className="-mx-2">
+          {current.history.map((group) => (
+            <SetupHistoryRow
+              key={group.key}
+              group={group}
+              isPb={group.best === current.qualiFastest}
+              open={openKey === group.key}
+              onOpenChange={(open) => setOpenKey(open ? group.key : null)}
+            />
+          ))}
+        </ul>
       </Panel>
     </>
+  );
+}
+
+/** "Wet · Online race · 22 Nov →", opening the session's own Setup tab the
+ *  way that tab links back here. Wet is spelled out because a wet setup run
+ *  in the dry (or the reverse) is the costliest mix-up on this tab. */
+function SetupSessionLink({ use }: { use: TrackSetupUse }) {
+  return (
+    <Link
+      to={`${sessionSummaryPath(use.data.summary)}?${SESSION_TAB_QUERY_PARAM}=setup`}
+      className="hover:text-tone-100"
+    >
+      {use.conditions === "wet" && (
+        <>
+          <CloudRain aria-hidden className="mr-1 inline size-3 align-[-2px]" />
+          Wet ·{" "}
+        </>
+      )}
+      {use.data.summary.isOnline ? "Online" : "Practice"}{" "}
+      {sessionKindLabel(use.kind).toLowerCase()} ·{" "}
+      {formatShortDate(use.data.summary.date)} →
+    </Link>
+  );
+}
+
+/**
+ * One setup in the history: when it was last used, what for, the values a
+ * driver scans for (aero, diff, anti-roll bars) and its best lap. Opening it
+ * shows the full sheet with Copy, so any past setup is one tap from the game.
+ */
+function SetupHistoryRow({
+  group,
+  isPb,
+  open,
+  onOpenChange,
+}: {
+  group: TrackSetupGroup;
+  isPb: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const panelId = `setup-${group.key.replace(/[^0-9a-z]/gi, "-")}`;
+  const lines = Object.fromEntries(
+    formatSetupText(group.latest.setup)
+      .split("\n")
+      .map((line) => line.split(/:\s*/)),
+  );
+  const specs: [string, string | undefined][] = [
+    ["Aero", lines.Aerodynamics],
+    ["Diff", lines.Transmission],
+    ["ARB", lines.Suspension?.split(" ")[1]],
+  ];
+  return (
+    <li className="border-t border-tone-800/70 first:border-t-0">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => onOpenChange(!open)}
+        className={cn(
+          "group flex w-full flex-wrap items-baseline gap-x-5 gap-y-1 rounded-lg px-2 py-2.5 text-left text-sm transition-colors hover:bg-tone-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-tone-600",
+          open && "bg-tone-800/50",
+        )}
+      >
+        <span className="flex min-w-0 items-baseline gap-x-3 sm:w-56">
+          <span className="shrink-0 font-medium text-tone-100">
+            {formatShortDate(group.latest.data.summary.date)}
+          </span>
+          <span className="truncate text-tone-400">
+            {group.kinds.map((k, i) => (
+              <span key={k} className="whitespace-nowrap">
+                {i > 0 && ", "}
+                <SessionKindIcon kind={k} className="mr-1 text-tone-500" />
+                {sessionKindLabel(k)}
+              </span>
+            ))}
+          </span>
+        </span>
+        <span className="order-last flex basis-full flex-wrap gap-x-4 text-xs sm:order-none sm:basis-auto sm:text-sm">
+          {specs.map(([label, value]) => (
+            <span key={label} className="whitespace-nowrap">
+              <span className="text-tone-500">{label}</span>{" "}
+              <span className="font-mono text-tone-100">{value ?? "—"}</span>
+            </span>
+          ))}
+          <span className="whitespace-nowrap text-tone-500">
+            {group.sessionCount}{" "}
+            {group.sessionCount === 1 ? "session" : "sessions"}
+          </span>
+        </span>
+        <span className="ml-auto flex items-baseline gap-2">
+          <span
+            className={cn("font-mono", isPb ? "text-best" : "text-tone-100")}
+          >
+            {msToLapTime(group.best.data.bestLapMs)}
+          </span>
+          <SessionKindIcon
+            kind={group.best.kind}
+            label={`Set in ${sessionKindLabel(group.best.kind).toLowerCase()}`}
+            className="text-xs text-tone-500"
+          />
+          <ChevronDown
+            aria-hidden
+            className={cn(
+              "size-4 shrink-0 self-center text-tone-500 transition-transform group-hover:text-tone-300",
+              open && "rotate-180",
+            )}
+          />
+        </span>
+      </button>
+      {open && (
+        <div
+          id={panelId}
+          className={cn(
+            wellClass,
+            "mx-2 mt-1 mb-3 p-4 transition-[opacity,translate] duration-200 ease-out starting:-translate-y-1 starting:opacity-0 sm:max-w-lg",
+          )}
+        >
+          <SetupSheet
+            setup={group.latest.setup}
+            title={
+              <>
+                Best lap{" "}
+                <span className={cn("font-mono", isPb && "text-best")}>
+                  {msToLapTime(group.best.data.bestLapMs)}
+                </span>
+              </>
+            }
+            meta={<SetupSessionLink use={group.best} />}
+          />
+        </div>
+      )}
+    </li>
   );
 }
