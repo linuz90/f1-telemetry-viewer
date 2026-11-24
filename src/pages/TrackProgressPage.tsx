@@ -137,6 +137,7 @@ import {
 import { buildPaceEvolution } from "../utils/stats/trackPaceEvolution";
 import { buildTrackRaceRecommendation } from "../analysis/trackRaceRecommendation";
 import { PUNCTURE_THRESHOLD } from "../utils/stats/tyres";
+import { formatLapDelta } from "../utils/stats/core";
 
 export function TrackProgressPage() {
   const { trackId } = useParams<{ trackId: string }>();
@@ -921,6 +922,7 @@ export function TrackProgressPage() {
                     alternative={recommendation?.alternative ?? null}
                     totalLaps={recommendation!.totalLaps}
                     fuel={recommendation?.fuelTarget ?? null}
+                    wetFuel={recommendation?.wetFuelTarget ?? null}
                     life={selectedCompoundLifeStats}
                     setup={planSetup}
                     onOpenRace={() => setTab("race")}
@@ -1216,6 +1218,7 @@ function RacePlanSummary({
   alternative,
   totalLaps,
   fuel,
+  wetFuel,
   life,
   setup,
   onOpenRace,
@@ -1225,6 +1228,7 @@ function RacePlanSummary({
   alternative: TrackStrategySuggestion | null;
   totalLaps: number;
   fuel: TrackRaceRecommendation["fuelTarget"];
+  wetFuel: TrackRaceRecommendation["wetFuelTarget"];
   life: CompoundLifeStats[];
   setup: TrackSetupUse | null;
   onOpenRace: () => void;
@@ -1264,17 +1268,26 @@ function RacePlanSummary({
         </>
       )}
       <div className="mt-4 grid grid-cols-2 gap-4 border-t border-tone-800 pt-3 text-sm">
-        {fuel && (
+        {(fuel || wetFuel) && (
           <div>
             <div className="text-xs text-tone-500">Start fuel</div>
-            <div className="font-semibold text-tone-50">
-              {fuel.recommendedFuelKg.toFixed(1)} kg
-            </div>
-            <div className="text-xs text-tone-500">
-              {fuel.recommendedDeltaLaps >= 0 ? "+" : ""}
-              {fuel.recommendedDeltaLaps.toFixed(1)} laps · {fuel.confidence}{" "}
-              confidence
-            </div>
+            {fuel && (
+              <>
+                <div className="font-semibold text-tone-50">
+                  {formatLapDelta(fuel.recommendedDeltaLaps)} laps
+                </div>
+                <div className="text-xs text-tone-500">
+                  {fuel.recommendedFuelKg.toFixed(1)} kg · {fuel.confidence}{" "}
+                  confidence
+                </div>
+              </>
+            )}
+            {wetFuel && (
+              <div className="text-xs text-tone-500">
+                Wet {formatLapDelta(wetFuel.recommendedDeltaLaps)} laps (
+                {wetFuel.recommendedFuelKg.toFixed(1)} kg)
+              </div>
+            )}
           </div>
         )}
         {life.length > 0 && (

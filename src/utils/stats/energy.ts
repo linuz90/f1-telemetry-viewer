@@ -8,33 +8,110 @@ import {
 import { formatLapDelta, median } from "./core";
 import type { StrategyInsight } from "./insightTypes";
 
-// ─── Fuel safety knobs ───────────────────────────────────────────────────────
+// ─── Fuel plan knobs ─────────────────────────────────────────────────────────
 //
 // Track Progress frames its fuel recommendation as "what slider value would
-// *just* finish the race assuming every lap is green-flag" and then adds two
-// small safety buffers on top. These knobs do not apply to the retrospective
-// Fuel Margin shown on a single session.
-//
-// Both buffers mirror the Pits n' Giggles in-app Fuel Strategy Calculator:
-//   https://github.com/ashwin-nat/pits-n-giggles/blob/hotfix-v4.3.0/apps/frontend/js/fuelCalculator.js
-// where they appear as `MIN_FUEL_LEVEL` (0.2 kg) and the default `surplusLaps`
-// input (0.25 laps), both folded into the "Conservative" strategy output.
+// finish the race on the reserve below": no surplus laps on top. The player
+// wants to reach the flag at about zero and lifts and coasts on the last laps
+// when a race runs heavy, so Pits n' Giggles' "Conservative" surplus
+// (`surplusLaps`, 0.25 laps in its Fuel Strategy Calculator) is gone. These
+// knobs do not apply to the retrospective Fuel Margin shown on a single session.
 
-/** Unusable fuel that physically can't be burned (F1 cars leave a small
- *  reserve at the bottom of the tank). Matches PnG's `MIN_FUEL_LEVEL`. */
-const MIN_FUEL_LEVEL_KG = 0.2;
+/** Fuel the car can't burn, kept in the tank at the flag. Matches PnG's
+ *  `MIN_FUEL_LEVEL`:
+ *  https://github.com/ashwin-nat/pits-n-giggles/blob/hotfix-v4.3.0/apps/frontend/js/fuelCalculator.js */
+export const FUEL_RESERVE_KG = 0.2;
 
-/** Extra laps of fuel kept as a safety buffer above the "clean-race"
- *  requirement. Matches the default `surplusLaps` input in PnG's
- *  conservative-strategy calculator. */
-const FUEL_SURPLUS_LAPS = 0.25;
+/** Dry and wet races burn differently (Inters ~7% more per lap than slicks
+ *  in F1 26), so each gets its own fuel plan. */
+export type FuelConditions = "dry" | "wet";
 
-/** Total safety margin (in laps) to subtract from any "clean-race" excess
- *  projection before turning it into a slider recommendation. Combines the
- *  unusable-fuel reserve (converted to laps at the green-flag burn rate)
- *  and the surplus-laps buffer. */
-export function fuelSafetyMarginLaps(burnRateKg: number): number {
-  return FUEL_SURPLUS_LAPS + MIN_FUEL_LEVEL_KG / burnRateKg;
+/** Same set as analysis/trackStrategyCompounds.ts isWetCompound(), kept here
+ *  so stats primitives don't import the product layer. */
+const WET_TYRES = new Set(["Inters", "Intermediate", "Wet", "Wets"]);
+
+/** The tyres a lap's end-of-lap snapshot shows: dry on slicks, wet on Inters or Wets. */
+export function lapFuelConditions(lap: PerLapInfo): FuelConditions {
+  return WET_TYRES.has(lap["car-status-data"]?.["visual-tyre-compound"] ?? "")
+    ? "wet"
+    : "dry";
+}
+
+/** Safety car or VSC. `FORMATION_LAP` is not one: online races tag lap 1 with
+ *  it, yet that lap burns like any other start. */
+function isNeutralisedFuelLap(lap: PerLapInfo): boolean {
+  const status = lap["max-safety-car-status"] ?? "NO_SAFETY_CAR";
+  return status !== "NO_SAFETY_CAR" && status !== "FORMATION_LAP";
+}
+
+export interface RaceFuelBurn {
+  /** Fuel burned from the grid to the end of lap 1, kg; null when lap 1 ran
+   *  under a safety car, on the other tyre type, or lacks a snapshot. */
+  startLapKg: number | null;
+  /** Fuel burned on each later green lap on this tyre type, kg. */
+  greenLapsKg: number[];
+}
+
+/** One race's fuel burn on dry or wet laps, for the track fuel plan.
+ *
+ *  Lap 1 stands apart: the standing start burns ~0.05-0.08 kg more than a
+ *  green lap, and only one lap per race does it. The formation lap shows no
+ *  burn at all: the lap-0 snapshot holds the load set in the menu, to the
+ *  0.1 kg, and lap 1 burns the same with or without a formation lap.
+ *  Later laps count when they and the lap before ran green (the lap after a
+ *  restart is still slow) on the same tyre type, so a pit lap that swaps
+ *  slicks for Inters counts for neither, and a lap still in progress when
+ *  the save was made never does. The race's last lap never counts:
+ *  online its snapshot is taken after the flag, 0.3-0.7 kg of cool-down burn
+ *  late. */
+export function collectRaceFuelBurn(
+  player: DriverData,
+  conditions: FuelConditions,
+  totalLaps: number,
+): RaceFuelBurn {
+  // A save made mid-race records the lap in progress too: its fuel is read
+  // part-way round, so only laps the game timed as finished count. Exports
+  // without lap history keep every snapshot.
+  const history = player["session-history"]?.["lap-history-data"] ?? [];
+  let lastTimedLap = 0;
+  history.forEach((lap, index) => {
+    if (lap["lap-time-in-ms"] > 0) lastTimedLap = index + 1;
+  });
+  const lastLap = lastTimedLap > 0 ? lastTimedLap : Number.POSITIVE_INFINITY;
+  const byLap = new Map<number, PerLapInfo>();
+  for (const lap of player["per-lap-info"] ?? []) {
+    const fuel = lap["car-status-data"]?.["fuel-in-tank"];
+    if (
+      Number.isFinite(lap["lap-number"]) &&
+      lap["lap-number"] <= lastLap &&
+      Number.isFinite(fuel) &&
+      fuel > 0
+    )
+      byLap.set(lap["lap-number"], lap);
+  }
+  const fuelOf = (lap: PerLapInfo) => lap["car-status-data"]["fuel-in-tank"];
+  const counts = (lap: PerLapInfo) =>
+    !isNeutralisedFuelLap(lap) && lapFuelConditions(lap) === conditions;
+
+  const grid = byLap.get(0);
+  const first = byLap.get(1);
+  const startBurn =
+    grid && first && counts(first) && lapFuelConditions(grid) === conditions
+      ? fuelOf(grid) - fuelOf(first)
+      : null;
+
+  const greenLapsKg: number[] = [];
+  for (const [lapNumber, lap] of byLap) {
+    if (lapNumber < 2 || lapNumber >= totalLaps) continue;
+    const prev = byLap.get(lapNumber - 1);
+    if (!prev || !counts(prev) || !counts(lap)) continue;
+    const delta = fuelOf(prev) - fuelOf(lap);
+    if (delta > 0) greenLapsKg.push(delta);
+  }
+  return {
+    startLapKg: startBurn != null && startBurn > 0 ? startBurn : null,
+    greenLapsKg,
+  };
 }
 
 /** True when a lap ran under normal green-flag racing conditions */

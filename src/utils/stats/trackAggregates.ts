@@ -1,8 +1,12 @@
 import { compoundDisplayRank } from "../../constants/compounds";
 import type { TelemetrySession } from "../../types/telemetry";
-import { quantile } from "./core";
+import { median } from "./core";
 import { findPlayer, isRaceSession } from "./drivers";
-import { collectGreenFlagBurnDeltas, fuelSafetyMarginLaps } from "./energy";
+import {
+  FUEL_RESERVE_KG,
+  collectRaceFuelBurn,
+  type FuelConditions,
+} from "./energy";
 import {
   getRacePaceLapSamples,
   isCompleteValidLap,
@@ -228,20 +232,23 @@ export function aggregateCompoundLife(
 
 /** Fuel stats aggregated across race sessions at a track */
 export interface TrackFuelStats {
-  p75BurnRateKgPerLap: number;
+  /** Median green-lap burn after lap 1, kg/lap. */
+  burnRateKgPerLap: number;
+  /** Lap-1 burn from the grid, kg: the median over races that measured it,
+   *  else the green burn. */
+  startLapBurnKg: number;
   /** Average game fuel-slider target implied by the track recommendation. */
   avgRecommendedFuelLaps: number;
-  /** Average total fuel load (kg) implied by the recommendation — i.e. enough
-   *  to cover the race distance at the pooled burn rate plus the safety
-   *  margin. Useful for surfacing alongside the laps-based delta. */
+  /** Total fuel load (kg) the recommendation stands for: lap 1, every later
+   *  lap at the median burn, the thin-sample allowance and the unburnable
+   *  reserve. */
   avgRecommendedFuelKg: number;
-  /** Average laps of fuel each race had to spare assuming a clean (all
-   *  green-flag) run at the pooled burn rate. Positive = over-fuel, negative
-   *  = wouldn't have finished without the SC saves that actually happened. */
+  /** Average laps (on the game's slider) each race started above the
+   *  recommendation. Positive = over-fuelled for a clean race. */
   avgExcessAtFinishLaps: number;
   /** Independent attempts that contributed enough consecutive fuel pairs. */
   eligibleAttemptCount: number;
-  /** Consecutive green-flag fuel pairs behind the p75 burn estimate. */
+  /** Green laps behind the median burn estimate. */
   consecutiveGreenPairCount: number;
   /** Contributing attempts classified as FINISHED. */
   completedRaceCount: number;
@@ -249,12 +256,40 @@ export interface TrackFuelStats {
   confidence: "low" | "medium" | "high";
 }
 
+/** Burn at one circuit drifts by several percent between months (patches,
+ *  setups, pace: Jeddah ran ~1.30 kg/lap in July and ~1.39 in November, as
+ *  far apart as slicks and Inters), so the fuel plan reads the runs within
+ *  this long of the newest one. */
+const FUEL_RECENT_WINDOW_MS = 30 * 24 * 3600_000;
+
+/** How far one run's median burn sits from another's at the same circuit
+ *  inside a month, as a share of the burn: 1.5% over 60 F1 26 runs. */
+const FUEL_RUN_SPREAD = 0.015;
+/** Runs from which the plan carries no thin-sample allowance. */
+const FUEL_FULL_SAMPLE_RUNS = 6;
+
+/** Extra share of the race's fuel a thin sample carries: one standard
+ *  deviation of the error it has beyond a full sample's. 1.4% with one run
+ *  (0.44 laps over 35), 0.9% with two, 0.6% with three, nothing from six.
+ *  Sized on partial data: plans from any one or two sessions at a circuit
+ *  then fell over half a lap short of the full data's estimate 2-5% of the
+ *  time, about as often as the full data fell short of a real race. */
+function thinSampleAllowance(runCount: number): number {
+  if (runCount >= FUEL_FULL_SAMPLE_RUNS) return 0;
+  return FUEL_RUN_SPREAD * Math.sqrt(1 / runCount - 1 / FUEL_FULL_SAMPLE_RUNS);
+}
+
 interface EligibleFuelAttempt {
+  /** Save instant from the file name, ms; NaN when the session carries none. */
+  at: number;
   deltas: number[];
+  startLapKg: number | null;
   fuelSnapshotCount: number;
   recordedLapCount: number;
   startFuelKg: number;
   startFuelRemaining: number;
+  /** kg per lap of the game's fuel slider at the first snapshot. */
+  gameKgPerLap: number;
   totalLaps: number;
   isCompleted: boolean;
 }
@@ -275,28 +310,47 @@ function isMoreCompleteFuelAttempt(
   return candidate.isCompleted && !current.isCompleted;
 }
 
-/** Aggregate fuel data across all race sessions at a track.
+/** Aggregate fuel data across all race sessions at a track, on dry or wet
+ *  laps (the race plan is dry; Inters burn ~7% more per lap, so a wet race
+ *  would talk the dry plan into over-fuelling and the reverse runs dry).
  *
- *  Two key choices, both aimed at making the chip safe to act on:
+ *  The target is the load that reaches the flag on the unburnable reserve in
+ *  a clean race, with no surplus on top: the player would rather lift and
+ *  coast on the last laps of a heavy race than carry spare fuel in every one.
  *
- *  1. **Conservative pooled burn rate.** Consecutive green-flag fuel deltas
- *     from every eligible attempt go into one pool. The 75th percentile is
- *     deliberate: the median missed sustained push phases often enough to be
- *     unsafe as an actionable initial-fuel target.
+ *  1. **Median burn, lap 1 apart.** Green laps after lap 1 from every
+ *     eligible attempt go into one pool and its median is the per-lap burn.
+ *     Planned from the earlier runs at their circuit alone, 15 finished dry
+ *     F1 26 races reached the line 0.3 laps above the reserve on average
+ *     (0.5 short to 1.7 over), where the earlier P75 plus PnG's Conservative
+ *     surplus carried 1.1 laps. Lap 1 burns more from the standing start,
+ *     so it adds its own median.
  *
- *  2. **Clean-race excess, not observed leftover.** Per-race excess is
- *     `startFuelKg / pooledBurnRate − totalLaps` — i.e. what the leftover
- *     *would* be if every lap burned at the green-flag rate. We deliberately
- *     do NOT use the fuel actually left in the tank at the finish: SC/VSC
- *     laps burn ~30% less, and counting that as headroom would tell the user
- *     to under-fuel for a race that happens to run clean.
+ *  2. **The game's own slider units.** The slider counts laps at the game's
+ *     burn estimate, 3-11% above the real one in F1 26, so kg turn into slider
+ *     laps at `startFuelKg / (laps left + startFuelRemaining)`, not at the
+ *     measured burn.
+ *
+ *  3. **This month's runs.** Only attempts within 30 days of the newest
+ *     count once they pass the evidence gate (FUEL_RECENT_WINDOW_MS).
+ *
+ *  4. **One long run is enough, with more fuel on a thin sample**
+ *     (thinSampleAllowance), the only margin above the reserve. Burn is flat
+ *     through a race (every tenth of the distance within 0.7% of the run's
+ *     median once lap 1 is out), so short runs stand in for a full one; 12
+ *     green laps are needed, from one run or several.
+ *
+ *  It never reads the fuel left at the flag: SC/VSC laps burn less, and
+ *  counting that as headroom would under-fuel a race that runs clean. Online
+ *  that reading is also taken after the flag (see collectRaceFuelBurn).
  */
 export function aggregateFuelData(
   sessions: TelemetrySession[],
+  conditions: FuelConditions = "dry",
 ): TrackFuelStats | null {
   const minimumPairsPerSession = 3;
   const minimumFuelSnapshotsPerSession = 6;
-  const minimumSessionCount = 2;
+  const minimumSessionCount = 1;
   const minimumPooledPairCount = 12;
   const attemptsByUid = new Map<string, EligibleFuelAttempt>();
   const unkeyedAttempts: EligibleFuelAttempt[] = [];
@@ -314,7 +368,8 @@ export function aggregateFuelData(
           Number.isFinite(l["car-status-data"]?.["fuel-in-tank"]) &&
           l["car-status-data"]["fuel-in-tank"] > 0,
       ) ?? [];
-    const deltas = collectGreenFlagBurnDeltas(player);
+    const burn = collectRaceFuelBurn(player, conditions, totalLaps);
+    const deltas = burn.greenLapsKg;
     // A second session only improves confidence when it contributes a usable
     // run of its own; one stray pair should not satisfy the independent-run
     // evidence gate.
@@ -330,13 +385,20 @@ export function aggregateFuelData(
     const startFuelRemaining =
       firstLap["car-status-data"]["fuel-remaining-laps"];
     if (!Number.isFinite(startFuelRemaining)) continue;
+    const gameKgPerLap =
+      startFuelKg /
+      (totalLaps - (firstLap["lap-number"] ?? 0) + startFuelRemaining);
+    if (!(gameKgPerLap > 0) || !Number.isFinite(gameKgPerLap)) continue;
 
     const attempt: EligibleFuelAttempt = {
+      at: parseSessionSortKey(session, Number.NaN),
       deltas,
+      startLapKg: burn.startLapKg,
       fuelSnapshotCount: lapsWithFuel.length,
       recordedLapCount: player["per-lap-info"]?.length ?? 0,
       startFuelKg,
       startFuelRemaining,
+      gameKgPerLap,
       totalLaps,
       isCompleted:
         player["final-classification"]?.["result-status"] === "FINISHED",
@@ -359,42 +421,45 @@ export function aggregateFuelData(
     }
   }
 
-  const perRace = [...unkeyedAttempts, ...attemptsByUid.values()];
-  const pooledDeltas = perRace.flatMap((race) => race.deltas);
-
   // Laps within one run share fuel load, tyres, weather, and driving intent,
   // so raw pair count alone cannot establish an actionable recommendation.
-  if (
-    perRace.length < minimumSessionCount ||
-    pooledDeltas.length < minimumPooledPairCount
-  ) {
-    return null;
-  }
+  const hasEvidence = (attempts: EligibleFuelAttempt[]) =>
+    attempts.length >= minimumSessionCount &&
+    attempts.reduce((pairs, race) => pairs + race.deltas.length, 0) >=
+      minimumPooledPairCount;
 
-  const pooledBurnRateKg = quantile(pooledDeltas, 0.75);
-  if (pooledBurnRateKg == null || pooledBurnRateKg <= 0) return null;
+  // Recent runs alone once they pass the gate (see FUEL_RECENT_WINDOW_MS);
+  // until then, and for undated sessions, every run counts.
+  const allAttempts = [...unkeyedAttempts, ...attemptsByUid.values()];
+  const newest = Math.max(
+    ...allAttempts.map((race) => race.at).filter(Number.isFinite),
+  );
+  const recent = allAttempts.filter(
+    (race) => !(newest - race.at > FUEL_RECENT_WINDOW_MS),
+  );
+  const perRace = hasEvidence(recent) ? recent : allAttempts;
+  if (!hasEvidence(perRace)) return null;
+  const pooledDeltas = perRace.flatMap((race) => race.deltas);
+
+  const burnRateKg = median(pooledDeltas);
+  if (burnRateKg == null || burnRateKg <= 0) return null;
+  const startLapBurnKg =
+    median(
+      perRace
+        .map((race) => race.startLapKg)
+        .filter((kg): kg is number => kg != null),
+    ) ?? burnRateKg;
 
   const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
 
-  // Raw clean-race excess per race (laps spare if every lap had burned at
-  // the pooled green-flag rate). This is the honest "how much could we have
-  // shaved" number, surfaced as-is in the tile note.
-  const excessAtFinish = perRace.map(
-    (r) => r.startFuelKg / pooledBurnRateKg - r.totalLaps,
-  );
-
-  // The actual recommendation keeps a small safety buffer above zero
-  // leftover (unusable-fuel reserve + surplus laps) so following it doesn't
-  // leave the player on fumes in a clean race. Matches the buffers PnG's
-  // calculator bakes into its "Conservative" strategy.
-  const safetyMarginLaps = fuelSafetyMarginLaps(pooledBurnRateKg);
+  // Every race in the bucket has the same distance, so one load fits them all.
+  const totalLaps = perRace[0]!.totalLaps;
+  const recommendedKg =
+    (startLapBurnKg + (totalLaps - 1) * burnRateKg) *
+      (1 + thinSampleAllowance(perRace.length)) +
+    FUEL_RESERVE_KG;
   const recommendedPerRace = perRace.map(
-    (r, i) => r.startFuelRemaining - (excessAtFinish[i]! - safetyMarginLaps),
-  );
-  // The recommendation collapses to "fuel for totalLaps + safetyMargin" at the
-  // pooled burn rate — that's the kg figure the player would set in PnG.
-  const recommendedKgPerRace = perRace.map(
-    (r) => (r.totalLaps + safetyMarginLaps) * pooledBurnRateKg,
+    (r) => recommendedKg / r.gameKgPerLap - r.totalLaps,
   );
   const completedRaceCount = perRace.filter((r) => r.isCompleted).length;
   const confidence =
@@ -405,10 +470,13 @@ export function aggregateFuelData(
         : "low";
 
   return {
-    p75BurnRateKgPerLap: pooledBurnRateKg,
+    burnRateKgPerLap: burnRateKg,
+    startLapBurnKg,
     avgRecommendedFuelLaps: avg(recommendedPerRace),
-    avgRecommendedFuelKg: avg(recommendedKgPerRace),
-    avgExcessAtFinishLaps: avg(excessAtFinish),
+    avgRecommendedFuelKg: recommendedKg,
+    avgExcessAtFinishLaps: avg(
+      perRace.map((r, i) => r.startFuelRemaining - recommendedPerRace[i]!),
+    ),
     eligibleAttemptCount: perRace.length,
     consecutiveGreenPairCount: pooledDeltas.length,
     completedRaceCount,

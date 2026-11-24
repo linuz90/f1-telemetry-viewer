@@ -528,6 +528,63 @@ test("deletion removes stale slugs and resurrects a dominated PnG auto-save", as
   );
 });
 
+test("an auto-save of a separate run stays listed, a snapshot of the same run hides", () => {
+  const save = (
+    time: string,
+    laps: number,
+    firstLapMs: number | undefined,
+    isAutoSave = true,
+  ) => ({
+    relativePath: `Race_Montreal_${time}.json`,
+    slug: `race-montreal-${time}`,
+    sessionType: "Race",
+    track: "Montreal",
+    formula: "F1 26",
+    date: `2026-11-23T${time}:00Z`,
+    validLapCount: laps,
+    bestLapTimeMs: 76_000 - laps,
+    firstLapMs,
+    isAutoSave,
+    fileSize: laps,
+  });
+  const slugs = (sessions: ReturnType<typeof save>[]) =>
+    deduplicateSessions(sessions)
+      .map((s) => s.slug)
+      .sort();
+
+  // A later 25-lap run hides an earlier snapshot of itself, but not the
+  // 19-lap run before it, nor that run's own 11-lap snapshot.
+  assert.deepEqual(
+    slugs([
+      save("18:44", 19, 83_495),
+      save("18:40", 11, 83_495),
+      save("20:54", 25, 82_944),
+      save("20:40", 12, 82_944),
+    ]),
+    ["race-montreal-18:44", "race-montreal-20:54"],
+  );
+  // A manual save of another run still lets a run's later auto-save hide
+  // its earlier one.
+  assert.deepEqual(
+    slugs([
+      save("18:44", 19, 83_495, false),
+      save("20:45", 7, 82_944),
+      save("20:40", 6, 82_944),
+    ]),
+    ["race-montreal-18:44", "race-montreal-20:45"],
+  );
+  // A two-lap restart stays hidden, and summaries without a first lap
+  // (Pits n' Giggles' own) keep the older rule.
+  assert.deepEqual(
+    slugs([save("18:10", 2, 84_100), save("20:54", 25, 82_944)]),
+    ["race-montreal-20:54"],
+  );
+  assert.deepEqual(
+    slugs([save("18:44", 19, undefined), save("20:54", 25, undefined)]),
+    ["race-montreal-20:54"],
+  );
+});
+
 test("hidden PnG caches and hidden directories never become candidates", async (t) => {
   const harness = await createHarness(t);
   const visibleRelativePath = path.posix.join("visible", RACE_FILE);

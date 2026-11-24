@@ -41,6 +41,11 @@ How to read Pits n' Giggles (PnG) session JSON: identity, units, and the exporte
 - Harvest utilization is `ers-harv-mguk-j / ers-harv-limit-mguk-j` (falling back to the matching car-status fields), MGU-H excluded. Keep explicit zero-harvest laps in the average, exclude pre-race, final-reset and neutralized laps, and allow slightly over 100% from packet timing.
 - Older exports without a harvest limit show raw harvested energy (`MJ/lap`) rather than an invented percentage.
 
+## Fuel
+
+- `fuel-remaining-laps` is the game's indicator, and on lap 0 the load the player set. It counts laps at the game's own burn estimate, 3-11% above the player's real burn in F1 26, so it climbs through a dry race: never read it as physical range.
+- In online races the last lap's `per-lap-info` snapshot is taken after the flag, 0.3-0.7 kg of cool-down burn late, and `fuel-in-tank` stops at 0.10 kg. Fuel at the flag is the previous lap's reading minus one lap of burn.
+
 ## Speed
 
 - Every product-facing speed value comes from `src/analysis/speedAnalysis.ts`; pages and components never read raw `top-speed-kmph` fields. `speedProfileAnalysis.ts` is its internal detail, so callers import `speedAnalysis.ts` only.

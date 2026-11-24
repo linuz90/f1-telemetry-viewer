@@ -83,6 +83,7 @@ function isBuiltSessionSummary(
     isOptionalFiniteNumber(summary.gameYear) &&
     isOptionalFiniteNumber(summary.packetFormat) &&
     isOptionalFiniteNumber(summary.bestLapTimeMs) &&
+    isOptionalFiniteNumber(summary.firstLapMs) &&
     isOptionalBoolean(summary.isOnline) &&
     isOptionalBoolean(summary.isAutoSave)
   );

@@ -8,7 +8,10 @@ import type {
   CompoundLifeStats,
   TrackFuelStats,
 } from "../utils/stats/trackAggregates";
-import { aggregateCompoundLife } from "../utils/stats/trackAggregates";
+import {
+  aggregateCompoundLife,
+  aggregateFuelData,
+} from "../utils/stats/trackAggregates";
 import {
   getBestLapTime,
   getRacePaceLapSamples,
@@ -217,19 +220,13 @@ export function buildTrackRaceRecommendation(
   );
   const hasEvidence = recommended != null || wetStrategies.length > 0;
 
-  // ── Fuel target (single line) ────────────────────────────────────────────
-  const fuelTarget: TrackFuelTarget | null = bucketFuelStats
-    ? {
-        recommendedDeltaLaps: bucketFuelStats.avgRecommendedFuelLaps,
-        recommendedFuelKg: bucketFuelStats.avgRecommendedFuelKg,
-        burnRateKgPerLap: bucketFuelStats.p75BurnRateKgPerLap,
-        excessAtFinishLaps: bucketFuelStats.avgExcessAtFinishLaps,
-        eligibleAttemptCount: bucketFuelStats.eligibleAttemptCount,
-        consecutiveGreenPairCount: bucketFuelStats.consecutiveGreenPairCount,
-        completedRaceCount: bucketFuelStats.completedRaceCount,
-        confidence: bucketFuelStats.confidence,
-      }
-    : null;
+  // ── Fuel targets ─────────────────────────────────────────────────────────
+  // The bucket's fuel stats are the dry plan; wet laps get their own, since
+  // Inters burn more per lap and a wet race would skew the dry load.
+  const fuelTarget = toFuelTarget(bucketFuelStats);
+  const wetFuelTarget = toFuelTarget(
+    aggregateFuelData(bucketRaceSessions, "wet"),
+  );
 
   // ── Since last race here ────────────────────────────────────────────────
   let sinceLastRace: TrackSinceLastRaceDelta | null = null;
@@ -260,6 +257,23 @@ export function buildTrackRaceRecommendation(
     alternative,
     wetStrategies,
     fuelTarget,
+    wetFuelTarget,
     sinceLastRace,
   };
+}
+
+function toFuelTarget(stats: TrackFuelStats | null): TrackFuelTarget | null {
+  return stats
+    ? {
+        recommendedDeltaLaps: stats.avgRecommendedFuelLaps,
+        recommendedFuelKg: stats.avgRecommendedFuelKg,
+        burnRateKgPerLap: stats.burnRateKgPerLap,
+        startLapBurnKg: stats.startLapBurnKg,
+        excessAtFinishLaps: stats.avgExcessAtFinishLaps,
+        eligibleAttemptCount: stats.eligibleAttemptCount,
+        consecutiveGreenPairCount: stats.consecutiveGreenPairCount,
+        completedRaceCount: stats.completedRaceCount,
+        confidence: stats.confidence,
+      }
+    : null;
 }

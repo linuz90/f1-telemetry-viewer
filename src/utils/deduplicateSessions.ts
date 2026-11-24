@@ -37,9 +37,14 @@ import type { SessionSummary } from "../types/telemetry";
  *       AND
  *         valid lap count >= the auto-save's (at least as many laps)
  *     A *regular* (manual) save is never hidden by this rule — manual
- *     saves are intentional and we always show them. If only auto-saves
- *     exist in a bucket, we keep the latest one (by date) and hide the
- *     earlier auto-saves it dominates.
+ *     saves are intentional and we always show them. When no regular save
+ *     of a run exists in the bucket, we keep its latest auto-save (by date)
+ *     and hide the earlier auto-saves it dominates.
+ *
+ *     An auto-save of a *separate* run (a restart: its first lap differs
+ *     from the other save's, see `firstLapMs`) with 3+ valid laps is never
+ *     dominated: it is its own session, and the track's race plan reads its
+ *     laps (fuel burn, tyre wear). Shorter restarts stay hidden as clutter.
  *
  * Each hidden save bumps the surviving session's `duplicateCount`, which
  * powers the `DuplicateNotice` in the session detail page, and lands in its
@@ -173,11 +178,27 @@ function applyTimeWindowRule<T extends WithFileSize>(
  * earlier snapshot on both axes).
  */
 function dominates<T extends WithFileSize>(x: T, y: T): boolean {
+  if (isSeparateRun(x, y)) return false;
   // Treat missing best-lap as "infinity" so a session without any timed
   // lap can't dominate one that has a recorded best.
   const xBest = x.bestLapTimeMs ?? Number.POSITIVE_INFINITY;
   const yBest = y.bestLapTimeMs ?? Number.POSITIVE_INFINITY;
   return xBest <= yBest && x.validLapCount >= y.validLapCount;
+}
+
+/** Valid laps from which a separate run's auto-save stays listed. */
+const MIN_SEPARATE_RUN_LAPS = 3;
+
+/** True when auto-save `y` is a run of its own rather than a snapshot of
+ *  `x`'s: both know their first lap and it differs. Summaries without it
+ *  (Pits n' Giggles' own) keep the older behaviour. */
+function isSeparateRun<T extends WithFileSize>(x: T, y: T): boolean {
+  return (
+    y.validLapCount >= MIN_SEPARATE_RUN_LAPS &&
+    x.firstLapMs != null &&
+    y.firstLapMs != null &&
+    x.firstLapMs !== y.firstLapMs
+  );
 }
 
 function applyAutoSaveDominanceRule<T extends WithFileSize>(
@@ -226,23 +247,27 @@ function applyAutoSaveDominanceRule<T extends WithFileSize>(
       if (!candidate.isAutoSave) continue;
 
       const candidateTime = new Date(candidate.date).getTime();
+      const hasRegularForRun =
+        hasRegular &&
+        bucket.some((s) => !s.isAutoSave && !isSeparateRun(s, candidate));
 
       // Build the eligibility filter for dominators.
       //
-      // * If the bucket contains a regular save, only regular saves are
-      //   allowed to dominate. Manual saves are the canonical record, so
-      //   we don't want one auto-save to remove another while a manual
-      //   save is doing that job; the manual save will get whichever
+      // * If the bucket contains a regular save of this run, only regular
+      //   saves are allowed to dominate. Manual saves are the canonical
+      //   record, so we don't want one auto-save to remove another while a
+      //   manual save is doing that job; the manual save will get whichever
       //   auto-saves it actually dominates.
-      // * Otherwise (auto-saves only), an auto-save can only be dominated
-      //   by a *later* auto-save. This implements the "keep the latest"
-      //   tiebreak: walking newest-first, an older auto-save sees the
-      //   newer one as its dominator, but the newest one finds nothing
-      //   newer than itself and therefore survives.
+      // * Otherwise, an auto-save can only be dominated by a *later*
+      //   auto-save. This implements the "keep the latest" tiebreak:
+      //   walking newest-first, an older auto-save sees the newer one as its
+      //   dominator, but the newest one finds nothing newer than itself and
+      //   therefore survives.
       const isEligible = (other: T) => {
         if (other === candidate || removed.has(other)) return false;
         if (!dominates(other, candidate)) return false;
-        if (hasRegular) return !other.isAutoSave;
+        if (!other.isAutoSave) return true;
+        if (hasRegularForRun) return false;
         return new Date(other.date).getTime() > candidateTime;
       };
 
