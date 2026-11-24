@@ -29,7 +29,7 @@ What the pace, tyre, fuel and strategy numbers mean, and the modelling choices b
 ## Fuel
 
 - Session pages are retrospective: lead with the game's signed lap-margin estimate at the finish or last captured lap. Never turn one session into a future-load recommendation or present the game estimate as physical range.
-- Actionable initial-fuel targets belong on the track page, from same-distance, UID-independent evidence, pooled P75 burn, and confidence.
+- Actionable initial-fuel targets belong on the track page, from same-distance, UID-independent evidence and confidence, dry and wet laps apart (Inters burn ~7% more) and only the runs within 30 days of the newest once they pass the gate (burn at a circuit drifts by several percent between months). One run of 12 green laps is enough. The target reaches the flag on the 0.2 kg unburnable reserve in a clean race: lap 1 at its own median burn, later green laps at the pooled median, turned into slider laps at the game's own kg per lap (3-11% above the real burn in F1 26). The only margin is a thin-sample allowance: about 0.45 laps over 35 with one run, 0.3 with two, none from six. Burn moves ~1.5% from night to night, half a lap over 35, and the player covers a heavy race with lift and coast; `aggregateFuelData()` in `src/utils/stats/trackAggregates.ts` holds the backtest behind it.
 
 ## Strategy
 

@@ -11,6 +11,10 @@ export interface SessionSummary {
   sessionUid?: string;
   date: string;
   validLapCount: number;
+  /** The focus driver's first timed lap, ms. Saves of one on-track run share
+   *  it to the millisecond, so dedupe tells a later run's save from a
+   *  snapshot of the same run. Pits n' Giggles' own summaries omit it. */
+  firstLapMs?: number;
   lapIndicators?: ("valid" | "invalid" | "best")[];
   bestLapTime?: string;
   bestLapTimeMs?: number;

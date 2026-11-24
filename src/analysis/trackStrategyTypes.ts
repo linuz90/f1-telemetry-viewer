@@ -80,13 +80,15 @@ export interface TrackFuelTarget {
   recommendedDeltaLaps: number;
   /** Recommended total fuel load (kg) the delta translates to */
   recommendedFuelKg: number;
-  /** Pooled p75 consecutive green-flag burn rate, kg/lap */
+  /** Median green-lap burn after lap 1, kg/lap */
   burnRateKgPerLap: number;
-  /** Average projected excess at finish (laps). Positive = over-fueling. */
+  /** Lap-1 burn from the grid, kg */
+  startLapBurnKg: number;
+  /** Average laps each start sat above the target. Positive = over-fuelling. */
   excessAtFinishLaps: number;
   /** Number of independently eligible attempts in the sample */
   eligibleAttemptCount: number;
-  /** Consecutive green-flag fuel pairs behind the p75 burn estimate. */
+  /** Green laps behind the median burn estimate. */
   consecutiveGreenPairCount: number;
   /** Contributing attempts classified as FINISHED. */
   completedRaceCount: number;
@@ -120,7 +122,10 @@ export interface TrackRaceRecommendation {
    *  first. Separate from the dry ranking because rain intensity, not lap
    *  time, decides between them. */
   wetStrategies: TrackStrategySuggestion[];
+  /** Dry laps only: the plan above is a dry plan. */
   fuelTarget: TrackFuelTarget | null;
+  /** The same target from Inters and Wets laps. */
+  wetFuelTarget: TrackFuelTarget | null;
   sinceLastRace: TrackSinceLastRaceDelta | null;
 }
 

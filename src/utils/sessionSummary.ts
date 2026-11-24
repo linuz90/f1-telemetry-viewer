@@ -60,7 +60,8 @@ export interface BuiltSessionSummary {
 // 12: race summaries carry the player's stints lap by lap (`stintLaps`), with
 // each stint's best valid lap, and setup, for stint comparison. (10 and 11
 // were this work in progress.)
-export const SESSION_SUMMARY_CACHE_VERSION = 12;
+// 13: summaries carry `firstLapMs`, so dedupe keeps separate runs listed.
+export const SESSION_SUMMARY_CACHE_VERSION = 13;
 
 function getDrivers(session: TelemetrySession | undefined): DriverData[] {
   return session?.["classification-data"] ?? [];
@@ -612,6 +613,7 @@ export function buildSessionSummary(
       : {};
 
   let validLapCount = 0;
+  let firstLapMs: number | undefined;
   let lapIndicators: ("valid" | "invalid" | "best")[] | undefined;
   let bestLapTime: string | undefined;
   let bestLapTimeMs: number | undefined;
@@ -619,6 +621,9 @@ export function buildSessionSummary(
   if (focusDriver) {
     const laps = focusDriver["session-history"]?.["lap-history-data"] ?? [];
     validLapCount = laps.filter(hasCompleteLapTiming).length;
+    firstLapMs = laps.find((lap) => lap["lap-time-in-ms"] > 0)?.[
+      "lap-time-in-ms"
+    ];
 
     if (
       isQualifyingSessionType(parsed.sessionType) ||
@@ -706,6 +711,7 @@ export function buildSessionSummary(
           : undefined,
       sessionUid,
       validLapCount,
+      firstLapMs,
       lapIndicators,
       bestLapTime,
       bestLapTimeMs,
