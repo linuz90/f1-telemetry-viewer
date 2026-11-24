@@ -1,4 +1,4 @@
-import { ArrowRight, CircleOff } from "lucide-react";
+import { ArrowRight, CircleOff, ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Link,
@@ -18,6 +18,7 @@ import {
   isInFamily,
   isSoloSelection,
   LAP_TELEMETRY_ANCHOR,
+  lapAnalyzerUrl,
   lapRefKey,
   LAPS_QUERY_PARAM,
   manifestCandidates,
@@ -69,6 +70,11 @@ export type LapTelemetryScope =
       formulaKey: string;
       sessionKind: TrackSessionKind;
     };
+
+// Set only by the Pits n' Giggles build; the standalone app has no lap analyzer.
+const LAP_ANALYZER_URL = import.meta.env.VITE_LAP_ANALYZER_URL as
+  | string
+  | undefined;
 
 function SectionShell({ children }: { children: ReactNode }) {
   return (
@@ -425,6 +431,8 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
     [slots],
   );
 
+  const analyzerUrl = lapAnalyzerUrl(selected, LAP_ANALYZER_URL);
+
   const writeSelection = (next: readonly LapCandidate[]) => {
     // Built by hand so refs stay readable (`slug~21~1,slug~21~1`):
     // URLSearchParams would percent-encode every `~` and `,`. Dropping the
@@ -552,6 +560,19 @@ export function LapTelemetrySection({ scope }: { scope: LapTelemetryScope }) {
       <SectionHeader
         title="Lap telemetry"
         hint="Recorded laps, aligned by distance"
+        action={
+          analyzerUrl && (
+            <a
+              href={analyzerUrl}
+              target="_blank"
+              rel="noopener"
+              className={buttonVariants({ variant: "secondary", size: "sm" })}
+            >
+              Open in Lap Analyzer
+              <ExternalLink className="size-3.5" />
+            </a>
+          )
+        }
       />
 
       <LapChips
