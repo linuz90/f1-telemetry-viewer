@@ -2,7 +2,11 @@ import { cardSurface } from "../ui/surfaces";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
-import type { SessionLogDay, SessionLogGroup } from "../../analysis/sessionLog";
+import type {
+  SessionLogDay,
+  SessionLogGroup,
+  SessionLogTrack,
+} from "../../analysis/sessionLog";
 import { sessionBestLapMs } from "../../analysis/sessionLog";
 import { sessionRowLabel, summaryKind } from "../../analysis/sessionKind";
 import type { SessionSummary } from "../../types/telemetry";
@@ -221,11 +225,48 @@ function OfflineGroup({
   );
 }
 
+function TrackName({ track }: { track: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 font-medium text-tone-200">
+      <TrackFlag track={track} />
+      {getTrackDisplayName(track)}
+    </span>
+  );
+}
+
+function TrackGroups({
+  track,
+  isPb,
+  expandOffline,
+}: {
+  track: SessionLogTrack;
+  isPb: (s: SessionSummary) => boolean;
+  expandOffline: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      {track.groups.map((group) =>
+        group.online ? (
+          <OnlineGroup key={group.key} group={group} isPb={isPb} />
+        ) : (
+          <OfflineGroup
+            key={`${group.key}:${expandOffline}`}
+            group={group}
+            isPb={isPb}
+            defaultOpen={expandOffline}
+          />
+        ),
+      )}
+    </div>
+  );
+}
+
 /**
- * The session log: days newest first, each day's online event as one block and
- * the offline runs folded into a practice group. Renders a couple of weeks at
- * a time and keeps growing as you scroll. `expandOffline` opens the practice
- * groups, for a log already filtered to one kind of session.
+ * The session log: days newest first, split by circuit, each circuit's online
+ * event as one block and its offline runs folded into a practice group.
+ * Renders a couple of weeks at a time and keeps growing as you scroll.
+ * `expandOffline` opens the practice groups, for a log already filtered to one
+ * kind of session.
  */
 export function SessionLog({
   days,
@@ -271,40 +312,39 @@ export function SessionLog({
         <span />
       </div>
       {shown.map((day) => {
-        const tracks = [...new Set(day.groups.map((g) => g.trackId))];
+        // A one-circuit day names it in the day header; a day across several
+        // gives each circuit its own heading over its sessions.
+        const single = day.tracks.length === 1 ? day.tracks[0] : undefined;
         return (
           <section key={day.key}>
             <h3 className="mb-2 flex items-baseline gap-2 border-b border-tone-800 px-0.5 pb-2 text-sm">
               <b className="font-semibold text-tone-50">
                 {formatDayLabel(day.key)}
               </b>
-              {tracks.map((trackId) => {
-                const group = day.groups.find((g) => g.trackId === trackId)!;
-                return (
-                  <span
-                    key={trackId}
-                    className="inline-flex items-center gap-1.5 text-tone-200"
-                  >
-                    <TrackFlag track={group.track} />
-                    {getTrackDisplayName(group.track)}
-                  </span>
-                );
-              })}
+              {single && <TrackName track={single.track} />}
             </h3>
-            <div className="space-y-2">
-              {day.groups.map((group) =>
-                group.online ? (
-                  <OnlineGroup key={group.key} group={group} isPb={isPb} />
-                ) : (
-                  <OfflineGroup
-                    key={`${group.key}:${expandOffline}`}
-                    group={group}
-                    isPb={isPb}
-                    defaultOpen={expandOffline}
-                  />
-                ),
-              )}
-            </div>
+            {single ? (
+              <TrackGroups
+                track={single}
+                isPb={isPb}
+                expandOffline={expandOffline}
+              />
+            ) : (
+              <div className="space-y-5">
+                {day.tracks.map((track) => (
+                  <div key={track.trackId}>
+                    <h4 className="mb-1.5 px-0.5 text-sm">
+                      <TrackName track={track.track} />
+                    </h4>
+                    <TrackGroups
+                      track={track}
+                      isPb={isPb}
+                      expandOffline={expandOffline}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         );
       })}

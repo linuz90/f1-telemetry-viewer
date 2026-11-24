@@ -149,7 +149,13 @@ function SessionsMenu() {
   );
   // The last online event stays pinned on top even when practice came after
   // it, since it is the session a driver most often comes back to.
-  const latestOnline = groups.find((group) => group.online);
+  // Groups run by day then circuit, so the newest event is picked by date.
+  let latestOnline: SessionLogGroup | undefined;
+  for (const group of groups) {
+    if (!group.online) continue;
+    if (!latestOnline || group.sessions[0].date > latestOnline.sessions[0].date)
+      latestOnline = group;
+  }
   const recent = groups
     .filter((group) => group !== latestOnline)
     .slice(0, RECENT_GROUPS);
