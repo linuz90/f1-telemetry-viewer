@@ -10,6 +10,7 @@ Page, chart and styling rules for the viewer. Keep this file current when a rule
 - Position changes come from `buildRaceStory()`: a pit cycle nets out once nearby cars have made their matching stop, and a swap that comes back within two laps reads as steady, so chips and headlines never credit a pit cycle or a back-and-forth as places gained.
 - Race pages show no whole-race sector split: it is not actionable. Qualifying keeps its one-lap sector cards.
 - The track Setups tab shows the quali setup (fastest or latest), the race setup and every setup run there, split into Dry and Wet (`sessionConditions()`: wet tyres or rain at save) with a selector when the track has both; each history row opens its full setup. `setupIdentity()` ignores brake bias and fuel, which drivers change mid-session.
+- The session log (`buildSessionLog()`, `SessionLog`) groups each day by circuit: a one-circuit day names it in the day header, a day across several gives each circuit a flag-and-name heading over its online event and practice group, so every card sits under its track.
 - `/ui-debug` is a dev-only page of UI fixtures (`src/pages/UiDebugPage.tsx`).
 - `src/components/ui/pageTabs.ts` owns the sticky tab bar shared by session and track pages and its tab-switch scroll. A sticky element or scroll target inside a tab panel takes its offset from there so it clears the stuck bar.
 

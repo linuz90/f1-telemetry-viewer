@@ -3,7 +3,7 @@ import { getTrackId } from "../utils/tracks";
 import { summaryKind, type SessionKind } from "./sessionKind";
 
 /**
- * The session log groups saves the way a driver remembers them: by day and
+ * The session log groups saves the way a driver remembers them: by day, then
  * circuit, the online event (quali → race) as one block, everything offline
  * (practice quali runs, long runs, time trials) folded into one group with a
  * summary line. Pure model; `SessionLog` renders it.
@@ -12,6 +12,16 @@ import { summaryKind, type SessionKind } from "./sessionKind";
 export interface SessionLogDay {
   /** YYYY-MM-DD from the save timestamp (local game-PC time, no zone). */
   key: string;
+  /** The day's circuits, the one driven most recently first. */
+  tracks: SessionLogTrack[];
+  /** Every group in display order (`tracks` flattened). */
+  groups: SessionLogGroup[];
+}
+
+export interface SessionLogTrack {
+  trackId: string;
+  track: string;
+  /** The online event first, then the offline group. */
   groups: SessionLogGroup[];
 }
 
@@ -107,16 +117,30 @@ export function buildSessionLog(sessions: SessionSummary[]): SessionLogDay[] {
   }
 
   return [...days.entries()].map(([key, groups]) => {
-    const list = [...groups.values()];
+    const tracks = new Map<string, SessionLogTrack>();
+    // Groups arrive newest first, so each circuit's first group dates it.
+    const list = [...groups.values()].sort((a, b) =>
+      b.sessions[0].date.localeCompare(a.sessions[0].date),
+    );
     for (const group of list) {
       if (!group.online) group.offlineLabel = offlineLabel(group.sessions);
+      let track = tracks.get(group.trackId);
+      if (!track) {
+        track = { trackId: group.trackId, track: group.track, groups: [] };
+        tracks.set(group.trackId, track);
+      }
+      track.groups.push(group);
     }
-    // Online events lead their day; within each half, the most recent first.
-    list.sort((a, b) => {
-      if (a.online !== b.online) return a.online ? -1 : 1;
-      return b.sessions[0].date.localeCompare(a.sessions[0].date);
-    });
-    return { key, groups: list };
+    // The online event leads its circuit.
+    for (const track of tracks.values()) {
+      track.groups.sort((a, b) => Number(b.online) - Number(a.online));
+    }
+    const trackList = [...tracks.values()];
+    return {
+      key,
+      tracks: trackList,
+      groups: trackList.flatMap((track) => track.groups),
+    };
   });
 }
 
